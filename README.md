@@ -117,7 +117,7 @@ file of the folder (`php tests/run.php` checks that `de` and `en` match).
 core/         src/ (Modulento\Core), lang/, migrations/, install/ - no templates
 extensions/   one folder per extension
 lang/         this installation's own wording, see "Languages"
-themes/       default/ (site), admin/ (administration), further site themes
+themes/       default/ and indigo/ (site), admin/ (administration)
 public/       web root: index.php only
 bin/          migrate.php, cron.php, create-admin.php
 .github/      CI and release workflows
@@ -136,6 +136,11 @@ chosen under **Administration → Themes**.
   site theme cannot lock anyone out.
 - A theme overrides an extension's templates by placing files in
   `themes/<theme>/extensions/<extension id>/`.
+- A theme can bring texts of its own (a slogan, the steps on its home page) in
+  `themes/<theme>/lang/<code>.php`, with keys starting `theme.`.
+- `indigo` is a second site theme and shows how little a theme needs: a
+  layout, a home page, two card partials, a stylesheet and its font. Every
+  other page comes from `default` and only looks different.
 
 | Template name | Looked up in |
 |---|---|
@@ -187,6 +192,8 @@ Available in every template:
 | `locale()`, `locale_urls()`, `locale_name(code)` | Current language; the current page in every language (`locale`, `name`, `url`, `absolute_url`, `current`) |
 | `page_links('header' \| 'footer' \| role)` | Published pages for a menu, as `title`/`url` |
 | `latest_offers(limit)` | The newest public offers as cards |
+| `categories()` | The category tree with `name`, `path`, `children` and `offer_count` |
+| `top_providers(limit)` | Public providers, best rated first, as shown on `provider/show.twig` |
 | `registration_open()` | Whether new accounts can be created |
 | `theme_asset(path)`, `admin_asset(path)`, `ext_asset(id, path)` | URL of a file in an `assets/` folder, with cache busting |
 | `csrf_field()`, `csrf_token()` | Required in every `POST` form or AJAX call |

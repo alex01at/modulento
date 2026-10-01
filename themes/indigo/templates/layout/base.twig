@@ -1,0 +1,97 @@
+{% import '_icons.twig' as icons %}
+<!DOCTYPE html>
+<html lang="{{ locale() }}">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}{{ site_name }}{% endblock %}</title>
+    {% for language in locale_urls() %}
+        <link rel="alternate" hreflang="{{ language.locale }}" href="{{ language.absolute_url }}">
+    {% endfor %}
+    <link rel="preload" href="{{ theme_asset('fonts/plus-jakarta-sans-latin.woff2') }}" as="font" type="font/woff2" crossorigin>
+    <link rel="stylesheet" href="{{ theme_asset('theme.css') }}">
+    {% block head %}{% endblock %}
+</head>
+<body class="{% block body_class %}{% endblock %}">
+<a class="skip-link" href="#content">{{ trans('theme.skip') }}</a>
+
+<header class="site-header">
+    <div class="container header-inner">
+        <a class="brand" href="{{ url('/') }}">
+            <span class="brand-mark">{{ icons.icon('logo') }}</span>
+            <span class="brand-name">{{ site_name }}</span>
+        </a>
+
+        <nav class="main-nav" aria-label="{{ trans('core.nav.main') }}">
+            <a href="{{ url('/offers') }}">{{ trans('core.nav.offers') }}</a>
+            <a href="{{ url('/providers') }}">{{ trans('core.nav.providers') }}</a>
+            {% for link in page_links('header') %}
+                <a href="{{ link.url }}">{{ link.title }}</a>
+            {% endfor %}
+        </nav>
+
+        <div class="header-actions">
+            {% if account %}
+                {% if can('core.admin.access') %}
+                    <a href="{{ url('/admin') }}">{{ trans('core.nav.admin') }}</a>
+                {% endif %}
+                <a href="{{ url('/account') }}">{{ trans('core.nav.account') }}</a>
+                <form method="post" action="{{ url('/logout') }}" class="inline-form">
+                    {{ csrf_field() }}
+                    <button type="submit" class="link-button">{{ trans('core.nav.logout') }}</button>
+                </form>
+            {% else %}
+                <a href="{{ url('/login') }}">{{ trans('core.nav.login') }}</a>
+                {% if registration_open() %}
+                    <a class="button" href="{{ url('/register') }}">{{ trans('core.nav.register') }}</a>
+                {% endif %}
+            {% endif %}
+        </div>
+    </div>
+</header>
+
+<main id="content">
+    {% if flashes %}
+        <div class="container flashes">
+            {% for type, message in flashes %}
+                <p class="flash flash-{{ type }}" role="status">{{ message }}</p>
+            {% endfor %}
+        </div>
+    {% endif %}
+    {# A page that brings its own full-width sections replaces "page";
+       every other page only fills "content" and gets the centred column. #}
+    {% block page %}
+        <div class="container page">
+            {% block content %}{% endblock %}
+        </div>
+    {% endblock %}
+</main>
+
+<footer class="site-footer">
+    <div class="container footer-inner">
+        <div class="footer-brand">
+            <span class="brand-mark small">{{ icons.icon('logo') }}</span>
+            <strong>{{ site_name }}</strong>
+            <span>© {{ 'now'|date('Y') }}</span>
+        </div>
+        <nav aria-label="{{ trans('core.nav.footer') }}">
+            {% for link in page_links('footer') %}
+                <a href="{{ link.url }}">{{ link.title }}</a>
+            {% endfor %}
+        </nav>
+        {% set languages = locale_urls() %}
+        {% if languages|length > 1 %}
+            <nav aria-label="{{ trans('core.nav.language') }}" class="language-menu">
+                {% for language in languages %}
+                    {% if language.current %}
+                        <span aria-current="true" lang="{{ language.locale }}">{{ language.name }}</span>
+                    {% else %}
+                        <a href="{{ language.url }}" hreflang="{{ language.locale }}" lang="{{ language.locale }}">{{ language.name }}</a>
+                    {% endif %}
+                {% endfor %}
+            </nav>
+        {% endif %}
+    </div>
+</footer>
+</body>
+</html>

@@ -22,6 +22,17 @@ final class OfferController extends Controller
 
     public function index(array $params): void
     {
+        // A search form with a category select sends its id; the category
+        // then has its own address, so the visitor is sent there.
+        $category = isset($_GET['category']) ? $this->app->categories->find((int) $_GET['category']) : null;
+        $view = $category !== null ? $this->app->categories->view($category, $this->app->translator->locale()) : null;
+
+        if ($view !== null) {
+            $query = http_build_query(array_filter(['q' => trim((string) ($_GET['q'] ?? ''))]));
+            header('Location: ' . $this->app->url($view['path']) . ($query !== '' ? '?' . $query : ''));
+            return;
+        }
+
         $this->renderList(null);
     }
 

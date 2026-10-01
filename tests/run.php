@@ -103,7 +103,7 @@ file_put_contents($langDir . '/pack/de-evil.php', '<?php return [];');
 check('translator: only two-letter codes count as languages', Translator::localesIn($langDir . '/pack') === ['de', 'en', 'fr']);
 
 // Every language folder must have identical keys in all locales.
-foreach ([$root . '/core/lang', ...glob($root . '/extensions/*/lang')] as $langDir) {
+foreach ([$root . '/core/lang', ...glob($root . '/extensions/*/lang'), ...glob($root . '/themes/*/lang')] as $langDir) {
     $de = array_keys(require $langDir . '/de.php');
     $en = array_keys(require $langDir . '/en.php');
     check("lang parity {$langDir}", array_diff($de, $en) === [] && array_diff($en, $de) === []);
@@ -284,6 +284,7 @@ function request(PDO $pdo, array $config, string $method, string $path, int|fals
     $app->router->post('/hook', $handler, Modulento\Core\Support\Router::PUBLIC, csrfExempt: true);
     $app->extensions->loadEnabled($app);
     Modulento\Core\Kernel::registerLast($app);
+    Modulento\Core\Kernel::loadThemeTexts($app);
     $redirect = Modulento\Core\Kernel::prepareRequest($app, $path, startSession: false);
 
     ob_start();
@@ -1155,7 +1156,7 @@ $pdo->exec('DELETE FROM provider');
 // Every key written out in a template or in PHP must exist, or a visitor
 // would read the raw key.
 $knownKeys = [];
-foreach ([$root . '/core/lang/de.php', ...glob($root . '/extensions/*/lang/de.php')] as $file) {
+foreach ([$root . '/core/lang/de.php', ...glob($root . '/extensions/*/lang/de.php'), ...glob($root . '/themes/*/lang/de.php')] as $file) {
     $knownKeys += require $file;
 }
 $missingKeys = [];
@@ -1199,6 +1200,26 @@ foreach ($serviceFlow->states() as $stateName => $definition) {
     }
 }
 check('every language key used exists: ' . implode(', ', array_unique($missingKeys)), $missingKeys === []);
+
+// --- A second site theme ("indigo") --------------------------------------------
+$r = $get('/', null);
+check('default theme: no texts of another theme', $r['status'] === 200 && !str_contains($r['body'], 'theme.hero') && !str_contains($r['body'], 'brand-mark'));
+$pdo->exec("INSERT INTO setting VALUES ('core.theme', 'indigo')");
+$r = $get('/', null);
+check('indigo: home page with its own texts, in German', $r['status'] === 200 && str_contains($r['body'], 'class="hero"') && str_contains($r['body'], 'Finde den passenden Freelancer')
+    && str_contains($r['body'], 'In drei Schritten zum Ergebnis') && preg_match('/[> "]theme\.[a-z_.]+[<" ]/', $r['body']) === 0);
+check('indigo: home page in English', str_contains($get('/en', null)['body'], 'Find the right freelancer') && str_contains($get('/en', null)['body'], 'action="/en/offers"'));
+check('indigo: nothing inline and nothing from other hosts', preg_match('/\sstyle="|<style|<script|onclick=|https?:\/\/(?!example\.test)/', $r['body']) === 0);
+$r = $get('/login', null);
+check('indigo: a page it does not bring comes from default, inside its layout', $r['status'] === 200 && str_contains($r['body'], 'brand-mark') && str_contains($r['body'], 'name="password"'));
+check('indigo: stylesheet and font are served from the theme', str_contains($get('/assets/theme/theme.css', null)['body'], 'Plus Jakarta Sans') && $get('/assets/theme/fonts/plus-jakarta-sans-latin.woff2', null)['status'] === 200);
+$post('/admin/categories/new', ['text' => ['de' => ['name' => 'Texte', 'slug' => ''], 'en' => ['name' => '', 'slug' => '']]], 3);
+$textId = (int) $pdo->query("SELECT category_id FROM category_translation WHERE slug = 'texte'")->fetchColumn();
+$r = $get('/', null);
+check('indigo: home lists categories with their number of offers', str_contains($r['body'], 'href="/categories/texte"') && str_contains($r['body'], '0 Angebote') && str_contains($r['body'], '<option value="' . $textId . '">Texte</option>'));
+check('search with a category chosen leads to the category\'s own address', ($get('/offers?category=' . $textId . '&q=logo', null)['body'] ?? '') === '' && $get('/categories/texte?q=logo', null)['status'] === 200);
+$pdo->exec('DELETE FROM category');
+$pdo->exec("DELETE FROM setting WHERE name = 'core.theme'");
 
 // --- Router: rest-of-path parameter --------------------------------------
 $r = request($pdo, $config, 'GET', '/assets/theme/theme.css', null);

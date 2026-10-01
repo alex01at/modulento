@@ -6,8 +6,7 @@ namespace Modulento\Core\Controller;
 
 use Modulento\Core\Catalogue\OfferView;
 use Modulento\Core\Event\ProviderStatusChanged;
-use Modulento\Core\Provider\Providers;
-use Modulento\Core\Review\Reviews;
+use Modulento\Core\Provider\ProviderView;
 use Modulento\Core\Review\ReviewView;
 use Modulento\Core\Support\Countries;
 use Modulento\Core\Support\Session;
@@ -57,7 +56,7 @@ final class ProviderController extends Controller
         $list = $this->app->providers->list(null, $page, self::PER_PAGE, publicOnly: true);
 
         $this->render('provider/index.twig', [
-            'providers' => array_map(fn (array $row) => $this->publicView($row), $list['rows']),
+            'providers' => ProviderView::all($list['rows'], $this->app),
             'page' => $page,
             'pages' => max(1, (int) ceil($list['total'] / self::PER_PAGE)),
         ]);
@@ -76,42 +75,10 @@ final class ProviderController extends Controller
         $offers = $this->app->offers->listPublic(['provider_id' => (int) $provider['id']], $this->app->translator->locale(), 1, 48);
 
         $this->render('provider/show.twig', [
-            'provider' => $this->publicView($provider),
+            'provider' => ProviderView::of($provider, $this->app),
             'offers' => OfferView::cards($offers['rows'], $this->app),
             'reviews' => ReviewView::all($this->app->reviews->listPublic('provider', (int) $provider['id'], 1, 20)['rows']),
         ]);
-    }
-
-    /**
-     * What a template may show of a provider. A business is identified
-     * with its legal details; of a private person only the name and the
-     * place are public.
-     */
-    private function publicView(array $provider): array
-    {
-        $text = Providers::text($provider, $this->app->translator->locale(), $this->app->locales->default());
-        $isBusiness = $provider['type'] === 'business';
-
-        return [
-            'name' => $provider['name'],
-            'slug' => $provider['slug'],
-            'path' => '/providers/' . $provider['slug'],
-            'type' => $provider['type'],
-            'headline' => $text['headline'] ?? '',
-            'description' => $text['description'] ?? '',
-            'city' => $provider['city'],
-            'country' => $provider['country'],
-            'rating' => Reviews::summary($provider),
-            'legal' => $isBusiness ? [
-                'legal_name' => $provider['legal_name'],
-                'street' => $provider['street'],
-                'postal_code' => $provider['postal_code'],
-                'contact_email' => $provider['contact_email'],
-                'phone' => $provider['phone'],
-                'vat_id' => $provider['vat_id'],
-                'company_register' => $provider['company_register'],
-            ] : null,
-        ];
     }
 
     private function renderForm(?array $provider, array $errors, ?array $stored = null): void
