@@ -78,7 +78,11 @@ final class AdminController extends Controller
 
         $this->render('@admin/tasks.twig', [
             'tasks' => $tasks,
-            'cron_script' => $config['root'] . '/bin/cron.php',
+            // The script is not executable by itself (an upload does not keep
+            // that flag), it has to be handed to PHP. PHP_BINDIR is where
+            // the PHP version serving this page keeps its command line
+            // binary, which avoids an older default "php" on the host.
+            'cron_command' => PHP_BINDIR . '/php ' . $config['root'] . '/bin/cron.php',
             'cron_url' => $config['cron_token'] !== '' ? $config['url'] . '/cron/' . $config['cron_token'] : null,
         ]);
     }

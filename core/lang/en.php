@@ -93,7 +93,7 @@ return [
     'core.admin.themes.title' => 'Themes',
     'core.admin.themes.intro' => 'A theme is a folder below themes/. It decides how the website looks; the administration has its own fixed theme. Whatever a theme does not bring itself comes from "default".',
     'core.admin.themes.activated' => 'Theme "{id}" is now active.',
-    'core.admin.tasks.setup_script' => 'In the hosting panel, create a scheduled task that runs this PHP script every minute:',
+    'core.admin.tasks.setup_script' => 'In the hosting panel, create a scheduled task that runs this command every minute (with "php" in front, the script cannot be started on its own):',
     'core.admin.tasks.setup_url' => 'If the panel can only call addresses, have it call this address every minute instead (keep it secret):',
     'core.update.migrations_title' => 'Database updates',
     'core.update.migrations_hint' => 'After an update this happens by itself. The button is for the case that an extension was replaced by a newer copy over FTP.',

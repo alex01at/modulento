@@ -34,7 +34,7 @@ Two rules shape everything:
    database and writes `.env`. After that it is no longer reachable.
 5. Scheduled tasks need a trigger every minute. **Administration → Tasks**
    shows both ways: a scheduled task in the hosting panel that runs
-   `bin/cron.php`, or - where the panel can only call addresses - a secret
+   `php bin/cron.php`, or - where the panel can only call addresses - a secret
    URL.
 
 ## Developing

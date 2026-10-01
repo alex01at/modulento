@@ -93,7 +93,7 @@ return [
     'core.admin.themes.title' => 'Themes',
     'core.admin.themes.intro' => 'Ein Theme ist ein Ordner unter themes/. Es bestimmt das Aussehen der Website; die Verwaltung hat ihr eigenes, festes Theme. Was ein Theme nicht selbst mitbringt, kommt aus „default“.',
     'core.admin.themes.activated' => 'Theme „{id}“ ist jetzt aktiv.',
-    'core.admin.tasks.setup_script' => 'Im Hosting-Panel eine geplante Aufgabe anlegen, die jede Minute dieses PHP-Skript ausführt:',
+    'core.admin.tasks.setup_script' => 'Im Hosting-Panel eine geplante Aufgabe anlegen, die jede Minute diesen Befehl ausführt (mit „php“ davor, das Skript allein lässt sich nicht starten):',
     'core.admin.tasks.setup_url' => 'Kann das Panel nur Adressen aufrufen, stattdessen jede Minute diese Adresse aufrufen lassen (geheim halten):',
     'core.update.migrations_title' => 'Datenbank-Aktualisierungen',
     'core.update.migrations_hint' => 'Nach einem Update läuft das von selbst. Der Knopf ist für den Fall, dass eine Erweiterung per FTP durch eine neuere Fassung ersetzt wurde.',
