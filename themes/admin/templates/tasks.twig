@@ -6,7 +6,7 @@
 <h1>{{ trans('core.admin.tasks.title') }}</h1>
 <p>{{ trans('core.admin.tasks.intro') }}</p>
 <ul>
-    <li>{{ trans('core.admin.tasks.setup_script') }}<br><code>{{ cron_script }}</code></li>
+    <li>{{ trans('core.admin.tasks.setup_script') }}<br><code>{{ cron_command }}</code></li>
     {% if cron_url %}
         <li>{{ trans('core.admin.tasks.setup_url') }}<br><code>{{ cron_url }}</code></li>
     {% endif %}
