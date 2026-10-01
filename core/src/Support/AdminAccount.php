@@ -10,7 +10,7 @@ use PDO;
 final class AdminAccount
 {
     /** Creates the account, or resets its password, and gives it the admin role. */
-    public static function create(PDO $db, string $email, string $password): void
+    public static function create(PDO $db, string $email, string $password, ?string $locale = null): void
     {
         $db->beginTransaction();
 
@@ -27,6 +27,11 @@ final class AdminAccount
              SELECT a.id, r.id FROM account a JOIN role r ON r.name = 'admin' WHERE a.email = :email"
         );
         $stmt->execute(['email' => strtolower(trim($email))]);
+
+        if ($locale !== null) {
+            $stmt = $db->prepare('UPDATE account SET locale = :locale WHERE email = :email');
+            $stmt->execute(['locale' => $locale, 'email' => strtolower(trim($email))]);
+        }
 
         $db->commit();
     }

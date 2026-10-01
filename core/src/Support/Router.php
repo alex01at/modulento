@@ -114,8 +114,11 @@ final class Router
 
         if (!$auth->check()) {
             if ($method === 'GET' && !$this->isAjax()) {
-                Session::set('login_return_to', $_SERVER['REQUEST_URI'] ?? '/');
-                header('Location: /login');
+                // Without the language prefix: after logging in, the
+                // account's own language decides the address.
+                $query = parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_QUERY);
+                Session::set('login_return_to', $this->app->path . ($query ? '?' . $query : ''));
+                header('Location: ' . $this->app->url('/login'));
                 return false;
             }
             $this->fail(403, 'core.error.forbidden');

@@ -54,3 +54,10 @@ button { background: var(--accent); border-color: var(--accent); color: #fff; cu
 
 section { margin-top: 2.5rem; }
 button.danger { background: var(--error); border-color: var(--error); }
+
+.site-footer { display: flex; flex-wrap: wrap; justify-content: space-between; gap: .75rem 2rem; padding: 1rem; border-top: 1px solid var(--line); background: var(--surface); }
+.site-footer nav { display: flex; flex-wrap: wrap; gap: 1rem; }
+.language-menu [aria-current] { font-weight: 700; }
+label.checkbox { display: flex; gap: .5rem; align-items: flex-start; }
+label.checkbox input { margin-top: .3rem; }
+article { overflow-wrap: anywhere; }

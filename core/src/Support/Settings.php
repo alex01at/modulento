@@ -29,8 +29,13 @@ final class Settings
 
     public function set(string $name, string $value): void
     {
+        $exists = $this->db->prepare('SELECT COUNT(*) FROM setting WHERE name = :name');
+        $exists->execute(['name' => $name]);
+
         $stmt = $this->db->prepare(
-            'INSERT INTO setting (name, value) VALUES (:name, :value) ON DUPLICATE KEY UPDATE value = VALUES(value)'
+            (int) $exists->fetchColumn() > 0
+                ? 'UPDATE setting SET value = :value WHERE name = :name'
+                : 'INSERT INTO setting (name, value) VALUES (:name, :value)'
         );
         $stmt->execute(['name' => $name, 'value' => $value]);
         $this->values = null;

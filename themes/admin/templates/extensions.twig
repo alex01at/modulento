@@ -33,12 +33,12 @@
                 </td>
                 <td>
                     {% if extension.enabled %}
-                        <form method="post" action="/admin/extensions/{{ extension.id }}/disable">
+                        <form method="post" action="{{ url('/admin/extensions/' ~ extension.id ~ '/disable') }}">
                             {{ csrf_field() }}
                             <button type="submit">{{ trans('core.admin.extensions.disable') }}</button>
                         </form>
                     {% elseif extension.compatible %}
-                        <form method="post" action="/admin/extensions/{{ extension.id }}/enable">
+                        <form method="post" action="{{ url('/admin/extensions/' ~ extension.id ~ '/enable') }}">
                             {{ csrf_field() }}
                             <button type="submit">{{ trans('core.admin.extensions.enable') }}</button>
                         </form>

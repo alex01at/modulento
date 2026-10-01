@@ -27,12 +27,12 @@
             <pre class="changelog">{{ available.changelog }}</pre>
         {% endif %}
         <p>{{ trans('core.update.apply_hint') }}</p>
-        <form method="post" action="/admin/updates/apply">
+        <form method="post" action="{{ url('/admin/updates/apply') }}">
             {{ csrf_field() }}
             <button type="submit">{{ trans('core.update.apply', {version: available.version}) }}</button>
         </form>
     {% else %}
-        <form method="post" action="/admin/updates/check">
+        <form method="post" action="{{ url('/admin/updates/check') }}">
             {{ csrf_field() }}
             <button type="submit">{{ trans('core.update.check') }}</button>
         </form>
@@ -40,7 +40,7 @@
 {% endif %}
 <h2>{{ trans('core.update.migrations_title') }}</h2>
 <p>{{ trans('core.update.migrations_hint') }}</p>
-<form method="post" action="/admin/updates/migrate">
+<form method="post" action="{{ url('/admin/updates/migrate') }}">
     {{ csrf_field() }}
     <button type="submit">{{ trans('core.update.migrations_run') }}</button>
 </form>

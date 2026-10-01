@@ -7,7 +7,7 @@
 
 <section>
     <h2>{{ trans('core.account.profile.title') }}</h2>
-    <form method="post" action="/account/profile" class="stack-form">
+    <form method="post" action="{{ url('/account/profile') }}" class="stack-form">
         {{ csrf_field() }}
         <label for="display_name">{{ trans('core.account.profile.display_name') }}</label>
         <input id="display_name" name="display_name" value="{{ account.display_name }}" maxlength="100" autocomplete="name">
@@ -15,7 +15,7 @@
         <label for="locale">{{ trans('core.nav.language') }}</label>
         <select id="locale" name="locale">
             {% for code in locales %}
-                <option value="{{ code }}" {{ code == account.locale ? 'selected' }}>{{ trans('core.language.' ~ code) }}</option>
+                <option value="{{ code }}" {{ code == account.locale ? 'selected' }}>{{ locale_name(code) }}</option>
             {% endfor %}
         </select>
 
@@ -26,7 +26,7 @@
 <section>
     <h2>{{ trans('core.account.email.title') }}</h2>
     <p>{{ trans('core.account.email.current', {email: account.email}) }}</p>
-    <form method="post" action="/account/email" class="stack-form">
+    <form method="post" action="{{ url('/account/email') }}" class="stack-form">
         {{ csrf_field() }}
         <label for="new_email">{{ trans('core.account.email.new') }}</label>
         <input id="new_email" name="email" type="email" autocomplete="email" required>
@@ -40,7 +40,7 @@
 
 <section>
     <h2>{{ trans('core.account.password.title') }}</h2>
-    <form method="post" action="/account/password" class="stack-form">
+    <form method="post" action="{{ url('/account/password') }}" class="stack-form">
         {{ csrf_field() }}
         <label for="password_current_password">{{ trans('core.account.current_password') }}</label>
         <input id="password_current_password" name="current_password" type="password" autocomplete="current-password" required>
@@ -58,7 +58,7 @@
 <section>
     <h2>{{ trans('core.account.export.title') }}</h2>
     <p>{{ trans('core.account.export.intro') }}</p>
-    <p><a href="/account/export">{{ trans('core.account.export.download') }}</a></p>
+    <p><a href="{{ url('/account/export') }}">{{ trans('core.account.export.download') }}</a></p>
 </section>
 
 <section>
@@ -67,7 +67,7 @@
         <p>{{ trans('core.account.delete.last_admin') }}</p>
     {% else %}
         <p>{{ trans('core.account.delete.intro') }}</p>
-        <form method="post" action="/account/delete" class="stack-form">
+        <form method="post" action="{{ url('/account/delete') }}" class="stack-form">
             {{ csrf_field() }}
             <label for="delete_current_password">{{ trans('core.account.current_password') }}</label>
             <input id="delete_current_password" name="current_password" type="password" autocomplete="current-password" required>

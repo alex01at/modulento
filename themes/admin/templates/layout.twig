@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="{{ locale }}">
+<html lang="{{ locale() }}">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -10,10 +10,15 @@
 </head>
 <body>
 <header class="site-header">
-    <a class="site-name" href="/admin">{{ site_name }} – {{ trans('core.admin.title') }}</a>
+    <a class="site-name" href="{{ url('/admin') }}">{{ site_name }} – {{ trans('core.admin.title') }}</a>
     <nav aria-label="{{ trans('core.nav.home') }}">
-        <a href="/">{{ trans('core.nav.to_site') }}</a>
-        <form method="post" action="/logout" class="inline-form">
+        <a href="{{ url('/') }}">{{ trans('core.nav.to_site') }}</a>
+        {% for language in locale_urls() %}
+            {% if not language.current %}
+                <a href="{{ language.url }}" hreflang="{{ language.locale }}" lang="{{ language.locale }}">{{ language.name }}</a>
+            {% endif %}
+        {% endfor %}
+        <form method="post" action="{{ url('/logout') }}" class="inline-form">
             {{ csrf_field() }}
             <button type="submit" class="link-button">{{ trans('core.nav.logout') }}</button>
         </form>
@@ -27,7 +32,7 @@
     <div class="admin">
         <nav class="admin-menu" aria-label="{{ trans('core.nav.admin') }}">
             {% for item in admin_menu %}
-                <a href="{{ item.path }}">{{ trans(item.label_key) }}</a>
+                <a href="{{ url(item.path) }}">{{ trans(item.label_key) }}</a>
             {% endfor %}
         </nav>
         <section class="admin-content">

@@ -17,16 +17,51 @@ final class RegistrationController extends Controller
 
     public function showRegister(array $params): void
     {
-        if ($this->app->auth->check()) {
+        if ($this->app->auth->check() || !$this->registrationOpen()) {
             $this->redirect('/');
             return;
         }
 
-        $this->render('auth/register.twig', ['errors' => [], 'email' => '', 'min_length' => PasswordPolicy::MIN_LENGTH]);
+        $this->renderRegister([], '');
+    }
+
+    private function registrationOpen(): bool
+    {
+        return $this->app->settings->get('core.registration', 'open') === 'open';
+    }
+
+    /** The terms and the privacy policy, as far as they are published - each must then be accepted. */
+    private function legalLinks(): array
+    {
+        $locale = $this->app->translator->locale();
+        $links = [];
+        foreach (['terms', 'privacy'] as $role) {
+            $page = $this->app->pages->links($role, $locale)[0] ?? null;
+            if ($page !== null) {
+                $links[$role] = ['title' => $page['title'], 'url' => $this->app->url($page['path'])];
+            }
+        }
+
+        return $links;
+    }
+
+    private function renderRegister(array $errors, string $email): void
+    {
+        $this->render('auth/register.twig', [
+            'errors' => $errors,
+            'email' => $email,
+            'min_length' => PasswordPolicy::MIN_LENGTH,
+            'legal' => $this->legalLinks(),
+        ]);
     }
 
     public function register(array $params): void
     {
+        if (!$this->registrationOpen()) {
+            $this->redirect('/');
+            return;
+        }
+
         $email = Accounts::normalizeEmail((string) ($_POST['email'] ?? ''));
         $password = (string) ($_POST['password'] ?? '');
         $errors = [];
@@ -40,19 +75,23 @@ final class RegistrationController extends Controller
         } elseif ($password !== (string) ($_POST['password_repeat'] ?? '')) {
             $errors[] = $this->trans('core.password.mismatch');
         }
+        $mustAccept = $this->legalLinks() !== [];
+        if ($mustAccept && !isset($_POST['accept_terms'])) {
+            $errors[] = $this->trans('core.register.error.terms');
+        }
         if ($errors === [] && (new RateLimiter($this->app->db))->hit('register', $_SERVER['REMOTE_ADDR'] ?? 'unknown', 10, 3600)) {
             $errors[] = $this->trans('core.error.too_many_requests');
         }
 
         if ($errors !== []) {
-            $this->render('auth/register.twig', ['errors' => $errors, 'email' => $email, 'min_length' => PasswordPolicy::MIN_LENGTH]);
+            $this->renderRegister($errors, $email);
             return;
         }
 
         // A field no person sees or fills in. A bot that does gets the same
         // answer as everyone else and no account.
         if ((string) ($_POST['website'] ?? '') === '') {
-            $this->createOrNotify($email, $password);
+            $this->createOrNotify($email, $password, $mustAccept);
         }
 
         // The same answer whether or not the address was known, so this
@@ -61,12 +100,12 @@ final class RegistrationController extends Controller
         $this->redirect('/login');
     }
 
-    private function createOrNotify(string $email, string $password): void
+    private function createOrNotify(string $email, string $password, bool $termsAccepted): void
     {
         $existing = $this->app->accounts->findByEmail($email);
 
         if ($existing === null) {
-            $accountId = $this->app->accounts->create($email, $password, $this->app->translator->locale(), verified: false);
+            $accountId = $this->app->accounts->create($email, $password, $this->app->translator->locale(), verified: false, termsAccepted: $termsAccepted);
             AuthController::sendVerification($this->app, $accountId, $email);
             $this->app->events->dispatch(new AccountRegistered($accountId));
             return;
@@ -80,8 +119,8 @@ final class RegistrationController extends Controller
             AuthController::sendVerification($this->app, (int) $existing['id'], $email);
         } else {
             $this->app->mailer->send($email, 'emails/already_registered.txt.twig', [
-                'login_link' => $this->app->config['app']['url'] . '/login',
-                'reset_link' => $this->app->config['app']['url'] . '/forgot-password',
+                'login_link' => $this->app->url('/login', absolute: true),
+                'reset_link' => $this->app->url('/forgot-password', absolute: true),
             ]);
         }
     }
@@ -103,7 +142,7 @@ final class RegistrationController extends Controller
         if ($account !== null && $account['status'] === 'active') {
             $token = $this->app->tokens->create((int) $account['id'], Tokens::RESET_PASSWORD, self::RESET_TTL_SECONDS);
             $this->app->mailer->send($account['email'], 'emails/reset_password.txt.twig', [
-                'link' => $this->app->config['app']['url'] . '/reset-password/' . $token,
+                'link' => $this->app->url('/reset-password/' . $token, absolute: true),
                 'minutes' => intdiv(self::RESET_TTL_SECONDS, 60),
             ]);
         }

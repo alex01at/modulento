@@ -67,11 +67,40 @@ $translator = new Translator('de', 'Testseite');
 $translator->load($root . '/core/lang', 'core');
 check('trans placeholder', $translator->trans('core.home.title') === 'Willkommen bei Testseite');
 check('trans unknown key falls back to key', $translator->trans('core.nope') === 'core.nope');
-check('trans rejects foreign prefix', throws(LogicException::class, fn () => $translator->load($root . '/core/lang', 'other')));
-check('locale: german preferred', Translator::detectLocale('de-AT,de;q=0.9,en;q=0.8') === 'de');
-check('locale: quality order', Translator::detectLocale('fr;q=0.9,en;q=0.8,de;q=0.7') === 'en');
-check('locale: unsupported', Translator::detectLocale('fr-FR,fr;q=0.9') === 'en');
-check('locale: missing header', Translator::detectLocale(null) === 'en');
+check('trans rejects foreign prefix', throws(LogicException::class, function () use ($root): void {
+    $wrong = new Translator('de', 'Testseite');
+    $wrong->load($root . '/core/lang', 'other');
+    $wrong->trans('core.home.title');
+}));
+$both = ['de', 'en'];
+check('locale: german preferred', Translator::detectLocale('de-AT,de;q=0.9,en;q=0.8', $both, 'en') === 'de');
+check('locale: quality order', Translator::detectLocale('fr;q=0.9,en;q=0.8,de;q=0.7', $both, 'de') === 'en');
+check('locale: unsupported falls back to the default', Translator::detectLocale('fr-FR,fr;q=0.9', $both, 'de') === 'de');
+check('locale: missing header', Translator::detectLocale(null, $both, 'en') === 'en');
+check('locale: a language that is not offered is skipped', Translator::detectLocale('de,en;q=0.5', ['en'], 'en') === 'en');
+
+// A language pack that is incomplete, and the site's own wording.
+$langDir = sys_get_temp_dir() . '/modulento-test-' . bin2hex(random_bytes(4));
+mkdir($langDir . '/pack', 0777, true);
+mkdir($langDir . '/site');
+file_put_contents($langDir . '/pack/fr.php', "<?php return ['core.nav.login' => 'Connexion'];");
+file_put_contents($langDir . '/pack/de.php', "<?php return ['core.nav.login' => 'Anmelden', 'core.nav.logout' => 'Abmelden'];");
+file_put_contents($langDir . '/pack/en.php', "<?php return ['core.nav.login' => 'Log in', 'core.nav.logout' => 'Log out', 'core.only.english' => 'English only'];");
+file_put_contents($langDir . '/site/de.php', "<?php return ['core.nav.login' => 'Einloggen', 'anything.goes' => 'frei'];");
+$partial = new Translator('fr', 'T');
+$partial->load($langDir . '/pack', 'core');
+$partial->setFallback('de');
+check('translator: text in the current language', $partial->trans('core.nav.login') === 'Connexion');
+check('translator: missing text comes from the default language', $partial->trans('core.nav.logout') === 'Abmelden');
+check('translator: then from English', $partial->trans('core.only.english') === 'English only');
+check('translator: explicit language', $partial->trans('core.nav.login', [], 'en') === 'Log in');
+check('translator: inLocale switches and restores', $partial->inLocale('en', fn () => $partial->trans('core.nav.login')) === 'Log in' && $partial->locale() === 'fr');
+$partial->loadOverrides($langDir . '/site');
+check('translator: the site folder rewords and may add any key', $partial->trans('core.nav.login', [], 'de') === 'Einloggen' && $partial->trans('anything.goes', [], 'de') === 'frei');
+check('translator: languages are found by file', Translator::localesIn($langDir . '/pack') === ['de', 'en', 'fr']);
+file_put_contents($langDir . '/pack/x.php', '<?php return [];');
+file_put_contents($langDir . '/pack/de-evil.php', '<?php return [];');
+check('translator: only two-letter codes count as languages', Translator::localesIn($langDir . '/pack') === ['de', 'en', 'fr']);
 
 // Every language folder must have identical keys in all locales.
 foreach ([$root . '/core/lang', ...glob($root . '/extensions/*/lang')] as $langDir) {
@@ -136,7 +165,10 @@ $pdo = new PDO('sqlite::memory:', null, null, [
     PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
 ]);
 $pdo->exec("CREATE TABLE account (id INTEGER PRIMARY KEY, email TEXT UNIQUE, display_name TEXT, password_hash TEXT, status TEXT,
-    email_verified_at TEXT, locale TEXT, created_at TEXT, last_login_at TEXT)");
+    email_verified_at TEXT, terms_accepted_at TEXT, locale TEXT, created_at TEXT, last_login_at TEXT)");
+$pdo->exec("CREATE TABLE page (id INTEGER PRIMARY KEY, status TEXT, role TEXT UNIQUE, in_header INTEGER, in_footer INTEGER, position INTEGER, created_at TEXT, updated_at TEXT)");
+$pdo->exec("CREATE TABLE page_translation (page_id INTEGER REFERENCES page (id) ON DELETE CASCADE, locale TEXT, title TEXT, slug TEXT,
+    meta_description TEXT, body TEXT, PRIMARY KEY (page_id, locale), UNIQUE (locale, slug))");
 $pdo->exec("CREATE TABLE account_token (id INTEGER PRIMARY KEY, account_id INTEGER REFERENCES account (id) ON DELETE CASCADE,
     purpose TEXT, token_hash TEXT UNIQUE, payload TEXT, expires_at TEXT, created_at TEXT)");
 $pdo->exec("CREATE TABLE rate_limit_attempt (id INTEGER PRIMARY KEY, action TEXT, identifier TEXT, created_at TEXT)");
@@ -147,6 +179,7 @@ $pdo->exec("CREATE TABLE role_permission (role_id INTEGER, permission TEXT)");
 $pdo->exec("CREATE TABLE account_role (account_id INTEGER, role_id INTEGER)");
 $pdo->exec("CREATE TABLE extension (id TEXT PRIMARY KEY, version TEXT, enabled INTEGER)");
 $pdo->exec("CREATE TABLE setting (name TEXT PRIMARY KEY, value TEXT)");
+$pdo->exec("INSERT INTO setting VALUES ('core.languages', 'de,en'), ('core.default_language', 'de')");
 $testHash = password_hash('correct horse battery', PASSWORD_BCRYPT, ['cost' => 4]);
 $insertAccount = $pdo->prepare("INSERT INTO account (id, email, password_hash, status, email_verified_at, locale, created_at) VALUES (?, ?, ?, ?, '2026-01-01 00:00:00', 'de', '2026-01-01 00:00:00')");
 foreach ([[1, 'plain@example.test', 'active'], [2, 'editor@example.test', 'active'], [3, 'admin@example.test', 'active'], [4, 'blocked@example.test', 'blocked']] as [$id, $email, $status]) {
@@ -179,7 +212,7 @@ function lastMail(string $mailLog, string $to): ?array
     return null;
 }
 
-/** @return array{called: bool, status: int, body: string} */
+/** @return array{called: bool, status: int, body: string, redirect: ?string} */
 function request(PDO $pdo, array $config, string $method, string $path, int|false|null $accountId, array $post = []): array
 {
     // $accountId false keeps the session of the previous request, as a
@@ -200,7 +233,7 @@ function request(PDO $pdo, array $config, string $method, string $path, int|fals
     unset($_SERVER['HTTP_X_REQUESTED_WITH'], $_SERVER['HTTP_REFERER']);
     http_response_code(200);
 
-    $app = new Modulento\Core\App($config, $pdo, 'de');
+    $app = new Modulento\Core\App($config, $pdo);
     $app->translator->load($config['app']['root'] . '/core/lang', 'core');
 
     Modulento\Core\Kernel::registerCore($app);
@@ -215,12 +248,16 @@ function request(PDO $pdo, array $config, string $method, string $path, int|fals
     $app->router->post('/save', $handler);
     $app->router->post('/hook', $handler, Modulento\Core\Support\Router::PUBLIC, csrfExempt: true);
     $app->extensions->loadEnabled($app);
+    Modulento\Core\Kernel::registerLast($app);
+    $redirect = Modulento\Core\Kernel::prepareRequest($app, $path, startSession: false);
 
     ob_start();
-    $app->router->dispatch($method, $path);
+    if ($redirect === null) {
+        $app->router->dispatch($method, $app->path);
+    }
     $body = (string) ob_get_clean();
 
-    return ['called' => $called, 'status' => (int) http_response_code(), 'body' => $body];
+    return ['called' => $called, 'status' => (int) http_response_code(), 'body' => $body, 'redirect' => $redirect];
 }
 
 $r = request($pdo, $config, 'GET', '/open', null);
@@ -391,6 +428,116 @@ $pdo->exec("UPDATE account SET created_at = '2020-01-01 00:00:00' WHERE email = 
 check('cleanup: only old unconfirmed registrations are removed', $accounts->deleteUnverifiedOlderThan(7 * 86400) === 1
     && $row('fresh@example.test') !== false && $row('admin@example.test') !== false);
 $pdo->exec("DELETE FROM account WHERE email = 'fresh@example.test'");
+
+// --- Languages in the address ---------------------------------------------
+$locales = fn () => new Modulento\Core\Support\Locales(new Modulento\Core\Support\Settings($pdo), $root . '/core/lang');
+check('locales: default first', $locales()->enabled() === ['de', 'en'] && $locales()->default() === 'de');
+check('locales: no prefix is the default language', $locales()->split('/login') === ['locale' => 'de', 'path' => '/login', 'redirect' => null]);
+check('locales: prefix selects the language', $locales()->split('/en/login') === ['locale' => 'en', 'path' => '/login', 'redirect' => null]);
+check('locales: prefix alone is the home page', $locales()->split('/en')['path'] === '/' && $locales()->split('/en/')['path'] === '/');
+check('locales: default language with prefix redirects to the plain address', $locales()->split('/de/login')['redirect'] === '/login');
+check('locales: an unknown or disabled code is an ordinary path', $locales()->split('/fr/login')['path'] === '/fr/login');
+check('locales: prefix()', $locales()->prefix('/login', 'en') === '/en/login' && $locales()->prefix('/', 'en') === '/en' && $locales()->prefix('/login', 'de') === '/login' && $locales()->prefix('/login', 'fr') === '/login');
+check('locales: a word starting like a code is not a prefix', $locales()->split('/english')['path'] === '/english');
+
+$r = $get('/login', null);
+check('page in the default language', str_contains($r['body'], '<html lang="de">') && str_contains($r['body'], 'action="/login"') && str_contains($r['body'], 'Passwort vergessen'));
+$r = $get('/en/login', null);
+check('page in another language: texts, links and form targets carry the prefix', str_contains($r['body'], '<html lang="en">')
+    && str_contains($r['body'], 'action="/en/login"') && str_contains($r['body'], 'href="/en/register"') && str_contains($r['body'], 'Forgot your password'));
+check('hreflang alternates for every language', str_contains($r['body'], 'hreflang="de" href="https://example.test/login"') && str_contains($r['body'], 'hreflang="en" href="https://example.test/en/login"'));
+check('language menu links to the same page', str_contains($r['body'], '<a href="/login" hreflang="de" lang="de">Deutsch</a>'));
+check('assets are not prefixed', str_contains($r['body'], 'href="/assets/theme/theme.css'));
+check('default language with prefix redirects, query kept', $get('/de/login?x=1', null)['redirect'] === '/login?x=1');
+$r = $get('/en/admin', null);
+check('login redirect remembers the page without prefix', ($_SESSION['login_return_to'] ?? '') === '/admin');
+$r = $get('/en/nowhere/at/all', null);
+check('404 in the visitor\'s language', $r['status'] === 404 && str_contains($r['body'], 'Page not found'));
+
+$post('/en/register', ['email' => 'english@example.test', 'password' => $pw, 'password_repeat' => $pw], null);
+$mail = lastMail($mailLog, 'english@example.test');
+check('mail in the language of the request, link with prefix', $mail['subject'] === 'Please confirm your e-mail address' && str_starts_with($mail['link'], '/en/verify-email/'));
+check('account remembers the language it registered in', $row('english@example.test')['locale'] === 'en');
+$pdo->exec("DELETE FROM account WHERE email = 'english@example.test'");
+
+$pdo->exec("UPDATE setting SET value = 'de' WHERE name = 'core.languages'");
+check('a disabled language is no prefix any more', $get('/en/login', null)['status'] === 404);
+check('with one language there is no language menu', !str_contains($get('/login', null)['body'], 'language-menu'));
+$pdo->exec("UPDATE setting SET value = 'de,en' WHERE name = 'core.languages'");
+
+// --- Pages -----------------------------------------------------------------
+use Modulento\Core\Support\HtmlSanitizer;
+
+check('sanitizer: scripts and handlers are removed', HtmlSanitizer::clean('<p onclick="x()">Hä <b>fett</b></p><script>alert(1)</script>') === '<p>Hä <b>fett</b></p>');
+check('sanitizer: javascript: link loses its target', HtmlSanitizer::clean("<a href=\"java\tscript:alert(1)\">x</a>") === '<a>x</a>');
+check('sanitizer: protocol-relative link loses its target', HtmlSanitizer::clean('<a href="//evil.test">x</a>') === '<a>x</a>');
+check('sanitizer: external link is kept and marked', HtmlSanitizer::clean('<a href="https://a.test/?x=1&y=2" target="_blank">y</a>') === '<a href="https://a.test/?x=1&amp;y=2" rel="noopener noreferrer">y</a>');
+check('sanitizer: unknown elements keep their text', HtmlSanitizer::clean('<div><span style="x">Text</span><img src=x onerror=alert(1)></div><iframe src=x></iframe>') === 'Text');
+check('sanitizer: tables and headings survive, h1 does not', HtmlSanitizer::clean('<h1>T</h1><h2>U</h2><table><tr><td colspan="2" style="a">1</td></tr></table>') === 'T<h2>U</h2><table><tr><td colspan="2">1</td></tr></table>');
+
+use Modulento\Core\Content\Pages;
+
+check('slug: umlauts and punctuation', Pages::slugify(' Über uns & Größe! ') === 'ueber-uns-groesse' && Pages::slugify('Conditions générales') === 'conditions-generales');
+
+$text = fn (string $title, string $body = '<p>Text</p>', string $slug = '') => ['title' => $title, 'slug' => $slug, 'meta_description' => '', 'body' => $body];
+$r = $post('/admin/pages/new', ['status' => 'published', 'role' => 'imprint', 'text' => ['de' => $text('Impressum', '<p>Angaben</p><script>x</script>'), 'en' => $text('')]], 1);
+check('pages: need their permission', $r['status'] === 403 && $pdo->query('SELECT COUNT(*) FROM page')->fetchColumn() == 0);
+$post('/admin/pages/new', ['status' => 'published', 'role' => 'imprint', 'text' => ['de' => $text('Impressum', '<p>Angaben</p><script>x</script>'), 'en' => $text('')]], 3);
+$imprint = $pdo->query("SELECT * FROM page_translation WHERE slug = 'impressum'")->fetch();
+check('pages: saved with slug from the title, body cleaned, only the filled language', $imprint !== false && $imprint['body'] === '<p>Angaben</p>'
+    && $pdo->query('SELECT COUNT(*) FROM page_translation')->fetchColumn() == 1);
+$r = $get('/impressum', null);
+check('pages: shown at their address', $r['status'] === 200 && str_contains($r['body'], '<h1>Impressum</h1>') && str_contains($r['body'], '<p>Angaben</p>'));
+$r = $get('/en/impressum', null);
+check('pages: a language without its own text shows the default one, marked as German', $r['status'] === 200 && str_contains($r['body'], '<article lang="de">') && str_contains($r['body'], '<html lang="en">'));
+check('pages: legal page is in the footer of every language', str_contains($r['body'], '<a href="/en/impressum">Impressum</a>'));
+
+$post('/admin/pages/' . $imprint['page_id'], ['status' => 'published', 'role' => 'imprint', 'text' => ['de' => $text('Impressum', '<p>Angaben</p>', 'impressum'), 'en' => $text('Imprint', '<p>Details</p>')]], 3);
+$r = $get('/en/imprint', null);
+check('pages: translated text and slug', $r['status'] === 200 && str_contains($r['body'], '<h1>Imprint</h1>') && str_contains($r['body'], '<article lang="en">'));
+check('pages: language menu and hreflang point to the translated slug', str_contains($r['body'], '<a href="/impressum" hreflang="de" lang="de">Deutsch</a>')
+    && str_contains($r['body'], 'hreflang="de" href="https://example.test/impressum"'));
+check('pages: the other language\'s slug is not an address here', $get('/en/impressum', null)['status'] === 404 && $get('/imprint', null)['status'] === 404);
+
+$post('/admin/pages/new', ['status' => 'published', 'role' => 'imprint', 'text' => ['de' => $text('Zweites Impressum')]], 3);
+check('pages: a legal function belongs to one page', $pdo->query('SELECT COUNT(*) FROM page')->fetchColumn() == 1);
+$post('/admin/pages/new', ['status' => 'published', 'text' => ['de' => $text('Doppelt', '', 'impressum')]], 3);
+check('pages: an address is unique per language', $pdo->query('SELECT COUNT(*) FROM page')->fetchColumn() == 1);
+$r = $post('/admin/pages/new', ['status' => 'published', 'text' => ['de' => $text('Login')]], 3);
+check('pages: system addresses are refused, the form keeps the input', $pdo->query('SELECT COUNT(*) FROM page')->fetchColumn() == 1 && str_contains($r['body'], 'value="Login"'));
+$post('/admin/pages/new', ['status' => 'draft', 'in_header' => '1', 'text' => ['de' => $text('Über uns')]], 3);
+check('pages: a draft is neither reachable nor linked', $get('/ueber-uns', null)['status'] === 404 && !str_contains($get('/', null)['body'], 'Über uns'));
+$aboutId = $pdo->query("SELECT page_id FROM page_translation WHERE slug = 'ueber-uns'")->fetchColumn();
+$post('/admin/pages/' . $aboutId, ['status' => 'published', 'in_header' => '1', 'text' => ['de' => $text('Über uns')]], 3);
+check('pages: published page appears in the main menu', str_contains($get('/', null)['body'], '<a href="/ueber-uns">Über uns</a>'));
+check('pages: core routes win over a page address', str_contains($get('/login', null)['body'], 'name="password"'));
+
+// --- Terms at registration -------------------------------------------------
+check('register: no checkbox while no terms are published', !str_contains($get('/register', null)['body'], 'accept_terms'));
+$post('/admin/pages/new', ['status' => 'published', 'role' => 'terms', 'text' => ['de' => $text('AGB')]], 3);
+$r = $get('/register', null);
+check('register: checkbox with link once terms are published', str_contains($r['body'], 'name="accept_terms"') && str_contains($r['body'], 'href="/agb"'));
+$post('/register', ['email' => 'terms@example.test', 'password' => $pw, 'password_repeat' => $pw], null);
+check('register: refused without accepting', $row('terms@example.test') === false);
+$post('/register', ['email' => 'terms@example.test', 'password' => $pw, 'password_repeat' => $pw, 'accept_terms' => '1'], null);
+check('register: acceptance is recorded with its time', ($row('terms@example.test')['terms_accepted_at'] ?? null) !== null);
+
+// --- Settings ----------------------------------------------------------------
+$r = $post('/admin/settings', ['site_name' => 'Neuer Name', 'mail_from' => 'post@example.test', 'registration' => 'closed', 'default_locale' => 'en', 'locales' => ['en', 'de']], 1);
+check('settings: need their permission', $r['status'] === 403);
+$post('/admin/settings', ['site_name' => 'Neuer Name', 'mail_from' => 'post@example.test', 'registration' => 'closed', 'default_locale' => 'en', 'locales' => ['en', 'de']], 3);
+$r = $get('/login', null);
+check('settings: site name and default language take effect', str_contains($r['body'], 'Neuer Name') && str_contains($r['body'], '<html lang="en">') && str_contains($get('/de/login', null)['body'], '<html lang="de">'));
+check('settings: closed registration hides the link and creates nothing', !str_contains($r['body'], '/register')
+    && $post('/register', ['email' => 'closed@example.test', 'password' => $pw, 'password_repeat' => $pw, 'accept_terms' => '1'], null) && $row('closed@example.test') === false);
+$post('/admin/settings', ['site_name' => '', 'mail_from' => 'nope', 'default_locale' => 'xx'], 3);
+check('settings: invalid input changes nothing', str_contains($get('/login', null)['body'], 'Neuer Name'));
+$post('/admin/settings', ['site_name' => 'Testseite', 'mail_from' => 'noreply@example.test', 'registration' => 'open', 'default_locale' => 'de', 'locales' => ['de', 'en']], 3);
+$post('/admin/settings', ['site_name' => 'Testseite', 'mail_from' => 'noreply@example.test', 'registration' => 'open', 'default_locale' => 'de', 'locales' => []], 3);
+check('settings: the default language cannot be switched off', $locales()->enabled() === ['de']);
+$post('/admin/settings', ['site_name' => 'Testseite', 'mail_from' => 'noreply@example.test', 'registration' => 'open', 'default_locale' => 'de', 'locales' => ['de', 'en']], 3);
+$pdo->exec('DELETE FROM page');
+$pdo->exec("DELETE FROM account WHERE email = 'terms@example.test'");
 @unlink($mailLog);
 
 // --- Router: rest-of-path parameter --------------------------------------
@@ -443,10 +590,10 @@ $pdo->exec("UPDATE setting SET value = 'gone' WHERE name = 'core.theme'");
 check('themes: falls back to default when the chosen folder is gone', $themes()->active() === 'default');
 $pdo->exec("UPDATE setting SET value = 'admin' WHERE name = 'core.theme'");
 check('themes: the admin theme can never become the site theme', $themes()->active() === 'default');
-$pdo->exec("DELETE FROM setting");
+$pdo->exec("DELETE FROM setting WHERE name = 'core.theme'");
 
 // Every template a controller renders must exist in the shipped themes.
-foreach (['default' => ['layout/base.twig', 'home.twig', 'error.twig', 'auth/login.twig'], 'admin' => ['layout.twig', 'index.twig', 'extensions.twig', 'themes.twig', 'tasks.twig', 'updates.twig']] as $theme => $templates) {
+foreach (['default' => ['layout/base.twig', 'home.twig', 'error.twig', 'page.twig', 'auth/login.twig', 'auth/register.twig', 'auth/forgot.twig', 'auth/reset.twig', 'account/index.twig', 'emails/verify_email.txt.twig', 'emails/reset_password.txt.twig', 'emails/already_registered.txt.twig', 'emails/change_email.txt.twig', 'emails/password_changed.txt.twig'], 'admin' => ['layout.twig', 'index.twig', 'settings.twig', 'pages.twig', 'page_edit.twig', 'extensions.twig', 'themes.twig', 'tasks.twig', 'updates.twig']] as $theme => $templates) {
     foreach ($templates as $template) {
         check("theme {$theme} ships {$template}", is_file("{$root}/themes/{$theme}/templates/{$template}"));
     }

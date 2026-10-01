@@ -4,7 +4,7 @@
 
 {% block content %}
 <h1>{{ trans('core.login.title') }}</h1>
-<form method="post" action="/login" class="stack-form">
+<form method="post" action="{{ url('/login') }}" class="stack-form">
     {{ csrf_field() }}
     <label for="email">{{ trans('core.login.email') }}</label>
     <input id="email" name="email" type="email" autocomplete="username" required>
@@ -16,14 +16,16 @@
 </form>
 
 {% if can_resend_verification %}
-    <form method="post" action="/verify-email/resend">
+    <form method="post" action="{{ url('/verify-email/resend') }}">
         {{ csrf_field() }}
         <button type="submit" class="link-button">{{ trans('core.verify.resend') }}</button>
     </form>
 {% endif %}
 
 <p>
-    <a href="/forgot-password">{{ trans('core.login.forgot') }}</a> ·
-    <a href="/register">{{ trans('core.login.register') }}</a>
+    <a href="{{ url('/forgot-password') }}">{{ trans('core.login.forgot') }}</a>
+    {% if registration_open() %}
+        · <a href="{{ url('/register') }}">{{ trans('core.login.register') }}</a>
+    {% endif %}
 </p>
 {% endblock %}

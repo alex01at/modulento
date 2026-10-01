@@ -7,9 +7,11 @@ namespace Modulento\Core\Install;
 use Modulento\Core\Support\AdminAccount;
 use Modulento\Core\Support\Csrf;
 use Modulento\Core\Support\Database;
+use Modulento\Core\Support\Locales;
 use Modulento\Core\Support\Migrator;
 use Modulento\Core\Support\PasswordPolicy;
 use Modulento\Core\Support\Session;
+use Modulento\Core\Support\Settings;
 use Modulento\Core\Support\Translator;
 use PDOException;
 use Throwable;
@@ -52,7 +54,8 @@ final class Installer
         }
 
         Session::start();
-        $locale = Translator::detectLocale($_SERVER['HTTP_ACCEPT_LANGUAGE'] ?? null);
+        $available = Translator::localesIn($this->root . '/core/lang');
+        $locale = Translator::detectLocale($_SERVER['HTTP_ACCEPT_LANGUAGE'] ?? null, $available, 'en');
         $this->translator = new Translator($locale, 'Modulento');
         $this->translator->load($this->root . '/core/lang', 'core');
 
@@ -101,7 +104,7 @@ final class Installer
         $checks = [
             ['PHP ' . PHP_VERSION . ' (>= 8.3)', PHP_VERSION_ID >= 80300],
         ];
-        foreach (['pdo_mysql', 'curl', 'zip', 'mbstring', 'ctype'] as $extension) {
+        foreach (['pdo_mysql', 'curl', 'zip', 'mbstring', 'ctype', 'dom', 'iconv'] as $extension) {
             $checks[] = ['PHP: ' . $extension, extension_loaded($extension)];
         }
         // .env is created in the installation folder; var/ holds the
@@ -168,7 +171,13 @@ final class Installer
 
         try {
             Migrator::run($db, 'core', $this->root . '/core/migrations');
-            AdminAccount::create($db, $values['admin_email'], $adminPassword);
+            AdminAccount::create($db, $values['admin_email'], $adminPassword, $this->translator->locale());
+
+            // The language the installer was used in becomes the site's
+            // default; every shipped language starts enabled.
+            $settings = new Settings($db);
+            $settings->set('core.site_name', $values['site_name']);
+            (new Locales($settings, $this->root . '/core/lang'))->save($this->translator->locale(), Translator::localesIn($this->root . '/core/lang'));
         } catch (Throwable $e) {
             error_log('Installer: ' . $e);
 
