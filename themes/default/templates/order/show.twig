@@ -34,6 +34,51 @@
     </section>
 {% endif %}
 
+{% if can_review %}
+    <section>
+        <h2>{{ trans('core.review.write') }}</h2>
+        <form method="post" action="{{ url('/orders/' ~ order.id ~ '/review') }}" class="stack-form wide">
+            {{ csrf_field() }}
+            <fieldset>
+                <legend>{{ trans('core.review.rating') }}</legend>
+                {% for stars in 5..1 %}
+                    <label class="checkbox">
+                        <input type="radio" name="rating" value="{{ stars }}" required>
+                        <span><span aria-hidden="true">{% for i in 1..5 %}{{ i <= stars ? '★' : '☆' }}{% endfor %}</span> {{ trans('core.review.stars', {rating: stars}) }}</span>
+                    </label>
+                {% endfor %}
+            </fieldset>
+            <label for="review_body">{{ trans('core.review.body') }}</label>
+            <textarea id="review_body" name="body" rows="5" maxlength="2000"></textarea>
+            <small>{{ trans('core.review.public_hint') }}</small>
+            <button type="submit">{{ trans('core.review.submit') }}</button>
+        </form>
+    </section>
+{% elseif review %}
+    <section>
+        <h2>{{ trans('core.review.one') }}</h2>
+        {% if review.status == 'hidden' %}
+            <p class="flash flash-error">{{ trans('core.review.hidden_notice') }}</p>
+        {% endif %}
+        <p>
+            <span role="img" aria-label="{{ trans('core.review.stars', {rating: review.rating}) }}"><span aria-hidden="true">{% for i in 1..5 %}{{ i <= review.rating ? '★' : '☆' }}{% endfor %}</span></span>
+            <small>{{ review.created_at }} UTC</small>
+        </p>
+        {% if review.body %}<p>{{ review.body|nl2br }}</p>{% endif %}
+        {% if review.reply %}
+            <p class="reply"><small>{{ trans('core.review.reply_by_provider') }}</small><br>{{ review.reply|nl2br }}</p>
+        {% elseif can_reply %}
+            <form method="post" action="{{ url('/orders/' ~ order.id ~ '/review/reply') }}" class="stack-form wide">
+                {{ csrf_field() }}
+                <label for="review_reply">{{ trans('core.review.reply') }}</label>
+                <textarea id="review_reply" name="reply" rows="4" maxlength="2000" required></textarea>
+                <small>{{ trans('core.review.reply_hint') }}</small>
+                <button type="submit">{{ trans('core.review.reply_submit') }}</button>
+            </form>
+        {% endif %}
+    </section>
+{% endif %}
+
 <section>
     <h2>{{ trans('core.order.details') }}</h2>
     <table>

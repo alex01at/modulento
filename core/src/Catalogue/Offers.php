@@ -22,7 +22,7 @@ final class Offers
 {
     public const SETTING_APPROVAL = 'core.offer_approval';
     public const STATUSES = ['draft', 'pending', 'published', 'rejected', 'paused'];
-    public const SORTS = ['newest', 'price_low', 'price_high'];
+    public const SORTS = ['newest', 'rating', 'price_low', 'price_high'];
 
     private const PUBLIC_WHERE = "o.status = 'published' AND p.status = 'approved' AND a.status = 'active'";
     private const FROM = 'FROM offer o JOIN provider p ON p.id = o.provider_id JOIN account a ON a.id = p.account_id';
@@ -164,6 +164,9 @@ final class Offers
         $order = match ($filter['sort'] ?? 'newest') {
             'price_low' => '(o.price_from IS NULL), o.price_from ASC, o.id DESC',
             'price_high' => 'o.price_from DESC, o.id DESC',
+            // Rated offers first, by their average; the number of
+            // ratings breaks ties.
+            'rating' => '(o.rating_count = 0), (CASE WHEN o.rating_count > 0 THEN o.rating_sum * 1.0 / o.rating_count ELSE 0 END) DESC, o.rating_count DESC, o.id DESC',
             default => 'o.published_at DESC, o.id DESC',
         };
 

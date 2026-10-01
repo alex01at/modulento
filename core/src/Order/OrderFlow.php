@@ -27,8 +27,10 @@ interface OrderFlow
     public function initialState(): string;
 
     /**
-     * @return array<string, array{label: string, final?: bool}> state =>
-     *         language key of its name, and whether the order ends there
+     * @return array<string, array{label: string, final?: bool, reviewable?: bool}>
+     *         state => language key of its name, whether the order ends
+     *         there, and whether the buyer may review an order that ended
+     *         there (it was carried out, not declined or cancelled)
      */
     public function states(): array;
 

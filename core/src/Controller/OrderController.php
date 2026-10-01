@@ -6,6 +6,7 @@ namespace Modulento\Core\Controller;
 
 use Modulento\Core\Order\OrderFiles;
 use Modulento\Core\Order\OrderNotifier;
+use Modulento\Core\Review\ReviewView;
 use Modulento\Core\Support\RateLimiter;
 use Modulento\Core\Support\Session;
 
@@ -185,6 +186,7 @@ final class OrderController extends Controller
         $provider = $order['provider_id'] !== null ? $app->providers->find($order['provider_id']) : null;
         $buyer = $order['buyer_id'] !== null ? $app->accounts->findById($order['buyer_id']) : null;
         $files = $app->orderFiles->ofOrder($order['id']);
+        $review = $app->reviews->findByOrder($order['id']);
 
         $this->render('order/show.twig', [
             'order' => $this->summary($order) + [
@@ -212,6 +214,9 @@ final class OrderController extends Controller
             'flow_template' => $flow?->orderDetailTemplate(),
             'flow_data' => $flow?->orderDetailData($order, $locale, $app) ?? [],
             'file_limits' => self::fileLimits(),
+            'review' => $review !== null ? ReviewView::of($review) : null,
+            'can_review' => $role === 'buyer' && $review === null && $app->orders->isReviewable($order),
+            'can_reply' => $role === 'provider' && $review !== null && $review['reply'] === null && $review['status'] === 'published',
         ]);
     }
 

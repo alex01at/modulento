@@ -91,3 +91,9 @@ a.button { display: inline-block; margin-top: .5rem; padding: .45rem .8rem; bord
 
 .files { list-style: none; padding: 0; margin: .25rem 0; }
 .files li::before { content: "📎 "; }
+
+.rating { color: #a15c00; white-space: nowrap; }
+.rating small { color: var(--muted); }
+.review { padding: .75rem 0; border-top: 1px solid var(--line); }
+.review p { margin: .25rem 0; }
+.reply { margin-left: 1.5rem; padding: .5rem .7rem; background: var(--surface); border-left: .2rem solid var(--accent); }

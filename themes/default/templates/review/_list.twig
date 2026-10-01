@@ -1,0 +1,20 @@
+{# Published reviews. Receives "reviews". #}
+{% if reviews %}
+    <section class="reviews">
+        <h2>{{ trans('core.review.title') }}</h2>
+        {# Where the reviews come from - the platform has to say so. #}
+        <p><small>{{ trans('core.review.origin') }}</small></p>
+        {% for review in reviews %}
+            <article class="review" lang="{{ review.locale }}">
+                <p>
+                    <span role="img" aria-label="{{ trans('core.review.stars', {rating: review.rating}) }}"><span aria-hidden="true">{% for i in 1..5 %}{{ i <= review.rating ? '★' : '☆' }}{% endfor %}</span></span>
+                    <small lang="{{ locale() }}">{{ review.author ?: trans('core.review.anonymous') }} · {{ review.created_at|slice(0, 10) }}</small>
+                </p>
+                {% if review.body %}<p>{{ review.body|nl2br }}</p>{% endif %}
+                {% if review.reply %}
+                    <p class="reply"><small lang="{{ locale() }}">{{ trans('core.review.reply_by_provider') }}</small><br>{{ review.reply|nl2br }}</p>
+                {% endif %}
+            </article>
+        {% endfor %}
+    </section>
+{% endif %}

@@ -17,6 +17,8 @@
         </small>
     </p>
 
+    {% include 'review/_rating.twig' with {rating: offer.rating} only %}
+
     {% if offer.images %}
         <div class="gallery">
             {% for image in offer.images %}
@@ -32,6 +34,8 @@
     {# The part that belongs to the offer's type, supplied by its extension. #}
     {% include type_template %}
 </article>
+
+{% include 'review/_list.twig' %}
 
 <section>
     <h2>{{ trans('core.offer.contact.title') }}</h2>

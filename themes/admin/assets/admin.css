@@ -75,3 +75,5 @@ button.danger { margin-top: 1.5rem; background: var(--error); border-color: var(
 .pager { display: flex; gap: 1rem; margin-top: 1.5rem; }
 .button-row { margin: 1rem 0; align-items: center; }
 .button-row [aria-current] { font-weight: 700; text-decoration: none; }
+
+.review-admin { padding: 1rem 0; border-top: 1px solid var(--line); }
