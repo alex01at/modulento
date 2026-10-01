@@ -4,9 +4,12 @@ declare(strict_types=1);
 
 namespace Modulento\Core;
 
+use Modulento\Core\Account\Accounts;
+use Modulento\Core\Account\Tokens;
 use Modulento\Core\Extension\ExtensionManager;
 use Modulento\Core\Support\Auth;
 use Modulento\Core\Support\Events;
+use Modulento\Core\Support\Mailer;
 use Modulento\Core\Support\Router;
 use Modulento\Core\Support\Scheduler;
 use Modulento\Core\Support\Settings;
@@ -36,6 +39,9 @@ final class App
     public readonly ExtensionManager $extensions;
     public readonly Settings $settings;
     public readonly ThemeManager $themes;
+    public readonly Accounts $accounts;
+    public readonly Tokens $tokens;
+    public readonly Mailer $mailer;
 
     private ?View $view = null;
     /** @var array<int, array{label_key: string, path: string, permission: string}> */
@@ -52,6 +58,9 @@ final class App
         $this->extensions = new ExtensionManager($db, $config['app']['root'] . '/extensions');
         $this->settings = new Settings($db);
         $this->themes = new ThemeManager($config['app']['root'] . '/themes', $this->settings);
+        $this->accounts = new Accounts($db);
+        $this->tokens = new Tokens($db);
+        $this->mailer = new Mailer($this);
         $this->router = new Router($this);
     }
 

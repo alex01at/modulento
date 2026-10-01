@@ -14,4 +14,16 @@
 
     <button type="submit">{{ trans('core.login.submit') }}</button>
 </form>
+
+{% if can_resend_verification %}
+    <form method="post" action="/verify-email/resend">
+        {{ csrf_field() }}
+        <button type="submit" class="link-button">{{ trans('core.verify.resend') }}</button>
+    </form>
+{% endif %}
+
+<p>
+    <a href="/forgot-password">{{ trans('core.login.forgot') }}</a> ·
+    <a href="/register">{{ trans('core.login.register') }}</a>
+</p>
 {% endblock %}

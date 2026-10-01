@@ -53,6 +53,9 @@ final class View
             // Without this, production never re-checks whether a template
             // changed and keeps serving the compiled copy after a deploy.
             'auto_reload' => true,
+            // HTML escaping for every template except "*.txt.twig" - the
+            // plain-text e-mails, where "&amp;" would be wrong.
+            'autoescape' => 'name',
         ]);
 
         $translator = $app->translator;
@@ -108,6 +111,12 @@ final class View
     public function render(string $template, array $data = []): string
     {
         return $this->twig->render($template, $data);
+    }
+
+    /** @param array<string, mixed> $data */
+    public function renderBlock(string $template, string $block, array $data = []): string
+    {
+        return $this->twig->load($template)->renderBlock($block, $data);
     }
 
     private static function assetUrl(string $prefix, string $path, ?string $file): string

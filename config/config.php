@@ -25,6 +25,15 @@ return [
         'cron_token' => $_ENV['CRON_TOKEN'] ?? '',
         'root' => $root,
     ],
+    'mail' => [
+        // Sender address; without one, noreply@<host of APP_URL>.
+        'from' => ($_ENV['MAIL_FROM'] ?? '') !== ''
+            ? $_ENV['MAIL_FROM']
+            : 'noreply@' . (parse_url($_ENV['APP_URL'] ?? '', PHP_URL_HOST) ?: 'localhost'),
+        // "dev" never sends: mails are appended to the log file instead.
+        'transport' => ($_ENV['APP_ENV'] ?? 'prod') === 'dev' ? 'log' : 'mail',
+        'log_path' => $root . '/var/log/mail.log',
+    ],
     'update' => [
         // "owner/name" of the GitHub repository whose releases are
         // installed from the administration; empty switches updates off.

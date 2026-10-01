@@ -1,0 +1,7 @@
+{# Plain text: nothing here is HTML-escaped. Blocks: subject, body. #}
+{% block subject %}{{ trans('core.mail.already.subject') }}{% endblock %}
+{% block body %}
+{{ trans('core.mail.already.body', {login_link: login_link, reset_link: reset_link}) }}
+
+{{ trans('core.mail.signature') }}
+{% endblock %}

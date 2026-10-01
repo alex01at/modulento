@@ -15,12 +15,14 @@
             <a href="/admin">{{ trans('core.nav.admin') }}</a>
         {% endif %}
         {% if account %}
+            <a href="/account">{{ trans('core.nav.account') }}</a>
             <form method="post" action="/logout" class="inline-form">
                 {{ csrf_field() }}
                 <button type="submit" class="link-button">{{ trans('core.nav.logout') }}</button>
             </form>
         {% else %}
             <a href="/login">{{ trans('core.nav.login') }}</a>
+            <a href="/register">{{ trans('core.nav.register') }}</a>
         {% endif %}
         <form method="post" action="/locale" class="inline-form">
             {{ csrf_field() }}

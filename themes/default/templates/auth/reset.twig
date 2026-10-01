@@ -1,0 +1,20 @@
+{% extends 'layout/base.twig' %}
+
+{% block title %}{{ trans('core.reset.title') }} – {{ site_name }}{% endblock %}
+
+{% block content %}
+<h1>{{ trans('core.reset.title') }}</h1>
+{% for error in errors %}
+    <p class="flash flash-error" role="alert">{{ error }}</p>
+{% endfor %}
+<form method="post" action="/reset-password/{{ token }}" class="stack-form">
+    {{ csrf_field() }}
+    <label for="password">{{ trans('core.password.new', {min: min_length}) }}</label>
+    <input id="password" name="password" type="password" minlength="{{ min_length }}" autocomplete="new-password" required>
+
+    <label for="password_repeat">{{ trans('core.password.repeat') }}</label>
+    <input id="password_repeat" name="password_repeat" type="password" minlength="{{ min_length }}" autocomplete="new-password" required>
+
+    <button type="submit">{{ trans('core.reset.submit') }}</button>
+</form>
+{% endblock %}

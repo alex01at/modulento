@@ -8,7 +8,9 @@ auction site and so on.
 Plain PHP without a framework and without a build step: PHP ≥ 8.3, Twig,
 MariaDB through PDO, vanilla JS/CSS.
 
-**Status: stage 1 of 7 (core skeleton).** There is no catalogue, order or
+**Status: early.** The core has accounts (registration with e-mail
+confirmation, password reset, own data export and deletion), roles, themes,
+extensions, scheduled tasks and self-update. There is no catalogue, order or
 payment code yet.
 
 Two rules shape everything:
@@ -109,9 +111,23 @@ chosen under **Administration → Themes**.
 | `@admin/x.twig` | `themes/admin` |
 | `@<ext>/x.twig` | `themes/<theme>/extensions/<ext>/`, then the extension's `templates/` |
 
-Templates a site theme can provide: `layout/base.twig` (blocks `title`,
-`head`, `content`), `home.twig`, `error.twig` (`status`, `message_key`),
-`auth/login.twig`.
+Templates of the site theme, with the variables they receive:
+
+| Template | Variables |
+|---|---|
+| `layout/base.twig` | blocks `title`, `head`, `content` |
+| `home.twig` | - |
+| `error.twig` | `status`, `message_key` |
+| `auth/login.twig` | `can_resend_verification` |
+| `auth/register.twig` | `errors`, `email`, `min_length`; keep the hidden `website` field |
+| `auth/forgot.twig` | - |
+| `auth/reset.twig` | `errors`, `token`, `min_length` |
+| `account/index.twig` | `locales`, `min_length`, `is_last_admin` |
+| `emails/*.txt.twig` | blocks `subject` and `body`; plain text, not HTML-escaped |
+
+E-mails are theme templates too: `verify_email`, `reset_password`,
+`already_registered`, `change_email`, `password_changed`. With `APP_ENV="dev"`
+nothing is sent; mails are appended to `var/log/mail.log`.
 
 Available in every template:
 
@@ -152,6 +168,20 @@ extensions/<id>/
 | `adminMenu(labelKey, path, permission)` | An entry in the administration menu |
 | `listen(EventClass, fn ($event, App $app) => ...)` | React to a core or extension event |
 | `task(name, everyMinutes, fn (App $app) => ...)` | Scheduled work, run by `bin/cron.php` |
+
+Core services an extension uses instead of SQL on core tables, all on the
+`App` object: `accounts` (find, create, change accounts), `tokens` (one-time
+links), `mailer` (`send(to, '@<id>/emails/x.txt.twig', data)`), `settings`,
+`auth`, `events`.
+
+Events to listen to: `AccountRegistered`, `AccountLoggedIn`, `AccountDeleted`
+and `AccountExport`. An extension that stores personal data per account
+references `account (id)` with `ON DELETE CASCADE`, so deleting an account
+removes it, and adds its part to the data export in an `AccountExport`
+listener (see `extensions/example`).
+
+Timestamps are created in PHP with `Clock::now()` and passed as parameters,
+not taken from the database's `NOW()`.
 
 Rules, which also bind first-party extensions:
 

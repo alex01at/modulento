@@ -1,0 +1,78 @@
+{% extends 'layout/base.twig' %}
+
+{% block title %}{{ trans('core.account.title') }} – {{ site_name }}{% endblock %}
+
+{% block content %}
+<h1>{{ trans('core.account.title') }}</h1>
+
+<section>
+    <h2>{{ trans('core.account.profile.title') }}</h2>
+    <form method="post" action="/account/profile" class="stack-form">
+        {{ csrf_field() }}
+        <label for="display_name">{{ trans('core.account.profile.display_name') }}</label>
+        <input id="display_name" name="display_name" value="{{ account.display_name }}" maxlength="100" autocomplete="name">
+
+        <label for="locale">{{ trans('core.nav.language') }}</label>
+        <select id="locale" name="locale">
+            {% for code in locales %}
+                <option value="{{ code }}" {{ code == account.locale ? 'selected' }}>{{ trans('core.language.' ~ code) }}</option>
+            {% endfor %}
+        </select>
+
+        <button type="submit">{{ trans('core.account.save') }}</button>
+    </form>
+</section>
+
+<section>
+    <h2>{{ trans('core.account.email.title') }}</h2>
+    <p>{{ trans('core.account.email.current', {email: account.email}) }}</p>
+    <form method="post" action="/account/email" class="stack-form">
+        {{ csrf_field() }}
+        <label for="new_email">{{ trans('core.account.email.new') }}</label>
+        <input id="new_email" name="email" type="email" autocomplete="email" required>
+
+        <label for="email_current_password">{{ trans('core.account.current_password') }}</label>
+        <input id="email_current_password" name="current_password" type="password" autocomplete="current-password" required>
+
+        <button type="submit">{{ trans('core.account.email.submit') }}</button>
+    </form>
+</section>
+
+<section>
+    <h2>{{ trans('core.account.password.title') }}</h2>
+    <form method="post" action="/account/password" class="stack-form">
+        {{ csrf_field() }}
+        <label for="password_current_password">{{ trans('core.account.current_password') }}</label>
+        <input id="password_current_password" name="current_password" type="password" autocomplete="current-password" required>
+
+        <label for="new_password">{{ trans('core.password.new', {min: min_length}) }}</label>
+        <input id="new_password" name="password" type="password" minlength="{{ min_length }}" autocomplete="new-password" required>
+
+        <label for="new_password_repeat">{{ trans('core.password.repeat') }}</label>
+        <input id="new_password_repeat" name="password_repeat" type="password" minlength="{{ min_length }}" autocomplete="new-password" required>
+
+        <button type="submit">{{ trans('core.account.password.submit') }}</button>
+    </form>
+</section>
+
+<section>
+    <h2>{{ trans('core.account.export.title') }}</h2>
+    <p>{{ trans('core.account.export.intro') }}</p>
+    <p><a href="/account/export">{{ trans('core.account.export.download') }}</a></p>
+</section>
+
+<section>
+    <h2>{{ trans('core.account.delete.title') }}</h2>
+    {% if is_last_admin %}
+        <p>{{ trans('core.account.delete.last_admin') }}</p>
+    {% else %}
+        <p>{{ trans('core.account.delete.intro') }}</p>
+        <form method="post" action="/account/delete" class="stack-form">
+            {{ csrf_field() }}
+            <label for="delete_current_password">{{ trans('core.account.current_password') }}</label>
+            <input id="delete_current_password" name="current_password" type="password" autocomplete="current-password" required>
+            <button type="submit" class="danger">{{ trans('core.account.delete.submit') }}</button>
+        </form>
+    {% endif %}
+</section>
+{% endblock %}

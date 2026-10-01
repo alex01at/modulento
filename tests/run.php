@@ -25,9 +25,11 @@ function check(string $label, bool $condition): void
 {
     global $failures, $checks;
     $checks++;
+    // Printed at the end: any output here would count as "headers sent"
+    // and stop the checks that follow from reading a response status.
     if (!$condition) {
         $failures++;
-        echo "FAIL  {$label}\n";
+        $GLOBALS['failed'][] = $label;
     }
 }
 
@@ -133,26 +135,66 @@ $pdo = new PDO('sqlite::memory:', null, null, [
     PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
     PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
 ]);
-$pdo->exec("CREATE TABLE account (id INTEGER PRIMARY KEY, email TEXT, status TEXT, locale TEXT, created_at TEXT)");
+$pdo->exec("CREATE TABLE account (id INTEGER PRIMARY KEY, email TEXT UNIQUE, display_name TEXT, password_hash TEXT, status TEXT,
+    email_verified_at TEXT, locale TEXT, created_at TEXT, last_login_at TEXT)");
+$pdo->exec("CREATE TABLE account_token (id INTEGER PRIMARY KEY, account_id INTEGER REFERENCES account (id) ON DELETE CASCADE,
+    purpose TEXT, token_hash TEXT UNIQUE, payload TEXT, expires_at TEXT, created_at TEXT)");
+$pdo->exec("CREATE TABLE rate_limit_attempt (id INTEGER PRIMARY KEY, action TEXT, identifier TEXT, created_at TEXT)");
+$pdo->exec("CREATE TABLE x_example_login (id INTEGER PRIMARY KEY, account_id INTEGER REFERENCES account (id) ON DELETE CASCADE, logged_in_at TEXT)");
+$pdo->exec("PRAGMA foreign_keys = ON");
 $pdo->exec("CREATE TABLE role (id INTEGER PRIMARY KEY, name TEXT)");
 $pdo->exec("CREATE TABLE role_permission (role_id INTEGER, permission TEXT)");
 $pdo->exec("CREATE TABLE account_role (account_id INTEGER, role_id INTEGER)");
 $pdo->exec("CREATE TABLE extension (id TEXT PRIMARY KEY, version TEXT, enabled INTEGER)");
 $pdo->exec("CREATE TABLE setting (name TEXT PRIMARY KEY, value TEXT)");
-$pdo->exec("INSERT INTO account VALUES (1, 'plain@example.test', 'active', 'de', ''), (2, 'editor@example.test', 'active', 'de', ''),
-    (3, 'admin@example.test', 'active', 'de', ''), (4, 'blocked@example.test', 'blocked', 'de', '')");
+$testHash = password_hash('correct horse battery', PASSWORD_BCRYPT, ['cost' => 4]);
+$insertAccount = $pdo->prepare("INSERT INTO account (id, email, password_hash, status, email_verified_at, locale, created_at) VALUES (?, ?, ?, ?, '2026-01-01 00:00:00', 'de', '2026-01-01 00:00:00')");
+foreach ([[1, 'plain@example.test', 'active'], [2, 'editor@example.test', 'active'], [3, 'admin@example.test', 'active'], [4, 'blocked@example.test', 'blocked']] as [$id, $email, $status]) {
+    $insertAccount->execute([$id, $email, $testHash, $status]);
+}
 $pdo->exec("INSERT INTO role VALUES (1, 'editor'), (2, 'admin')");
 $pdo->exec("INSERT INTO role_permission VALUES (1, 'demo.edit'), (2, '*')");
 $pdo->exec("INSERT INTO account_role VALUES (2, 1), (3, 2), (4, 2)");
 $pdo->exec("INSERT INTO extension VALUES ('example', '0.1.0', 1)");
 
-$config = ['app' => ['env' => 'dev', 'url' => 'https://example.test', 'name' => 'Testseite', 'root' => $root, 'cron_token' => 'secret-cron-token']];
+$mailLog = sys_get_temp_dir() . '/modulento-test-mail-' . bin2hex(random_bytes(4)) . '.log';
+$config = [
+    'app' => ['env' => 'dev', 'url' => 'https://example.test', 'name' => 'Testseite', 'root' => $root, 'cron_token' => 'secret-cron-token'],
+    'mail' => ['from' => 'noreply@example.test', 'transport' => 'log', 'log_path' => $mailLog],
+];
+
+/** The newest logged mail to an address, and the link inside it. @return array{subject: string, link: string}|null */
+function lastMail(string $mailLog, string $to): ?array
+{
+    $mails = is_file($mailLog) ? array_filter(explode("\n--\n", (string) file_get_contents($mailLog))) : [];
+    foreach (array_reverse($mails) as $mail) {
+        if (str_starts_with(ltrim($mail), 'To: ' . $to . "\n")) {
+            preg_match('/^Subject: (.*)$/m', $mail, $subject);
+            preg_match('#https://example\.test(/\S+)#', $mail, $link);
+
+            return ['subject' => $subject[1] ?? '', 'link' => $link[1] ?? ''];
+        }
+    }
+
+    return null;
+}
 
 /** @return array{called: bool, status: int, body: string} */
-function request(PDO $pdo, array $config, string $method, string $path, ?int $accountId, array $post = []): array
+function request(PDO $pdo, array $config, string $method, string $path, int|false|null $accountId, array $post = []): array
 {
-    $_SESSION = $accountId === null ? [] : ['account_id' => $accountId];
+    // $accountId false keeps the session of the previous request, as a
+    // browser would; null starts as a visitor; an id starts logged in.
+    if ($accountId !== false) {
+        $_SESSION = [];
+        if ($accountId !== null) {
+            $hash = $pdo->query('SELECT password_hash FROM account WHERE id = ' . (int) $accountId)->fetchColumn();
+            $_SESSION = ['account_id' => $accountId, 'auth_stamp' => Modulento\Core\Support\Auth::stamp((string) $hash)];
+        }
+    }
     $_SESSION['_csrf'] = 'test-token';
+    if ($method === 'POST') {
+        $post += ['_csrf' => 'test-token'];
+    }
     $_POST = $post;
     $_SERVER['REQUEST_URI'] = $path;
     unset($_SERVER['HTTP_X_REQUESTED_WITH'], $_SERVER['HTTP_REFERER']);
@@ -197,7 +239,7 @@ $r = request($pdo, $config, 'GET', '/edit/7', 3);
 check('wildcard role passes any permission', $r['called']);
 $r = request($pdo, $config, 'GET', '/edit/7', 4);
 check('blocked admin passes nothing', !$r['called']);
-$r = request($pdo, $config, 'POST', '/save', 1);
+$r = request($pdo, $config, 'POST', '/save', 1, ['_csrf' => '']);
 check('POST without CSRF token does not run', !$r['called']);
 $r = request($pdo, $config, 'POST', '/save', 1, ['_csrf' => 'wrong']);
 check('POST with wrong CSRF token does not run', !$r['called']);
@@ -214,7 +256,6 @@ $r = request($pdo, $config, 'GET', '/example', null);
 check('enabled extension: route, template and language file work', $r['status'] === 200 && str_contains($r['body'], 'Diese Seite stammt aus der Erweiterung'));
 $r = request($pdo, $config, 'GET', '/admin/example', 2);
 check('extension permission route: 403 without it', $r['status'] === 403);
-$pdo->exec("CREATE TABLE x_example_login (id INTEGER PRIMARY KEY, account_id INTEGER, logged_in_at TEXT)");
 $r = request($pdo, $config, 'GET', '/admin/example', 3);
 check('extension admin page renders for an admin, with its menu entry', $r['status'] === 200
     && str_contains($r['body'], 'href="/admin/example"') && str_contains($r['body'], 'noch niemand angemeldet'));
@@ -222,6 +263,135 @@ check('extension admin page renders for an admin, with its menu entry', $r['stat
 $pdo->exec("UPDATE extension SET enabled = 0");
 $r = request($pdo, $config, 'GET', '/example', null);
 check('disabled extension: its route is gone', $r['status'] === 404);
+
+// --- Accounts: register, confirm, log in, reset, change, export, delete ---
+$post = fn (string $path, array $fields, int|false|null $as = false) => request($pdo, $config, 'POST', $path, $as, $fields);
+$get = fn (string $path, int|false|null $as = false) => request($pdo, $config, 'GET', $path, $as);
+$row = fn (string $email) => $pdo->query("SELECT * FROM account WHERE email = " . $pdo->quote($email))->fetch();
+$pw = 'a new long password';
+
+$r = $post('/register', ['email' => 'New@Example.test ', 'password' => 'short', 'password_repeat' => 'short'], null);
+check('register: short password is refused', str_contains($r['body'], 'mindestens 12 Zeichen') && $row('new@example.test') === false);
+$r = $post('/register', ['email' => 'new@example.test', 'password' => $pw, 'password_repeat' => $pw . 'x'], null);
+check('register: differing repeat is refused', $row('new@example.test') === false);
+$r = $post('/register', ['email' => 'bot@example.test', 'password' => $pw, 'password_repeat' => $pw, 'website' => 'http://spam'], null);
+check('register: filled bot trap creates nothing', $row('bot@example.test') === false && lastMail($mailLog, 'bot@example.test') === null);
+
+$post('/register', ['email' => 'New@Example.test ', 'password' => $pw, 'password_repeat' => $pw], null);
+$new = $row('new@example.test');
+check('register: account is created unconfirmed, address normalised', $new !== false && $new['email_verified_at'] === null && password_verify($pw, $new['password_hash']));
+$mail = lastMail($mailLog, 'new@example.test');
+check('register: confirmation mail with link', $mail !== null && str_starts_with($mail['link'], '/verify-email/') && $mail['subject'] === 'Bitte bestätige deine E-Mail-Adresse');
+check('token is stored hashed only', $pdo->query("SELECT COUNT(*) FROM account_token WHERE token_hash = " . $pdo->quote(substr($mail['link'], 14)))->fetchColumn() == 0
+    && $pdo->query("SELECT COUNT(*) FROM account_token WHERE token_hash = " . $pdo->quote(hash('sha256', substr($mail['link'], 14))))->fetchColumn() == 1);
+
+$post('/login', ['email' => 'new@example.test', 'password' => $pw], null);
+check('login: refused while unconfirmed', $get('/account')['body'] === '' && ($_SESSION['account_id'] ?? null) === null);
+$post('/verify-email/resend', []);
+$resent = lastMail($mailLog, 'new@example.test');
+check('resend: new link, old one stops working', $resent['link'] !== $mail['link']);
+$get($mail['link'], null);
+check('verify: replaced link is refused', $row('new@example.test')['email_verified_at'] === null);
+$get($resent['link'], null);
+check('verify: link confirms the address', $row('new@example.test')['email_verified_at'] !== null);
+$get($resent['link'], null);
+check('verify: link works once', $pdo->query('SELECT COUNT(*) FROM account_token')->fetchColumn() == 0);
+
+$post('/register', ['email' => 'new@example.test', 'password' => $pw, 'password_repeat' => $pw], null);
+check('register again: no second account, owner is told', $pdo->query("SELECT COUNT(*) FROM account WHERE email = 'new@example.test'")->fetchColumn() == 1
+    && lastMail($mailLog, 'new@example.test')['subject'] === 'Du hast bereits ein Konto');
+
+$post('/login', ['email' => 'new@example.test', 'password' => 'wrong password!'], null);
+check('login: wrong password is refused', ($_SESSION['account_id'] ?? null) === null);
+$post('/login', ['email' => 'new@example.test', 'password' => $pw], null);
+check('login: works after confirmation', ($_SESSION['account_id'] ?? null) == $new['id']);
+$r = $get('/account');
+check('account page renders for the logged-in account', $r['status'] === 200 && str_contains($r['body'], 'new@example.test'));
+
+$post('/account/profile', ['display_name' => 'Neue Person', 'locale' => 'en']);
+check('profile: name and language are saved', $row('new@example.test')['display_name'] === 'Neue Person' && $row('new@example.test')['locale'] === 'en');
+$post('/account/profile', ['display_name' => 'x', 'locale' => 'xx']);
+check('profile: unknown language is refused', $row('new@example.test')['display_name'] === 'Neue Person');
+
+$post('/account/password', ['current_password' => 'wrong', 'password' => 'another long password', 'password_repeat' => 'another long password']);
+check('password change: needs the current password', password_verify($pw, $row('new@example.test')['password_hash']));
+$otherSession = $_SESSION;
+$post('/account/password', ['current_password' => $pw, 'password' => 'another long password', 'password_repeat' => 'another long password']);
+$pw = 'another long password';
+check('password change: saved, this session stays logged in', password_verify($pw, $row('new@example.test')['password_hash']) && $get('/account')['status'] === 200);
+check('password change: owner is notified', lastMail($mailLog, 'new@example.test')['subject'] === 'Dein Passwort wurde geändert');
+$current = $_SESSION;
+$_SESSION = $otherSession;
+check('password change: a session with the old password is logged out', $get('/account')['body'] === '');
+$_SESSION = $current;
+
+$post('/account/email', ['email' => 'admin@example.test', 'current_password' => $pw]);
+check('email change: an address in use sends nothing', lastMail($mailLog, 'admin@example.test') === null);
+$post('/account/email', ['email' => 'moved@example.test', 'current_password' => $pw]);
+check('email change: nothing changes before the link is opened', $row('moved@example.test') === false);
+$change = lastMail($mailLog, 'moved@example.test');
+$current = $_SESSION;
+$get($change['link'], 1);
+check('email change: link is useless in another account', $row('moved@example.test') === false && $row('plain@example.test') !== false);
+$_SESSION = $current;
+$post('/account/email', ['email' => 'moved@example.test', 'current_password' => $pw]);
+$get(lastMail($mailLog, 'moved@example.test')['link']);
+check('email change: confirmed link changes the address', $row('moved@example.test') !== false && $row('new@example.test') === false);
+
+$pdo->exec("UPDATE extension SET enabled = 1");
+$r = $get('/account/export');
+$pdo->exec("UPDATE extension SET enabled = 0");
+$export = json_decode($r['body'], true);
+check('export: core data and the extension\'s part', ($export['core']['email'] ?? '') === 'moved@example.test' && !isset($export['core']['password_hash']) && array_key_exists('example', $export));
+
+$post('/forgot-password', ['email' => 'nobody@example.test'], null);
+check('forgot: unknown address sends nothing', lastMail($mailLog, 'nobody@example.test') === null);
+$post('/forgot-password', ['email' => 'moved@example.test'], null);
+$reset = lastMail($mailLog, 'moved@example.test');
+check('forgot: reset mail with link', str_starts_with($reset['link'], '/reset-password/'));
+check('reset: form opens for a valid link', str_contains($get($reset['link'], null)['body'], 'name="password_repeat"'));
+$post($reset['link'], ['password' => 'short', 'password_repeat' => 'short'], null);
+check('reset: a refused password does not use up the link', $pdo->query("SELECT COUNT(*) FROM account_token WHERE purpose = 'reset_password'")->fetchColumn() == 1);
+$_SESSION = $current;
+$post($reset['link'], ['password' => 'the third long password', 'password_repeat' => 'the third long password'], null);
+check('reset: new password is set', password_verify('the third long password', $row('moved@example.test')['password_hash']));
+$_SESSION = $current;
+check('reset: sessions with the old password are logged out', $get('/account')['body'] === '');
+$post($reset['link'], ['password' => 'a fourth long password', 'password_repeat' => 'a fourth long password'], null);
+check('reset: link works once', password_verify('the third long password', $row('moved@example.test')['password_hash']));
+$pdo->exec("UPDATE account_token SET expires_at = '2020-01-01 00:00:00'");
+$post('/forgot-password', ['email' => 'moved@example.test'], null);
+$expired = lastMail($mailLog, 'moved@example.test');
+$pdo->exec("UPDATE account_token SET expires_at = '2020-01-01 00:00:00'");
+$post($expired['link'], ['password' => 'a fourth long password', 'password_repeat' => 'a fourth long password'], null);
+check('reset: expired link is refused', password_verify('the third long password', $row('moved@example.test')['password_hash']));
+
+for ($i = 0; $i < 6; $i++) {
+    $post('/login', ['email' => 'plain@example.test', 'password' => 'guess number ' . $i], null);
+}
+$post('/login', ['email' => 'plain@example.test', 'password' => 'correct horse battery'], null);
+check('login: locked after repeated wrong passwords, even with the right one', ($_SESSION['account_id'] ?? null) === null);
+$pdo->exec('DELETE FROM rate_limit_attempt');
+
+$post('/login', ['email' => 'moved@example.test', 'password' => 'the third long password'], null);
+$post('/account/delete', ['current_password' => 'wrong']);
+check('delete: needs the current password', $row('moved@example.test') !== false);
+$post('/account/delete', ['current_password' => 'the third long password']);
+check('delete: account, its tokens and its session are gone', $row('moved@example.test') === false && ($_SESSION['account_id'] ?? null) === null
+    && $pdo->query('SELECT COUNT(*) FROM account_token')->fetchColumn() == 0);
+
+$pdo->exec("UPDATE account SET status = 'blocked' WHERE id = 4");
+$post('/account/delete', ['current_password' => 'correct horse battery'], 3);
+check('delete: the only administrator cannot delete itself', $row('admin@example.test') !== false);
+
+$accounts = new Modulento\Core\Account\Accounts($pdo);
+$accounts->create('stale@example.test', $pw, 'de', verified: false);
+$accounts->create('fresh@example.test', $pw, 'de', verified: false);
+$pdo->exec("UPDATE account SET created_at = '2020-01-01 00:00:00' WHERE email = 'stale@example.test'");
+check('cleanup: only old unconfirmed registrations are removed', $accounts->deleteUnverifiedOlderThan(7 * 86400) === 1
+    && $row('fresh@example.test') !== false && $row('admin@example.test') !== false);
+$pdo->exec("DELETE FROM account WHERE email = 'fresh@example.test'");
+@unlink($mailLog);
 
 // --- Router: rest-of-path parameter --------------------------------------
 $r = request($pdo, $config, 'GET', '/assets/theme/theme.css', null);
@@ -399,5 +569,8 @@ $result = $updater->applyUpdate();
 check('update refuses to touch a git working copy', !$result['success'] && $result['message_key'] === 'core.update.error.dev_checkout');
 check('updater is off without a repository', !(new Modulento\Core\Support\Updater($dir, '', '', fn () => null))->isEnabled());
 
+foreach ($GLOBALS['failed'] ?? [] as $label) {
+    echo "FAIL  {$label}\n";
+}
 echo $failures === 0 ? "OK ({$checks} checks)\n" : "{$failures} of {$checks} checks failed\n";
 exit($failures === 0 ? 0 : 1);
