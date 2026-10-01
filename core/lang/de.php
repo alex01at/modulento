@@ -597,7 +597,7 @@ return [
     'core.order.message.new' => 'Neue Nachricht',
     'core.order.message.send' => 'Senden',
     'core.order.message.none' => 'Noch keine Nachrichten.',
-    'core.order.message.error' => 'Die Nachricht darf nicht leer und höchstens 5000 Zeichen lang sein.',
+    'core.order.message.error' => 'Die Nachricht braucht einen Text oder eine Datei; der Text darf höchstens 5000 Zeichen lang sein.',
     'core.order.error.not_possible' => 'Dieser Schritt ist bei dieser Bestellung gerade nicht möglich.',
     'core.order.error.changed_meanwhile' => 'Die Bestellung wurde inzwischen geändert. Bitte sieh dir den aktuellen Stand an.',
     'core.order.error.note_required' => 'Bitte gib eine Begründung bzw. Nachricht an.',
@@ -612,4 +612,14 @@ return [
     'core.mail.order_message.subject' => 'Neue Nachricht zur Bestellung {number}',
     'core.mail.order_message.body' => "Hallo,\n\n{sender} hat dir zur Bestellung {number} („{title}“) geschrieben:\n\n{message}\n\nAntworten kannst du auf der Bestellseite: {link}",
     'core.order.event.unknown' => 'Unbekannter Schritt',
+
+    'core.order.file.attach' => 'Dateien anhängen',
+    'core.order.file.hint' => 'Höchstens {max} Dateien mit je {megabytes} MB. Erlaubt: {types}.',
+    'core.order.file.sent_files' => '{count} Datei(en) geschickt.',
+    'core.order.file.error.too_many' => 'Es können höchstens {max} Dateien auf einmal angehängt werden.',
+    'core.order.file.error.too_large' => 'Eine Datei ist zu groß (höchstens {megabytes} MB).',
+    'core.order.file.error.upload' => 'Das Hochladen ist fehlgeschlagen. Bitte versuche es erneut.',
+    'core.order.file.error.empty' => 'Eine der Dateien ist leer.',
+    'core.order.file.error.type' => 'Dieser Dateityp ist nicht erlaubt. Erlaubt: {types}. Anderes bitte als ZIP-Archiv schicken.',
+    'core.error.upload_too_large' => 'Die hochgeladenen Dateien sind zusammen zu groß für diesen Server. Bitte schicke weniger oder kleinere Dateien.',
 ];

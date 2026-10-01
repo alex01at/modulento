@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modulento\Core\Controller;
 
+use Modulento\Core\Order\OrderFiles;
 use Modulento\Core\Order\OrderNotifier;
 use Modulento\Core\Support\RateLimiter;
 use Modulento\Core\Support\Session;
@@ -41,6 +42,12 @@ final class OrderController extends Controller
             $errors[] = 'core.order.error.note_too_long';
         }
 
+        $uploads = OrderFiles::uploads($_FILES['files'] ?? null);
+        $fileProblem = OrderFiles::problem($uploads);
+        if ($fileProblem !== null) {
+            $errors[] = $fileProblem;
+        }
+
         $methods = $app->orders->paymentMethods();
         $methodId = (string) ($_POST['payment_method'] ?? array_key_first($methods));
         if (!isset($methods[$methodId])) {
@@ -58,7 +65,7 @@ final class OrderController extends Controller
         }
 
         if ($errors !== [] || $built['items'] === []) {
-            $this->renderForm($context, $_POST, array_map(fn (string $key) => $this->trans($key), array_unique($errors)));
+            $this->renderForm($context, $_POST, array_map(fn (string $key) => $this->trans($key, self::fileLimits()), array_unique($errors)));
             return;
         }
 
@@ -66,6 +73,7 @@ final class OrderController extends Controller
         $orderId = $app->orders->create(
             $app->auth->account(), $offer, $title, $flow, $built['items'], $built['data'], $methodId, $locale, $note !== '' ? $note : null, $mustAccept
         );
+        $app->orderFiles->store($orderId, $app->auth->account()['id'], 'buyer', $app->orders->lastEventId($orderId), null, $uploads);
         $order = $app->orders->find($orderId);
 
         OrderNotifier::stateChanged($app, null, $order, 'place', 'buyer', $note !== '' ? $note : null);
@@ -124,6 +132,7 @@ final class OrderController extends Controller
                 array_values($app->orders->paymentMethods())
             ),
             'terms' => $app->pages->links('terms', $locale)[0] ?? null,
+            'file_limits' => self::fileLimits(),
             'errors' => $errors,
         ]);
     }
@@ -175,6 +184,7 @@ final class OrderController extends Controller
         $method = $app->orders->paymentMethods()[$order['payment_method']] ?? null;
         $provider = $order['provider_id'] !== null ? $app->providers->find($order['provider_id']) : null;
         $buyer = $order['buyer_id'] !== null ? $app->accounts->findById($order['buyer_id']) : null;
+        $files = $app->orderFiles->ofOrder($order['id']);
 
         $this->render('order/show.twig', [
             'order' => $this->summary($order) + [
@@ -184,8 +194,9 @@ final class OrderController extends Controller
                     'role' => $event['actor_role'],
                     'note' => $event['note'],
                     'at' => $event['created_at'],
+                    'files' => $files['events'][(int) $event['id']] ?? [],
                 ], $order['events']),
-                'messages' => $order['messages'],
+                'messages' => array_map(fn (array $message) => $message + ['files' => $files['messages'][(int) $message['id']] ?? []], $order['messages']),
                 'payment_label_key' => $method?->labelKey(),
                 'payment_description_key' => $method?->descriptionKey(),
                 'final' => $app->orders->isFinal($order),
@@ -200,6 +211,7 @@ final class OrderController extends Controller
                 : ['name' => $order['buyer_name'], 'email' => $buyer['email'] ?? null, 'path' => null],
             'flow_template' => $flow?->orderDetailTemplate(),
             'flow_data' => $flow?->orderDetailData($order, $locale, $app) ?? [],
+            'file_limits' => self::fileLimits(),
         ]);
     }
 
@@ -215,16 +227,61 @@ final class OrderController extends Controller
         $name = (string) ($_POST['transition'] ?? '');
         $note = trim((string) ($_POST['note'] ?? ''));
 
-        $problem = $app->orders->apply($order['id'], $name, $role, $app->auth->account()['id'], $note, $app);
+        // Files are checked first: a refused file must not leave the
+        // step done without it.
+        $uploads = $app->orders->acceptsFiles($order, $name) ? OrderFiles::uploads($_FILES['files'] ?? null) : [];
+        $problem = OrderFiles::problem($uploads)
+            ?? $app->orders->apply($order['id'], $name, $role, $app->auth->account()['id'], $note, $app);
 
         if ($problem === null) {
+            $app->orderFiles->store($order['id'], $app->auth->account()['id'], $role, $app->orders->lastEventId($order['id']), null, $uploads);
             OrderNotifier::stateChanged($app, $order, $app->orders->find($order['id']), $name, $role, $note !== '' ? $note : null);
             Session::flash('success', $this->trans('core.order.updated'));
         } else {
-            Session::flash('error', $this->trans($problem));
+            Session::flash('error', $this->trans($problem, self::fileLimits()));
         }
 
         $this->redirect('/orders/' . $order['id']);
+    }
+
+    /** A file of the order, for its buyer and its provider only, always as a download. */
+    public function download(array $params): void
+    {
+        $found = $this->ownOrder($params);
+        if ($found === null) {
+            return;
+        }
+
+        $file = $this->app->orderFiles->find($found[0]['id'], (int) $params['file']);
+        if ($file === null) {
+            $this->notFound();
+            return;
+        }
+
+        self::sendFile($file);
+    }
+
+    /** @param array{path: string, name: string, size: int} $file */
+    public static function sendFile(array $file): void
+    {
+        // Never shown by the browser, whatever the file claims to be: an
+        // uploaded HTML or SVG file must not run in this site's name.
+        header('Content-Type: application/octet-stream');
+        header("Content-Disposition: attachment; filename=\"" . preg_replace('/[^A-Za-z0-9._-]/', '_', $file['name']) . "\"; filename*=UTF-8''" . rawurlencode($file['name']));
+        header('Content-Length: ' . $file['size']);
+        header('Cache-Control: private, no-store');
+        header("Content-Security-Policy: default-src 'none'; sandbox");
+        readfile($file['path']);
+    }
+
+    /** @return array{max: int, megabytes: int, types: string} for messages and hints about attachments */
+    public static function fileLimits(): array
+    {
+        return [
+            'max' => OrderFiles::MAX_FILES,
+            'megabytes' => max(1, intdiv(OrderFiles::maxBytes(), 1024 * 1024)),
+            'types' => implode(', ', OrderFiles::EXTENSIONS),
+        ];
     }
 
     public function message(array $params): void
@@ -239,13 +296,20 @@ final class OrderController extends Controller
         $accountId = $app->auth->account()['id'];
         $body = trim(str_replace("\r\n", "\n", (string) ($_POST['body'] ?? '')));
 
-        if ($body === '' || mb_strlen($body) > 5000) {
+        $uploads = OrderFiles::uploads($_FILES['files'] ?? null);
+        $fileProblem = OrderFiles::problem($uploads);
+
+        // A message is text, files, or both.
+        if (($body === '' && $uploads === []) || mb_strlen($body) > 5000) {
             Session::flash('error', $this->trans('core.order.message.error'));
+        } elseif ($fileProblem !== null) {
+            Session::flash('error', $this->trans($fileProblem, self::fileLimits()));
         } elseif ((new RateLimiter($app->db))->hit('order-message', (string) $accountId, 60, 3600)) {
             Session::flash('error', $this->trans('core.error.too_many_requests'));
         } else {
-            $app->orders->addMessage($order['id'], $accountId, $role, $body);
-            OrderNotifier::message($app, $order, $role, $body);
+            $messageId = $app->orders->addMessage($order['id'], $accountId, $role, $body);
+            $app->orderFiles->store($order['id'], $accountId, $role, null, $messageId, $uploads);
+            OrderNotifier::message($app, $order, $role, $body !== '' ? $body : $this->trans('core.order.file.sent_files', ['count' => count($uploads)]));
         }
 
         $this->redirect('/orders/' . $order['id']);

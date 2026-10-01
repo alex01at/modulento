@@ -30,13 +30,19 @@
             <strong>{{ trans(order.event_labels[loop.index0]) }}</strong>
             <small>{{ trans('core.order.role.' ~ event.actor_role) }} · {{ event.created_at }} UTC</small>
             {% if event.note %}<p>{{ event.note|nl2br }}</p>{% endif %}
+            {% for file in files.events[event.id] ?? [] %}
+                <br><a href="{{ url('/admin/orders/' ~ order.id ~ '/files/' ~ file.id) }}" download>{{ file.name }}</a> <small>({{ (file.size / 1024)|round(0, 'ceil') }} KB)</small>
+            {% endfor %}
         </li>
     {% endfor %}
 </ol>
 
 <h2>{{ trans('core.order.messages') }}</h2>
 {% for message in order.messages %}
-    <p><small>{{ message.author_role == 'buyer' ? order.buyer_name : order.provider_name }} · {{ message.created_at }} UTC</small><br>{{ message.body|nl2br }}</p>
+    <p><small>{{ message.author_role == 'buyer' ? order.buyer_name : order.provider_name }} · {{ message.created_at }} UTC</small><br>{{ message.body|nl2br }}
+            {% for file in files.messages[message.id] ?? [] %}
+                <br><a href="{{ url('/admin/orders/' ~ order.id ~ '/files/' ~ file.id) }}" download>{{ file.name }}</a> <small>({{ (file.size / 1024)|round(0, 'ceil') }} KB)</small>
+            {% endfor %}</p>
 {% else %}
     <p><small>{{ trans('core.order.message.none') }}</small></p>
 {% endfor %}

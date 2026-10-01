@@ -213,6 +213,22 @@ final class Orders
         return $definition['done'] ?? $definition['label'] ?? 'core.order.event.unknown';
     }
 
+    /** Whether files may be attached to a transition. */
+    public function acceptsFiles(array $order, string $transition): bool
+    {
+        return (bool) ($this->flow($order['flow'])?->transitions()[$transition]['files'] ?? false);
+    }
+
+    /** The id of the newest history entry - the one a transition just wrote. */
+    public function lastEventId(int $orderId): ?int
+    {
+        $stmt = $this->db->prepare('SELECT MAX(id) FROM order_event WHERE order_id = :id');
+        $stmt->execute(['id' => $orderId]);
+        $id = $stmt->fetchColumn();
+
+        return $id !== null && $id !== false ? (int) $id : null;
+    }
+
     /** The side of an order an account is on, or null if it has nothing to do with it. */
     public function roleOf(array $order, int $accountId, ?int $providerIdOfAccount): ?string
     {
@@ -236,7 +252,7 @@ final class Orders
     /**
      * The transitions a role can apply to an order right now.
      *
-     * @return array<string, array{label: string, note: ?string}> name => button label key and whether a note is asked
+     * @return array<string, array{label: string, note: ?string, files: bool}> name => button label key, whether a note is asked and whether files can be attached
      */
     public function available(array $order, string $role, App $app): array
     {
@@ -248,7 +264,7 @@ final class Orders
         $available = [];
         foreach ($flow->transitions() as $name => $transition) {
             if ($this->permits($flow, $name, $transition, $order, $role, $app)) {
-                $available[$name] = ['label' => $transition['label'], 'note' => $transition['note'] ?? null];
+                $available[$name] = ['label' => $transition['label'], 'note' => $transition['note'] ?? null, 'files' => $transition['files'] ?? false];
             }
         }
 
@@ -338,12 +354,15 @@ final class Orders
         return $applied;
     }
 
-    public function addMessage(int $orderId, int $accountId, string $role, string $body): void
+    /** @return int the message's id */
+    public function addMessage(int $orderId, int $accountId, string $role, string $body): int
     {
         $stmt = $this->db->prepare(
             'INSERT INTO order_message (order_id, account_id, author_role, body, created_at) VALUES (:order, :account, :role, :body, :now)'
         );
         $stmt->execute(['order' => $orderId, 'account' => $accountId, 'role' => $role, 'body' => $body, 'now' => Clock::now()]);
+
+        return (int) $this->db->lastInsertId();
     }
 
     /** Records that the order has been paid. Returns false if it already was. */

@@ -44,6 +44,7 @@ final class AdminOrderController extends Controller
                 'state_label_key' => $this->stateLabel($order),
                 'event_labels' => array_map(fn (array $event) => $app->orders->eventLabel($order, $event['transition']), $order['events']),
             ],
+            'files' => $app->orderFiles->ofOrder($order['id']),
             'actions' => $app->orders->available($order, 'admin', $app),
             'flow_template' => $flow?->orderDetailTemplate(),
             'flow_data' => $flow?->orderDetailData($order, $app->translator->locale(), $app) ?? [],
@@ -71,6 +72,17 @@ final class AdminOrderController extends Controller
         }
 
         $this->redirect('/admin/orders/' . $order['id']);
+    }
+
+    public function download(array $params): void
+    {
+        $file = $this->app->orderFiles->find((int) $params['id'], (int) $params['file']);
+        if ($file === null) {
+            $this->redirect('/admin/orders');
+            return;
+        }
+
+        OrderController::sendFile($file);
     }
 
     private function stateLabel(array $order): string

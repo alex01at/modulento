@@ -157,6 +157,7 @@ final class Kernel
         $router->post('/orders/{id}/transition', [OrderController::class, 'transition']);
         $router->post('/orders/{id}/message', [OrderController::class, 'message']);
         $router->post('/orders/{id}/paid', [OrderController::class, 'markPaid']);
+        $router->get('/orders/{id}/files/{file}', [OrderController::class, 'download']);
         $router->get('/categories/{slug}', [OfferController::class, 'category'], Router::PUBLIC);
 
         $router->get('/providers', [ProviderController::class, 'index'], Router::PUBLIC);
@@ -181,6 +182,7 @@ final class Kernel
         $router->get('/admin/orders', [AdminOrderController::class, 'index'], 'core.orders.manage');
         $router->get('/admin/orders/{id}', [AdminOrderController::class, 'show'], 'core.orders.manage');
         $router->post('/admin/orders/{id}/transition', [AdminOrderController::class, 'transition'], 'core.orders.manage');
+        $router->get('/admin/orders/{id}/files/{file}', [AdminOrderController::class, 'download'], 'core.orders.manage');
 
         $router->get('/admin/offers', [AdminCatalogueController::class, 'offers'], 'core.offers.manage');
         $router->get('/admin/offers/{id}', [AdminCatalogueController::class, 'offer'], 'core.offers.manage');

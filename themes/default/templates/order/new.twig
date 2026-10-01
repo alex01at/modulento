@@ -14,7 +14,7 @@
     <p class="flash flash-error" role="alert">{{ error }}</p>
 {% endfor %}
 
-<form method="post" action="{{ url(offer.path ~ '/order') }}" class="stack-form wide">
+<form method="post" action="{{ url(offer.path ~ '/order') }}" class="stack-form wide" enctype="multipart/form-data">
     {{ csrf_field() }}
 
     {# What can be chosen, supplied by the extension of the offer's type. #}
@@ -22,6 +22,10 @@
 
     <label for="note">{{ trans('core.order.new.note') }}</label>
     <textarea id="note" name="note" rows="5" maxlength="5000">{{ note }}</textarea>
+
+    <label for="files">{{ trans('core.order.file.attach') }}</label>
+    <input id="files" name="files[]" type="file" multiple>
+    <small>{{ trans('core.order.file.hint', file_limits) }}</small>
 
     <fieldset>
         <legend>{{ trans('core.order.payment') }}</legend>

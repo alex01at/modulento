@@ -16,12 +16,17 @@
     <section>
         <h2>{{ trans('core.order.actions') }}</h2>
         {% for name, action in actions %}
-            <form method="post" action="{{ url('/orders/' ~ order.id ~ '/transition') }}" class="stack-form wide">
+            <form method="post" action="{{ url('/orders/' ~ order.id ~ '/transition') }}" class="stack-form wide" {{ action.files ? 'enctype="multipart/form-data"' }}>
                 {{ csrf_field() }}
                 <input type="hidden" name="transition" value="{{ name }}">
                 {% if action.note %}
                     <label for="note_{{ name }}">{{ trans(action.note == 'required' ? 'core.order.note_required' : 'core.order.note_optional') }}</label>
                     <textarea id="note_{{ name }}" name="note" rows="3" maxlength="5000" {{ action.note == 'required' ? 'required' }}></textarea>
+                {% endif %}
+                {% if action.files %}
+                    <label for="files_{{ name }}">{{ trans('core.order.file.attach') }}</label>
+                    <input id="files_{{ name }}" name="files[]" type="file" multiple>
+                    <small>{{ trans('core.order.file.hint', file_limits) }}</small>
                 {% endif %}
                 <button type="submit">{{ trans(action.label) }}</button>
             </form>
@@ -81,6 +86,13 @@
                 <strong>{{ trans(event.label_key) }}</strong>
                 <small>{{ trans('core.order.role.' ~ event.role) }} · {{ event.at }} UTC</small>
                 {% if event.note %}<p>{{ event.note|nl2br }}</p>{% endif %}
+                {% if event.files %}
+                    <ul class="files">
+                        {% for file in event.files %}
+                            <li><a href="{{ url('/orders/' ~ order.id ~ '/files/' ~ file.id) }}" download>{{ file.name }}</a> <small>({{ (file.size / 1024)|round(0, 'ceil') }} KB)</small></li>
+                        {% endfor %}
+                    </ul>
+                {% endif %}
             </li>
         {% endfor %}
     </ol>
@@ -93,14 +105,24 @@
             <small>{{ message.author_role == 'buyer' ? order.buyer_name : order.provider_name }} · {{ message.created_at }} UTC</small><br>
             {{ message.body|nl2br }}
         </p>
+        {% if message.files %}
+            <ul class="files">
+                {% for file in message.files %}
+                    <li><a href="{{ url('/orders/' ~ order.id ~ '/files/' ~ file.id) }}" download>{{ file.name }}</a> <small>({{ (file.size / 1024)|round(0, 'ceil') }} KB)</small></li>
+                {% endfor %}
+            </ul>
+        {% endif %}
     {% else %}
         <p><small>{{ trans('core.order.message.none') }}</small></p>
     {% endfor %}
 
-    <form method="post" action="{{ url('/orders/' ~ order.id ~ '/message') }}" class="stack-form wide">
+    <form method="post" action="{{ url('/orders/' ~ order.id ~ '/message') }}" class="stack-form wide" enctype="multipart/form-data">
         {{ csrf_field() }}
         <label for="body">{{ trans('core.order.message.new') }}</label>
-        <textarea id="body" name="body" rows="4" maxlength="5000" required></textarea>
+        <textarea id="body" name="body" rows="4" maxlength="5000"></textarea>
+        <label for="message_files">{{ trans('core.order.file.attach') }}</label>
+        <input id="message_files" name="files[]" type="file" multiple>
+        <small>{{ trans('core.order.file.hint', file_limits) }}</small>
         <button type="submit">{{ trans('core.order.message.send') }}</button>
     </form>
 </section>
