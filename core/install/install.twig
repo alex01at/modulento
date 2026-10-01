@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="{{ locale }}">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="robots" content="noindex">
+    <title>{{ t['core.install.title'] }}</title>
+    <link rel="stylesheet" href="/install.css">
+</head>
+<body>
+<main>
+    <h1>{{ t['core.install.title'] }}</h1>
+    <p>{{ t['core.install.intro'] }}</p>
+
+    {% for error in errors %}
+        <p class="error" role="alert">{{ error }}</p>
+    {% endfor %}
+
+    <h2>{{ t['core.install.requirements'] }}</h2>
+    <ul class="checks">
+        {% for requirement in requirements %}
+            <li class="{{ requirement.ok ? 'ok' : 'missing' }}">
+                {{ requirement.label }} –
+                {{ requirement.ok ? t['core.install.requirement_ok'] : t['core.install.requirement_missing'] }}
+            </li>
+        {% endfor %}
+    </ul>
+
+    <form method="post" action="/">
+        <input type="hidden" name="_csrf" value="{{ csrf }}">
+
+        <h2>{{ t['core.install.site'] }}</h2>
+        <label for="site_name">{{ t['core.install.site_name'] }}</label>
+        <input id="site_name" name="site_name" value="{{ values.site_name }}" required>
+
+        <h2>{{ t['core.install.database'] }}</h2>
+        <p>{{ t['core.install.database_hint'] }}</p>
+        <label for="db_host">{{ t['core.install.db_host'] }}</label>
+        <input id="db_host" name="db_host" value="{{ values.db_host }}" required>
+        <label for="db_port">{{ t['core.install.db_port'] }}</label>
+        <input id="db_port" name="db_port" value="{{ values.db_port }}" inputmode="numeric" required>
+        <label for="db_name">{{ t['core.install.db_name'] }}</label>
+        <input id="db_name" name="db_name" value="{{ values.db_name }}" required>
+        <label for="db_user">{{ t['core.install.db_user'] }}</label>
+        <input id="db_user" name="db_user" value="{{ values.db_user }}" autocomplete="off" required>
+        <label for="db_pass">{{ t['core.install.db_pass'] }}</label>
+        <input id="db_pass" name="db_pass" type="password" autocomplete="off">
+
+        <h2>{{ t['core.install.admin'] }}</h2>
+        <label for="admin_email">{{ t['core.install.admin_email'] }}</label>
+        <input id="admin_email" name="admin_email" type="email" value="{{ values.admin_email }}" autocomplete="username" required>
+        <label for="admin_password">{{ t['core.install.admin_password'] }}</label>
+        <input id="admin_password" name="admin_password" type="password" minlength="12" autocomplete="new-password" required>
+        <label for="admin_password_repeat">{{ t['core.install.admin_password_repeat'] }}</label>
+        <input id="admin_password_repeat" name="admin_password_repeat" type="password" minlength="12" autocomplete="new-password" required>
+
+        <button type="submit">{{ t['core.install.submit'] }}</button>
+    </form>
+</main>
+</body>
+</html>

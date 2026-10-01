@@ -1,0 +1,36 @@
+{% extends '@admin/layout.twig' %}
+
+{% block title %}{{ trans('core.admin.themes.title') }} – {{ site_name }}{% endblock %}
+
+{% block admin %}
+<h1>{{ trans('core.admin.themes.title') }}</h1>
+<p>{{ trans('core.admin.themes.intro') }}</p>
+
+<table>
+    <thead>
+    <tr>
+        <th scope="col">{{ trans('core.admin.extensions.name') }}</th>
+        <th scope="col">{{ trans('core.admin.extensions.version') }}</th>
+        <th scope="col">{{ trans('core.admin.extensions.status') }}</th>
+        <th scope="col"></th>
+    </tr>
+    </thead>
+    <tbody>
+    {% for theme in themes %}
+        <tr>
+            <th scope="row">{{ theme.name }} <small>({{ theme.id }})</small></th>
+            <td>{{ theme.version }}</td>
+            <td>{{ theme.id == active ? trans('core.admin.extensions.status_enabled') : trans('core.admin.extensions.status_disabled') }}</td>
+            <td>
+                {% if theme.id != active %}
+                    <form method="post" action="/admin/themes/{{ theme.id }}/activate">
+                        {{ csrf_field() }}
+                        <button type="submit">{{ trans('core.admin.extensions.enable') }}</button>
+                    </form>
+                {% endif %}
+            </td>
+        </tr>
+    {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

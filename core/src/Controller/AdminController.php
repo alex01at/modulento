@@ -13,7 +13,7 @@ final class AdminController extends Controller
 {
     public function index(array $params): void
     {
-        $this->render('admin/index.twig');
+        $this->render('@admin/index.twig');
     }
 
     public function extensions(array $params): void
@@ -33,7 +33,7 @@ final class AdminController extends Controller
             ];
         }
 
-        $this->render('admin/extensions.twig', [
+        $this->render('@admin/extensions.twig', [
             'extensions' => $rows,
             'invalid' => $manager->invalid(),
             'missing' => array_values(array_diff($enabled, array_keys($manager->discover()))),
@@ -74,6 +74,29 @@ final class AdminController extends Controller
             ]);
         }
 
-        $this->render('admin/tasks.twig', ['tasks' => $tasks]);
+        $config = $this->app->config['app'];
+
+        $this->render('@admin/tasks.twig', [
+            'tasks' => $tasks,
+            'cron_script' => $config['root'] . '/bin/cron.php',
+            'cron_url' => $config['cron_token'] !== '' ? $config['url'] . '/cron/' . $config['cron_token'] : null,
+        ]);
+    }
+
+    public function themes(array $params): void
+    {
+        $this->render('@admin/themes.twig', [
+            'themes' => array_values($this->app->themes->siteThemes()),
+            'active' => $this->app->themes->active(),
+        ]);
+    }
+
+    public function activateTheme(array $params): void
+    {
+        if ($this->app->themes->activate($params['id'])) {
+            Session::flash('success', $this->trans('core.admin.themes.activated', ['id' => $params['id']]));
+        }
+
+        $this->redirect('/admin/themes');
     }
 }

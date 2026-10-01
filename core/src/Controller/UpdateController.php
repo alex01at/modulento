@@ -17,7 +17,7 @@ final class UpdateController extends Controller
         $available = Session::get('update_available');
         Session::remove('update_available');
 
-        $this->render('admin/updates.twig', [
+        $this->render('@admin/updates.twig', [
             'enabled' => $updater->isEnabled(),
             'dev_checkout' => $updater->isDevelopmentCheckout(),
             'current_version' => $updater->currentVersion(),
@@ -53,6 +53,20 @@ final class UpdateController extends Controller
         $result = $this->updater()->applyUpdate();
 
         Session::flash($result['success'] ? 'success' : 'error', $this->trans($result['message_key'], $result['params']));
+        $this->redirect('/admin/updates');
+    }
+
+    /**
+     * For changes that did not come through an update: an extension that
+     * was replaced by a newer copy over FTP brings new migration files
+     * that nothing else would run without shell access.
+     */
+    public function migrate(array $params): void
+    {
+        $applied = Migrator::runAll($this->app->db, $this->app->config['app']['root']);
+        $count = array_sum(array_map('count', $applied));
+
+        Session::flash('success', $this->trans($count > 0 ? 'core.update.migrations_applied' : 'core.update.migrations_none', ['count' => $count]));
         $this->redirect('/admin/updates');
     }
 

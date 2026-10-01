@@ -51,7 +51,9 @@ final class Router
 
     private function add(string $method, string $path, array|Closure $handler, string $access, bool $csrfExempt): void
     {
-        $regex = preg_replace('#\{([a-zA-Z_][a-zA-Z0-9_]*)\}#', '(?P<$1>[^/]+)', $path);
+        // {name} matches one path segment, {name*} the rest of the path.
+        $regex = preg_replace('#\{([a-zA-Z_][a-zA-Z0-9_]*)\*\}#', '(?P<$1>.+)', $path);
+        $regex = preg_replace('#\{([a-zA-Z_][a-zA-Z0-9_]*)\}#', '(?P<$1>[^/]+)', $regex);
         $this->routes[] = [
             'method' => $method,
             'regex' => '#^' . $regex . '$#',

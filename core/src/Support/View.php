@@ -5,15 +5,22 @@ declare(strict_types=1);
 namespace Modulento\Core\Support;
 
 use Modulento\Core\App;
+use Modulento\Core\Controller\AssetController;
 use Twig\Environment;
 use Twig\Loader\FilesystemLoader;
 use Twig\TwigFunction;
 
 /**
- * Core templates live in the main Twig namespace, an extension's templates
- * in "@<extension id>/...". A theme can override both: themes/<theme>/
- * templates/ shadows core templates, themes/<theme>/extensions/<id>/
- * shadows that extension's templates.
+ * Where a template name is looked up (first match wins):
+ *
+ *   "home.twig"          active site theme, then themes/default
+ *   "@admin/x.twig"      themes/admin
+ *   "@<ext id>/x.twig"   <site theme>/extensions/<ext id>/, then the
+ *                        extension's own templates/ folder
+ *
+ * What controllers hand to templates - the globals and functions below and
+ * the variables documented per template - is the contract between code and
+ * themes. Templates get data, never services or database access.
  */
 final class View
 {
@@ -23,19 +30,17 @@ final class View
     {
         $root = $app->config['app']['root'];
         $debug = $app->config['app']['env'] === 'dev';
-        $themeDir = $app->config['app']['theme'] !== ''
-            ? $root . '/themes/' . basename($app->config['app']['theme'])
-            : null;
+        $themes = $app->themes;
 
         $loader = new FilesystemLoader();
-        if ($themeDir !== null && is_dir($themeDir . '/templates')) {
-            $loader->addPath($themeDir . '/templates');
+        foreach ($themes->siteDirs('templates') as $dir) {
+            $loader->addPath($dir);
         }
-        $loader->addPath($root . '/core/templates');
+        $loader->addPath($themes->adminDir('templates'), 'admin');
 
         foreach ($app->extensions->loaded() as $manifest) {
-            if ($themeDir !== null && is_dir($themeDir . '/extensions/' . $manifest->id)) {
-                $loader->addPath($themeDir . '/extensions/' . $manifest->id, $manifest->id);
+            foreach ($themes->siteDirs('extensions/' . $manifest->id) as $dir) {
+                $loader->addPath($dir, $manifest->id);
             }
             if (is_dir($manifest->dir . '/templates')) {
                 $loader->addPath($manifest->dir . '/templates', $manifest->id);
@@ -77,10 +82,38 @@ final class View
             'money',
             fn (int $minorUnits, string $currency = 'EUR') => Money::format($minorUnits, $currency, $translator->locale())
         ));
+
+        // URLs of files in a theme's or an extension's assets/ folder. They
+        // carry the file's change time, so a changed file is fetched anew
+        // although assets are served with a long cache lifetime.
+        $this->twig->addFunction(new TwigFunction(
+            'theme_asset',
+            fn (string $path) => self::assetUrl('/assets/theme/', $path, AssetController::locate($themes->siteDirs('assets'), $path))
+        ));
+        $this->twig->addFunction(new TwigFunction(
+            'admin_asset',
+            fn (string $path) => self::assetUrl('/assets/admin/', $path, AssetController::locate([$themes->adminDir('assets')], $path))
+        ));
+        $this->twig->addFunction(new TwigFunction(
+            'ext_asset',
+            function (string $extensionId, string $path) use ($app): string {
+                $manifest = $app->extensions->loaded()[$extensionId] ?? null;
+                $file = $manifest !== null ? AssetController::locate([$manifest->dir . '/assets'], $path) : null;
+
+                return self::assetUrl('/assets/ext/' . rawurlencode($extensionId) . '/', $path, $file);
+            }
+        ));
     }
 
     public function render(string $template, array $data = []): string
     {
         return $this->twig->render($template, $data);
+    }
+
+    private static function assetUrl(string $prefix, string $path, ?string $file): string
+    {
+        $url = $prefix . implode('/', array_map('rawurlencode', explode('/', $path)));
+
+        return $file !== null ? $url . '?v=' . filemtime($file) : $url;
     }
 }

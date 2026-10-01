@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="{{ locale }}">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="robots" content="noindex">
+    <title>{% block title %}{{ trans('core.admin.title') }} – {{ site_name }}{% endblock %}</title>
+    <link rel="stylesheet" href="{{ admin_asset('admin.css') }}">
+    {% block head %}{% endblock %}
+</head>
+<body>
+<header class="site-header">
+    <a class="site-name" href="/admin">{{ site_name }} – {{ trans('core.admin.title') }}</a>
+    <nav aria-label="{{ trans('core.nav.home') }}">
+        <a href="/">{{ trans('core.nav.to_site') }}</a>
+        <form method="post" action="/logout" class="inline-form">
+            {{ csrf_field() }}
+            <button type="submit" class="link-button">{{ trans('core.nav.logout') }}</button>
+        </form>
+    </nav>
+</header>
+
+<main>
+    {% for type, message in flashes %}
+        <p class="flash flash-{{ type }}" role="status">{{ message }}</p>
+    {% endfor %}
+    <div class="admin">
+        <nav class="admin-menu" aria-label="{{ trans('core.nav.admin') }}">
+            {% for item in admin_menu %}
+                <a href="{{ item.path }}">{{ trans(item.label_key) }}</a>
+            {% endfor %}
+        </nav>
+        <section class="admin-content">
+            {% block admin %}{% endblock %}
+        </section>
+    </div>
+</main>
+</body>
+</html>

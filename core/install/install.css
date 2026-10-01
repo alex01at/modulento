@@ -1,0 +1,11 @@
+* { box-sizing: border-box; }
+body { margin: 0; color: #1c2430; background: #f5f7fa; font: 1rem/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+main { max-width: 34rem; margin: 0 auto; padding: 2rem 1rem 4rem; }
+h2 { margin: 2rem 0 .5rem; font-size: 1.15rem; }
+label { display: block; margin-top: .75rem; }
+input { display: block; width: 100%; padding: .5rem .6rem; border: 1px solid #b9c0ca; border-radius: .3rem; font: inherit; }
+button { margin-top: 1.75rem; padding: .6rem 1.2rem; border: 0; border-radius: .3rem; background: #1f5fbf; color: #fff; font: inherit; cursor: pointer; }
+.error { padding: .6rem .8rem; border-left: .25rem solid #a3231f; background: #fff; color: #a3231f; }
+.checks { padding-left: 1.2rem; }
+.checks .ok { color: #1c6b3a; }
+.checks .missing { color: #a3231f; font-weight: 600; }

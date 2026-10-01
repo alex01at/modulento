@@ -1,0 +1,14 @@
+# Only needed where the web server's document root cannot be pointed at
+# public/ (some shared hosting packages): everything is passed on to
+# public/, so no other file of the installation - .env, var/, the source -
+# can be requested. With the document root set to public/ this file is
+# never read.
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteRule ^$ public/ [L]
+    RewriteRule (.*) public/$1 [L]
+</IfModule>
+
+<IfModule !mod_rewrite.c>
+    Require all denied
+</IfModule>

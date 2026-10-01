@@ -1,4 +1,4 @@
-{% extends 'layout/admin.twig' %}
+{% extends '@admin/layout.twig' %}
 
 {% block title %}{{ trans('core.update.title') }} – {{ site_name }}{% endblock %}
 
@@ -38,4 +38,10 @@
         </form>
     {% endif %}
 {% endif %}
+<h2>{{ trans('core.update.migrations_title') }}</h2>
+<p>{{ trans('core.update.migrations_hint') }}</p>
+<form method="post" action="/admin/updates/migrate">
+    {{ csrf_field() }}
+    <button type="submit">{{ trans('core.update.migrations_run') }}</button>
+</form>
 {% endblock %}

@@ -1,0 +1,53 @@
+/* Site theme "default". Deliberately small: it only has to be usable and
+   to show a theme author every template that exists. */
+:root {
+    --text: #1c2430;
+    --muted: #55606e;
+    --line: #d5dae1;
+    --surface: #f5f7fa;
+    --accent: #1f5fbf;
+    --error: #a3231f;
+    --success: #1c6b3a;
+}
+
+* { box-sizing: border-box; }
+
+body {
+    margin: 0;
+    color: var(--text);
+    font: 1rem/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+a { color: var(--accent); }
+
+.site-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: .75rem 1.5rem;
+    padding: .75rem 1rem;
+    border-bottom: 1px solid var(--line);
+    background: var(--surface);
+}
+
+.site-header nav { display: flex; flex-wrap: wrap; align-items: center; gap: 1rem; }
+.site-name { font-weight: 700; text-decoration: none; color: var(--text); }
+
+main { max-width: 64rem; margin: 0 auto; padding: 1.5rem 1rem 3rem; }
+
+.inline-form { display: inline; margin: 0; }
+.link-button { padding: 0; border: 0; background: none; color: var(--accent); font: inherit; text-decoration: underline; cursor: pointer; }
+
+.stack-form { display: grid; gap: .5rem; max-width: 24rem; }
+.stack-form button { margin-top: .5rem; justify-self: start; }
+
+input, select, button { font: inherit; padding: .45rem .6rem; border: 1px solid var(--line); border-radius: .3rem; }
+button { background: var(--accent); border-color: var(--accent); color: #fff; cursor: pointer; }
+.link-button { border-radius: 0; }
+
+.flash { padding: .6rem .8rem; border-left: .25rem solid var(--muted); background: var(--surface); }
+.flash-error { border-color: var(--error); color: var(--error); }
+.flash-success { border-color: var(--success); color: var(--success); }
+
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }

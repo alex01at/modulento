@@ -13,6 +13,7 @@ if (PHP_SAPI === 'cli-server') {
     }
 }
 
+use Modulento\Core\Install\Installer;
 use Modulento\Core\Kernel;
 use Modulento\Core\NotConfiguredException;
 
@@ -42,9 +43,8 @@ try {
     }
     $app->router->dispatch($_SERVER['REQUEST_METHOD'], $_SERVER['REQUEST_URI']);
 } catch (NotConfiguredException $e) {
-    http_response_code(503);
-    header('Content-Type: text/plain; charset=utf-8');
-    echo "Modulento is not configured yet.\n\n" . $e->getMessage() . "\nThen run: php bin/migrate.php\n";
+    // No database settings yet: every request goes to the setup page.
+    (new Installer($root))->handle($_SERVER['REQUEST_METHOD'], $_SERVER['REQUEST_URI']);
 } catch (Throwable $e) {
     error_log((string) $e);
     if (!headers_sent()) {
