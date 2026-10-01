@@ -8,6 +8,8 @@ use Closure;
 use LogicException;
 use Modulento\Core\App;
 use Modulento\Core\Catalogue\OfferType;
+use Modulento\Core\Order\OrderFlow;
+use Modulento\Core\Order\PaymentMethod;
 use Modulento\Core\Support\Router;
 
 /**
@@ -57,6 +59,20 @@ final class Registrar
     {
         $this->prefixed($type->id(), 'Offer type');
         $this->app->offers->registerType($type);
+    }
+
+    /** How offers of one of this extension's types are ordered and carried out. */
+    public function orderFlow(OrderFlow $flow): void
+    {
+        $this->prefixed($flow->id(), 'Order flow');
+        $this->app->orders->registerFlow($flow);
+    }
+
+    /** A way to pay for orders, e.g. a payment service. */
+    public function paymentMethod(PaymentMethod $method): void
+    {
+        $this->prefixed($method->id(), 'Payment method');
+        $this->app->orders->registerPaymentMethod($method);
     }
 
     public function adminMenu(string $labelKey, string $path, string $permission): void

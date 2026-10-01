@@ -14,7 +14,9 @@ profiles and a catalogue of offers with approval, categories, pictures and
 search, roles and account administration, content pages and legal texts,
 several languages, themes, extensions, scheduled tasks and self-update. The
 extension `freelancer` adds services with packages as the first kind of offer.
-There is no order or payment code yet.
+Orders run as a state machine with history, messages and deadlines. Payment
+is settled between buyer and provider for now; a payment service plugs in as
+an extension.
 
 Two rules shape everything:
 
@@ -159,6 +161,9 @@ Templates of the site theme, with the variables they receive:
 | `offer/show.twig` | `offer` (`title`, `summary`, `description` as plain text, `images`, `price_from`, `category`, `provider_*`, `is_own`), `type_template`, `type_data` |
 | `account/offers.twig` | `offers`, `types`, `provider_status` |
 | `account/offer_edit.twig` | `offer`, `type` (`id`, `label_key`, `template`), `type_data`, `texts`, `category_id`, `categories`, `locales`, `errors`, `approval_required`, `images_available`, `max_images`, `currency` |
+| `order/new.twig` | `offer`, `flow_template`, `flow_data`, `note`, `payment_methods`, `terms`, `errors`; keep the button's wording |
+| `order/index.twig` | `role` (`buyer` or `provider`), `orders`, `page`, `pages` |
+| `order/show.twig` | `order` (summary, `items`, `events`, `messages`, payment), `role`, `actions`, `can_mark_paid`, `counterpart`, `flow_template`, `flow_data` |
 | `provider/index.twig` | `providers`, `page`, `pages` |
 | `provider/show.twig` | `provider`: `name`, `path`, `type`, `headline`, `description` (plain text), `city`, `country`, `legal` (only for a business); block `offers` for extensions |
 | `emails/*.txt.twig` | blocks `subject` and `body`; plain text, not HTML-escaped |
@@ -166,7 +171,7 @@ Templates of the site theme, with the variables they receive:
 E-mails are theme templates too: `verify_email`, `reset_password`,
 `already_registered`, `change_email`, `password_changed`, `provider_approved`,
 `provider_rejected`, `provider_suspended`, `account_blocked`, `offer_published`,
-`offer_rejected`, `offer_contact`. With `APP_ENV="dev"`
+`offer_rejected`, `offer_contact`, `order_update`, `order_message`. With `APP_ENV="dev"`
 nothing is sent; mails are appended to `var/log/mail.log`.
 
 Available in every template:
@@ -214,12 +219,14 @@ extensions/<id>/
 | `listen(EventClass, fn ($event, App $app) => ...)` | React to a core or extension event |
 | `task(name, everyMinutes, fn (App $app) => ...)` | Scheduled work, run by `bin/cron.php` |
 | `offerType(OfferType)` | A kind of offer for the catalogue, see below |
+| `orderFlow(OrderFlow)` | How offers of a type are ordered and carried out, see below |
+| `paymentMethod(PaymentMethod)` | A way to pay, e.g. a payment service |
 
 Core services an extension uses instead of SQL on core tables, all on the
 `App` object: `accounts` (find, create, change accounts), `tokens` (one-time
 links), `mailer` (`send(to, '@<id>/emails/x.txt.twig', data, locale)`),
 `settings`, `locales`, `pages`, `providers`, `offers`, `categories`,
-`offerImages`, `roles`, `auth`, `events`, and `url()`.
+`offerImages`, `orders`, `roles`, `auth`, `events`, and `url()`.
 
 ### Offer types
 
@@ -237,6 +244,34 @@ that implements `Modulento\Core\Catalogue\OfferType`:
 `extensions/freelancer` is the reference: packages with price, delivery time
 and revisions, extras, and requirements, each with a text per language.
 
+### Order flows
+
+An extension makes its offers orderable by registering an
+`Modulento\Core\Order\OrderFlow`. The flow describes; the core executes:
+
+- `states()` and `transitions()` - a transition names the states it starts
+  in, its target, who may apply it (`buyer`, `provider`, `admin`, `system`),
+  whether a note is asked, and optionally `by` (`counterparty` or `initiator`)
+  to tie an answer to the side that did not, or did, cause the current state.
+  The target `Orders::PREVIOUS` leads back to the state before the current one.
+- `deadline()` - what the scheduler applies if nobody acts in time
+- `allows()` - a further condition, e.g. revisions left
+- `build()` - turns the buyer's choices into items and a total, **reading
+  prices from the stored offer, never from the request**
+- form and detail templates with their data
+
+`Orders::apply()` is the only way an order changes state. It checks state,
+actor and guard, changes the state in one conditional update (two requests at
+once cannot both succeed), writes the history, and `OrderNotifier` mails the
+other side in their language. `extensions/freelancer/src/ServiceFlow.php` is
+the reference: accept or decline, deliver, revisions, acceptance, mutual
+cancellation, expiry and automatic acceptance.
+
+A `PaymentMethod` decides how an order is paid. The core ships `core.offline`
+(buyer and provider settle it themselves; the provider confirms the receipt).
+A payment service implements the same interface, sends the buyer to pay from
+`begin()` and reports the result with `Orders::markPaid()`.
+
 Visibility is the core's business: an offer is public while it is published,
 its provider approved and the account active, and offers of a disabled
 extension are hidden, not lost. `ProviderStatusChanged` and
@@ -249,7 +284,8 @@ language where it is shown to others (see `page_translation` for the
 pattern).
 
 Events to listen to: `AccountRegistered`, `AccountLoggedIn`, `AccountDeleted`,
-`AccountExport`, `ProviderStatusChanged` and `OfferStatusChanged`. An extension that stores personal data per account
+`AccountExport`, `ProviderStatusChanged`, `OfferStatusChanged` and
+`OrderStateChanged`. An extension that stores personal data per account
 references `account (id)` with `ON DELETE CASCADE`, so deleting an account
 removes it, and adds its part to the data export in an `AccountExport`
 listener (see `extensions/example`).

@@ -83,3 +83,8 @@ address { font-style: normal; }
 .price { font-weight: 700; }
 table { width: 100%; border-collapse: collapse; }
 th, td { padding: .5rem .6rem; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+
+a.button { display: inline-block; margin-top: .5rem; padding: .45rem .8rem; border-radius: .3rem; background: var(--accent); color: #fff; text-decoration: none; }
+.history { padding-left: 1.2rem; display: grid; gap: .6rem; }
+.history p, .message { margin: .25rem 0; padding: .5rem .7rem; background: var(--surface); border-left: .2rem solid var(--line); }
+.message.own { border-left-color: var(--accent); }

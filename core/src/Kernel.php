@@ -8,6 +8,7 @@ use Modulento\Core\Controller\AccountController;
 use Modulento\Core\Controller\AdminAccountController;
 use Modulento\Core\Controller\AdminCatalogueController;
 use Modulento\Core\Controller\AdminController;
+use Modulento\Core\Controller\AdminOrderController;
 use Modulento\Core\Controller\AdminProviderController;
 use Modulento\Core\Controller\AssetController;
 use Modulento\Core\Controller\AuthController;
@@ -15,6 +16,7 @@ use Modulento\Core\Controller\CronController;
 use Modulento\Core\Controller\HomeController;
 use Modulento\Core\Controller\MediaController;
 use Modulento\Core\Controller\OfferController;
+use Modulento\Core\Controller\OrderController;
 use Modulento\Core\Controller\PageController;
 use Modulento\Core\Controller\ProviderController;
 use Modulento\Core\Controller\RegistrationController;
@@ -146,6 +148,15 @@ final class Kernel
         $router->get('/offers', [OfferController::class, 'index'], Router::PUBLIC);
         $router->get('/offers/{slug}', [OfferController::class, 'show'], Router::PUBLIC);
         $router->post('/offers/{slug}/contact', [OfferController::class, 'contact']);
+        $router->get('/offers/{slug}/order', [OrderController::class, 'form']);
+        $router->post('/offers/{slug}/order', [OrderController::class, 'place']);
+
+        $router->get('/account/orders', [OrderController::class, 'purchases']);
+        $router->get('/account/sales', [OrderController::class, 'sales']);
+        $router->get('/orders/{id}', [OrderController::class, 'show']);
+        $router->post('/orders/{id}/transition', [OrderController::class, 'transition']);
+        $router->post('/orders/{id}/message', [OrderController::class, 'message']);
+        $router->post('/orders/{id}/paid', [OrderController::class, 'markPaid']);
         $router->get('/categories/{slug}', [OfferController::class, 'category'], Router::PUBLIC);
 
         $router->get('/providers', [ProviderController::class, 'index'], Router::PUBLIC);
@@ -166,6 +177,10 @@ final class Kernel
         $router->get('/admin/pages/{id}', [PageController::class, 'edit'], 'core.pages.manage');
         $router->post('/admin/pages/{id}', [PageController::class, 'save'], 'core.pages.manage');
         $router->post('/admin/pages/{id}/delete', [PageController::class, 'delete'], 'core.pages.manage');
+
+        $router->get('/admin/orders', [AdminOrderController::class, 'index'], 'core.orders.manage');
+        $router->get('/admin/orders/{id}', [AdminOrderController::class, 'show'], 'core.orders.manage');
+        $router->post('/admin/orders/{id}/transition', [AdminOrderController::class, 'transition'], 'core.orders.manage');
 
         $router->get('/admin/offers', [AdminCatalogueController::class, 'offers'], 'core.offers.manage');
         $router->get('/admin/offers/{id}', [AdminCatalogueController::class, 'offer'], 'core.offers.manage');
@@ -212,6 +227,7 @@ final class Kernel
         $app->addPermission('core.themes.manage', 'core.permission.themes_manage');
         $app->addPermission('core.settings.manage', 'core.permission.settings_manage');
         $app->addPermission('core.pages.manage', 'core.permission.pages_manage');
+        $app->addPermission('core.orders.manage', 'core.permission.orders_manage');
         $app->addPermission('core.offers.manage', 'core.permission.offers_manage');
         $app->addPermission('core.categories.manage', 'core.permission.categories_manage');
         $app->addPermission('core.providers.manage', 'core.permission.providers_manage');
@@ -221,6 +237,7 @@ final class Kernel
 
         $app->addAdminMenu('core.admin.menu.settings', '/admin/settings', 'core.settings.manage');
         $app->addAdminMenu('core.admin.menu.pages', '/admin/pages', 'core.pages.manage');
+        $app->addAdminMenu('core.admin.menu.orders', '/admin/orders', 'core.orders.manage');
         $app->addAdminMenu('core.admin.menu.offers', '/admin/offers', 'core.offers.manage');
         $app->addAdminMenu('core.admin.menu.categories', '/admin/categories', 'core.categories.manage');
         $app->addAdminMenu('core.admin.menu.providers', '/admin/providers', 'core.providers.manage');
@@ -236,6 +253,8 @@ final class Kernel
             60,
             fn (App $app) => (new RateLimiter($app->db))->cleanup()
         );
+        // Deadlines of orders: what happens when nobody acts in time.
+        $app->scheduler->register('core.order-deadlines', 5, fn (App $app) => $app->orders->runDeadlines($app));
         // Expired mail links, and registrations whose address was never
         // confirmed within a week.
         $app->scheduler->register('core.account-cleanup', 60, function (App $app): void {

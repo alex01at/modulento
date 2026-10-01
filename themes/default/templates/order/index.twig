@@ -1,0 +1,44 @@
+{% extends 'layout/base.twig' %}
+
+{% block title %}{{ trans('core.order.list.' ~ role) }} – {{ site_name }}{% endblock %}
+
+{% block content %}
+<h1>{{ trans('core.order.list.' ~ role) }}</h1>
+
+{% if orders is empty %}
+    <p>{{ trans('core.order.list.none') }}</p>
+{% else %}
+    <table>
+        <thead>
+        <tr>
+            <th scope="col">{{ trans('core.order.number') }}</th>
+            <th scope="col">{{ trans('core.offer.field.title') }}</th>
+            <th scope="col">{{ trans(role == 'buyer' ? 'core.provider.field.name' : 'core.order.buyer') }}</th>
+            <th scope="col">{{ trans('core.offer.field.status') }}</th>
+            <th scope="col">{{ trans('core.order.total') }}</th>
+        </tr>
+        </thead>
+        <tbody>
+        {% for order in orders %}
+            <tr>
+                <th scope="row"><a href="{{ url('/orders/' ~ order.id) }}">{{ order.number }}</a></th>
+                <td>{{ order.title }}</td>
+                <td>{{ role == 'buyer' ? order.provider_name : order.buyer_name }}</td>
+                <td>{{ trans(order.state_label_key) }}</td>
+                <td>{{ money(order.total, order.currency) }}</td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+
+    {% if pages > 1 %}
+        {% set base = role == 'buyer' ? '/account/orders' : '/account/sales' %}
+        <nav class="pager" aria-label="{{ trans('core.pager.label') }}">
+            {% if page > 1 %}<a href="{{ url(base) }}?page={{ page - 1 }}" rel="prev">{{ trans('core.pager.previous') }}</a>{% endif %}
+            <span>{{ trans('core.pager.position', {page: page, pages: pages}) }}</span>
+            {% if page < pages %}<a href="{{ url(base) }}?page={{ page + 1 }}" rel="next">{{ trans('core.pager.next') }}</a>{% endif %}
+        </nav>
+    {% endif %}
+{% endif %}
+<p><a href="{{ url('/account') }}">{{ trans('core.nav.account') }}</a></p>
+{% endblock %}

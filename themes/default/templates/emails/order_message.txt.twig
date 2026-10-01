@@ -1,0 +1,7 @@
+{# Plain text: nothing here is HTML-escaped. Blocks: subject, body. #}
+{% block subject %}{{ trans('core.mail.order_message.subject', {number: number}) }}{% endblock %}
+{% block body %}
+{{ trans('core.mail.order_message.body', {number: number, title: title, sender: sender, message: message, link: link}) }}
+
+{{ trans('core.mail.signature') }}
+{% endblock %}

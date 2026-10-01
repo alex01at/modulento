@@ -1,0 +1,7 @@
+{# Plain text: nothing here is HTML-escaped. Blocks: subject, body. #}
+{% block subject %}{{ trans('core.mail.order_update.subject', {number: number, event: event}) }}{% endblock %}
+{% block body %}
+{{ trans('core.mail.order_update.body', {number: number, title: title, event: event, state: state, actor: actor, note: note, link: link}) }}
+
+{{ trans('core.mail.signature') }}
+{% endblock %}
