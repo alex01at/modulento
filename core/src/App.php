@@ -7,6 +7,9 @@ namespace Modulento\Core;
 use Modulento\Core\Account\Accounts;
 use Modulento\Core\Account\Roles;
 use Modulento\Core\Account\Tokens;
+use Modulento\Core\Catalogue\Categories;
+use Modulento\Core\Catalogue\OfferImages;
+use Modulento\Core\Catalogue\Offers;
 use Modulento\Core\Content\Pages;
 use Modulento\Core\Extension\ExtensionManager;
 use Modulento\Core\Provider\Providers;
@@ -50,6 +53,9 @@ final class App
     public readonly Pages $pages;
     public readonly Providers $providers;
     public readonly Roles $roles;
+    public readonly Categories $categories;
+    public readonly Offers $offers;
+    public readonly OfferImages $offerImages;
 
     /** The request path without its language prefix - what routes are matched against. */
     public string $path = '/';
@@ -81,6 +87,9 @@ final class App
         $this->pages = new Pages($db, $this->locales);
         $this->providers = new Providers($db, $this->settings, $this->locales);
         $this->roles = new Roles($db);
+        $this->categories = new Categories($db, $this->locales);
+        $this->offers = new Offers($db, $this->settings, $this->locales);
+        $this->offerImages = new OfferImages($db, ($config['app']['uploads'] ?? $config['app']['root'] . '/var/uploads') . '/offers');
         $this->themes = new ThemeManager($config['app']['root'] . '/themes', $this->settings);
         $this->accounts = new Accounts($db);
         $this->tokens = new Tokens($db);

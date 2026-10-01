@@ -1,0 +1,7 @@
+{# Plain text: nothing here is HTML-escaped. Blocks: subject, body. #}
+{% block subject %}{{ trans('core.mail.offer_rejected.subject', {title: title}) }}{% endblock %}
+{% block body %}
+{{ trans('core.mail.offer_rejected.body', {title: title, note: note, edit_link: edit_link}) }}
+
+{{ trans('core.mail.signature') }}
+{% endblock %}

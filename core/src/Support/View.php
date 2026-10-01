@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modulento\Core\Support;
 
 use Modulento\Core\App;
+use Modulento\Core\Catalogue\OfferView;
 use Modulento\Core\Controller\AssetController;
 use Twig\Environment;
 use Twig\Loader\FilesystemLoader;
@@ -103,6 +104,12 @@ final class View
                 fn (array $link) => ['title' => $link['title'], 'url' => $app->url($link['path']), 'role' => $link['role']],
                 $app->pages->links($where, $app->translator->locale())
             );
+        }));
+        // The newest public offers as cards, e.g. for the home page.
+        $this->twig->addFunction(new TwigFunction('latest_offers', function (int $limit = 6) use ($app): array {
+            $list = $app->offers->listPublic([], $app->translator->locale(), 1, max(1, min(48, $limit)));
+
+            return OfferView::cards($list['rows'], $app);
         }));
         $this->twig->addFunction(new TwigFunction('registration_open', fn () => $app->settings->get('core.registration', 'open') === 'open'));
         $this->twig->addFunction(new TwigFunction('locale_name', fn (string $locale) => $app->locales->name($locale)));

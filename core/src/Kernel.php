@@ -6,12 +6,15 @@ namespace Modulento\Core;
 
 use Modulento\Core\Controller\AccountController;
 use Modulento\Core\Controller\AdminAccountController;
+use Modulento\Core\Controller\AdminCatalogueController;
 use Modulento\Core\Controller\AdminController;
 use Modulento\Core\Controller\AdminProviderController;
 use Modulento\Core\Controller\AssetController;
 use Modulento\Core\Controller\AuthController;
 use Modulento\Core\Controller\CronController;
 use Modulento\Core\Controller\HomeController;
+use Modulento\Core\Controller\MediaController;
+use Modulento\Core\Controller\OfferController;
 use Modulento\Core\Controller\PageController;
 use Modulento\Core\Controller\ProviderController;
 use Modulento\Core\Controller\RegistrationController;
@@ -75,7 +78,7 @@ final class Kernel
         // Asset and cron requests need neither a login nor a language, so
         // they skip the session: no session file per cron call, and assets
         // load in parallel instead of queueing on the session lock.
-        if (preg_match('#^/(assets|cron)/#', $path) === 1) {
+        if (preg_match('#^/(assets|cron|media)/#', $path) === 1) {
             $app->path = $path;
             $app->translator->setLocale($app->locales->default());
             return null;
@@ -102,6 +105,7 @@ final class Kernel
         $router->get('/assets/theme/{path*}', [AssetController::class, 'theme'], Router::PUBLIC);
         $router->get('/assets/admin/{path*}', [AssetController::class, 'admin'], Router::PUBLIC);
         $router->get('/assets/ext/{id}/{path*}', [AssetController::class, 'extension'], Router::PUBLIC);
+        $router->get('/media/offers/{id}/{file}', [MediaController::class, 'offerImage'], Router::PUBLIC);
         $router->get('/cron/{token}', [CronController::class, 'run'], Router::PUBLIC);
 
         $router->get('/login', [AuthController::class, 'showLogin'], Router::PUBLIC);
@@ -127,6 +131,23 @@ final class Kernel
         $router->get('/account/provider', [ProviderController::class, 'edit']);
         $router->post('/account/provider', [ProviderController::class, 'save']);
 
+        $router->get('/account/offers', [OfferController::class, 'mine']);
+        $router->get('/account/offers/new', [OfferController::class, 'create']);
+        $router->post('/account/offers/new', [OfferController::class, 'save']);
+        $router->get('/account/offers/{id}', [OfferController::class, 'edit']);
+        $router->post('/account/offers/{id}', [OfferController::class, 'save']);
+        $router->post('/account/offers/{id}/submit', [OfferController::class, 'submit']);
+        $router->post('/account/offers/{id}/pause', [OfferController::class, 'pause']);
+        $router->post('/account/offers/{id}/resume', [OfferController::class, 'resume']);
+        $router->post('/account/offers/{id}/delete', [OfferController::class, 'delete']);
+        $router->post('/account/offers/{id}/images', [OfferController::class, 'uploadImage']);
+        $router->post('/account/offers/{id}/images/{image}/delete', [OfferController::class, 'deleteImage']);
+
+        $router->get('/offers', [OfferController::class, 'index'], Router::PUBLIC);
+        $router->get('/offers/{slug}', [OfferController::class, 'show'], Router::PUBLIC);
+        $router->post('/offers/{slug}/contact', [OfferController::class, 'contact']);
+        $router->get('/categories/{slug}', [OfferController::class, 'category'], Router::PUBLIC);
+
         $router->get('/providers', [ProviderController::class, 'index'], Router::PUBLIC);
         $router->get('/providers/{slug}', [ProviderController::class, 'show'], Router::PUBLIC);
 
@@ -145,6 +166,17 @@ final class Kernel
         $router->get('/admin/pages/{id}', [PageController::class, 'edit'], 'core.pages.manage');
         $router->post('/admin/pages/{id}', [PageController::class, 'save'], 'core.pages.manage');
         $router->post('/admin/pages/{id}/delete', [PageController::class, 'delete'], 'core.pages.manage');
+
+        $router->get('/admin/offers', [AdminCatalogueController::class, 'offers'], 'core.offers.manage');
+        $router->get('/admin/offers/{id}', [AdminCatalogueController::class, 'offer'], 'core.offers.manage');
+        $router->post('/admin/offers/{id}/decide', [AdminCatalogueController::class, 'decide'], 'core.offers.manage');
+
+        $router->get('/admin/categories', [AdminCatalogueController::class, 'categories'], 'core.categories.manage');
+        $router->get('/admin/categories/new', [AdminCatalogueController::class, 'editCategory'], 'core.categories.manage');
+        $router->post('/admin/categories/new', [AdminCatalogueController::class, 'saveCategory'], 'core.categories.manage');
+        $router->get('/admin/categories/{id}', [AdminCatalogueController::class, 'editCategory'], 'core.categories.manage');
+        $router->post('/admin/categories/{id}', [AdminCatalogueController::class, 'saveCategory'], 'core.categories.manage');
+        $router->post('/admin/categories/{id}/delete', [AdminCatalogueController::class, 'deleteCategory'], 'core.categories.manage');
 
         $router->get('/admin/providers', [AdminProviderController::class, 'index'], 'core.providers.manage');
         $router->get('/admin/providers/{id}', [AdminProviderController::class, 'show'], 'core.providers.manage');
@@ -180,6 +212,8 @@ final class Kernel
         $app->addPermission('core.themes.manage', 'core.permission.themes_manage');
         $app->addPermission('core.settings.manage', 'core.permission.settings_manage');
         $app->addPermission('core.pages.manage', 'core.permission.pages_manage');
+        $app->addPermission('core.offers.manage', 'core.permission.offers_manage');
+        $app->addPermission('core.categories.manage', 'core.permission.categories_manage');
         $app->addPermission('core.providers.manage', 'core.permission.providers_manage');
         $app->addPermission('core.accounts.manage', 'core.permission.accounts_manage');
         $app->addPermission('core.roles.manage', 'core.permission.roles_manage');
@@ -187,6 +221,8 @@ final class Kernel
 
         $app->addAdminMenu('core.admin.menu.settings', '/admin/settings', 'core.settings.manage');
         $app->addAdminMenu('core.admin.menu.pages', '/admin/pages', 'core.pages.manage');
+        $app->addAdminMenu('core.admin.menu.offers', '/admin/offers', 'core.offers.manage');
+        $app->addAdminMenu('core.admin.menu.categories', '/admin/categories', 'core.categories.manage');
         $app->addAdminMenu('core.admin.menu.providers', '/admin/providers', 'core.providers.manage');
         $app->addAdminMenu('core.admin.menu.accounts', '/admin/accounts', 'core.accounts.manage');
         $app->addAdminMenu('core.admin.menu.roles', '/admin/roles', 'core.roles.manage');

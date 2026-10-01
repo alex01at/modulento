@@ -1,0 +1,28 @@
+{% extends '@admin/layout.twig' %}
+
+{% block title %}{{ trans('core.admin.categories.title') }} – {{ site_name }}{% endblock %}
+
+{% block admin %}
+<h1>{{ trans('core.admin.categories.title') }}</h1>
+<p>{{ trans('core.admin.categories.intro') }}</p>
+<p><a href="{{ url('/admin/categories/new') }}">{{ trans('core.admin.categories.new') }}</a></p>
+
+{% if tree is empty %}
+    <p>{{ trans('core.admin.categories.none') }}</p>
+{% else %}
+    <ul>
+        {% for top in tree %}
+            <li>
+                <a href="{{ url('/admin/categories/' ~ top.id) }}">{{ top.name }}</a>
+                {% if top.children %}
+                    <ul>
+                        {% for child in top.children %}
+                            <li><a href="{{ url('/admin/categories/' ~ child.id) }}">{{ child.name }}</a></li>
+                        {% endfor %}
+                    </ul>
+                {% endif %}
+            </li>
+        {% endfor %}
+    </ul>
+{% endif %}
+{% endblock %}

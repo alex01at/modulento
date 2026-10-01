@@ -19,6 +19,8 @@ final class SettingsController extends Controller
                 'mail_from' => $app->settings->get('core.mail_from', $app->config['mail']['from']),
                 'registration' => $app->settings->get('core.registration', 'open'),
                 'provider_approval' => $app->providers->approvalRequired() ? 'required' : 'off',
+                'offer_approval' => $app->offers->approvalRequired() ? 'required' : 'off',
+                'currency' => $app->offers->currency(),
             ],
             'available_locales' => $app->locales->available(),
             'enabled_locales' => $app->locales->enabled(),
@@ -54,6 +56,20 @@ final class SettingsController extends Controller
                 $provider = $app->providers->find($providerId);
                 AdminProviderController::announce($app, ['status' => 'pending'] + $provider, 'approved');
             }
+        }
+
+        $offerApprovalRequired = ($_POST['offer_approval'] ?? '') !== 'off';
+        if ($offerApprovalRequired !== $app->offers->approvalRequired()) {
+            foreach ($app->offers->setApprovalRequired($offerApprovalRequired) as $offerId) {
+                AdminCatalogueController::announce($app, ['status' => 'pending'] + $app->offers->find($offerId), 'published');
+            }
+        }
+
+        // Three letters, as in ISO 4217. Existing offers keep the currency
+        // they were created in.
+        $currency = strtoupper(trim((string) ($_POST['currency'] ?? '')));
+        if (preg_match('/^[A-Z]{3}$/', $currency) === 1) {
+            $app->settings->set('core.currency', $currency);
         }
 
         // The administrator's own language may just have been switched off,

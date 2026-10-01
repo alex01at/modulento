@@ -1,0 +1,123 @@
+{% extends 'layout/base.twig' %}
+
+{% block title %}{{ trans(type.label_key) }} – {{ site_name }}{% endblock %}
+
+{% block content %}
+<p><a href="{{ url('/account/offers') }}">{{ trans('core.offer.mine.title') }}</a></p>
+<h1>{{ offer ? trans('core.offer.edit') : trans('core.offer.mine.new', {type: trans(type.label_key)}) }}</h1>
+
+{% if offer %}
+    <p class="flash {{ offer.status == 'published' ? 'flash-success' : (offer.status == 'rejected' ? 'flash-error' : '') }}">
+        {{ trans('core.offer.status_long.' ~ offer.status) }}
+        {% if offer.status_note %}<br>{{ trans('core.provider.status_note') }} {{ offer.status_note }}{% endif %}
+    </p>
+    <div class="button-row">
+        {% if offer.public_path %}<a href="{{ url(offer.public_path) }}">{{ trans('core.offer.view_public') }}</a>{% endif %}
+        {% if offer.status in ['draft', 'rejected'] %}
+        <form method="post" action="{{ url('/account/offers/' ~ offer.id ~ '/submit') }}" class="inline-form">
+            {{ csrf_field() }}
+            <button type="submit">{{ trans('core.offer.action.submit') }}</button>
+        </form>
+        {% endif %}
+        {% if offer.status == 'published' %}
+        <form method="post" action="{{ url('/account/offers/' ~ offer.id ~ '/pause') }}" class="inline-form">
+            {{ csrf_field() }}
+            <button type="submit">{{ trans('core.offer.action.pause') }}</button>
+        </form>
+        {% endif %}
+        {% if offer.status == 'paused' %}
+        <form method="post" action="{{ url('/account/offers/' ~ offer.id ~ '/resume') }}" class="inline-form">
+            {{ csrf_field() }}
+            <button type="submit">{{ trans('core.offer.action.resume') }}</button>
+        </form>
+        {% endif %}
+    </div>
+{% else %}
+    <p>{{ trans(approval_required ? 'core.offer.intro_approval' : 'core.offer.intro') }}</p>
+{% endif %}
+
+{% for error in errors %}
+    <p class="flash flash-error" role="alert">{{ error }}</p>
+{% endfor %}
+
+<form method="post" action="{{ url(offer ? '/account/offers/' ~ offer.id : '/account/offers/new') }}" class="stack-form wide">
+    {{ csrf_field() }}
+    <input type="hidden" name="type" value="{{ type.id }}">
+
+    {% if categories %}
+        <label for="category_id">{{ trans('core.offer.field.category') }}</label>
+        <select id="category_id" name="category_id" required>
+            <option value=""></option>
+            {% for top in categories %}
+                <option value="{{ top.id }}" {{ top.id == category_id ? 'selected' }}>{{ top.name }}</option>
+                {% for child in top.children %}
+                    <option value="{{ child.id }}" {{ child.id == category_id ? 'selected' }}>– {{ child.name }}</option>
+                {% endfor %}
+            {% endfor %}
+        </select>
+    {% endif %}
+
+    {% for code in locales %}
+        {% set text = texts[code] ?? {} %}
+        <fieldset>
+            <legend>{{ trans('core.offer.section.text') }} – {{ locale_name(code) }}</legend>
+            {% if not loop.first %}
+                <p><small>{{ trans('core.offer.section.text_optional') }}</small></p>
+            {% endif %}
+            <label for="title_{{ code }}">{{ trans('core.offer.field.title') }}</label>
+            <input id="title_{{ code }}" name="text[{{ code }}][title]" value="{{ text.title ?? '' }}" maxlength="150" lang="{{ code }}" {{ loop.first ? 'required' }}>
+            <label for="summary_{{ code }}">{{ trans('core.offer.field.summary') }}</label>
+            <input id="summary_{{ code }}" name="text[{{ code }}][summary]" value="{{ text.summary ?? '' }}" maxlength="300" lang="{{ code }}">
+            <label for="description_{{ code }}">{{ trans('core.offer.field.description') }}</label>
+            <textarea id="description_{{ code }}" name="text[{{ code }}][description]" rows="10" maxlength="10000" lang="{{ code }}">{{ text.description ?? '' }}</textarea>
+        </fieldset>
+    {% endfor %}
+
+    {# The fields of the offer's type, supplied by its extension. #}
+    {% include type.template %}
+
+    <button type="submit">{{ trans('core.account.save') }}</button>
+</form>
+
+{% if offer %}
+    <section>
+        <h2>{{ trans('core.offer.image.title') }}</h2>
+        {% if not images_available %}
+            <p>{{ trans('core.offer.image.error.unavailable') }}</p>
+        {% else %}
+            {% if offer.images %}
+                <ul class="card-list">
+                    {% for image in offer.images %}
+                        <li>
+                            <img src="{{ image.thumb }}" alt="{{ trans('core.offer.image.number', {number: loop.index}) }}">
+                            <form method="post" action="{{ url('/account/offers/' ~ offer.id ~ '/images/' ~ image.id ~ '/delete') }}">
+                                {{ csrf_field() }}
+                                <button type="submit" class="link-button">{{ trans('core.offer.image.delete') }}</button>
+                            </form>
+                        </li>
+                    {% endfor %}
+                </ul>
+            {% endif %}
+            {% if offer.images|length < max_images %}
+                <form method="post" action="{{ url('/account/offers/' ~ offer.id ~ '/images') }}" enctype="multipart/form-data" class="stack-form">
+                    {{ csrf_field() }}
+                    <label for="image">{{ trans('core.offer.image.add') }}</label>
+                    <input id="image" name="image" type="file" accept="image/jpeg,image/png,image/webp" required>
+                    <small>{{ trans('core.offer.image.hint', {max: max_images}) }}</small>
+                    <button type="submit">{{ trans('core.offer.image.upload') }}</button>
+                </form>
+            {% endif %}
+        {% endif %}
+    </section>
+
+    <section>
+        <h2>{{ trans('core.offer.action.delete') }}</h2>
+        <form method="post" action="{{ url('/account/offers/' ~ offer.id ~ '/delete') }}">
+            {{ csrf_field() }}
+            <button type="submit" class="danger">{{ trans('core.offer.action.delete') }}</button>
+        </form>
+    </section>
+{% else %}
+    <p><small>{{ trans('core.offer.image.after_save') }}</small></p>
+{% endif %}
+{% endblock %}

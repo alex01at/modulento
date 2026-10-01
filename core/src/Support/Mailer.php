@@ -29,7 +29,7 @@ final class Mailer
      *        not caused by the recipient's own request (links in $data are
      *        then built with App::url(..., $locale, true) by the caller)
      */
-    public function send(string $to, string $template, array $data = [], ?string $locale = null): bool
+    public function send(string $to, string $template, array $data = [], ?string $locale = null, ?string $replyTo = null): bool
     {
         if (filter_var($to, FILTER_VALIDATE_EMAIL) === false) {
             return false;
@@ -53,7 +53,7 @@ final class Mailer
         $config = $this->app->config['mail'];
 
         if ($config['transport'] === 'log') {
-            $entry = "To: {$to}\nSubject: {$subject}\n\n{$body}\n--\n";
+            $entry = "To: {$to}\n" . ($replyTo !== null ? "Reply-To: {$replyTo}\n" : '') . "Subject: {$subject}\n\n{$body}\n--\n";
 
             return file_put_contents($config['log_path'], $entry, FILE_APPEND | LOCK_EX) !== false;
         }
@@ -64,6 +64,11 @@ final class Mailer
             'Content-Type' => 'text/plain; charset=UTF-8',
             'Content-Transfer-Encoding' => '8bit',
         ];
+        // Lets the recipient answer the person who wrote, without that
+        // person's address ever being used as the sender.
+        if ($replyTo !== null && filter_var($replyTo, FILTER_VALIDATE_EMAIL) !== false) {
+            $headers['Reply-To'] = $replyTo;
+        }
 
         $sent = mail($to, self::encodeHeader($subject), str_replace("\n", "\r\n", $body), $headers);
         if (!$sent) {
