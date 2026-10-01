@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="{{ locale }}">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}{{ site_name }}{% endblock %}</title>
+    <link rel="stylesheet" href="/assets/core.css?v=2">
+    {% block head %}{% endblock %}
+</head>
+<body>
+<header class="site-header">
+    <a class="site-name" href="/">{{ site_name }}</a>
+    <nav aria-label="{{ trans('core.nav.home') }}">
+        {% if can('core.admin.access') %}
+            <a href="/admin">{{ trans('core.nav.admin') }}</a>
+        {% endif %}
+        {% if account %}
+            <form method="post" action="/logout" class="inline-form">
+                {{ csrf_field() }}
+                <button type="submit" class="link-button">{{ trans('core.nav.logout') }}</button>
+            </form>
+        {% else %}
+            <a href="/login">{{ trans('core.nav.login') }}</a>
+        {% endif %}
+        <form method="post" action="/locale" class="inline-form">
+            {{ csrf_field() }}
+            <label class="visually-hidden" for="locale-switch">{{ trans('core.nav.language') }}</label>
+            <select id="locale-switch" name="locale">
+                <option value="de" {{ locale == 'de' ? 'selected' }}>Deutsch</option>
+                <option value="en" {{ locale == 'en' ? 'selected' }}>English</option>
+            </select>
+            <button type="submit">OK</button>
+        </form>
+    </nav>
+</header>
+
+<main>
+    {% for type, message in flashes %}
+        <p class="flash flash-{{ type }}" role="status">{{ message }}</p>
+    {% endfor %}
+    {% block content %}{% endblock %}
+</main>
+</body>
+</html>

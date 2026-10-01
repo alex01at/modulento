@@ -1,0 +1,57 @@
+name: Release
+
+# Fires only on a version tag:
+#   git tag v0.1.0 && git push origin v0.1.0
+# It publishes a GitHub Release with the package and its checksum, which
+# is what the "Updates" page of an installation looks for - see
+# core/src/Support/Updater.php.
+on:
+  push:
+    tags: ['v*.*.*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: curl, pdo_mysql, pdo_sqlite, zip
+
+      - name: Derive version from tag
+        id: version
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      # A release must never go out with failing checks, so they run here
+      # again rather than relying on the CI run of the tagged commit.
+      - name: Install Composer dependencies
+        run: composer install --no-interaction --prefer-dist
+
+      - name: Lint
+        run: |
+          find core extensions bin public tests config -name '*.php' -print0 \
+            | xargs -0 -n1 php -l > /tmp/lint.log || { grep -v '^No syntax errors' /tmp/lint.log; exit 1; }
+
+      - name: Tests
+        run: php tests/run.php
+
+      - name: Build release package
+        run: bash .github/scripts/build_release.sh "${{ steps.version.outputs.version }}"
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            "dist/modulento-$VERSION.zip" \
+            "dist/modulento-$VERSION.zip.sha256" \
+            --title "Modulento $VERSION" \
+            --generate-notes

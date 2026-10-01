@@ -1,0 +1,15 @@
+{% extends 'layout/base.twig' %}
+
+{% block content %}
+<div class="admin">
+    <nav class="admin-menu" aria-label="{{ trans('core.nav.admin') }}">
+        <a href="/admin">{{ trans('core.admin.title') }}</a>
+        {% for item in admin_menu %}
+            <a href="{{ item.path }}">{{ trans(item.label_key) }}</a>
+        {% endfor %}
+    </nav>
+    <section class="admin-content">
+        {% block admin %}{% endblock %}
+    </section>
+</div>
+{% endblock %}

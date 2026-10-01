@@ -1,0 +1,32 @@
+{% extends 'layout/admin.twig' %}
+
+{% block title %}{{ trans('core.admin.tasks.title') }} – {{ site_name }}{% endblock %}
+
+{% block admin %}
+<h1>{{ trans('core.admin.tasks.title') }}</h1>
+<p>{{ trans('core.admin.tasks.intro') }}</p>
+
+<table>
+    <thead>
+    <tr>
+        <th scope="col">{{ trans('core.admin.tasks.name') }}</th>
+        <th scope="col">{{ trans('core.admin.tasks.last_run') }}</th>
+        <th scope="col">{{ trans('core.admin.tasks.status') }}</th>
+    </tr>
+    </thead>
+    <tbody>
+    {% for task in tasks %}
+        <tr>
+            <th scope="row">{{ task.name }}</th>
+            <td>{{ task.last_started_at ?? trans('core.admin.tasks.never') }}</td>
+            <td>
+                {% if task.last_status %}
+                    {{ trans('core.admin.tasks.status_' ~ task.last_status) }}
+                    {% if task.last_error %}<br><small>{{ task.last_error }}</small>{% endif %}
+                {% endif %}
+            </td>
+        </tr>
+    {% endfor %}
+    </tbody>
+</table>
+{% endblock %}
