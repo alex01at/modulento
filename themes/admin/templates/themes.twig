@@ -23,7 +23,7 @@
             <td>{{ theme.id == active ? trans('core.admin.extensions.status_enabled') : trans('core.admin.extensions.status_disabled') }}</td>
             <td>
                 {% if theme.id != active %}
-                    <form method="post" action="/admin/themes/{{ theme.id }}/activate">
+                    <form method="post" action="{{ url('/admin/themes/' ~ theme.id ~ '/activate') }}">
                         {{ csrf_field() }}
                         <button type="submit">{{ trans('core.admin.extensions.enable') }}</button>
                     </form>

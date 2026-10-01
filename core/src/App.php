@@ -6,9 +6,11 @@ namespace Modulento\Core;
 
 use Modulento\Core\Account\Accounts;
 use Modulento\Core\Account\Tokens;
+use Modulento\Core\Content\Pages;
 use Modulento\Core\Extension\ExtensionManager;
 use Modulento\Core\Support\Auth;
 use Modulento\Core\Support\Events;
+use Modulento\Core\Support\Locales;
 use Modulento\Core\Support\Mailer;
 use Modulento\Core\Support\Router;
 use Modulento\Core\Support\Scheduler;
@@ -42,6 +44,20 @@ final class App
     public readonly Accounts $accounts;
     public readonly Tokens $tokens;
     public readonly Mailer $mailer;
+    public readonly Locales $locales;
+    public readonly Pages $pages;
+
+    /** The request path without its language prefix - what routes are matched against. */
+    public string $path = '/';
+    /** Set when the request should be answered with a redirect to its one proper address. */
+    public ?string $redirect = null;
+    /**
+     * The current page's path in other languages, where it differs from
+     * $path (a page whose slug is translated). Set by the controller.
+     *
+     * @var array<string, string> locale => path without prefix
+     */
+    public array $alternatePaths = [];
 
     private ?View $view = null;
     /** @var array<int, array{label_key: string, path: string, permission: string}> */
@@ -49,7 +65,7 @@ final class App
     /** @var array<string, string> permission name => label key */
     private array $permissions = [];
 
-    public function __construct(public readonly array $config, public readonly PDO $db, string $locale)
+    public function __construct(public readonly array $config, public readonly PDO $db, string $locale = 'en')
     {
         $this->events = new Events();
         $this->scheduler = new Scheduler($db);
@@ -57,11 +73,31 @@ final class App
         $this->translator = new Translator($locale, $config['app']['name']);
         $this->extensions = new ExtensionManager($db, $config['app']['root'] . '/extensions');
         $this->settings = new Settings($db);
+        $this->locales = new Locales($this->settings, $config['app']['root'] . '/core/lang');
+        $this->pages = new Pages($db, $this->locales);
         $this->themes = new ThemeManager($config['app']['root'] . '/themes', $this->settings);
         $this->accounts = new Accounts($db);
         $this->tokens = new Tokens($db);
         $this->mailer = new Mailer($this);
         $this->router = new Router($this);
+    }
+
+    /**
+     * The address of a path of this site in a language (the current one
+     * unless given). Every link, form action and redirect goes through
+     * this, which is what keeps a visitor in their language.
+     */
+    public function url(string $path, ?string $locale = null, bool $absolute = false): string
+    {
+        $url = $this->locales->prefix($path, $locale ?? $this->translator->locale());
+
+        return $absolute ? $this->config['app']['url'] . $url : $url;
+    }
+
+    /** Set in the administration; APP_NAME from .env until then. */
+    public function siteName(): string
+    {
+        return $this->settings->get('core.site_name', $this->config['app']['name']);
     }
 
     /**

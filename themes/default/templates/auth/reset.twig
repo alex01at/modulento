@@ -7,7 +7,7 @@
 {% for error in errors %}
     <p class="flash flash-error" role="alert">{{ error }}</p>
 {% endfor %}
-<form method="post" action="/reset-password/{{ token }}" class="stack-form">
+<form method="post" action="{{ url('/reset-password/' ~ token) }}" class="stack-form">
     {{ csrf_field() }}
     <label for="password">{{ trans('core.password.new', {min: min_length}) }}</label>
     <input id="password" name="password" type="password" minlength="{{ min_length }}" autocomplete="new-password" required>

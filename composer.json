@@ -6,6 +6,9 @@
     "require": {
         "php": ">=8.3",
         "ext-curl": "*",
+        "ext-dom": "*",
+        "ext-iconv": "*",
+        "ext-mbstring": "*",
         "ext-pdo": "*",
         "ext-pdo_mysql": "*",
         "ext-zip": "*",

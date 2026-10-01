@@ -21,9 +21,10 @@ abstract class Controller
         echo $this->app->view()->render($template, $data);
     }
 
-    protected function redirect(string $path): void
+    /** @param string $path a path of this site without language prefix; the prefix is added here */
+    protected function redirect(string $path, ?string $locale = null): void
     {
-        header('Location: ' . $path);
+        header('Location: ' . $this->app->url($path, $locale));
     }
 
     protected function trans(string $key, array $replacements = []): string

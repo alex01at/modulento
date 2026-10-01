@@ -11,7 +11,6 @@ use Modulento\Core\Event\AccountExport;
 use Modulento\Core\Support\PasswordPolicy;
 use Modulento\Core\Support\RateLimiter;
 use Modulento\Core\Support\Session;
-use Modulento\Core\Support\Translator;
 use PDOException;
 
 /** The logged-in account's own settings. Every route here is login-only. */
@@ -22,7 +21,7 @@ final class AccountController extends Controller
     public function index(array $params): void
     {
         $this->render('account/index.twig', [
-            'locales' => Translator::SUPPORTED_LOCALES,
+            'locales' => $this->app->locales->enabled(),
             'min_length' => PasswordPolicy::MIN_LENGTH,
             'is_last_admin' => $this->app->accounts->isLastAdmin($this->accountId()),
         ]);
@@ -33,13 +32,14 @@ final class AccountController extends Controller
         $name = trim((string) ($_POST['display_name'] ?? ''));
         $locale = (string) ($_POST['locale'] ?? '');
 
-        if (mb_strlen($name) > 100 || !in_array($locale, Translator::SUPPORTED_LOCALES, true)) {
+        if (mb_strlen($name) > 100 || !$this->app->locales->isEnabled($locale)) {
             $this->back('error', 'core.account.profile.invalid');
             return;
         }
 
         $this->app->accounts->updateProfile($this->accountId(), $name !== '' ? $name : null, $locale);
-        Session::set('locale', $locale);
+        // Answer in the language just chosen.
+        $this->app->translator->setLocale($locale);
         $this->back('success', 'core.account.profile.saved');
     }
 
@@ -67,7 +67,7 @@ final class AccountController extends Controller
         $this->app->auth->refreshStamp();
         // If it was not the owner, this mail is how they find out.
         $this->app->mailer->send($account['email'], 'emails/password_changed.txt.twig', [
-            'reset_link' => $this->app->config['app']['url'] . '/forgot-password',
+            'reset_link' => $this->app->url('/forgot-password', absolute: true),
         ]);
 
         $this->back('success', 'core.account.password.saved');
@@ -97,7 +97,7 @@ final class AccountController extends Controller
         if ($this->app->accounts->findByEmail($email) === null) {
             $token = $this->app->tokens->create($this->accountId(), Tokens::CHANGE_EMAIL, self::CHANGE_EMAIL_TTL_SECONDS, $email);
             $this->app->mailer->send($email, 'emails/change_email.txt.twig', [
-                'link' => $this->app->config['app']['url'] . '/account/confirm-email/' . $token,
+                'link' => $this->app->url('/account/confirm-email/' . $token, absolute: true),
                 'hours' => intdiv(self::CHANGE_EMAIL_TTL_SECONDS, 3600),
             ]);
         }

@@ -23,8 +23,13 @@ final class Mailer
     {
     }
 
-    /** @param array<string, mixed> $data */
-    public function send(string $to, string $template, array $data = []): bool
+    /**
+     * @param array<string, mixed> $data
+     * @param string|null $locale the recipient's language where the mail is
+     *        not caused by the recipient's own request (links in $data are
+     *        then built with App::url(..., $locale, true) by the caller)
+     */
+    public function send(string $to, string $template, array $data = [], ?string $locale = null): bool
     {
         if (filter_var($to, FILTER_VALIDATE_EMAIL) === false) {
             return false;
@@ -32,8 +37,11 @@ final class Mailer
 
         try {
             $view = $this->app->view();
-            $subject = trim($view->renderBlock($template, 'subject', $data));
-            $body = trim($view->renderBlock($template, 'body', $data)) . "\n";
+            $translator = $this->app->translator;
+            [$subject, $body] = $translator->inLocale($locale ?? $translator->locale(), fn () => [
+                trim($view->renderBlock($template, 'subject', $data)),
+                trim($view->renderBlock($template, 'body', $data)) . "\n",
+            ]);
         } catch (Throwable $e) {
             error_log('Mail template ' . $template . ' failed: ' . $e);
 
@@ -51,7 +59,7 @@ final class Mailer
         }
 
         $headers = [
-            'From' => self::encodeHeader($this->app->config['app']['name']) . ' <' . $config['from'] . '>',
+            'From' => self::encodeHeader($this->app->siteName()) . ' <' . $this->app->settings->get('core.mail_from', $config['from']) . '>',
             'MIME-Version' => '1.0',
             'Content-Type' => 'text/plain; charset=UTF-8',
             'Content-Transfer-Encoding' => '8bit',

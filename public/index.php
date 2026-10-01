@@ -52,7 +52,12 @@ try {
     if ($app->config['app']['env'] === 'dev') {
         ini_set('display_errors', '1');
     }
-    $app->router->dispatch($_SERVER['REQUEST_METHOD'], $_SERVER['REQUEST_URI']);
+    $redirect = $app->redirect;
+    if ($redirect !== null) {
+        header('Location: ' . $redirect, true, 301);
+    } else {
+        $app->router->dispatch($_SERVER['REQUEST_METHOD'], $app->path);
+    }
 } catch (NotConfiguredException $e) {
     // No database settings yet: every request goes to the setup page.
     (new Installer($root))->handle($_SERVER['REQUEST_METHOD'], $_SERVER['REQUEST_URI']);

@@ -63,8 +63,7 @@ final class View
 
         $this->twig->addGlobal('flashes', Session::pullFlashes());
         $this->twig->addGlobal('account', $auth->account());
-        $this->twig->addGlobal('locale', $translator->locale());
-        $this->twig->addGlobal('site_name', $app->config['app']['name']);
+        $this->twig->addGlobal('site_name', $app->siteName());
         $this->twig->addGlobal('admin_menu', array_values(array_filter(
             $app->adminMenu(),
             fn (array $item) => $auth->can($item['permission'])
@@ -74,6 +73,39 @@ final class View
             'trans',
             fn (string $key, array $replacements = []) => $translator->trans($key, $replacements)
         ));
+        // The language can change while rendering (an e-mail in the
+        // recipient's language), so these are functions, not fixed values.
+        $this->twig->addFunction(new TwigFunction('locale', fn () => $translator->locale()));
+        $this->twig->addFunction(new TwigFunction(
+            'url',
+            fn (string $path, ?string $locale = null) => $app->url($path, $locale)
+        ));
+        // The current page in every enabled language, for the language
+        // menu and for <link rel="alternate" hreflang>.
+        $this->twig->addFunction(new TwigFunction('locale_urls', function () use ($app): array {
+            $urls = [];
+            foreach ($app->locales->enabled() as $locale) {
+                $urls[] = [
+                    'locale' => $locale,
+                    'name' => $app->locales->name($locale),
+                    'url' => $app->url($app->alternatePaths[$locale] ?? $app->path, $locale),
+                    'absolute_url' => $app->url($app->alternatePaths[$locale] ?? $app->path, $locale, true),
+                    'current' => $locale === $app->translator->locale(),
+                ];
+            }
+
+            return $urls;
+        }));
+        // Published pages for a menu: "header", "footer" (includes the
+        // legal pages) or a role such as "terms".
+        $this->twig->addFunction(new TwigFunction('page_links', function (string $where) use ($app): array {
+            return array_map(
+                fn (array $link) => ['title' => $link['title'], 'url' => $app->url($link['path']), 'role' => $link['role']],
+                $app->pages->links($where, $app->translator->locale())
+            );
+        }));
+        $this->twig->addFunction(new TwigFunction('registration_open', fn () => $app->settings->get('core.registration', 'open') === 'open'));
+        $this->twig->addFunction(new TwigFunction('locale_name', fn (string $locale) => $app->locales->name($locale)));
         $this->twig->addFunction(new TwigFunction('can', fn (string $permission) => $auth->can($permission)));
         $this->twig->addFunction(new TwigFunction('csrf_token', fn () => Csrf::token()));
         $this->twig->addFunction(new TwigFunction(

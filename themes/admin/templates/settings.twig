@@ -1,0 +1,45 @@
+{% extends '@admin/layout.twig' %}
+
+{% block title %}{{ trans('core.admin.settings.title') }} – {{ site_name }}{% endblock %}
+
+{% block admin %}
+<h1>{{ trans('core.admin.settings.title') }}</h1>
+
+<form method="post" action="{{ url('/admin/settings') }}" class="stack-form">
+    {{ csrf_field() }}
+
+    <label for="site_name">{{ trans('core.admin.settings.site_name') }}</label>
+    <input id="site_name" name="site_name" value="{{ settings.site_name }}" maxlength="100" required>
+
+    <label for="mail_from">{{ trans('core.admin.settings.mail_from') }}</label>
+    <input id="mail_from" name="mail_from" type="email" value="{{ settings.mail_from }}" required>
+    <small>{{ trans('core.admin.settings.mail_from_hint') }}</small>
+
+    <label for="registration">{{ trans('core.admin.settings.registration') }}</label>
+    <select id="registration" name="registration">
+        <option value="open" {{ settings.registration == 'open' ? 'selected' }}>{{ trans('core.admin.settings.registration_open') }}</option>
+        <option value="closed" {{ settings.registration == 'closed' ? 'selected' }}>{{ trans('core.admin.settings.registration_closed') }}</option>
+    </select>
+
+    <fieldset>
+        <legend>{{ trans('core.admin.settings.languages') }}</legend>
+        <p><small>{{ trans('core.admin.settings.languages_hint') }}</small></p>
+        {% for code in available_locales %}
+            <label class="checkbox">
+                <input type="checkbox" name="locales[]" value="{{ code }}" {{ code in enabled_locales ? 'checked' }}>
+                <span>{{ locale_name(code) }} <small>({{ code }})</small></span>
+            </label>
+        {% endfor %}
+
+        <label for="default_locale">{{ trans('core.admin.settings.default_language') }}</label>
+        <select id="default_locale" name="default_locale">
+            {% for code in available_locales %}
+                <option value="{{ code }}" {{ code == default_locale ? 'selected' }}>{{ locale_name(code) }}</option>
+            {% endfor %}
+        </select>
+        <small>{{ trans('core.admin.settings.default_language_hint') }}</small>
+    </fieldset>
+
+    <button type="submit">{{ trans('core.account.save') }}</button>
+</form>
+{% endblock %}

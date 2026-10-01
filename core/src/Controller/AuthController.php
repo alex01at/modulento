@@ -70,12 +70,14 @@ final class AuthController extends Controller
         $this->app->auth->login((int) $account['id']);
         Session::remove('login_return_to');
         Session::remove('unverified_account_id');
-        Session::set('locale', $account['locale']);
         $this->app->events->dispatch(new AccountLoggedIn((int) $account['id']));
 
         // Only a local path - never a full or protocol-relative URL.
         $isLocalPath = str_starts_with($returnTo, '/') && !str_starts_with($returnTo, '//') && !str_contains($returnTo, '\\');
-        $this->redirect($isLocalPath ? $returnTo : '/');
+        // From here on the account's own language, whatever language the
+        // login page was opened in.
+        $locale = $this->app->locales->isEnabled($account['locale']) ? $account['locale'] : null;
+        $this->redirect($isLocalPath ? $returnTo : '/', $locale);
     }
 
     public function logout(array $params): void
@@ -119,7 +121,7 @@ final class AuthController extends Controller
         $token = $app->tokens->create($accountId, Tokens::VERIFY_EMAIL, self::VERIFY_TTL_SECONDS);
 
         $app->mailer->send($email, 'emails/verify_email.txt.twig', [
-            'link' => $app->config['app']['url'] . '/verify-email/' . $token,
+            'link' => $app->url('/verify-email/' . $token, absolute: true),
             'hours' => intdiv(self::VERIFY_TTL_SECONDS, 3600),
         ]);
     }

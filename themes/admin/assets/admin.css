@@ -63,3 +63,11 @@ small { color: var(--muted); font-weight: 400; }
 
 code { padding: .1rem .3rem; background: var(--surface); border: 1px solid var(--line); border-radius: .2rem; overflow-wrap: anywhere; }
 .button-row { display: flex; flex-wrap: wrap; gap: .75rem; }
+
+.stack-form.wide { max-width: 48rem; }
+fieldset { margin: 1.5rem 0 0; padding: 1rem; border: 1px solid var(--line); border-radius: .3rem; display: grid; gap: .5rem; }
+legend { font-weight: 700; padding: 0 .4rem; }
+textarea { font: inherit; padding: .45rem .6rem; border: 1px solid var(--line); border-radius: .3rem; width: 100%; }
+label.checkbox { display: flex; gap: .5rem; align-items: flex-start; }
+label.checkbox input { margin-top: .3rem; }
+button.danger { margin-top: 1.5rem; background: var(--error); border-color: var(--error); }

@@ -7,7 +7,7 @@
 {% for error in errors %}
     <p class="flash flash-error" role="alert">{{ error }}</p>
 {% endfor %}
-<form method="post" action="/register" class="stack-form">
+<form method="post" action="{{ url('/register') }}" class="stack-form">
     {{ csrf_field() }}
     <label for="email">{{ trans('core.login.email') }}</label>
     <input id="email" name="email" type="email" value="{{ email }}" autocomplete="username" required>
@@ -24,7 +24,19 @@
         <input id="website" name="website" type="text" tabindex="-1" autocomplete="off">
     </div>
 
+    {% if legal %}
+        <label class="checkbox">
+            <input type="checkbox" name="accept_terms" value="1" required>
+            <span>
+                {{ trans('core.register.accept') }}
+                {% for role, link in legal %}
+                    <a href="{{ link.url }}" target="_blank" rel="noopener">{{ link.title }}</a>{{ not loop.last ? ',' }}
+                {% endfor %}
+            </span>
+        </label>
+    {% endif %}
+
     <button type="submit">{{ trans('core.register.submit') }}</button>
 </form>
-<p><a href="/login">{{ trans('core.register.have_account') }}</a></p>
+<p><a href="{{ url('/login') }}">{{ trans('core.register.have_account') }}</a></p>
 {% endblock %}

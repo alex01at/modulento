@@ -1,38 +1,37 @@
 <!DOCTYPE html>
-<html lang="{{ locale }}">
+<html lang="{{ locale() }}">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{% block title %}{{ site_name }}{% endblock %}</title>
+    {% for language in locale_urls() %}
+        <link rel="alternate" hreflang="{{ language.locale }}" href="{{ language.absolute_url }}">
+    {% endfor %}
     <link rel="stylesheet" href="{{ theme_asset('theme.css') }}">
     {% block head %}{% endblock %}
 </head>
 <body>
 <header class="site-header">
-    <a class="site-name" href="/">{{ site_name }}</a>
-    <nav aria-label="{{ trans('core.nav.home') }}">
+    <a class="site-name" href="{{ url('/') }}">{{ site_name }}</a>
+    <nav aria-label="{{ trans('core.nav.main') }}">
+        {% for link in page_links('header') %}
+            <a href="{{ link.url }}">{{ link.title }}</a>
+        {% endfor %}
         {% if can('core.admin.access') %}
-            <a href="/admin">{{ trans('core.nav.admin') }}</a>
+            <a href="{{ url('/admin') }}">{{ trans('core.nav.admin') }}</a>
         {% endif %}
         {% if account %}
-            <a href="/account">{{ trans('core.nav.account') }}</a>
-            <form method="post" action="/logout" class="inline-form">
+            <a href="{{ url('/account') }}">{{ trans('core.nav.account') }}</a>
+            <form method="post" action="{{ url('/logout') }}" class="inline-form">
                 {{ csrf_field() }}
                 <button type="submit" class="link-button">{{ trans('core.nav.logout') }}</button>
             </form>
         {% else %}
-            <a href="/login">{{ trans('core.nav.login') }}</a>
-            <a href="/register">{{ trans('core.nav.register') }}</a>
+            <a href="{{ url('/login') }}">{{ trans('core.nav.login') }}</a>
+            {% if registration_open() %}
+                <a href="{{ url('/register') }}">{{ trans('core.nav.register') }}</a>
+            {% endif %}
         {% endif %}
-        <form method="post" action="/locale" class="inline-form">
-            {{ csrf_field() }}
-            <label class="visually-hidden" for="locale-switch">{{ trans('core.nav.language') }}</label>
-            <select id="locale-switch" name="locale">
-                <option value="de" {{ locale == 'de' ? 'selected' }}>Deutsch</option>
-                <option value="en" {{ locale == 'en' ? 'selected' }}>English</option>
-            </select>
-            <button type="submit">OK</button>
-        </form>
     </nav>
 </header>
 
@@ -42,5 +41,25 @@
     {% endfor %}
     {% block content %}{% endblock %}
 </main>
+
+<footer class="site-footer">
+    <nav aria-label="{{ trans('core.nav.footer') }}">
+        {% for link in page_links('footer') %}
+            <a href="{{ link.url }}">{{ link.title }}</a>
+        {% endfor %}
+    </nav>
+    {% set languages = locale_urls() %}
+    {% if languages|length > 1 %}
+        <nav aria-label="{{ trans('core.nav.language') }}" class="language-menu">
+            {% for language in languages %}
+                {% if language.current %}
+                    <span aria-current="true" lang="{{ language.locale }}">{{ language.name }}</span>
+                {% else %}
+                    <a href="{{ language.url }}" hreflang="{{ language.locale }}" lang="{{ language.locale }}">{{ language.name }}</a>
+                {% endif %}
+            {% endfor %}
+        </nav>
+    {% endif %}
+</footer>
 </body>
 </html>

@@ -9,9 +9,9 @@ Plain PHP without a framework and without a build step: PHP ≥ 8.3, Twig,
 MariaDB through PDO, vanilla JS/CSS.
 
 **Status: early.** The core has accounts (registration with e-mail
-confirmation, password reset, own data export and deletion), roles, themes,
-extensions, scheduled tasks and self-update. There is no catalogue, order or
-payment code yet.
+confirmation, password reset, own data export and deletion), roles, content
+pages and legal texts, several languages, themes, extensions, scheduled tasks
+and self-update. There is no catalogue, order or payment code yet.
 
 Two rules shape everything:
 
@@ -21,6 +21,8 @@ Two rules shape everything:
   convenience, never a requirement.
 - **Templates are not part of the core.** The core hands data to templates;
   every page is rendered by a theme. See "Themes" below.
+- **Every text exists per language.** Interface texts, e-mails and content
+  pages; nothing visible is written into code or templates. See "Languages".
 
 ## Installing
 
@@ -80,11 +82,35 @@ The database is not backed up - export it before updating.
   "Run pending database updates" on the Updates page then applies an
   extension's new migrations.
 
+## Languages
+
+- A language is a file `core/lang/<code>.php` (two-letter code), plus one per
+  extension in its `lang/` folder. Which of them the site offers, and which is
+  the default, is set under **Administration → Settings**.
+- The language is part of the address: the default language has none
+  (`/login`), every other its code (`/en/login`). Each language version of a
+  page can be linked and indexed; pages announce each other with `hreflang`.
+- A text missing in a language is shown in the default language, then in
+  English, so an unfinished language pack is usable.
+- `lang/<code>.php` in the installation is read last and may reword any text
+  or complete a language. Updates never touch that folder.
+- Content pages have one text and one address per language
+  (**Administration → Pages**). A language without its own text shows the
+  default language's.
+- An account remembers its language: after logging in it lands there, and
+  mails sent on its behalf use it.
+
+In code and templates: never write a path as a literal. `App::url($path)`
+and the Twig function `url()` add the language; `Controller::redirect()` does
+it for redirects. Texts come from `trans()`; new keys go into every language
+file of the folder (`php tests/run.php` checks that `de` and `en` match).
+
 ## Layout
 
 ```
 core/         src/ (Modulento\Core), lang/, migrations/, install/ - no templates
 extensions/   one folder per extension
+lang/         this installation's own wording, see "Languages"
 themes/       default/ (site), admin/ (administration), further site themes
 public/       web root: index.php only
 bin/          migrate.php, cron.php, create-admin.php
@@ -117,9 +143,10 @@ Templates of the site theme, with the variables they receive:
 |---|---|
 | `layout/base.twig` | blocks `title`, `head`, `content` |
 | `home.twig` | - |
+| `page.twig` | `page`: `title`, `body` (cleaned HTML, output with `raw`), `meta_description`, `locale`, `role` |
 | `error.twig` | `status`, `message_key` |
 | `auth/login.twig` | `can_resend_verification` |
-| `auth/register.twig` | `errors`, `email`, `min_length`; keep the hidden `website` field |
+| `auth/register.twig` | `errors`, `email`, `min_length`, `legal` (terms and privacy pages to accept, as `title`/`url`); keep the hidden `website` field |
 | `auth/forgot.twig` | - |
 | `auth/reset.twig` | `errors`, `token`, `min_length` |
 | `account/index.twig` | `locales`, `min_length`, `is_last_admin` |
@@ -134,11 +161,15 @@ Available in every template:
 | | |
 |---|---|
 | `trans(key, {placeholders})` | Text in the visitor's language |
+| `url(path)` | Address of a path in the current language - use it for every link and form target |
+| `locale()`, `locale_urls()`, `locale_name(code)` | Current language; the current page in every language (`locale`, `name`, `url`, `absolute_url`, `current`) |
+| `page_links('header' \| 'footer' \| role)` | Published pages for a menu, as `title`/`url` |
+| `registration_open()` | Whether new accounts can be created |
 | `theme_asset(path)`, `admin_asset(path)`, `ext_asset(id, path)` | URL of a file in an `assets/` folder, with cache busting |
 | `csrf_field()`, `csrf_token()` | Required in every `POST` form or AJAX call |
 | `can(permission)` | Whether the logged-in account has a permission |
 | `money(cents, currency)` | Formatted amount |
-| `account`, `locale`, `site_name`, `flashes`, `admin_menu` | Globals |
+| `account`, `site_name`, `flashes`, `admin_menu` | Globals |
 
 Assets are served from the theme folder itself (`/assets/theme/...`), so a
 theme works by upload alone - no symlink, no copy step, no build. The content
@@ -171,8 +202,13 @@ extensions/<id>/
 
 Core services an extension uses instead of SQL on core tables, all on the
 `App` object: `accounts` (find, create, change accounts), `tokens` (one-time
-links), `mailer` (`send(to, '@<id>/emails/x.txt.twig', data)`), `settings`,
-`auth`, `events`.
+links), `mailer` (`send(to, '@<id>/emails/x.txt.twig', data, locale)`),
+`settings`, `locales`, `pages`, `auth`, `events`, and `url()`.
+
+An extension is multilingual from its first line: texts in `lang/de.php` and
+`lang/en.php`, links through `url()`, and content its users type stored per
+language where it is shown to others (see `page_translation` for the
+pattern).
 
 Events to listen to: `AccountRegistered`, `AccountLoggedIn`, `AccountDeleted`
 and `AccountExport`. An extension that stores personal data per account

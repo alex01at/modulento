@@ -38,13 +38,15 @@ final class Accounts
         return $stmt->fetch() ?: null;
     }
 
-    public function create(string $email, string $password, string $locale, bool $verified): int
+    /** @param bool $termsAccepted whether the terms were accepted, which is recorded with its time */
+    public function create(string $email, string $password, string $locale, bool $verified, bool $termsAccepted = false): int
     {
         $stmt = $this->db->prepare(
-            "INSERT INTO account (email, password_hash, status, email_verified_at, locale, created_at)
-             VALUES (:email, :hash, 'active', :verified_at, :locale, :created_at)"
+            "INSERT INTO account (email, password_hash, status, email_verified_at, terms_accepted_at, locale, created_at)
+             VALUES (:email, :hash, 'active', :verified_at, :terms_at, :locale, :created_at)"
         );
         $stmt->execute([
+            'terms_at' => $termsAccepted ? Clock::now() : null,
             'email' => self::normalizeEmail($email),
             'hash' => password_hash($password, PASSWORD_DEFAULT),
             'verified_at' => $verified ? Clock::now() : null,
