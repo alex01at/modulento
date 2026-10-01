@@ -3,49 +3,50 @@
 {% block title %}{{ trans('core.admin.providers.title') }} – {{ site_name }}{% endblock %}
 
 {% block admin %}
-<h1>{{ trans('core.admin.providers.title') }}</h1>
-<p>{{ trans(approval_required ? 'core.admin.providers.approval_on' : 'core.admin.providers.approval_off') }}</p>
+{% include '@admin/_page_header.twig' with {heading: trans('core.admin.providers.title')} only %}
 
-<nav class="button-row">
-    <a href="{{ url('/admin/providers') }}" {{ status is null ? 'aria-current="page"' }}>{{ trans('core.admin.providers.all') }}</a>
-    {% for name, count in counts %}
-        <a href="{{ url('/admin/providers') }}?status={{ name }}" {{ status == name ? 'aria-current="page"' }}>{{ trans('core.provider.status_short.' ~ name) }} ({{ count }})</a>
-    {% endfor %}
-</nav>
+<section class="card-box">
+    <div class="card-head">
+        <p>{{ trans(approval_required ? 'core.admin.providers.approval_on' : 'core.admin.providers.approval_off') }}</p>
+    </div>
 
-{% if providers is empty %}
-    <p>{{ trans('core.admin.providers.none') }}</p>
-{% else %}
-    <table>
-        <thead>
-        <tr>
-            <th scope="col">{{ trans('core.provider.field.name') }}</th>
-            <th scope="col">{{ trans('core.provider.field.type') }}</th>
-            <th scope="col">{{ trans('core.login.email') }}</th>
-            <th scope="col">{{ trans('core.admin.extensions.status') }}</th>
-        </tr>
-        </thead>
-        <tbody>
-        {% for provider in providers %}
-            <tr>
-                <th scope="row"><a href="{{ url('/admin/providers/' ~ provider.id) }}">{{ provider.name }}</a></th>
-                <td>{{ trans('core.provider.type.' ~ provider.type) }}</td>
-                <td>{{ provider.account_email }}</td>
-                <td>
-                    {{ trans('core.provider.status_short.' ~ provider.status) }}
-                    {% if provider.changed_since_decision %}<br><small>{{ trans('core.admin.providers.changed') }}</small>{% endif %}
-                </td>
-            </tr>
+    <nav class="tabs" aria-label="{{ trans('core.admin.layout.filter') }}">
+        <a href="{{ url('/admin/providers') }}" {{ status is null ? 'aria-current="page"' }}>{{ trans('core.admin.providers.all') }}</a>
+        {% for name, count in counts %}
+            <a href="{{ url('/admin/providers') }}?status={{ name }}" {{ status == name ? 'aria-current="page"' }}>{{ trans('core.provider.status_short.' ~ name) }} ({{ count }})</a>
         {% endfor %}
-        </tbody>
-    </table>
-
-{% if pages > 1 %}
-    <nav class="pager">
-        {% if page > 1 %}<a href="{{ url('/admin/providers') }}?page={{ page - 1 }}{{ status ? '&status=' ~ status }}" rel="prev">{{ trans('core.pager.previous') }}</a>{% endif %}
-        <span>{{ trans('core.pager.position', {page: page, pages: pages}) }}</span>
-        {% if page < pages %}<a href="{{ url('/admin/providers') }}?page={{ page + 1 }}{{ status ? '&status=' ~ status }}" rel="next">{{ trans('core.pager.next') }}</a>{% endif %}
     </nav>
-{% endif %}
-{% endif %}
+
+    {% if providers is empty %}
+        <p class="empty">{{ trans('core.admin.providers.none') }}</p>
+    {% else %}
+        <div class="table-wrap">
+            <table>
+                <thead>
+                <tr>
+                    <th scope="col">{{ trans('core.provider.field.name') }}</th>
+                    <th scope="col">{{ trans('core.provider.field.type') }}</th>
+                    <th scope="col">{{ trans('core.login.email') }}</th>
+                    <th scope="col">{{ trans('core.admin.extensions.status') }}</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for provider in providers %}
+                    <tr>
+                        <th scope="row"><a href="{{ url('/admin/providers/' ~ provider.id) }}">{{ provider.name }}</a></th>
+                        <td>{{ trans('core.provider.type.' ~ provider.type) }}</td>
+                        <td>{{ provider.account_email }}</td>
+                        <td>
+                            <span class="badge badge-{{ provider.status }}">{{ trans('core.provider.status_short.' ~ provider.status) }}</span>
+                            {% if provider.changed_since_decision %}<br><small>{{ trans('core.admin.providers.changed') }}</small>{% endif %}
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        {% include '@admin/_pager.twig' with {path: '/admin/providers', page: page, pages: pages, extra: status ? '&status=' ~ status : ''} only %}
+    {% endif %}
+</section>
 {% endblock %}

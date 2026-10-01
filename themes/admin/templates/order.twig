@@ -3,62 +3,90 @@
 {% block title %}{{ trans('core.order.title', {number: order.number}) }} – {{ site_name }}{% endblock %}
 
 {% block admin %}
-<p><a href="{{ url('/admin/orders') }}">{{ trans('core.admin.orders.title') }}</a></p>
-<h1>{{ trans('core.order.title', {number: order.number}) }}</h1>
-<p><strong>{{ trans(order.state_label_key) }}</strong>{% if order.due_at %} <small>({{ trans('core.order.due', {date: order.due_at}) }})</small>{% endif %}</p>
+{% include '@admin/_page_header.twig' with {heading: trans('core.order.title', {number: order.number}), crumbs: [{label: trans('core.admin.orders.title'), path: '/admin/orders'}]} only %}
 
-<table>
-    <tr><th scope="row">{{ trans('core.offer.field.title') }}</th><td>{% if order.offer_id %}<a href="{{ url('/admin/offers/' ~ order.offer_id) }}">{{ order.offer_title }}</a>{% else %}{{ order.offer_title }}{% endif %}</td></tr>
-    <tr><th scope="row">{{ trans('core.order.buyer') }}</th><td>{% if order.buyer_id %}<a href="{{ url('/admin/accounts/' ~ order.buyer_id) }}">{{ order.buyer_name }}</a>{% else %}{{ order.buyer_name }}{% endif %}</td></tr>
-    <tr><th scope="row">{{ trans('core.provider.field.name') }}</th><td>{% if order.provider_id %}<a href="{{ url('/admin/providers/' ~ order.provider_id) }}">{{ order.provider_name }}</a>{% else %}{{ order.provider_name }}{% endif %}</td></tr>
-    {% for item in order.items %}
-        <tr><td>{{ item.label }}</td><td>{{ money(item.quantity * item.unit_price, order.currency) }}</td></tr>
-    {% endfor %}
-    <tr><th scope="row">{{ trans('core.order.total') }}</th><td><strong>{{ money(order.total, order.currency) }}</strong></td></tr>
-    <tr><th scope="row">{{ trans('core.order.payment') }}</th><td>{{ order.payment_method }} – {{ trans('core.order.payment_state.' ~ order.payment_state) }}</td></tr>
-    <tr><th scope="row">{{ trans('core.admin.providers.created') }}</th><td>{{ order.created_at }} UTC</td></tr>
-</table>
+<div class="split">
+    <div>
+        <section class="card-box">
+            <div class="card-head">
+                <h2>{{ trans('core.admin.layout.details') }}</h2>
+                <div class="status-line">
+                    <span class="badge">{{ trans(order.state_label_key) }}</span>
+                    {% if order.due_at %}<small>({{ trans('core.order.due', {date: order.due_at}) }})</small>{% endif %}
+                </div>
+            </div>
+            <div class="table-wrap">
+                <table class="details">
+                    <tr><th scope="row">{{ trans('core.offer.field.title') }}</th><td>{% if order.offer_id %}<a href="{{ url('/admin/offers/' ~ order.offer_id) }}">{{ order.offer_title }}</a>{% else %}{{ order.offer_title }}{% endif %}</td></tr>
+                    <tr><th scope="row">{{ trans('core.order.buyer') }}</th><td>{% if order.buyer_id %}<a href="{{ url('/admin/accounts/' ~ order.buyer_id) }}">{{ order.buyer_name }}</a>{% else %}{{ order.buyer_name }}{% endif %}</td></tr>
+                    <tr><th scope="row">{{ trans('core.provider.field.name') }}</th><td>{% if order.provider_id %}<a href="{{ url('/admin/providers/' ~ order.provider_id) }}">{{ order.provider_name }}</a>{% else %}{{ order.provider_name }}{% endif %}</td></tr>
+                    {% for item in order.items %}
+                        <tr><th scope="row">{{ item.label }}</th><td>{{ money(item.quantity * item.unit_price, order.currency) }}</td></tr>
+                    {% endfor %}
+                    <tr><th scope="row">{{ trans('core.order.total') }}</th><td><strong>{{ money(order.total, order.currency) }}</strong></td></tr>
+                    <tr><th scope="row">{{ trans('core.order.payment') }}</th><td>{{ order.payment_method }} – {{ trans('core.order.payment_state.' ~ order.payment_state) }}</td></tr>
+                    <tr><th scope="row">{{ trans('core.admin.providers.created') }}</th><td>{{ order.created_at }} UTC</td></tr>
+                </table>
+            </div>
+        </section>
 
-{% if flow_template %}
-    {% include flow_template %}
-{% endif %}
+        {% if flow_template %}
+            <div class="card-box ext-detail">
+                {% include flow_template %}
+            </div>
+        {% endif %}
 
-<h2>{{ trans('core.order.history') }}</h2>
-<ol>
-    {% for event in order.events %}
-        <li>
-            <strong>{{ trans(order.event_labels[loop.index0]) }}</strong>
-            <small>{{ trans('core.order.role.' ~ event.actor_role) }} · {{ event.created_at }} UTC</small>
-            {% if event.note %}<p>{{ event.note|nl2br }}</p>{% endif %}
-            {% for file in files.events[event.id] ?? [] %}
-                <br><a href="{{ url('/admin/orders/' ~ order.id ~ '/files/' ~ file.id) }}" download>{{ file.name }}</a> <small>({{ (file.size / 1024)|round(0, 'ceil') }} KB)</small>
+        <section class="card-box">
+            <h2>{{ trans('core.order.messages') }}</h2>
+            {% for message in order.messages %}
+                <div class="message">
+                    <small>{{ message.author_role == 'buyer' ? order.buyer_name : order.provider_name }} · {{ message.created_at }} UTC</small>
+                    <p>{{ message.body|nl2br }}
+                        {% for file in files.messages[message.id] ?? [] %}
+                            <br><a href="{{ url('/admin/orders/' ~ order.id ~ '/files/' ~ file.id) }}" download>{{ file.name }}</a> <small>({{ (file.size / 1024)|round(0, 'ceil') }} KB)</small>
+                        {% endfor %}</p>
+                </div>
+            {% else %}
+                <p><small>{{ trans('core.order.message.none') }}</small></p>
             {% endfor %}
-        </li>
-    {% endfor %}
-</ol>
+        </section>
+    </div>
 
-<h2>{{ trans('core.order.messages') }}</h2>
-{% for message in order.messages %}
-    <p><small>{{ message.author_role == 'buyer' ? order.buyer_name : order.provider_name }} · {{ message.created_at }} UTC</small><br>{{ message.body|nl2br }}
-            {% for file in files.messages[message.id] ?? [] %}
-                <br><a href="{{ url('/admin/orders/' ~ order.id ~ '/files/' ~ file.id) }}" download>{{ file.name }}</a> <small>({{ (file.size / 1024)|round(0, 'ceil') }} KB)</small>
-            {% endfor %}</p>
-{% else %}
-    <p><small>{{ trans('core.order.message.none') }}</small></p>
-{% endfor %}
+    <div>
+        {% if actions %}
+            <section class="card-box">
+                <h2>{{ trans('core.order.actions') }}</h2>
+                {% for name, action in actions %}
+                    <form method="post" action="{{ url('/admin/orders/' ~ order.id ~ '/transition') }}" class="danger-form">
+                        {{ csrf_field() }}
+                        <input type="hidden" name="transition" value="{{ name }}">
+                        {% if action.note %}
+                            <div class="field">
+                                <label for="note_{{ name }}">{{ trans(action.note == 'required' ? 'core.order.note_required' : 'core.order.note_optional') }}</label>
+                                <textarea id="note_{{ name }}" name="note" rows="3" {{ action.note == 'required' ? 'required' }}></textarea>
+                            </div>
+                        {% endif %}
+                        <button type="submit" class="danger">{{ trans(action.label) }}</button>
+                    </form>
+                {% endfor %}
+            </section>
+        {% endif %}
 
-{% if actions %}
-    <h2>{{ trans('core.order.actions') }}</h2>
-    {% for name, action in actions %}
-        <form method="post" action="{{ url('/admin/orders/' ~ order.id ~ '/transition') }}" class="stack-form wide">
-            {{ csrf_field() }}
-            <input type="hidden" name="transition" value="{{ name }}">
-            {% if action.note %}
-                <label for="note_{{ name }}">{{ trans(action.note == 'required' ? 'core.order.note_required' : 'core.order.note_optional') }}</label>
-                <textarea id="note_{{ name }}" name="note" rows="3" {{ action.note == 'required' ? 'required' }}></textarea>
-            {% endif %}
-            <button type="submit" class="danger">{{ trans(action.label) }}</button>
-        </form>
-    {% endfor %}
-{% endif %}
+        <section class="card-box">
+            <h2>{{ trans('core.order.history') }}</h2>
+            <ol class="timeline">
+                {% for event in order.events %}
+                    <li>
+                        <strong>{{ trans(order.event_labels[loop.index0]) }}</strong>
+                        <small>{{ trans('core.order.role.' ~ event.actor_role) }} · {{ event.created_at }} UTC</small>
+                        {% if event.note %}<p>{{ event.note|nl2br }}</p>{% endif %}
+                        {% for file in files.events[event.id] ?? [] %}
+                            <a href="{{ url('/admin/orders/' ~ order.id ~ '/files/' ~ file.id) }}" download>{{ file.name }}</a> <small>({{ (file.size / 1024)|round(0, 'ceil') }} KB)</small>
+                        {% endfor %}
+                    </li>
+                {% endfor %}
+            </ol>
+        </section>
+    </div>
+</div>
 {% endblock %}

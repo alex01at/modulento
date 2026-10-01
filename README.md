@@ -190,6 +190,7 @@ Available in every template:
 | `trans(key, {placeholders})` | Text in the visitor's language |
 | `url(path)` | Address of a path in the current language - use it for every link and form target |
 | `locale()`, `locale_urls()`, `locale_name(code)` | Current language; the current page in every language (`locale`, `name`, `url`, `absolute_url`, `current`) |
+| `current_path()` | Path of the current page without its language prefix, e.g. to mark the active menu entry |
 | `page_links('header' \| 'footer' \| role)` | Published pages for a menu, as `title`/`url` |
 | `latest_offers(limit)` | The newest public offers as cards |
 | `categories()` | The category tree with `name`, `path`, `children` and `offer_count` |

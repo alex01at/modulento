@@ -1,35 +1,43 @@
 {% extends '@admin/layout.twig' %}
+{% import '@admin/_icons.twig' as icons %}
 
 {% block title %}{{ trans('core.admin.pages.title') }} – {{ site_name }}{% endblock %}
 
 {% block admin %}
-<h1>{{ trans('core.admin.pages.title') }}</h1>
-<p>{{ trans('core.admin.pages.intro') }}</p>
-<p><a href="{{ url('/admin/pages/new') }}">{{ trans('core.admin.pages.new') }}</a></p>
+{% include '@admin/_page_header.twig' with {heading: trans('core.admin.pages.title')} only %}
 
-{% if pages is empty %}
-    <p>{{ trans('core.admin.pages.none') }}</p>
-{% else %}
-    <table>
-        <thead>
-        <tr>
-            <th scope="col">{{ trans('core.admin.pages.field.title') }}</th>
-            <th scope="col">{{ trans('core.admin.pages.languages') }}</th>
-            <th scope="col">{{ trans('core.admin.pages.field.role') }}</th>
-            <th scope="col">{{ trans('core.admin.extensions.status') }}</th>
-        </tr>
-        </thead>
-        <tbody>
-        {% for page in pages %}
-            {% set text = page.translations[default_locale] ?? page.translations|first %}
-            <tr>
-                <th scope="row"><a href="{{ url('/admin/pages/' ~ page.id) }}">{{ text.title }}</a></th>
-                <td>{{ page.translations|keys|join(', ') }}</td>
-                <td>{{ page.role ? trans('core.admin.pages.role.' ~ page.role) }}</td>
-                <td>{{ trans('core.admin.pages.status.' ~ page.status) }}</td>
-            </tr>
-        {% endfor %}
-        </tbody>
-    </table>
-{% endif %}
+<section class="card-box">
+    <div class="card-head">
+        <p>{{ trans('core.admin.pages.intro') }}</p>
+        <a class="btn" href="{{ url('/admin/pages/new') }}">{{ icons.icon('plus') }}<span>{{ trans('core.admin.pages.new') }}</span></a>
+    </div>
+
+    {% if pages is empty %}
+        <p class="empty">{{ trans('core.admin.pages.none') }}</p>
+    {% else %}
+        <div class="table-wrap">
+            <table>
+                <thead>
+                <tr>
+                    <th scope="col">{{ trans('core.admin.pages.field.title') }}</th>
+                    <th scope="col">{{ trans('core.admin.pages.languages') }}</th>
+                    <th scope="col">{{ trans('core.admin.pages.field.role') }}</th>
+                    <th scope="col">{{ trans('core.admin.extensions.status') }}</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for page in pages %}
+                    {% set text = page.translations[default_locale] ?? page.translations|first %}
+                    <tr>
+                        <th scope="row"><a href="{{ url('/admin/pages/' ~ page.id) }}">{{ text.title }}</a></th>
+                        <td>{{ page.translations|keys|join(', ') }}</td>
+                        <td>{{ page.role ? trans('core.admin.pages.role.' ~ page.role) }}</td>
+                        <td><span class="badge badge-{{ page.status }}">{{ trans('core.admin.pages.status.' ~ page.status) }}</span></td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% endif %}
+</section>
 {% endblock %}

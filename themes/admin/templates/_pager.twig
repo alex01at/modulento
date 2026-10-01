@@ -1,0 +1,9 @@
+{# Previous/next links of a list. Receives "path", "page", "pages" and
+   optionally "extra", the rest of the query string starting with "&". #}
+{% if pages > 1 %}
+    <nav class="pager" aria-label="{{ trans('core.admin.layout.pager') }}">
+        {% if page > 1 %}<a class="btn btn-outline btn-sm" href="{{ url(path) }}?page={{ page - 1 }}{{ extra ?? '' }}" rel="prev">{{ trans('core.pager.previous') }}</a>{% endif %}
+        <span>{{ trans('core.pager.position', {page: page, pages: pages}) }}</span>
+        {% if page < pages %}<a class="btn btn-outline btn-sm" href="{{ url(path) }}?page={{ page + 1 }}{{ extra ?? '' }}" rel="next">{{ trans('core.pager.next') }}</a>{% endif %}
+    </nav>
+{% endif %}

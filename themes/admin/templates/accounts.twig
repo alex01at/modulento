@@ -1,46 +1,47 @@
 {% extends '@admin/layout.twig' %}
+{% import '@admin/_icons.twig' as icons %}
 
 {% block title %}{{ trans('core.admin.accounts.title') }} – {{ site_name }}{% endblock %}
 
 {% block admin %}
-<h1>{{ trans('core.admin.accounts.title') }}</h1>
+{% include '@admin/_page_header.twig' with {heading: trans('core.admin.accounts.title')} only %}
 
-<form method="get" action="{{ url('/admin/accounts') }}" class="button-row" role="search">
-    <label class="visually-hidden" for="q">{{ trans('core.admin.accounts.search') }}</label>
-    <input id="q" name="q" type="search" value="{{ search }}" placeholder="{{ trans('core.admin.accounts.search') }}">
-    <button type="submit">{{ trans('core.admin.accounts.search_submit') }}</button>
-</form>
-<p><small>{{ trans('core.admin.accounts.total', {count: total}) }}</small></p>
+<section class="card-box">
+    <div class="card-head">
+        <form method="get" action="{{ url('/admin/accounts') }}" class="search-form" role="search">
+            <label class="visually-hidden" for="q">{{ trans('core.admin.accounts.search') }}</label>
+            <input id="q" name="q" type="search" value="{{ search }}" placeholder="{{ trans('core.admin.accounts.search') }}">
+            <button type="submit">{{ icons.icon('search') }}<span>{{ trans('core.admin.accounts.search_submit') }}</span></button>
+        </form>
+        <p><small>{{ trans('core.admin.accounts.total', {count: total}) }}</small></p>
+    </div>
 
-<table>
-    <thead>
-    <tr>
-        <th scope="col">{{ trans('core.login.email') }}</th>
-        <th scope="col">{{ trans('core.account.profile.display_name') }}</th>
-        <th scope="col">{{ trans('core.admin.extensions.status') }}</th>
-        <th scope="col">{{ trans('core.admin.accounts.last_login') }}</th>
-    </tr>
-    </thead>
-    <tbody>
-    {% for row in accounts %}
-        <tr>
-            <th scope="row"><a href="{{ url('/admin/accounts/' ~ row.id) }}">{{ row.email }}</a></th>
-            <td>{{ row.display_name }}</td>
-            <td>
-                {{ trans('core.admin.accounts.status.' ~ row.status) }}
-                {% if not row.email_verified_at %}<br><small>{{ trans('core.admin.accounts.unverified') }}</small>{% endif %}
-            </td>
-            <td>{{ row.last_login_at ?? '–' }}</td>
-        </tr>
-    {% endfor %}
-    </tbody>
-</table>
+    <div class="table-wrap">
+        <table>
+            <thead>
+            <tr>
+                <th scope="col">{{ trans('core.login.email') }}</th>
+                <th scope="col">{{ trans('core.account.profile.display_name') }}</th>
+                <th scope="col">{{ trans('core.admin.extensions.status') }}</th>
+                <th scope="col">{{ trans('core.admin.accounts.last_login') }}</th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for row in accounts %}
+                <tr>
+                    <th scope="row"><a href="{{ url('/admin/accounts/' ~ row.id) }}">{{ row.email }}</a></th>
+                    <td>{{ row.display_name }}</td>
+                    <td>
+                        <span class="badge badge-{{ row.status }}">{{ trans('core.admin.accounts.status.' ~ row.status) }}</span>
+                        {% if not row.email_verified_at %}<br><small>{{ trans('core.admin.accounts.unverified') }}</small>{% endif %}
+                    </td>
+                    <td>{{ row.last_login_at ?? '–' }}</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
 
-{% if pages > 1 %}
-    <nav class="pager">
-        {% if page > 1 %}<a href="{{ url('/admin/accounts') }}?page={{ page - 1 }}{{ search ? '&q=' ~ search|url_encode }}" rel="prev">{{ trans('core.pager.previous') }}</a>{% endif %}
-        <span>{{ trans('core.pager.position', {page: page, pages: pages}) }}</span>
-        {% if page < pages %}<a href="{{ url('/admin/accounts') }}?page={{ page + 1 }}{{ search ? '&q=' ~ search|url_encode }}" rel="next">{{ trans('core.pager.next') }}</a>{% endif %}
-    </nav>
-{% endif %}
+    {% include '@admin/_pager.twig' with {path: '/admin/accounts', page: page, pages: pages, extra: search ? '&q=' ~ search|url_encode : ''} only %}
+</section>
 {% endblock %}

@@ -1134,6 +1134,18 @@ check('role: admin can be neither edited nor deleted', $pdo->query("SELECT permi
 $post('/admin/accounts/1/roles', ['roles' => [$roleId]], 3);
 check('roles: assigned role gives its permission and nothing more', $get('/admin/pages', 1)['status'] === 200 && $get('/admin/settings', 1)['status'] === 403);
 check('roles: the admin menu only shows what the account may do', str_contains($get('/admin/pages', 1)['body'], 'href="/admin/pages"') && !str_contains($get('/admin/pages', 1)['body'], 'href="/admin/settings"'));
+$r = $get('/admin/pages/new', 3);
+check('admin menu marks the entry of the current page', str_contains($r['body'], 'href="/admin/pages" aria-current="page"')
+    && !str_contains($r['body'], 'href="/admin/settings" aria-current'));
+$r = $get('/admin', 3);
+$figure = fn (string $body, string $path): bool => str_contains($body, 'class="stat-label" href="' . $path . '"');
+check('dashboard: an administrator gets a figure for every area', $r['status'] === 200 && $figure($r['body'], '/admin/providers') && $figure($r['body'], '/admin/offers')
+    && $figure($r['body'], '/admin/orders') && $figure($r['body'], '/admin/accounts') && $figure($r['body'], '/admin/reviews'));
+$pdo->exec("INSERT INTO role_permission VALUES ({$roleId}, 'core.admin.access'), ({$roleId}, 'core.orders.manage')");
+$r = $get('/admin', 1);
+check('dashboard: figures only for areas the account may manage', $r['status'] === 200 && $figure($r['body'], '/admin/orders')
+    && !$figure($r['body'], '/admin/accounts') && !$figure($r['body'], '/admin/providers') && !$figure($r['body'], '/admin/reviews'));
+$pdo->exec("DELETE FROM role_permission WHERE role_id = {$roleId} AND permission IN ('core.admin.access', 'core.orders.manage')");
 $pdo->exec("INSERT INTO role_permission VALUES ({$roleId}, 'core.accounts.manage')");
 $post('/admin/accounts/1/roles', ['roles' => [$roleId, $adminRoleId]], 1);
 check('roles: managing accounts does not allow handing out roles', $get('/admin/settings', 1)['status'] === 403);

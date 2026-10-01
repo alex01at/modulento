@@ -3,46 +3,62 @@
 {% block title %}{{ trans('core.admin.categories.title') }} – {{ site_name }}{% endblock %}
 
 {% block admin %}
-<p><a href="{{ url('/admin/categories') }}">{{ trans('core.admin.categories.title') }}</a></p>
-<h1>{{ category and category.id ? trans('core.admin.categories.edit') : trans('core.admin.categories.new') }}</h1>
+{% include '@admin/_page_header.twig' with {
+    heading: category and category.id ? trans('core.admin.categories.edit') : trans('core.admin.categories.new'),
+    crumbs: [{label: trans('core.admin.categories.title'), path: '/admin/categories'}]
+} only %}
 
 {% for error in errors %}
     <p class="flash flash-error" role="alert">{{ error }}</p>
 {% endfor %}
 
-<form method="post" action="{{ url(category and category.id ? '/admin/categories/' ~ category.id : '/admin/categories/new') }}" class="stack-form wide">
+<form method="post" action="{{ url(category and category.id ? '/admin/categories/' ~ category.id : '/admin/categories/new') }}">
     {{ csrf_field() }}
 
-    {% for code in locales %}
-        {% set text = category ? (category.translations[code] ?? {}) : {} %}
-        <fieldset>
-            <legend>{{ locale_name(code) }}</legend>
-            <label for="name_{{ code }}">{{ trans('core.admin.extensions.name') }}</label>
-            <input id="name_{{ code }}" name="text[{{ code }}][name]" value="{{ text.name ?? '' }}" maxlength="150" lang="{{ code }}" {{ loop.first ? 'required' }}>
-            <label for="slug_{{ code }}">{{ trans('core.admin.pages.field.slug') }}</label>
-            <input id="slug_{{ code }}" name="text[{{ code }}][slug]" value="{{ text.slug ?? '' }}" maxlength="160">
-        </fieldset>
-    {% endfor %}
-
-    <label for="parent_id">{{ trans('core.admin.categories.parent') }}</label>
-    <select id="parent_id" name="parent_id">
-        <option value="">{{ trans('core.admin.categories.parent_none') }}</option>
-        {% for parent in parents %}
-            <option value="{{ parent.id }}" {{ category and category.parent_id == parent.id ? 'selected' }}>{{ parent.name }}</option>
+    <div class="columns">
+        {% for code in locales %}
+            {% set text = category ? (category.translations[code] ?? {}) : {} %}
+            <fieldset class="card-box">
+                <legend>{{ locale_name(code) }}</legend>
+                <div class="field">
+                    <label for="name_{{ code }}">{{ trans('core.admin.extensions.name') }}</label>
+                    <input id="name_{{ code }}" name="text[{{ code }}][name]" value="{{ text.name ?? '' }}" maxlength="150" lang="{{ code }}" {{ loop.first ? 'required' }}>
+                </div>
+                <div class="field">
+                    <label for="slug_{{ code }}">{{ trans('core.admin.pages.field.slug') }}</label>
+                    <input id="slug_{{ code }}" name="text[{{ code }}][slug]" value="{{ text.slug ?? '' }}" maxlength="160">
+                </div>
+            </fieldset>
         {% endfor %}
-    </select>
+    </div>
 
-    <label for="position">{{ trans('core.admin.pages.field.position') }}</label>
-    <input id="position" name="position" type="number" value="{{ category ? category.position : 0 }}">
-
-    <button type="submit">{{ trans('core.account.save') }}</button>
+    <div class="card-box stack-form wide">
+        <div class="field-grid">
+            <div class="field">
+                <label for="parent_id">{{ trans('core.admin.categories.parent') }}</label>
+                <select id="parent_id" name="parent_id">
+                    <option value="">{{ trans('core.admin.categories.parent_none') }}</option>
+                    {% for parent in parents %}
+                        <option value="{{ parent.id }}" {{ category and category.parent_id == parent.id ? 'selected' }}>{{ parent.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="field">
+                <label for="position">{{ trans('core.admin.pages.field.position') }}</label>
+                <input id="position" name="position" type="number" value="{{ category ? category.position : 0 }}">
+            </div>
+        </div>
+        <button type="submit">{{ trans('core.account.save') }}</button>
+    </div>
 </form>
 
 {% if category and category.id %}
-    <form method="post" action="{{ url('/admin/categories/' ~ category.id ~ '/delete') }}">
-        {{ csrf_field() }}
-        <p><small>{{ trans('core.admin.categories.delete_hint') }}</small></p>
-        <button type="submit" class="danger">{{ trans('core.admin.categories.delete') }}</button>
-    </form>
+    <section class="card-box">
+        <form method="post" action="{{ url('/admin/categories/' ~ category.id ~ '/delete') }}" class="danger-form">
+            {{ csrf_field() }}
+            <p><small>{{ trans('core.admin.categories.delete_hint') }}</small></p>
+            <button type="submit" class="danger">{{ trans('core.admin.categories.delete') }}</button>
+        </form>
+    </section>
 {% endif %}
 {% endblock %}

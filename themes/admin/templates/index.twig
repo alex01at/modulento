@@ -1,13 +1,44 @@
 {% extends '@admin/layout.twig' %}
+{% import '@admin/_icons.twig' as icons %}
 
 {% block title %}{{ trans('core.admin.title') }} – {{ site_name }}{% endblock %}
 
 {% block admin %}
-<h1>{{ trans('core.admin.title') }}</h1>
-<p>{{ trans('core.admin.intro') }}</p>
-<ul>
-    {% for item in admin_menu %}
-        <li><a href="{{ url(item.path) }}">{{ trans(item.label_key) }}</a></li>
-    {% endfor %}
-</ul>
+{% include '@admin/_page_header.twig' with {heading: trans('core.admin.dashboard.title')} only %}
+
+{% if stats %}
+    <p>{{ trans('core.admin.dashboard.intro') }}</p>
+    <ul class="stats">
+        {% for stat in stats %}
+            {% set waiting = stat.pending is not null and stat.pending > 0 %}
+            <li class="card-box stat-card{{ waiting ? ' is-pending' }}">
+                <span class="stat-value">{{ stat.total }}</span>
+                <a class="stat-label" href="{{ url(stat.path) }}">{{ trans(stat.label_key) }}</a>
+                <span class="stat-icon">{{ icons.menu(stat.path) }}</span>
+                <span class="stat-note">
+                    {% if waiting %}
+                        <a class="badge badge-pending" href="{{ url(stat.path) }}?status=pending">{{ trans('core.admin.dashboard.pending', {count: stat.pending}) }}</a>
+                    {% elseif stat.pending is not null %}
+                        {{ trans('core.admin.dashboard.none_pending') }}
+                    {% else %}
+                        {{ trans('core.admin.dashboard.total') }}
+                    {% endif %}
+                </span>
+            </li>
+        {% endfor %}
+    </ul>
+{% endif %}
+
+<section class="card-box">
+    <h2>{{ trans('core.admin.dashboard.areas') }}</h2>
+    {% if admin_menu is empty %}
+        <p>{{ trans('core.admin.intro') }}</p>
+    {% else %}
+        <ul class="area-list">
+            {% for item in admin_menu %}
+                <li><a href="{{ url(item.path) }}">{{ icons.menu(item.path) }}<span>{{ trans(item.label_key) }}</span></a></li>
+            {% endfor %}
+        </ul>
+    {% endif %}
+</section>
 {% endblock %}

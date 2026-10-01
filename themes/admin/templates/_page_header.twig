@@ -1,0 +1,15 @@
+{# Title of a page with its breadcrumb trail. Receives "heading" and
+   optionally "crumbs", a list of label/path pairs between the dashboard and
+   this page. #}
+<header class="page-header card-box">
+    <h1>{{ heading }}</h1>
+    <nav aria-label="{{ trans('core.admin.layout.breadcrumb') }}">
+        <ol class="breadcrumb">
+            <li><a href="{{ url('/admin') }}">{{ trans('core.admin.title') }}</a></li>
+            {% for crumb in crumbs ?? [] %}
+                <li><a href="{{ url(crumb.path) }}">{{ crumb.label }}</a></li>
+            {% endfor %}
+            <li aria-current="page">{{ heading }}</li>
+        </ol>
+    </nav>
+</header>

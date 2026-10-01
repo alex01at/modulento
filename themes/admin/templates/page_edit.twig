@@ -3,57 +3,76 @@
 {% block title %}{{ trans('core.admin.pages.title') }} – {{ site_name }}{% endblock %}
 
 {% block admin %}
-<h1>{{ page and page.id ? trans('core.admin.pages.edit') : trans('core.admin.pages.new') }}</h1>
+{% include '@admin/_page_header.twig' with {
+    heading: page and page.id ? trans('core.admin.pages.edit') : trans('core.admin.pages.new'),
+    crumbs: [{label: trans('core.admin.pages.title'), path: '/admin/pages'}]
+} only %}
 
 {% for error in errors %}
     <p class="flash flash-error" role="alert">{{ error }}</p>
 {% endfor %}
 
-<form method="post" action="{{ url(page and page.id ? '/admin/pages/' ~ page.id : '/admin/pages/new') }}" class="stack-form wide">
+<form method="post" action="{{ url(page and page.id ? '/admin/pages/' ~ page.id : '/admin/pages/new') }}">
     {{ csrf_field() }}
 
     {% for code in locales %}
         {% set text = page ? (page.translations[code] ?? {}) : {} %}
-        <fieldset>
+        <fieldset class="card-box">
             <legend>{{ locale_name(code) }}</legend>
             {% if not loop.first %}
                 <p><small>{{ trans('core.admin.pages.optional_language') }}</small></p>
             {% endif %}
 
-            <label for="title_{{ code }}">{{ trans('core.admin.pages.field.title') }}</label>
-            <input id="title_{{ code }}" name="text[{{ code }}][title]" value="{{ text.title ?? '' }}" maxlength="200" lang="{{ code }}">
-
-            <label for="slug_{{ code }}">{{ trans('core.admin.pages.field.slug') }}</label>
-            <input id="slug_{{ code }}" name="text[{{ code }}][slug]" value="{{ text.slug ?? '' }}" maxlength="200">
-            <small>{{ trans('core.admin.pages.field.slug_hint') }}</small>
-
-            <label for="meta_{{ code }}">{{ trans('core.admin.pages.field.meta') }}</label>
-            <input id="meta_{{ code }}" name="text[{{ code }}][meta_description]" value="{{ text.meta_description ?? '' }}" maxlength="300" lang="{{ code }}">
-
-            <label for="body_{{ code }}">{{ trans('core.admin.pages.field.body') }}</label>
-            <textarea id="body_{{ code }}" name="text[{{ code }}][body]" rows="14" lang="{{ code }}">{{ text.body ?? '' }}</textarea>
-            <small>{{ trans('core.admin.pages.field.body_hint') }}</small>
+            <div class="field-grid">
+                <div class="field">
+                    <label for="title_{{ code }}">{{ trans('core.admin.pages.field.title') }}</label>
+                    <input id="title_{{ code }}" name="text[{{ code }}][title]" value="{{ text.title ?? '' }}" maxlength="200" lang="{{ code }}">
+                </div>
+                <div class="field">
+                    <label for="slug_{{ code }}">{{ trans('core.admin.pages.field.slug') }}</label>
+                    <input id="slug_{{ code }}" name="text[{{ code }}][slug]" value="{{ text.slug ?? '' }}" maxlength="200">
+                    <small>{{ trans('core.admin.pages.field.slug_hint') }}</small>
+                </div>
+                <div class="field field-wide">
+                    <label for="meta_{{ code }}">{{ trans('core.admin.pages.field.meta') }}</label>
+                    <input id="meta_{{ code }}" name="text[{{ code }}][meta_description]" value="{{ text.meta_description ?? '' }}" maxlength="300" lang="{{ code }}">
+                </div>
+                <div class="field field-wide">
+                    <label for="body_{{ code }}">{{ trans('core.admin.pages.field.body') }}</label>
+                    <textarea id="body_{{ code }}" name="text[{{ code }}][body]" rows="14" lang="{{ code }}">{{ text.body ?? '' }}</textarea>
+                    <small>{{ trans('core.admin.pages.field.body_hint') }}</small>
+                </div>
+            </div>
         </fieldset>
     {% endfor %}
 
-    <fieldset>
+    <fieldset class="card-box">
         <legend>{{ trans('core.admin.pages.publishing') }}</legend>
 
-        <label for="status">{{ trans('core.admin.extensions.status') }}</label>
-        <select id="status" name="status">
-            {% for status in ['draft', 'published'] %}
-                <option value="{{ status }}" {{ page and page.status == status ? 'selected' }}>{{ trans('core.admin.pages.status.' ~ status) }}</option>
-            {% endfor %}
-        </select>
-
-        <label for="role">{{ trans('core.admin.pages.field.role') }}</label>
-        <select id="role" name="role">
-            <option value="">{{ trans('core.admin.pages.role.none') }}</option>
-            {% for role in roles %}
-                <option value="{{ role }}" {{ page and page.role == role ? 'selected' }}>{{ trans('core.admin.pages.role.' ~ role) }}</option>
-            {% endfor %}
-        </select>
-        <small>{{ trans('core.admin.pages.field.role_hint') }}</small>
+        <div class="field-grid">
+            <div class="field">
+                <label for="status">{{ trans('core.admin.extensions.status') }}</label>
+                <select id="status" name="status">
+                    {% for status in ['draft', 'published'] %}
+                        <option value="{{ status }}" {{ page and page.status == status ? 'selected' }}>{{ trans('core.admin.pages.status.' ~ status) }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="field">
+                <label for="role">{{ trans('core.admin.pages.field.role') }}</label>
+                <select id="role" name="role">
+                    <option value="">{{ trans('core.admin.pages.role.none') }}</option>
+                    {% for role in roles %}
+                        <option value="{{ role }}" {{ page and page.role == role ? 'selected' }}>{{ trans('core.admin.pages.role.' ~ role) }}</option>
+                    {% endfor %}
+                </select>
+                <small>{{ trans('core.admin.pages.field.role_hint') }}</small>
+            </div>
+            <div class="field">
+                <label for="position">{{ trans('core.admin.pages.field.position') }}</label>
+                <input id="position" name="position" type="number" value="{{ page ? page.position : 0 }}">
+            </div>
+        </div>
 
         <label class="checkbox">
             <input type="checkbox" name="in_header" value="1" {{ page and page.in_header ? 'checked' }}>
@@ -64,17 +83,18 @@
             <span>{{ trans('core.admin.pages.field.in_footer') }}</span>
         </label>
 
-        <label for="position">{{ trans('core.admin.pages.field.position') }}</label>
-        <input id="position" name="position" type="number" value="{{ page ? page.position : 0 }}">
+        <div class="button-row">
+            <button type="submit">{{ trans('core.account.save') }}</button>
+        </div>
     </fieldset>
-
-    <button type="submit">{{ trans('core.account.save') }}</button>
 </form>
 
 {% if page and page.id %}
-    <form method="post" action="{{ url('/admin/pages/' ~ page.id ~ '/delete') }}">
-        {{ csrf_field() }}
-        <button type="submit" class="danger">{{ trans('core.admin.pages.delete') }}</button>
-    </form>
+    <section class="card-box">
+        <form method="post" action="{{ url('/admin/pages/' ~ page.id ~ '/delete') }}" class="danger-form">
+            {{ csrf_field() }}
+            <button type="submit" class="danger">{{ trans('core.admin.pages.delete') }}</button>
+        </form>
+    </section>
 {% endif %}
 {% endblock %}
