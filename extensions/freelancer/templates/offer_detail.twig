@@ -11,6 +11,10 @@
                     {{ trans(package.delivery_days == 1 ? 'freelancer.detail.delivery_day' : 'freelancer.detail.delivery_days', {days: package.delivery_days}) }}
                     · {{ trans(package.revisions == 1 ? 'freelancer.detail.revision' : 'freelancer.detail.revisions', {count: package.revisions}) }}
                 </small>
+                {# "offer" comes from the page this is included in; in the administration it has no path. #}
+                {% if offer.orderable is defined and offer.orderable and not offer.is_own %}
+                    <a class="button" href="{{ url(offer.path ~ '/order') }}?package={{ package.tier }}">{{ trans('freelancer.detail.order', {name: package.name}) }}</a>
+                {% endif %}
             </li>
         {% endfor %}
     </ul>

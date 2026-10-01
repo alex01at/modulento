@@ -1,0 +1,87 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Modulento\Core\Order;
+
+use Modulento\Core\App;
+use Modulento\Core\Event\OrderStateChanged;
+
+/**
+ * Tells the people an order concerns what happened to it, each by e-mail
+ * in their own language, and tells extensions through an event.
+ */
+final class OrderNotifier
+{
+    /**
+     * @param array|null $before the order before the transition (null for a new order)
+     * @param string $role who applied it: buyer, provider, admin or system
+     */
+    public static function stateChanged(App $app, ?array $before, array $after, string $transition, string $role, ?string $note): void
+    {
+        $app->events->dispatch(new OrderStateChanged($after['id'], $before['state'] ?? null, $after['state'], $transition, $role));
+
+        $flow = $app->orders->flow($after['flow']);
+        if ($flow === null) {
+            return;
+        }
+
+        $labelKey = $app->orders->eventLabel($after, $transition);
+        $stateKey = $flow->states()[$after['state']]['label'] ?? $after['state'];
+
+        // The one who acted does not need a mail about it; what the
+        // system or an administrator did concerns both sides.
+        foreach (self::recipients($app, $after) as $side => $recipient) {
+            if ($side === $role) {
+                continue;
+            }
+
+            $locale = $recipient['locale'];
+            $app->mailer->send($recipient['email'], 'emails/order_update.txt.twig', [
+                'number' => $after['number'],
+                'title' => $after['offer_title'],
+                'event' => $app->translator->trans($labelKey, [], $locale),
+                'state' => $app->translator->trans($stateKey, [], $locale),
+                'actor' => $app->translator->trans('core.order.role.' . $role, [], $locale),
+                'note' => $note ?? '',
+                'link' => $app->url('/orders/' . $after['id'], $locale, true),
+            ], $locale);
+        }
+    }
+
+    public static function message(App $app, array $order, string $role, string $body): void
+    {
+        foreach (self::recipients($app, $order) as $side => $recipient) {
+            if ($side === $role) {
+                continue;
+            }
+
+            $app->mailer->send($recipient['email'], 'emails/order_message.txt.twig', [
+                'number' => $order['number'],
+                'title' => $order['offer_title'],
+                'sender' => $role === 'buyer' ? $order['buyer_name'] : $order['provider_name'],
+                'message' => $body,
+                'link' => $app->url('/orders/' . $order['id'], $recipient['locale'], true),
+            ], $recipient['locale']);
+        }
+    }
+
+    /** @return array<string, array{email: string, locale: string}> "buyer" and "provider", as far as their accounts still exist */
+    private static function recipients(App $app, array $order): array
+    {
+        $recipients = [];
+        $locale = fn (string $wanted) => $app->locales->isEnabled($wanted) ? $wanted : $app->locales->default();
+
+        $buyer = $order['buyer_id'] !== null ? $app->accounts->findById($order['buyer_id']) : null;
+        if ($buyer !== null && $buyer['status'] === 'active') {
+            $recipients['buyer'] = ['email' => $buyer['email'], 'locale' => $locale($buyer['locale'])];
+        }
+
+        $provider = $order['provider_id'] !== null ? $app->providers->find($order['provider_id']) : null;
+        if ($provider !== null && $provider['account_status'] === 'active') {
+            $recipients['provider'] = ['email' => $provider['account_email'], 'locale' => $locale($provider['account_locale'])];
+        }
+
+        return $recipients;
+    }
+}

@@ -139,6 +139,12 @@ final class AdminAccountController extends Controller
             return;
         }
 
+        $provider = $this->app->providers->findByAccount((int) $account['id']);
+        if ($this->app->orders->hasOpen((int) $account['id'], $provider !== null ? (int) $provider['id'] : null)) {
+            $this->back($account, 'error', 'core.account.delete.open_orders');
+            return;
+        }
+
         AccountRemoval::run($this->app, (int) $account['id'], $account['email']);
 
         Session::flash('success', $this->trans('core.admin.accounts.deleted', ['email' => $account['email']]));

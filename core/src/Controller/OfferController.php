@@ -102,6 +102,8 @@ final class OfferController extends Controller
                 'provider_path' => '/providers/' . $offer['provider_slug'],
                 'category' => $category !== null ? $app->categories->view($category, $locale) : null,
                 'is_own' => $account !== null && $account['id'] === $offer['account_id'],
+                // Whether an extension registered a way to order this type.
+                'orderable' => $app->orders->flowForOfferType($offer['type']) !== null,
             ],
             'type_template' => $type->detailTemplate(),
             'type_data' => $type->detailData($offer['id'], $locale, $app),

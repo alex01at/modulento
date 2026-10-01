@@ -1,0 +1,46 @@
+{% extends 'layout/base.twig' %}
+
+{% block title %}{{ trans('core.order.new.title') }} – {{ site_name }}{% endblock %}
+
+{% block content %}
+<p><a href="{{ url(offer.path) }}">{{ offer.title }}</a></p>
+<h1>{{ trans('core.order.new.title') }}</h1>
+<p>{{ trans('core.order.new.from', {provider: offer.provider_name}) }}</p>
+{% if offer.provider_type == 'private' %}
+    <p><small>{{ trans('core.provider.private_notice') }}</small></p>
+{% endif %}
+
+{% for error in errors %}
+    <p class="flash flash-error" role="alert">{{ error }}</p>
+{% endfor %}
+
+<form method="post" action="{{ url(offer.path ~ '/order') }}" class="stack-form wide">
+    {{ csrf_field() }}
+
+    {# What can be chosen, supplied by the extension of the offer's type. #}
+    {% include flow_template %}
+
+    <label for="note">{{ trans('core.order.new.note') }}</label>
+    <textarea id="note" name="note" rows="5" maxlength="5000">{{ note }}</textarea>
+
+    <fieldset>
+        <legend>{{ trans('core.order.payment') }}</legend>
+        {% for method in payment_methods %}
+            <label class="checkbox">
+                <input type="radio" name="payment_method" value="{{ method.id }}" {{ loop.first ? 'checked' }} required>
+                <span><strong>{{ trans(method.label_key) }}</strong><br><small>{{ trans(method.description_key) }}</small></span>
+            </label>
+        {% endfor %}
+    </fieldset>
+
+    {% if terms %}
+        <label class="checkbox">
+            <input type="checkbox" name="accept_terms" value="1" required>
+            <span>{{ trans('core.register.accept') }} <a href="{{ url(terms.path) }}" target="_blank" rel="noopener">{{ terms.title }}</a></span>
+        </label>
+    {% endif %}
+
+    {# The wording of this button states that the order costs money. Keep it in every theme. #}
+    <button type="submit">{{ trans('core.order.new.submit') }}</button>
+</form>
+{% endblock %}

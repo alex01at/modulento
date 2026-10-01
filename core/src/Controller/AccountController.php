@@ -144,6 +144,12 @@ final class AccountController extends Controller
             unset($provider['account_email'], $provider['account_status'], $provider['account_locale'], $provider['decided_by'], $provider['changed_since_decision']);
             $export->add('provider', $provider);
         }
+        $orders = $this->app->orders->list('buyer', $this->accountId(), null, 1, 100000)['rows'];
+        if ($orders !== []) {
+            $export->add('orders', array_map(fn (array $order) => array_intersect_key($order, array_flip(
+                ['number', 'offer_title', 'provider_name', 'state', 'total', 'currency', 'payment_state', 'created_at', 'closed_at']
+            )), $orders));
+        }
         $this->app->events->dispatch($export);
 
         header('Content-Type: application/json; charset=utf-8');
@@ -164,6 +170,13 @@ final class AccountController extends Controller
 
         $accountId = $this->accountId();
         $email = $this->app->auth->account()['email'];
+        $provider = $this->app->providers->findByAccount($accountId);
+
+        // The other side of an unfinished order must not be left standing.
+        if ($this->app->orders->hasOpen($accountId, $provider !== null ? (int) $provider['id'] : null)) {
+            $this->back('error', 'core.account.delete.open_orders');
+            return;
+        }
 
         AccountRemoval::run($this->app, $accountId, $email);
         $this->app->auth->logout();

@@ -1,0 +1,51 @@
+{% extends '@admin/layout.twig' %}
+
+{% block title %}{{ trans('core.admin.orders.title') }} – {{ site_name }}{% endblock %}
+
+{% block admin %}
+<h1>{{ trans('core.admin.orders.title') }}</h1>
+
+<nav class="button-row">
+    <a href="{{ url('/admin/orders') }}" {{ state is null ? 'aria-current="page"' }}>{{ trans('core.admin.providers.all') }}</a>
+    {% for name, count in counts %}
+        <a href="{{ url('/admin/orders') }}?state={{ name }}" {{ state == name ? 'aria-current="page"' }}>{{ name }} ({{ count }})</a>
+    {% endfor %}
+</nav>
+
+{% if orders is empty %}
+    <p>{{ trans('core.order.list.none') }}</p>
+{% else %}
+    <table>
+        <thead>
+        <tr>
+            <th scope="col">{{ trans('core.order.number') }}</th>
+            <th scope="col">{{ trans('core.offer.field.title') }}</th>
+            <th scope="col">{{ trans('core.order.buyer') }}</th>
+            <th scope="col">{{ trans('core.provider.field.name') }}</th>
+            <th scope="col">{{ trans('core.offer.field.status') }}</th>
+            <th scope="col">{{ trans('core.order.total') }}</th>
+        </tr>
+        </thead>
+        <tbody>
+        {% for order in orders %}
+            <tr>
+                <th scope="row"><a href="{{ url('/admin/orders/' ~ order.id) }}">{{ order.number }}</a></th>
+                <td>{{ order.offer_title }}</td>
+                <td>{{ order.buyer_name }}</td>
+                <td>{{ order.provider_name }}</td>
+                <td>{{ trans(order.state_label_key) }}</td>
+                <td>{{ money(order.total, order.currency) }}</td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+
+    {% if pages > 1 %}
+        <nav class="pager">
+            {% if page > 1 %}<a href="{{ url('/admin/orders') }}?page={{ page - 1 }}{{ state ? '&state=' ~ state }}" rel="prev">{{ trans('core.pager.previous') }}</a>{% endif %}
+            <span>{{ trans('core.pager.position', {page: page, pages: pages}) }}</span>
+            {% if page < pages %}<a href="{{ url('/admin/orders') }}?page={{ page + 1 }}{{ state ? '&state=' ~ state }}" rel="next">{{ trans('core.pager.next') }}</a>{% endif %}
+        </nav>
+    {% endif %}
+{% endif %}
+{% endblock %}

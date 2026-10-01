@@ -188,6 +188,15 @@ $pdo->exec("CREATE TABLE x_freelancer_package_translation (package_id INTEGER RE
 $pdo->exec("CREATE TABLE x_freelancer_extra (id INTEGER PRIMARY KEY, offer_id INTEGER REFERENCES offer (id) ON DELETE CASCADE, position INTEGER, price INTEGER, extra_days INTEGER)");
 $pdo->exec("CREATE TABLE x_freelancer_extra_translation (extra_id INTEGER REFERENCES x_freelancer_extra (id) ON DELETE CASCADE, locale TEXT, title TEXT, PRIMARY KEY (extra_id, locale))");
 $pdo->exec("CREATE TABLE x_freelancer_requirement (offer_id INTEGER REFERENCES offer (id) ON DELETE CASCADE, locale TEXT, text TEXT, PRIMARY KEY (offer_id, locale))");
+$pdo->exec("CREATE TABLE orders (id INTEGER PRIMARY KEY, buyer_id INTEGER REFERENCES account (id) ON DELETE SET NULL, provider_id INTEGER REFERENCES provider (id) ON DELETE SET NULL,
+    offer_id INTEGER REFERENCES offer (id) ON DELETE SET NULL, flow TEXT, state TEXT, previous_state TEXT, state_actor TEXT, buyer_name TEXT, provider_name TEXT, offer_title TEXT,
+    total INTEGER, currency TEXT, locale TEXT, payment_method TEXT, payment_state TEXT DEFAULT 'unpaid', paid_at TEXT, data TEXT, due_at TEXT, due_transition TEXT,
+    terms_accepted_at TEXT, created_at TEXT, updated_at TEXT, closed_at TEXT)");
+$pdo->exec("CREATE TABLE order_item (id INTEGER PRIMARY KEY, order_id INTEGER REFERENCES orders (id) ON DELETE CASCADE, position INTEGER, label TEXT, quantity INTEGER, unit_price INTEGER)");
+$pdo->exec("CREATE TABLE order_event (id INTEGER PRIMARY KEY, order_id INTEGER REFERENCES orders (id) ON DELETE CASCADE, transition TEXT, from_state TEXT, to_state TEXT,
+    actor_id INTEGER REFERENCES account (id) ON DELETE SET NULL, actor_role TEXT, note TEXT, created_at TEXT)");
+$pdo->exec("CREATE TABLE order_message (id INTEGER PRIMARY KEY, order_id INTEGER REFERENCES orders (id) ON DELETE CASCADE, account_id INTEGER REFERENCES account (id) ON DELETE SET NULL,
+    author_role TEXT, body TEXT, created_at TEXT)");
 $pdo->exec("PRAGMA foreign_keys = ON");
 $pdo->exec("CREATE TABLE role (id INTEGER PRIMARY KEY, name TEXT)");
 $pdo->exec("CREATE TABLE role_permission (role_id INTEGER REFERENCES role (id) ON DELETE CASCADE, permission TEXT)");
@@ -787,6 +796,138 @@ check('deleting a category keeps its offers', $offerRow("id = {$offerId}")['cate
 $post('/account/offers/' . $second['id'] . '/delete', [], 1);
 check('offer: deleting removes it and the type\'s rows', $offerRow('id = ' . (int) $second['id']) === false && $pdo->query('SELECT COUNT(*) FROM x_freelancer_package WHERE offer_id = ' . (int) $second['id'])->fetchColumn() == 0);
 
+// --- Orders: the engine and the freelancer flow --------------------------------
+$orderRow = fn (int $id) => $pdo->query("SELECT * FROM orders WHERE id = {$id}")->fetch();
+$lastOrder = fn () => (int) $pdo->query('SELECT MAX(id) FROM orders')->fetchColumn();
+$act = fn (int $orderId, string $transition, int $as, string $note = '') => $post('/orders/' . $orderId . '/transition', ['transition' => $transition, 'note' => $note], $as);
+$orderPath = '/offers/ich-gestalte-dein-logo/order';
+
+$r = $get('/offers/ich-gestalte-dein-logo', 2);
+check('offer page offers to order each package', str_contains($r['body'], $orderPath . '?package=1') && str_contains($r['body'], $orderPath . '?package=2'));
+check('the provider sees no order button on the own offer', !str_contains($get('/offers/ich-gestalte-dein-logo', 1)['body'], $orderPath . '?package='));
+check('ordering needs a login', $get($orderPath, null)['body'] === '');
+$r = $get($orderPath . '?package=2', 2);
+check('order form: chosen package preselected, legally worded button', $r['status'] === 200 && preg_match('/value="2" checked/', $r['body']) === 1 && str_contains($r['body'], 'Zahlungspflichtig bestellen'));
+$post($orderPath, ['package' => '2'], 1);
+check('nobody orders their own offer', $lastOrder() === 0);
+$post($orderPath, ['package' => '3'], 2);
+check('a package that does not exist cannot be ordered', $lastOrder() === 0);
+$post($orderPath, ['package' => '2', 'extras' => ['5']], 2);
+check('an extra that does not exist cannot be ordered', $lastOrder() === 0);
+
+$post($orderPath, ['package' => '2', 'extras' => ['0'], 'note' => 'Firma: Beispiel GmbH', 'total' => '1', 'price' => '1', 'unit_price' => '1'], 2);
+$orderId = $lastOrder();
+$order = $orderRow($orderId);
+check('order: created with prices from the offer, whatever the request claims', $orderId > 0 && (int) $order['total'] === 9900 + 2000 && $order['state'] === 'placed'
+    && $order['payment_state'] === 'unpaid' && $order['payment_method'] === 'core.offline' && $order['offer_title'] === 'Ich gestalte dein Logo');
+check('order: items, flow data and the first history entry', $pdo->query("SELECT GROUP_CONCAT(label || ':' || unit_price, '|') FROM order_item WHERE order_id = {$orderId}")->fetchColumn() === 'Komplett:9900|Quelldatei:2000'
+    && json_decode($order['data'], true) === ['tier' => 2, 'delivery_days' => 6, 'revisions' => 3]
+    && $pdo->query("SELECT note FROM order_event WHERE order_id = {$orderId}")->fetchColumn() === 'Firma: Beispiel GmbH');
+check('order: has a deadline for the provider to answer', $order['due_transition'] === 'expire' && $order['due_at'] > gmdate('Y-m-d H:i:s', time() + 2 * 86400));
+check('order: the provider is told', lastMail($mailLog, 'plain@example.test')['subject'] === 'Bestellung ' . sprintf('%06d', $orderId) . ': Bestellt'
+    && lastMail($mailLog, 'plain@example.test')['link'] === '/orders/' . $orderId);
+
+check('order page: buyer and provider see it, nobody else', $get('/orders/' . $orderId, 2)['status'] === 200 && $get('/orders/' . $orderId, 1)['status'] === 200 && $get('/orders/' . $orderId, 3)['status'] === 404);
+$r = $get('/orders/' . $orderId, 2);
+check('order page (buyer): items, total, own actions only', str_contains($r['body'], '119,00 €') && str_contains($r['body'], 'Bestellung zurückziehen') && !str_contains($r['body'], 'Auftrag annehmen'));
+check('order page (provider): own actions and the buyer\'s note', str_contains($get('/orders/' . $orderId, 1)['body'], 'Auftrag annehmen') && str_contains($get('/orders/' . $orderId, 1)['body'], 'Firma: Beispiel GmbH'));
+check('lists: purchases and sales', str_contains($get('/account/orders', 2)['body'], '/orders/' . $orderId) && str_contains($get('/account/sales', 1)['body'], '/orders/' . $orderId)
+    && !str_contains($get('/account/orders', 1)['body'], '/orders/' . $orderId));
+
+$act($orderId, 'accept', 2);
+check('a buyer cannot accept the order for the provider', $orderRow($orderId)['state'] === 'placed');
+$act($orderId, 'accept', 3);
+check('an outsider cannot touch the order', $orderRow($orderId)['state'] === 'placed');
+$act($orderId, 'deliver', 1, 'zu früh');
+check('a transition from the wrong state is refused', $orderRow($orderId)['state'] === 'placed');
+$act($orderId, 'decline', 1, '');
+check('declining needs a reason', $orderRow($orderId)['state'] === 'placed');
+$act($orderId, 'accept', 1);
+check('accept: in progress, deadline cleared, buyer told', $orderRow($orderId)['state'] === 'in_progress' && $orderRow($orderId)['due_at'] === null
+    && lastMail($mailLog, 'editor@example.test')['subject'] === 'Bestellung ' . sprintf('%06d', $orderId) . ': Auftrag angenommen');
+check('order page shows the delivery date', str_contains($get('/orders/' . $orderId, 2)['body'], 'zu liefern bis'));
+
+$post('/orders/' . $orderId . '/message', ['body' => "Hier sind die Farben:\n<b>blau</b>"], 2);
+$post('/orders/' . $orderId . '/message', ['body' => 'hallo'], 3);
+check('messages: stored for a party, refused for an outsider, the other side is mailed', $pdo->query("SELECT COUNT(*) FROM order_message WHERE order_id = {$orderId}")->fetchColumn() == 1
+    && lastMail($mailLog, 'plain@example.test')['subject'] === 'Neue Nachricht zur Bestellung ' . sprintf('%06d', $orderId));
+check('messages: shown escaped', str_contains($get('/orders/' . $orderId, 1)['body'], '&lt;b&gt;blau&lt;/b&gt;'));
+
+$post('/orders/' . $orderId . '/paid', [], 2);
+check('only the provider confirms a payment', $orderRow($orderId)['payment_state'] === 'unpaid');
+$post('/orders/' . $orderId . '/paid', [], 1);
+check('provider marks the payment as received', $orderRow($orderId)['payment_state'] === 'paid' && $orderRow($orderId)['paid_at'] !== null);
+
+$act($orderId, 'deliver', 1, 'Fertig: https://example.test/logo.zip');
+check('deliver: waits for the buyer, with a deadline for automatic acceptance', $orderRow($orderId)['state'] === 'delivered' && $orderRow($orderId)['due_transition'] === 'auto_complete');
+foreach ([1, 2, 3] as $round) {
+    $act($orderId, 'request_revision', 2, 'Bitte heller, Runde ' . $round);
+    $act($orderId, 'deliver', 1, 'Neu geliefert');
+}
+check('revisions: three are included and were used', $pdo->query("SELECT COUNT(*) FROM order_event WHERE order_id = {$orderId} AND transition = 'request_revision'")->fetchColumn() == 3 && $orderRow($orderId)['state'] === 'delivered');
+$act($orderId, 'request_revision', 2, 'Noch eine');
+check('revisions: a fourth is refused and no longer offered', $orderRow($orderId)['state'] === 'delivered' && !str_contains($get('/orders/' . $orderId, 2)['body'], 'value="request_revision"')
+    && str_contains($get('/orders/' . $orderId, 2)['body'], 'value="accept_delivery"'));
+
+$act($orderId, 'request_cancel', 2, 'Passt doch nicht');
+check('cancellation requested by the buyer', $orderRow($orderId)['state'] === 'cancel_requested' && $orderRow($orderId)['previous_state'] === 'delivered');
+$act($orderId, 'agree_cancel', 2);
+check('the one who asked cannot agree to the own request', $orderRow($orderId)['state'] === 'cancel_requested');
+$act($orderId, 'withdraw_cancel', 1);
+check('only the one who asked can withdraw the request', $orderRow($orderId)['state'] === 'cancel_requested');
+$act($orderId, 'refuse_cancel', 1, 'Die Arbeit ist getan');
+check('refusing leads back to where the order was', $orderRow($orderId)['state'] === 'delivered' && $orderRow($orderId)['due_transition'] === 'auto_complete');
+$act($orderId, 'accept_delivery', 2);
+check('accepting the delivery completes the order', $orderRow($orderId)['state'] === 'completed' && $orderRow($orderId)['closed_at'] !== null);
+$act($orderId, 'request_cancel', 2, 'zu spät');
+check('a completed order cannot be changed', $orderRow($orderId)['state'] === 'completed' && !str_contains($get('/orders/' . $orderId, 2)['body'], 'name="transition"'));
+
+// Deadlines, applied by the scheduler.
+$post($orderPath, ['package' => '1'], 2);
+$expiring = $lastOrder();
+$pdo->exec("UPDATE orders SET due_at = '2020-01-01 00:00:00' WHERE id = {$expiring}");
+$post($orderPath, ['package' => '1'], 2);
+$waiting = $lastOrder();
+$deadlineApp = new Modulento\Core\App($config, $pdo);
+$deadlineApp->translator->load($root . '/core/lang', 'core');
+Modulento\Core\Kernel::registerCore($deadlineApp);
+$deadlineApp->extensions->loadEnabled($deadlineApp);
+check('deadline: only the overdue order is moved on', $deadlineApp->orders->runDeadlines($deadlineApp) === 1 && $orderRow($expiring)['state'] === 'declined' && $orderRow($waiting)['state'] === 'placed');
+check('deadline: both sides are told', lastMail($mailLog, 'editor@example.test')['subject'] === 'Bestellung ' . sprintf('%06d', $expiring) . ': Nicht rechtzeitig angenommen');
+check('deadline: recorded as done by the system', $pdo->query("SELECT actor_role FROM order_event WHERE order_id = {$expiring} ORDER BY id DESC")->fetchColumn() === 'system');
+
+// Two requests at once: the second finds the order already changed.
+$app2 = new Modulento\Core\App($config, $pdo);
+Modulento\Core\Kernel::registerCore($app2);
+$app2->extensions->loadEnabled($app2);
+$first = $app2->orders->apply($waiting, 'accept', 'provider', 1, null, $app2);
+$pdo->exec("UPDATE orders SET state = 'placed' WHERE id = {$waiting}");
+$stale = $app2->orders->find($waiting);
+$pdo->exec("UPDATE orders SET state = 'in_progress' WHERE id = {$waiting}");
+check('engine: a transition only succeeds from the state it was checked against', $first === null && $stale['state'] === 'placed'
+    && $app2->orders->apply($waiting, 'withdraw', 'buyer', 2, null, $app2) === 'core.order.error.not_possible');
+
+check('order administration needs its permission', $get('/admin/orders', 1)['status'] === 403);
+$r = $get('/admin/orders/' . $waiting, 3);
+check('order administration shows the order and only the administrator\'s action', $r['status'] === 200 && str_contains($r['body'], 'Durch die Plattform stornieren') && !str_contains($r['body'], 'value="deliver"'));
+$post('/admin/orders/' . $waiting . '/transition', ['transition' => 'admin_cancel', 'note' => ''], 3);
+check('administrator cancelling needs a reason', $orderRow($waiting)['state'] === 'in_progress');
+$post('/admin/orders/' . $waiting . '/transition', ['transition' => 'deliver', 'note' => 'x'], 3);
+check('an administrator cannot play the provider', $orderRow($waiting)['state'] === 'in_progress');
+
+$post('/account/delete', ['current_password' => 'correct horse battery'], 2);
+check('an account with an open order cannot be deleted', $row('editor@example.test') !== false);
+$post('/admin/orders/' . $waiting . '/transition', ['transition' => 'admin_cancel', 'note' => 'Verstoß'], 3);
+check('administrator cancels; both sides are told', $orderRow($waiting)['state'] === 'cancelled' && lastMail($mailLog, 'editor@example.test')['subject'] === 'Bestellung ' . sprintf('%06d', $waiting) . ': Durch die Plattform storniert'
+    && lastMail($mailLog, 'plain@example.test')['subject'] === 'Bestellung ' . sprintf('%06d', $waiting) . ': Durch die Plattform storniert');
+$export = json_decode($get('/account/export', 2)['body'], true);
+check('export lists the buyer\'s orders', count($export['orders'] ?? []) === 3 && ($export['orders'][0]['offer_title'] ?? '') === 'Ich gestalte dein Logo');
+
+$pdo->exec("UPDATE extension SET enabled = 0 WHERE id = 'freelancer'");
+check('order of a disabled extension: still readable, no actions', $get('/orders/' . $orderId, 2)['status'] === 200 && str_contains($get('/orders/' . $orderId, 2)['body'], 'Unbekannter Status'));
+$pdo->exec("UPDATE extension SET enabled = 1 WHERE id = 'freelancer'");
+$pdo->exec('DELETE FROM orders');
+
 $accounts->create('seller@example.test', $pw, 'de', verified: true);
 $sellerId = (int) $row('seller@example.test')['id'];
 $post('/account/provider', $private, $sellerId);
@@ -888,9 +1029,30 @@ foreach (glob($root . '/{core/src,extensions/*/src}/{,*/}*.php', GLOB_BRACE) as 
     preg_match_all("/(?:trans\\(|flash\\('[a-z]+', \\\$this->trans\\(|'key' => |back\\([^,]+, '[a-z]+', |Key\\) => |return |\\\$errors\\[\\] = |UpdateException\\(|result\\([a-z]+, '[a-z_]+', )'((?:core|example|freelancer)\\.[a-z0-9_.]+[a-z0-9])'/", (string) file_get_contents($file), $found);
     foreach ($found[1] as $key) {
         // Offer type ids look like keys but are not.
-        if (!isset($knownKeys[$key]) && $key !== 'freelancer.service') {
+        if (!isset($knownKeys[$key]) && !in_array($key, ['freelancer.service', 'core.offline'], true)) {
             $missingKeys[] = $key . ' in ' . basename($file);
         }
+    }
+}
+// The wording of every transition, as button and as history entry.
+$flowApp = new Modulento\Core\App($config, $pdo);
+$pdo->exec("UPDATE extension SET enabled = 1 WHERE id = 'freelancer'");
+$flowApp->extensions->loadEnabled($flowApp);
+$pdo->exec("UPDATE extension SET enabled = 0 WHERE id = 'freelancer'");
+$serviceFlow = $flowApp->orders->flow('freelancer.service');
+foreach ($serviceFlow->transitions() as $transitionName => $definition) {
+    foreach (['label', 'done'] as $kind) {
+        if (!isset($knownKeys[$definition[$kind] ?? ''])) {
+            $missingKeys[] = "{$kind} of {$transitionName}";
+        }
+    }
+    if (!isset($serviceFlow->states()[$definition['to']]) && $definition['to'] !== Modulento\Core\Order\Orders::PREVIOUS) {
+        $missingKeys[] = "target state of {$transitionName}";
+    }
+}
+foreach ($serviceFlow->states() as $stateName => $definition) {
+    if (!isset($knownKeys[$definition['label']])) {
+        $missingKeys[] = "label of state {$stateName}";
     }
 }
 check('every language key used exists: ' . implode(', ', array_unique($missingKeys)), $missingKeys === []);
@@ -948,7 +1110,7 @@ check('themes: the admin theme can never become the site theme', $themes()->acti
 $pdo->exec("DELETE FROM setting WHERE name = 'core.theme'");
 
 // Every template a controller renders must exist in the shipped themes.
-foreach (['default' => ['layout/base.twig', 'home.twig', 'error.twig', 'page.twig', 'auth/login.twig', 'auth/register.twig', 'auth/forgot.twig', 'auth/reset.twig', 'account/index.twig', 'emails/verify_email.txt.twig', 'emails/reset_password.txt.twig', 'emails/already_registered.txt.twig', 'emails/change_email.txt.twig', 'emails/password_changed.txt.twig'], 'admin' => ['layout.twig', 'index.twig', 'settings.twig', 'pages.twig', 'page_edit.twig', 'offers.twig', 'offer.twig', 'categories.twig', 'category_edit.twig', 'providers.twig', 'provider.twig', 'accounts.twig', 'account.twig', 'roles.twig', 'role_edit.twig', 'extensions.twig', 'themes.twig', 'tasks.twig', 'updates.twig']] as $theme => $templates) {
+foreach (['default' => ['layout/base.twig', 'home.twig', 'error.twig', 'page.twig', 'auth/login.twig', 'auth/register.twig', 'auth/forgot.twig', 'auth/reset.twig', 'account/index.twig', 'emails/verify_email.txt.twig', 'emails/reset_password.txt.twig', 'emails/already_registered.txt.twig', 'emails/change_email.txt.twig', 'emails/password_changed.txt.twig'], 'admin' => ['layout.twig', 'index.twig', 'settings.twig', 'pages.twig', 'page_edit.twig', 'orders.twig', 'order.twig', 'offers.twig', 'offer.twig', 'categories.twig', 'category_edit.twig', 'providers.twig', 'provider.twig', 'accounts.twig', 'account.twig', 'roles.twig', 'role_edit.twig', 'extensions.twig', 'themes.twig', 'tasks.twig', 'updates.twig']] as $theme => $templates) {
     foreach ($templates as $template) {
         check("theme {$theme} ships {$template}", is_file("{$root}/themes/{$theme}/templates/{$template}"));
     }

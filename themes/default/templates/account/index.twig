@@ -24,6 +24,11 @@
 </section>
 
 <section>
+    <h2>{{ trans('core.order.list.buyer') }}</h2>
+    <p><a href="{{ url('/account/orders') }}">{{ trans('core.order.list.buyer') }}</a></p>
+</section>
+
+<section>
     <h2>{{ trans('core.provider.title') }}</h2>
     <p>
         {{ provider_status ? trans('core.provider.status.' ~ provider_status) : trans('core.provider.none') }}
@@ -31,6 +36,7 @@
     <p><a href="{{ url('/account/provider') }}">{{ provider_status ? trans('core.provider.edit') : trans('core.provider.create') }}</a></p>
     {% if provider_status %}
         <p><a href="{{ url('/account/offers') }}">{{ trans('core.offer.mine.title') }}</a></p>
+        <p><a href="{{ url('/account/sales') }}">{{ trans('core.order.list.provider') }}</a></p>
     {% endif %}
 </section>
 

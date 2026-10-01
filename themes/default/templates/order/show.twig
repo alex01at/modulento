@@ -1,0 +1,107 @@
+{% extends 'layout/base.twig' %}
+
+{% block title %}{{ trans('core.order.title', {number: order.number}) }} – {{ site_name }}{% endblock %}
+
+{% block content %}
+<p><a href="{{ url(role == 'buyer' ? '/account/orders' : '/account/sales') }}">{{ trans('core.order.list.' ~ role) }}</a></p>
+<h1>{{ trans('core.order.title', {number: order.number}) }}</h1>
+<p><strong>{{ order.title }}</strong></p>
+
+<p class="flash {{ order.final ? '' : 'flash-success' }}">
+    {{ trans(order.state_label_key) }}
+    {% if order.due_at %}<br><small>{{ trans('core.order.due', {date: order.due_at}) }}</small>{% endif %}
+</p>
+
+{% if actions %}
+    <section>
+        <h2>{{ trans('core.order.actions') }}</h2>
+        {% for name, action in actions %}
+            <form method="post" action="{{ url('/orders/' ~ order.id ~ '/transition') }}" class="stack-form wide">
+                {{ csrf_field() }}
+                <input type="hidden" name="transition" value="{{ name }}">
+                {% if action.note %}
+                    <label for="note_{{ name }}">{{ trans(action.note == 'required' ? 'core.order.note_required' : 'core.order.note_optional') }}</label>
+                    <textarea id="note_{{ name }}" name="note" rows="3" maxlength="5000" {{ action.note == 'required' ? 'required' }}></textarea>
+                {% endif %}
+                <button type="submit">{{ trans(action.label) }}</button>
+            </form>
+        {% endfor %}
+    </section>
+{% endif %}
+
+<section>
+    <h2>{{ trans('core.order.details') }}</h2>
+    <table>
+        {% for item in order.items %}
+            <tr>
+                <td>{{ item.quantity > 1 ? item.quantity ~ ' × ' }}{{ item.label }}</td>
+                <td>{{ money(item.quantity * item.unit_price, order.currency) }}</td>
+            </tr>
+        {% endfor %}
+        <tr>
+            <th scope="row">{{ trans('core.order.total') }}</th>
+            <td><strong>{{ money(order.total, order.currency) }}</strong></td>
+        </tr>
+    </table>
+
+    {# What the offer's type knows about this order, supplied by its extension. #}
+    {% if flow_template %}
+        {% include flow_template %}
+    {% endif %}
+
+    <p>
+        {{ trans(role == 'buyer' ? 'core.provider.field.name' : 'core.order.buyer') }}:
+        {% if counterpart.path %}<a href="{{ url(counterpart.path) }}">{{ counterpart.name }}</a>{% else %}{{ counterpart.name }}{% endif %}
+        {% if counterpart.email %}· <a href="mailto:{{ counterpart.email }}">{{ counterpart.email }}</a>{% endif %}
+    </p>
+</section>
+
+<section>
+    <h2>{{ trans('core.order.payment') }}</h2>
+    <p>
+        {% if order.payment_label_key %}<strong>{{ trans(order.payment_label_key) }}</strong> – {% endif %}
+        {{ trans('core.order.payment_state.' ~ order.payment_state) }}
+    </p>
+    {% if order.payment_description_key and order.payment_state == 'unpaid' %}
+        <p><small>{{ trans(order.payment_description_key) }}</small></p>
+    {% endif %}
+    {% if can_mark_paid %}
+        <form method="post" action="{{ url('/orders/' ~ order.id ~ '/paid') }}">
+            {{ csrf_field() }}
+            <button type="submit">{{ trans('core.order.mark_paid') }}</button>
+        </form>
+    {% endif %}
+</section>
+
+<section>
+    <h2>{{ trans('core.order.history') }}</h2>
+    <ol class="history">
+        {% for event in order.events %}
+            <li>
+                <strong>{{ trans(event.label_key) }}</strong>
+                <small>{{ trans('core.order.role.' ~ event.role) }} · {{ event.at }} UTC</small>
+                {% if event.note %}<p>{{ event.note|nl2br }}</p>{% endif %}
+            </li>
+        {% endfor %}
+    </ol>
+</section>
+
+<section>
+    <h2>{{ trans('core.order.messages') }}</h2>
+    {% for message in order.messages %}
+        <p class="message {{ message.author_role == role ? 'own' }}">
+            <small>{{ message.author_role == 'buyer' ? order.buyer_name : order.provider_name }} · {{ message.created_at }} UTC</small><br>
+            {{ message.body|nl2br }}
+        </p>
+    {% else %}
+        <p><small>{{ trans('core.order.message.none') }}</small></p>
+    {% endfor %}
+
+    <form method="post" action="{{ url('/orders/' ~ order.id ~ '/message') }}" class="stack-form wide">
+        {{ csrf_field() }}
+        <label for="body">{{ trans('core.order.message.new') }}</label>
+        <textarea id="body" name="body" rows="4" maxlength="5000" required></textarea>
+        <button type="submit">{{ trans('core.order.message.send') }}</button>
+    </form>
+</section>
+{% endblock %}
