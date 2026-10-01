@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace Modulento\Core;
 
 use Modulento\Core\Controller\AdminController;
+use Modulento\Core\Controller\AssetController;
 use Modulento\Core\Controller\AuthController;
+use Modulento\Core\Controller\CronController;
 use Modulento\Core\Controller\HomeController;
 use Modulento\Core\Controller\UpdateController;
 use Modulento\Core\Support\Database;
@@ -31,8 +33,14 @@ final class Kernel
 
         $db = Database::connect($config['db']);
 
+        // Asset and cron requests need neither a login nor a language, so
+        // they skip the session: no session file per cron call, and assets
+        // load in parallel instead of queueing on the session lock.
+        $path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
+        $stateless = preg_match('#^/(assets|cron)/#', $path) === 1;
+
         $locale = 'en';
-        if ($web) {
+        if ($web && !$stateless) {
             Session::start();
             $locale = Session::get('locale');
             if (!in_array($locale, Translator::SUPPORTED_LOCALES, true)) {
@@ -52,12 +60,18 @@ final class Kernel
         return $app;
     }
 
-    private static function registerCore(App $app): void
+    /** Public so the test suite checks the real route table. */
+    public static function registerCore(App $app): void
     {
         $router = $app->router;
 
         $router->get('/', [HomeController::class, 'index'], Router::PUBLIC);
         $router->post('/locale', [HomeController::class, 'switchLocale'], Router::PUBLIC);
+
+        $router->get('/assets/theme/{path*}', [AssetController::class, 'theme'], Router::PUBLIC);
+        $router->get('/assets/admin/{path*}', [AssetController::class, 'admin'], Router::PUBLIC);
+        $router->get('/assets/ext/{id}/{path*}', [AssetController::class, 'extension'], Router::PUBLIC);
+        $router->get('/cron/{token}', [CronController::class, 'run'], Router::PUBLIC);
 
         $router->get('/login', [AuthController::class, 'showLogin'], Router::PUBLIC);
         $router->post('/login', [AuthController::class, 'login'], Router::PUBLIC);
@@ -69,17 +83,22 @@ final class Kernel
         $router->post('/admin/extensions/{id}/disable', [AdminController::class, 'disableExtension'], 'core.extensions.manage');
         $router->get('/admin/tasks', [AdminController::class, 'tasks'], 'core.tasks.view');
 
+        $router->get('/admin/themes', [AdminController::class, 'themes'], 'core.themes.manage');
+        $router->post('/admin/themes/{id}/activate', [AdminController::class, 'activateTheme'], 'core.themes.manage');
+
         $router->get('/admin/updates', [UpdateController::class, 'index'], 'core.update.manage');
+        $router->post('/admin/updates/migrate', [UpdateController::class, 'migrate'], 'core.update.manage');
         $router->post('/admin/updates/check', [UpdateController::class, 'check'], 'core.update.manage');
         $router->post('/admin/updates/apply', [UpdateController::class, 'apply'], 'core.update.manage');
 
         $app->addPermission('core.admin.access', 'core.permission.admin_access');
         $app->addPermission('core.extensions.manage', 'core.permission.extensions_manage');
         $app->addPermission('core.tasks.view', 'core.permission.tasks_view');
-
+        $app->addPermission('core.themes.manage', 'core.permission.themes_manage');
         $app->addPermission('core.update.manage', 'core.permission.update_manage');
 
         $app->addAdminMenu('core.admin.menu.extensions', '/admin/extensions', 'core.extensions.manage');
+        $app->addAdminMenu('core.admin.menu.themes', '/admin/themes', 'core.themes.manage');
         $app->addAdminMenu('core.admin.menu.tasks', '/admin/tasks', 'core.tasks.view');
         $app->addAdminMenu('core.admin.menu.updates', '/admin/updates', 'core.update.manage');
 

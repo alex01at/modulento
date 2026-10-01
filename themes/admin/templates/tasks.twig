@@ -1,10 +1,16 @@
-{% extends 'layout/admin.twig' %}
+{% extends '@admin/layout.twig' %}
 
 {% block title %}{{ trans('core.admin.tasks.title') }} – {{ site_name }}{% endblock %}
 
 {% block admin %}
 <h1>{{ trans('core.admin.tasks.title') }}</h1>
 <p>{{ trans('core.admin.tasks.intro') }}</p>
+<ul>
+    <li>{{ trans('core.admin.tasks.setup_script') }}<br><code>{{ cron_script }}</code></li>
+    {% if cron_url %}
+        <li>{{ trans('core.admin.tasks.setup_url') }}<br><code>{{ cron_url }}</code></li>
+    {% endif %}
+</ul>
 
 <table>
     <thead>

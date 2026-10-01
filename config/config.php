@@ -20,7 +20,9 @@ return [
         'env' => $_ENV['APP_ENV'] ?? 'prod',
         'url' => rtrim($_ENV['APP_URL'] ?? '', '/'),
         'name' => $_ENV['APP_NAME'] ?? 'Modulento',
-        'theme' => $_ENV['APP_THEME'] ?? '',
+        // Lets a cron service call /cron/<token> where the hosting panel
+        // cannot run bin/cron.php itself. Empty switches that URL off.
+        'cron_token' => $_ENV['CRON_TOKEN'] ?? '',
         'root' => $root,
     ],
     'update' => [

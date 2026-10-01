@@ -31,7 +31,7 @@ final class Updater
     private const COPY_EXCLUDE_FILES = ['.env', 'VERSION'];
     private const BACKUP_EXCLUDE_PREFIXES = ['var/cache/', 'var/updates/', 'var/uploads/', 'var/log/', '.git/'];
     private const BACKUP_RETENTION = 5;
-    private const REQUIRED_PACKAGE_ENTRIES = ['public/index.php', 'core/src', 'vendor/autoload.php', 'composer.json', 'VERSION'];
+    private const REQUIRED_PACKAGE_ENTRIES = ['public/index.php', 'core/src', 'themes/default/theme.json', 'themes/admin/theme.json', 'vendor/autoload.php', 'composer.json', 'VERSION'];
 
     /**
      * @param Closure(): void $migrate runs the core and extension migrations

@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 // Usage: php bin/create-admin.php admin@example.com
 // Creates the account (or resets its password) and gives it the admin role.
-// Registration through the web follows in stage 2.
+// The web installer does the same for the first admin; this is for later
+// ones and for a lost password.
 
+use Modulento\Core\Support\AdminAccount;
 use Modulento\Core\Support\Database;
 
 if (PHP_SAPI !== 'cli') {
@@ -35,28 +37,12 @@ if ($isTerminal) {
     fwrite(STDOUT, "\n");
 }
 
-if (strlen($password) < 12) {
+if (strlen($password) < AdminAccount::MIN_PASSWORD_LENGTH) {
     fwrite(STDERR, "The password needs at least 12 characters.\n");
     exit(1);
 }
 
 $config = require $root . '/config/config.php';
-$db = Database::connect($config['db']);
-
-$db->beginTransaction();
-
-$stmt = $db->prepare(
-    "INSERT INTO account (email, password_hash, status, created_at) VALUES (:email, :hash, 'active', NOW())
-     ON DUPLICATE KEY UPDATE password_hash = VALUES(password_hash), status = 'active'"
-);
-$stmt->execute(['email' => $email, 'hash' => password_hash($password, PASSWORD_DEFAULT)]);
-
-$stmt = $db->prepare(
-    "INSERT IGNORE INTO account_role (account_id, role_id)
-     SELECT a.id, r.id FROM account a JOIN role r ON r.name = 'admin' WHERE a.email = :email"
-);
-$stmt->execute(['email' => $email]);
-
-$db->commit();
+AdminAccount::create(Database::connect($config['db']), $email, $password);
 
 echo "Admin account ready: {$email}\n";

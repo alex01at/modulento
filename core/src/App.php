@@ -9,8 +9,10 @@ use Modulento\Core\Support\Auth;
 use Modulento\Core\Support\Events;
 use Modulento\Core\Support\Router;
 use Modulento\Core\Support\Scheduler;
+use Modulento\Core\Support\Settings;
 use Modulento\Core\Support\Translator;
 use Modulento\Core\Support\View;
+use Modulento\Core\Theme\ThemeManager;
 use PDO;
 
 /**
@@ -32,6 +34,8 @@ final class App
     public readonly Auth $auth;
     public readonly Translator $translator;
     public readonly ExtensionManager $extensions;
+    public readonly Settings $settings;
+    public readonly ThemeManager $themes;
 
     private ?View $view = null;
     /** @var array<int, array{label_key: string, path: string, permission: string}> */
@@ -46,12 +50,14 @@ final class App
         $this->auth = new Auth($db);
         $this->translator = new Translator($locale, $config['app']['name']);
         $this->extensions = new ExtensionManager($db, $config['app']['root'] . '/extensions');
+        $this->settings = new Settings($db);
+        $this->themes = new ThemeManager($config['app']['root'] . '/themes', $this->settings);
         $this->router = new Router($this);
     }
 
     /**
-     * Built on first use, after every extension has registered its
-     * template folder.
+     * Built on first use, after every extension has been loaded, because
+     * the template folders depend on the enabled extensions.
      */
     public function view(): View
     {

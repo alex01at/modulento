@@ -138,6 +138,7 @@ $pdo->exec("CREATE TABLE role (id INTEGER PRIMARY KEY, name TEXT)");
 $pdo->exec("CREATE TABLE role_permission (role_id INTEGER, permission TEXT)");
 $pdo->exec("CREATE TABLE account_role (account_id INTEGER, role_id INTEGER)");
 $pdo->exec("CREATE TABLE extension (id TEXT PRIMARY KEY, version TEXT, enabled INTEGER)");
+$pdo->exec("CREATE TABLE setting (name TEXT PRIMARY KEY, value TEXT)");
 $pdo->exec("INSERT INTO account VALUES (1, 'plain@example.test', 'active', 'de', ''), (2, 'editor@example.test', 'active', 'de', ''),
     (3, 'admin@example.test', 'active', 'de', ''), (4, 'blocked@example.test', 'blocked', 'de', '')");
 $pdo->exec("INSERT INTO role VALUES (1, 'editor'), (2, 'admin')");
@@ -145,7 +146,7 @@ $pdo->exec("INSERT INTO role_permission VALUES (1, 'demo.edit'), (2, '*')");
 $pdo->exec("INSERT INTO account_role VALUES (2, 1), (3, 2), (4, 2)");
 $pdo->exec("INSERT INTO extension VALUES ('example', '0.1.0', 1)");
 
-$config = ['app' => ['env' => 'dev', 'url' => '', 'name' => 'Testseite', 'theme' => '', 'root' => $root]];
+$config = ['app' => ['env' => 'dev', 'url' => 'https://example.test', 'name' => 'Testseite', 'root' => $root, 'cron_token' => 'secret-cron-token']];
 
 /** @return array{called: bool, status: int, body: string} */
 function request(PDO $pdo, array $config, string $method, string $path, ?int $accountId, array $post = []): array
@@ -159,6 +160,8 @@ function request(PDO $pdo, array $config, string $method, string $path, ?int $ac
 
     $app = new Modulento\Core\App($config, $pdo, 'de');
     $app->translator->load($config['app']['root'] . '/core/lang', 'core');
+
+    Modulento\Core\Kernel::registerCore($app);
 
     $called = false;
     $handler = function (array $params, Modulento\Core\App $app) use (&$called): void {
@@ -220,6 +223,71 @@ $pdo->exec("UPDATE extension SET enabled = 0");
 $r = request($pdo, $config, 'GET', '/example', null);
 check('disabled extension: its route is gone', $r['status'] === 404);
 
+// --- Router: rest-of-path parameter --------------------------------------
+$r = request($pdo, $config, 'GET', '/assets/theme/theme.css', null);
+check('theme asset is served through the router', $r['status'] === 200 && str_contains($r['body'], '.site-header'));
+$r = request($pdo, $config, 'GET', '/assets/admin/admin.css', null);
+check('admin asset is served', $r['status'] === 200 && str_contains($r['body'], '.admin-menu'));
+$r = request($pdo, $config, 'GET', '/assets/theme/../theme.json', null);
+check('asset route does not leave the assets folder', $r['status'] === 404);
+$r = request($pdo, $config, 'GET', '/assets/theme/missing.css', null);
+check('missing asset: 404', $r['status'] === 404);
+
+$r = request($pdo, $config, 'GET', '/cron/wrong', null);
+check('cron URL with a wrong token: 404', $r['status'] === 404);
+$r = request($pdo, $config, 'GET', '/admin/themes', 1);
+check('theme administration needs its permission', $r['status'] === 403);
+$r = request($pdo, $config, 'GET', '/admin/themes', 3);
+check('theme administration lists the default theme', $r['status'] === 200 && str_contains($r['body'], '(default)') && !str_contains($r['body'], '(admin)'));
+
+// --- Assets --------------------------------------------------------------
+$assetDir = sys_get_temp_dir() . '/modulento-test-' . bin2hex(random_bytes(4));
+mkdir($assetDir . '/assets/img', 0777, true);
+file_put_contents($assetDir . '/assets/img/logo.svg', '<svg/>');
+file_put_contents($assetDir . '/assets/page.php', '<?php');
+file_put_contents($assetDir . '/secret.css', 'x');
+symlink($assetDir . '/secret.css', $assetDir . '/assets/link.css');
+$locate = fn (string $path) => Modulento\Core\Controller\AssetController::locate([$assetDir . '/assets'], $path);
+check('asset in a sub folder is found', $locate('img/logo.svg') !== null);
+check('asset: path climbing out is refused', $locate('../secret.css') === null);
+check('asset: symlink pointing out is refused', $locate('link.css') === null);
+check('asset: non-static file type is refused', $locate('page.php') === null);
+
+// --- Themes --------------------------------------------------------------
+$themesDir = sys_get_temp_dir() . '/modulento-test-' . bin2hex(random_bytes(4));
+foreach (['default' => ['templates', 'assets'], 'admin' => ['templates'], 'shop' => ['templates'], 'broken' => []] as $id => $subDirs) {
+    mkdir($themesDir . '/' . $id, 0777, true);
+    foreach ($subDirs as $subDir) {
+        mkdir($themesDir . '/' . $id . '/' . $subDir);
+    }
+    file_put_contents($themesDir . '/' . $id . '/theme.json', $id === 'broken' ? '{' : json_encode(['id' => $id, 'name' => ucfirst($id), 'version' => '1.0.0']));
+}
+$themes = fn () => new Modulento\Core\Theme\ThemeManager($themesDir, new Modulento\Core\Support\Settings($pdo));
+check('themes: admin theme and broken folders are not selectable', array_keys($themes()->siteThemes()) === ['default', 'shop']);
+check('themes: default is active when nothing is chosen', $themes()->active() === 'default');
+$pdo->exec("INSERT INTO setting VALUES ('core.theme', 'shop')");
+check('themes: chosen theme is active', $themes()->active() === 'shop');
+check('themes: active theme is searched before default', $themes()->siteDirs('templates') === [$themesDir . '/shop/templates', $themesDir . '/default/templates']);
+check('themes: a folder the theme lacks comes from default alone', $themes()->siteDirs('assets') === [$themesDir . '/default/assets']);
+$pdo->exec("UPDATE setting SET value = 'gone' WHERE name = 'core.theme'");
+check('themes: falls back to default when the chosen folder is gone', $themes()->active() === 'default');
+$pdo->exec("UPDATE setting SET value = 'admin' WHERE name = 'core.theme'");
+check('themes: the admin theme can never become the site theme', $themes()->active() === 'default');
+$pdo->exec("DELETE FROM setting");
+
+// Every template a controller renders must exist in the shipped themes.
+foreach (['default' => ['layout/base.twig', 'home.twig', 'error.twig', 'auth/login.twig'], 'admin' => ['layout.twig', 'index.twig', 'extensions.twig', 'themes.twig', 'tasks.twig', 'updates.twig']] as $theme => $templates) {
+    foreach ($templates as $template) {
+        check("theme {$theme} ships {$template}", is_file("{$root}/themes/{$theme}/templates/{$template}"));
+    }
+}
+check('the core itself contains no theme templates', !is_dir($root . '/core/templates'));
+
+// --- Installer: .env values survive the dotenv parser --------------------
+$nasty = ['A' => 'plain', 'B' => 'with space', 'C' => 'p$ss"w\\ord#1', 'D' => '${A}', 'E' => "line\nbreak", 'F' => ''];
+$parsed = Dotenv\Dotenv::parse(Modulento\Core\Install\Installer::envFile($nasty));
+check('env file round trip', $parsed === ['A' => 'plain', 'B' => 'with space', 'C' => 'p$ss"w\\ord#1', 'D' => '${A}', 'E' => 'linebreak', 'F' => '']);
+
 // --- Updater: applying a package -----------------------------------------
 // Downloading from GitHub is not covered; installPackage() is everything
 // that happens after the download.
@@ -263,6 +331,8 @@ $package = [
     'core/src/App.php' => 'new core',
     'core/src/New.php' => 'added',
     'vendor/autoload.php' => 'autoload',
+    'themes/default/theme.json' => '{}',
+    'themes/admin/theme.json' => '{}',
     'composer.json' => '{}',
     'VERSION' => '0.2.0',
     '.env' => 'DB_PASS="from package"',

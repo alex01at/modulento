@@ -1,5 +1,4 @@
-/* Deliberately small: the built-in look only has to be usable. A theme in
-   themes/<name>/ replaces templates and brings its own stylesheet. */
+/* Administration theme. Independent of the site theme on purpose. */
 :root {
     --text: #1c2430;
     --muted: #55606e;
@@ -34,7 +33,7 @@ a { color: var(--accent); }
 .site-header nav { display: flex; flex-wrap: wrap; align-items: center; gap: 1rem; }
 .site-name { font-weight: 700; text-decoration: none; color: var(--text); }
 
-main { max-width: 64rem; margin: 0 auto; padding: 1.5rem 1rem 3rem; }
+main { max-width: 76rem; margin: 0 auto; padding: 1.5rem 1rem 3rem; }
 
 .inline-form { display: inline; margin: 0; }
 .link-button { padding: 0; border: 0; background: none; color: var(--accent); font: inherit; text-decoration: underline; cursor: pointer; }
@@ -50,6 +49,8 @@ button { background: var(--accent); border-color: var(--accent); color: #fff; cu
 .flash-error { border-color: var(--error); color: var(--error); }
 .flash-success { border-color: var(--success); color: var(--success); }
 
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
 .admin { display: grid; grid-template-columns: 12rem 1fr; gap: 2rem; }
 .admin-menu { display: grid; align-content: start; gap: .4rem; }
 @media (max-width: 40rem) { .admin { grid-template-columns: 1fr; gap: 1rem; } }
@@ -58,6 +59,7 @@ table { width: 100%; border-collapse: collapse; }
 th, td { padding: .5rem .6rem; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
 small { color: var(--muted); font-weight: 400; }
 
-.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-
 .changelog { padding: .8rem; background: var(--surface); border: 1px solid var(--line); white-space: pre-wrap; font: inherit; }
+
+code { padding: .1rem .3rem; background: var(--surface); border: 1px solid var(--line); border-radius: .2rem; overflow-wrap: anywhere; }
+.button-row { display: flex; flex-wrap: wrap; gap: .75rem; }
