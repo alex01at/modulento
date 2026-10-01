@@ -1,0 +1,7 @@
+{
+    "id": "freelancer",
+    "name": "Freelancer services",
+    "version": "0.1.0",
+    "api": 1,
+    "namespace": "Modulento\\Freelancer"
+}

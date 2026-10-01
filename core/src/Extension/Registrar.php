@@ -7,6 +7,7 @@ namespace Modulento\Core\Extension;
 use Closure;
 use LogicException;
 use Modulento\Core\App;
+use Modulento\Core\Catalogue\OfferType;
 use Modulento\Core\Support\Router;
 
 /**
@@ -49,6 +50,13 @@ final class Registrar
     public function permission(string $name, string $labelKey): void
     {
         $this->app->addPermission($this->prefixed($name, 'Permission'), $labelKey);
+    }
+
+    /** A kind of offer this extension adds to the catalogue. Its id starts with the extension id. */
+    public function offerType(OfferType $type): void
+    {
+        $this->prefixed($type->id(), 'Offer type');
+        $this->app->offers->registerType($type);
     }
 
     public function adminMenu(string $labelKey, string $path, string $permission): void

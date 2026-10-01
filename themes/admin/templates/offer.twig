@@ -1,0 +1,52 @@
+{% extends '@admin/layout.twig' %}
+
+{% block title %}{{ trans('core.admin.offers.title') }} – {{ site_name }}{% endblock %}
+
+{% block admin %}
+<p><a href="{{ url('/admin/offers') }}">{{ trans('core.admin.offers.title') }}</a></p>
+<h1>{{ offer.title }}</h1>
+
+<p>
+    <strong>{{ trans('core.offer.status.' ~ offer.status) }}</strong>
+    {% if offer.decided_at %}<small>({{ offer.decided_at }} UTC)</small>{% endif %}
+    {% if offer.status_note %}<br>{{ trans('core.provider.status_note') }} {{ offer.status_note }}{% endif %}
+    {% if offer.changed_since_decision %}<br><strong>{{ trans('core.admin.offers.changed') }}</strong>{% endif %}
+</p>
+
+<table>
+    <tr><th scope="row">{{ trans('core.provider.field.name') }}</th><td><a href="{{ url('/admin/providers/' ~ offer.provider_id) }}">{{ offer.provider_name }}</a> ({{ trans('core.provider.status_short.' ~ offer.provider_status) }})</td></tr>
+    <tr><th scope="row">{{ trans('core.offer.field.type') }}</th><td>{{ type_label_key ? trans(type_label_key) : offer.type ~ ' – ' ~ trans('core.admin.offers.type_missing') }}</td></tr>
+    <tr><th scope="row">{{ trans('core.offer.field.category') }}</th><td>{{ offer.category ? offer.category.name : '–' }}</td></tr>
+    <tr><th scope="row">{{ trans('core.admin.providers.created') }}</th><td>{{ offer.created_at }} UTC</td></tr>
+</table>
+
+{% for image in offer.image_urls %}
+    <a href="{{ image.large }}"><img src="{{ image.thumb }}" alt="" width="160"></a>
+{% endfor %}
+
+{% for code, text in offer.texts %}
+    <h2>{{ locale_name(code) }}: {{ text.title }}</h2>
+    {% if text.summary %}<p><strong>{{ text.summary }}</strong></p>{% endif %}
+    <p>{{ text.description|nl2br }}</p>
+{% endfor %}
+
+{% if type_template %}
+    {% include type_template %}
+{% endif %}
+
+<h2>{{ trans('core.admin.providers.decision') }}</h2>
+<form method="post" action="{{ url('/admin/offers/' ~ offer.id ~ '/decide') }}" class="stack-form wide">
+    {{ csrf_field() }}
+    <label for="note">{{ trans('core.admin.providers.note') }}</label>
+    <textarea id="note" name="note" rows="4"></textarea>
+    <small>{{ trans('core.admin.offers.note_hint') }}</small>
+    <div class="button-row">
+        {% if offer.status in ['pending', 'rejected'] %}
+            <button type="submit" name="decision" value="approve">{{ trans('core.admin.offers.approve') }}</button>
+        {% endif %}
+        {% if offer.status in ['pending', 'published', 'paused'] %}
+            <button type="submit" name="decision" value="reject" class="danger">{{ trans(offer.status == 'pending' ? 'core.admin.providers.reject' : 'core.admin.offers.take_down') }}</button>
+        {% endif %}
+    </div>
+</form>
+{% endblock %}

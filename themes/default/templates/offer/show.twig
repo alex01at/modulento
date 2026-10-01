@@ -1,0 +1,52 @@
+{% extends 'layout/base.twig' %}
+
+{% block title %}{{ offer.title }} – {{ site_name }}{% endblock %}
+
+{% block head %}
+    {% if offer.summary %}<meta name="description" content="{{ offer.summary }}">{% endif %}
+{% endblock %}
+
+{% block content %}
+<article>
+    <h1>{{ offer.title }}</h1>
+    <p>
+        <small>
+            <a href="{{ url(offer.provider_path) }}">{{ offer.provider_name }}</a>
+            {% if offer.category %}· <a href="{{ url(offer.category.path) }}">{{ offer.category.name }}</a>{% endif %}
+            {% if offer.price_from is not null %}· {{ trans('core.offer.price_from', {price: money(offer.price_from, offer.currency)}) }}{% endif %}
+        </small>
+    </p>
+
+    {% if offer.images %}
+        <div class="gallery">
+            {% for image in offer.images %}
+                <a href="{{ image.large }}"><img src="{{ loop.first ? image.large : image.thumb }}" alt="{{ trans('core.offer.image_alt', {title: offer.title, number: loop.index}) }}" width="{{ image.width }}" height="{{ image.height }}" {{ not loop.first ? 'loading="lazy"' }}></a>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    {% if offer.summary %}<p><strong>{{ offer.summary }}</strong></p>{% endif %}
+    {# Plain text typed by the provider: escaped, line breaks kept. #}
+    <p>{{ offer.description|nl2br }}</p>
+
+    {# The part that belongs to the offer's type, supplied by its extension. #}
+    {% include type_template %}
+</article>
+
+<section>
+    <h2>{{ trans('core.offer.contact.title') }}</h2>
+    {% if offer.is_own %}
+        <p>{{ trans('core.offer.contact.own') }}</p>
+    {% elseif account %}
+        <form method="post" action="{{ url(offer.path ~ '/contact') }}" class="stack-form wide">
+            {{ csrf_field() }}
+            <label for="message">{{ trans('core.offer.contact.message') }}</label>
+            <textarea id="message" name="message" rows="6" minlength="20" maxlength="3000" required></textarea>
+            <small>{{ trans('core.offer.contact.hint') }}</small>
+            <button type="submit">{{ trans('core.offer.contact.submit') }}</button>
+        </form>
+    {% else %}
+        <p><a href="{{ url('/login') }}">{{ trans('core.offer.contact.login') }}</a></p>
+    {% endif %}
+</section>
+{% endblock %}

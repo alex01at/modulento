@@ -28,6 +28,17 @@
     </select>
     <small>{{ trans('core.admin.settings.provider_approval_hint') }}</small>
 
+    <label for="offer_approval">{{ trans('core.admin.settings.offer_approval') }}</label>
+    <select id="offer_approval" name="offer_approval">
+        <option value="required" {{ settings.offer_approval == 'required' ? 'selected' }}>{{ trans('core.admin.settings.offer_approval_required') }}</option>
+        <option value="off" {{ settings.offer_approval == 'off' ? 'selected' }}>{{ trans('core.admin.settings.offer_approval_off') }}</option>
+    </select>
+    <small>{{ trans('core.admin.settings.offer_approval_hint') }}</small>
+
+    <label for="currency">{{ trans('core.admin.settings.currency') }}</label>
+    <input id="currency" name="currency" value="{{ settings.currency }}" maxlength="3" pattern="[A-Za-z]{3}" required>
+    <small>{{ trans('core.admin.settings.currency_hint') }}</small>
+
     <fieldset>
         <legend>{{ trans('core.admin.settings.languages') }}</legend>
         <p><small>{{ trans('core.admin.settings.languages_hint') }}</small></p>

@@ -1,0 +1,37 @@
+<?php
+
+declare(strict_types=1);
+
+return [
+    'freelancer.type.service' => 'Service',
+    'freelancer.tier.1' => 'Basic',
+    'freelancer.tier.2' => 'Standard',
+    'freelancer.tier.3' => 'Premium',
+    'freelancer.form.package' => 'Package "{name}"',
+    'freelancer.form.package_optional' => 'Optional. The package exists once a price is entered.',
+    'freelancer.form.price' => 'Price in {currency}',
+    'freelancer.form.delivery_days' => 'Delivery time in days',
+    'freelancer.form.revisions' => 'Revisions included',
+    'freelancer.form.package_name' => 'Name of the package',
+    'freelancer.form.package_description' => 'What is included?',
+    'freelancer.form.extras' => 'Extras',
+    'freelancer.form.extras_hint' => 'Additional services that can be booked with any package. Empty rows are ignored.',
+    'freelancer.form.extra_title' => 'Extra {number}',
+    'freelancer.form.extra_days' => 'Additional days',
+    'freelancer.form.requirements' => 'What do you need from the buyer?',
+    'freelancer.form.requirements_hint' => 'For example texts, logos or access data. The buyer sees this before ordering.',
+    'freelancer.detail.packages' => 'Packages',
+    'freelancer.detail.extras' => 'Extras',
+    'freelancer.detail.requirements' => 'What the provider needs from you',
+    'freelancer.detail.delivery_day' => 'Delivery in {days} day',
+    'freelancer.detail.delivery_days' => 'Delivery in {days} days',
+    'freelancer.detail.revision' => '{count} revision',
+    'freelancer.detail.revisions' => '{count} revisions',
+    'freelancer.detail.extra_day' => '+{days} day',
+    'freelancer.detail.extra_days' => '+{days} days',
+    'freelancer.error.price' => 'Please give every package a price between 1 and 100,000, e.g. 49 or 49.90.',
+    'freelancer.error.delivery_days' => 'The delivery time must be between 1 and 365 days.',
+    'freelancer.error.revisions' => 'The number of revisions must be between 0 and 99.',
+    'freelancer.error.too_long' => 'A package name or description is too long.',
+    'freelancer.error.extra' => 'An extra needs a title and a price between 1 and 100,000.',
+];

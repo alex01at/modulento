@@ -71,3 +71,15 @@ small { color: var(--muted); }
 .card-list li { padding: 1rem; border: 1px solid var(--line); border-radius: .3rem; display: grid; gap: .25rem; }
 .pager { display: flex; gap: 1rem; margin-top: 1.5rem; }
 address { font-style: normal; }
+
+.card-list img { width: 100%; height: auto; aspect-ratio: 4 / 3; object-fit: cover; border-radius: .2rem; }
+.gallery { display: grid; gap: .5rem; grid-template-columns: repeat(auto-fill, minmax(8rem, 1fr)); margin: 1rem 0; }
+.gallery a:first-child { grid-column: 1 / -1; }
+.gallery img { width: 100%; height: auto; border-radius: .3rem; }
+.filter-row, .button-row { display: flex; flex-wrap: wrap; gap: .75rem; align-items: center; margin: 1rem 0; }
+.category-nav { display: flex; flex-wrap: wrap; gap: .4rem 1rem; margin: 1rem 0; }
+.category-nav .child { font-size: .9rem; }
+.category-nav [aria-current] { font-weight: 700; text-decoration: none; }
+.price { font-weight: 700; }
+table { width: 100%; border-collapse: collapse; }
+th, td { padding: .5rem .6rem; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }

@@ -29,6 +29,9 @@
         {{ provider_status ? trans('core.provider.status.' ~ provider_status) : trans('core.provider.none') }}
     </p>
     <p><a href="{{ url('/account/provider') }}">{{ provider_status ? trans('core.provider.edit') : trans('core.provider.create') }}</a></p>
+    {% if provider_status %}
+        <p><a href="{{ url('/account/offers') }}">{{ trans('core.offer.mine.title') }}</a></p>
+    {% endif %}
 </section>
 
 <section>

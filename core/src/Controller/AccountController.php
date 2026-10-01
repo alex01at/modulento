@@ -6,7 +6,7 @@ namespace Modulento\Core\Controller;
 
 use Modulento\Core\Account\Accounts;
 use Modulento\Core\Account\Tokens;
-use Modulento\Core\Event\AccountDeleted;
+use Modulento\Core\Account\AccountRemoval;
 use Modulento\Core\Event\AccountExport;
 use Modulento\Core\Support\PasswordPolicy;
 use Modulento\Core\Support\RateLimiter;
@@ -165,8 +165,7 @@ final class AccountController extends Controller
         $accountId = $this->accountId();
         $email = $this->app->auth->account()['email'];
 
-        $this->app->accounts->delete($accountId);
-        $this->app->events->dispatch(new AccountDeleted($accountId, $email));
+        AccountRemoval::run($this->app, $accountId, $email);
         $this->app->auth->logout();
         $this->redirect('/');
     }

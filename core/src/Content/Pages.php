@@ -20,7 +20,7 @@ final class Pages
 
     // First path segments a page must not use: its address would never be
     // reached, because these routes are matched first.
-    private const RESERVED_SLUGS = ['admin', 'account', 'assets', 'cron', 'login', 'logout', 'register', 'forgot-password', 'reset-password', 'verify-email', 'providers'];
+    private const RESERVED_SLUGS = ['admin', 'account', 'assets', 'cron', 'login', 'logout', 'register', 'forgot-password', 'reset-password', 'verify-email', 'providers', 'offers', 'categories', 'media'];
 
     public function __construct(private PDO $db, private Locales $locales)
     {

@@ -3,4 +3,11 @@
 {% block content %}
 <h1>{{ trans('core.home.title') }}</h1>
 <p>{{ trans('core.home.intro') }}</p>
+
+{% set offers = latest_offers(6) %}
+{% if offers %}
+    <h2>{{ trans('core.offers.latest') }}</h2>
+    {% include 'offer/_cards.twig' %}
+    <p><a href="{{ url('/offers') }}">{{ trans('core.offers.all') }}</a></p>
+{% endif %}
 {% endblock %}

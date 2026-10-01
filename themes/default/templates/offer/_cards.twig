@@ -1,0 +1,16 @@
+{# A list of offer cards. Receives "offers". #}
+<ul class="card-list">
+    {% for offer in offers %}
+        <li>
+            {% if offer.thumb %}
+                <a href="{{ url(offer.path) }}" tabindex="-1" aria-hidden="true"><img src="{{ offer.thumb }}" alt="" loading="lazy"></a>
+            {% endif %}
+            <a href="{{ url(offer.path) }}"><strong>{{ offer.title }}</strong></a>
+            {% if offer.summary %}<p>{{ offer.summary }}</p>{% endif %}
+            <small>
+                <a href="{{ url(offer.provider_path) }}">{{ offer.provider_name }}</a>
+                {% if offer.price_from is not null %}· {{ trans('core.offer.price_from', {price: money(offer.price_from, offer.currency)}) }}{% endif %}
+            </small>
+        </li>
+    {% endfor %}
+</ul>

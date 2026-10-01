@@ -1,0 +1,48 @@
+{% extends 'layout/base.twig' %}
+
+{% block title %}{{ trans('core.offer.mine.title') }} – {{ site_name }}{% endblock %}
+
+{% block content %}
+<h1>{{ trans('core.offer.mine.title') }}</h1>
+
+{% if provider_status != 'approved' %}
+    <p class="flash">{{ trans('core.offer.mine.provider_not_approved') }}</p>
+{% endif %}
+
+{% if types is empty %}
+    <p>{{ trans('core.offer.mine.no_types') }}</p>
+{% else %}
+    <p class="button-row">
+        {% for type in types %}
+            <a href="{{ url('/account/offers/new') }}?type={{ type.id|url_encode }}">{{ trans('core.offer.mine.new', {type: trans(type.label_key)}) }}</a>
+        {% endfor %}
+    </p>
+{% endif %}
+
+{% if offers is empty %}
+    <p>{{ trans('core.offer.mine.none') }}</p>
+{% else %}
+    <table>
+        <thead>
+        <tr>
+            <th scope="col">{{ trans('core.offer.field.title') }}</th>
+            <th scope="col">{{ trans('core.offer.field.type') }}</th>
+            <th scope="col">{{ trans('core.offer.field.status') }}</th>
+        </tr>
+        </thead>
+        <tbody>
+        {% for offer in offers %}
+            <tr>
+                <th scope="row"><a href="{{ url('/account/offers/' ~ offer.id) }}">{{ offer.title }}</a></th>
+                <td>{{ offer.type_label }}</td>
+                <td>
+                    {{ trans('core.offer.status.' ~ offer.status) }}
+                    {% if offer.public_path %}<br><a href="{{ url(offer.public_path) }}">{{ trans('core.offer.view_public') }}</a>{% endif %}
+                </td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+{% endif %}
+<p><a href="{{ url('/account') }}">{{ trans('core.nav.account') }}</a></p>
+{% endblock %}

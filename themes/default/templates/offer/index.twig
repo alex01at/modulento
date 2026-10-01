@@ -1,0 +1,47 @@
+{% extends 'layout/base.twig' %}
+
+{% block title %}{{ category ? category.name : trans('core.offers.title') }} – {{ site_name }}{% endblock %}
+
+{% block content %}
+<h1>{{ category ? category.name : trans('core.offers.title') }}</h1>
+
+<form method="get" action="{{ url(category ? category.path : '/offers') }}" class="filter-row" role="search">
+    <label class="visually-hidden" for="q">{{ trans('core.offers.search') }}</label>
+    <input id="q" name="q" type="search" value="{{ search }}" placeholder="{{ trans('core.offers.search') }}">
+    <label class="visually-hidden" for="sort">{{ trans('core.offers.sort') }}</label>
+    <select id="sort" name="sort">
+        {% for name in sorts %}
+            <option value="{{ name }}" {{ name == sort ? 'selected' }}>{{ trans('core.offers.sort.' ~ name) }}</option>
+        {% endfor %}
+    </select>
+    <button type="submit">{{ trans('core.offers.search_submit') }}</button>
+</form>
+
+{% if categories %}
+    <nav class="category-nav" aria-label="{{ trans('core.offers.categories') }}">
+        <a href="{{ url('/offers') }}" {{ category is null ? 'aria-current="page"' }}>{{ trans('core.offers.all') }}</a>
+        {% for top in categories %}
+            <a href="{{ url(top.path) }}" {{ category and category.id == top.id ? 'aria-current="page"' }}>{{ top.name }}</a>
+            {% for child in top.children %}
+                <a href="{{ url(child.path) }}" class="child" {{ category and category.id == child.id ? 'aria-current="page"' }}>{{ child.name }}</a>
+            {% endfor %}
+        {% endfor %}
+    </nav>
+{% endif %}
+
+{% if offers is empty %}
+    <p>{{ trans(search ? 'core.offers.none_found' : 'core.offers.none') }}</p>
+{% else %}
+    <p><small>{{ trans(total == 1 ? 'core.offers.total_one' : 'core.offers.total', {count: total}) }}</small></p>
+    {% include 'offer/_cards.twig' %}
+
+    {% if pages > 1 %}
+        {% set query = (search ? '&q=' ~ search|url_encode : '') ~ (sort != 'newest' ? '&sort=' ~ sort : '') %}
+        <nav class="pager" aria-label="{{ trans('core.pager.label') }}">
+            {% if page > 1 %}<a href="{{ url(category ? category.path : '/offers') }}?page={{ page - 1 }}{{ query }}" rel="prev">{{ trans('core.pager.previous') }}</a>{% endif %}
+            <span>{{ trans('core.pager.position', {page: page, pages: pages}) }}</span>
+            {% if page < pages %}<a href="{{ url(category ? category.path : '/offers') }}?page={{ page + 1 }}{{ query }}" rel="next">{{ trans('core.pager.next') }}</a>{% endif %}
+        </nav>
+    {% endif %}
+{% endif %}
+{% endblock %}

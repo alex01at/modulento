@@ -104,7 +104,7 @@ final class Installer
         $checks = [
             ['PHP ' . PHP_VERSION . ' (>= 8.3)', PHP_VERSION_ID >= 80300],
         ];
-        foreach (['pdo_mysql', 'curl', 'zip', 'mbstring', 'ctype', 'dom', 'iconv'] as $extension) {
+        foreach (['pdo_mysql', 'curl', 'zip', 'mbstring', 'ctype', 'dom', 'iconv', 'gd'] as $extension) {
             $checks[] = ['PHP: ' . $extension, extension_loaded($extension)];
         }
         // .env is created in the installation folder; var/ holds the

@@ -1,0 +1,40 @@
+{# Included on the public offer page and in the administration. Receives type_data. #}
+<section class="packages">
+    <h2>{{ trans('freelancer.detail.packages') }}</h2>
+    <ul class="card-list">
+        {% for package in type_data.packages %}
+            <li>
+                <strong>{{ package.name }}</strong>
+                <span class="price">{{ money(package.price, type_data.currency) }}</span>
+                {% if package.description %}<p>{{ package.description|nl2br }}</p>{% endif %}
+                <small>
+                    {{ trans(package.delivery_days == 1 ? 'freelancer.detail.delivery_day' : 'freelancer.detail.delivery_days', {days: package.delivery_days}) }}
+                    · {{ trans(package.revisions == 1 ? 'freelancer.detail.revision' : 'freelancer.detail.revisions', {count: package.revisions}) }}
+                </small>
+            </li>
+        {% endfor %}
+    </ul>
+</section>
+
+{% if type_data.extras %}
+    <section>
+        <h2>{{ trans('freelancer.detail.extras') }}</h2>
+        <ul>
+            {% for extra in type_data.extras %}
+                <li>
+                    {{ extra.title }}: + {{ money(extra.price, type_data.currency) }}
+                    {% if extra.extra_days > 0 %}
+                        ({{ trans(extra.extra_days == 1 ? 'freelancer.detail.extra_day' : 'freelancer.detail.extra_days', {days: extra.extra_days}) }})
+                    {% endif %}
+                </li>
+            {% endfor %}
+        </ul>
+    </section>
+{% endif %}
+
+{% if type_data.requirements %}
+    <section>
+        <h2>{{ trans('freelancer.detail.requirements') }}</h2>
+        <p>{{ type_data.requirements|nl2br }}</p>
+    </section>
+{% endif %}

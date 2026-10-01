@@ -1,0 +1,37 @@
+<?php
+
+declare(strict_types=1);
+
+return [
+    'freelancer.type.service' => 'Dienstleistung',
+    'freelancer.tier.1' => 'Basis',
+    'freelancer.tier.2' => 'Standard',
+    'freelancer.tier.3' => 'Premium',
+    'freelancer.form.package' => 'Paket „{name}“',
+    'freelancer.form.package_optional' => 'Optional. Das Paket gibt es, sobald ein Preis eingetragen ist.',
+    'freelancer.form.price' => 'Preis in {currency}',
+    'freelancer.form.delivery_days' => 'Lieferzeit in Tagen',
+    'freelancer.form.revisions' => 'Enthaltene Korrekturschleifen',
+    'freelancer.form.package_name' => 'Name des Pakets',
+    'freelancer.form.package_description' => 'Was ist enthalten?',
+    'freelancer.form.extras' => 'Extras',
+    'freelancer.form.extras_hint' => 'Zusatzleistungen, die zu jedem Paket dazugebucht werden können. Leere Zeilen werden ignoriert.',
+    'freelancer.form.extra_title' => 'Extra {number}',
+    'freelancer.form.extra_days' => 'Zusätzliche Tage',
+    'freelancer.form.requirements' => 'Was brauchst du vom Käufer?',
+    'freelancer.form.requirements_hint' => 'Zum Beispiel Texte, Logos oder Zugangsdaten. Der Käufer sieht das vor der Bestellung.',
+    'freelancer.detail.packages' => 'Pakete',
+    'freelancer.detail.extras' => 'Extras',
+    'freelancer.detail.requirements' => 'Das braucht der Anbieter von dir',
+    'freelancer.detail.delivery_day' => 'Lieferung in {days} Tag',
+    'freelancer.detail.delivery_days' => 'Lieferung in {days} Tagen',
+    'freelancer.detail.revision' => '{count} Korrekturschleife',
+    'freelancer.detail.revisions' => '{count} Korrekturschleifen',
+    'freelancer.detail.extra_day' => '+{days} Tag',
+    'freelancer.detail.extra_days' => '+{days} Tage',
+    'freelancer.error.price' => 'Bitte gib für jedes Paket einen Preis zwischen 1 und 100.000 an, z. B. 49 oder 49,90.',
+    'freelancer.error.delivery_days' => 'Die Lieferzeit muss zwischen 1 und 365 Tagen liegen.',
+    'freelancer.error.revisions' => 'Die Zahl der Korrekturschleifen muss zwischen 0 und 99 liegen.',
+    'freelancer.error.too_long' => 'Ein Paketname oder eine Paketbeschreibung ist zu lang.',
+    'freelancer.error.extra' => 'Ein Extra braucht einen Titel und einen Preis zwischen 1 und 100.000.',
+];

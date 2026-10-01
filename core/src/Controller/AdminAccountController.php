@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Modulento\Core\Controller;
 
 use Modulento\Core\Account\Tokens;
-use Modulento\Core\Event\AccountDeleted;
+use Modulento\Core\Account\AccountRemoval;
 use Modulento\Core\Support\Session;
 
 /** Accounts and roles as an administrator sees them. */
@@ -139,8 +139,7 @@ final class AdminAccountController extends Controller
             return;
         }
 
-        $this->app->accounts->delete((int) $account['id']);
-        $this->app->events->dispatch(new AccountDeleted((int) $account['id'], $account['email']));
+        AccountRemoval::run($this->app, (int) $account['id'], $account['email']);
 
         Session::flash('success', $this->trans('core.admin.accounts.deleted', ['email' => $account['email']]));
         $this->redirect('/admin/accounts');

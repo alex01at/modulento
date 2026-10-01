@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modulento\Core\Controller;
 
+use Modulento\Core\Catalogue\OfferView;
 use Modulento\Core\Event\ProviderStatusChanged;
 use Modulento\Core\Provider\Providers;
 use Modulento\Core\Support\Countries;
@@ -70,7 +71,12 @@ final class ProviderController extends Controller
             return;
         }
 
-        $this->render('provider/show.twig', ['provider' => $this->publicView($provider)]);
+        $offers = $this->app->offers->listPublic(['provider_id' => (int) $provider['id']], $this->app->translator->locale(), 1, 48);
+
+        $this->render('provider/show.twig', [
+            'provider' => $this->publicView($provider),
+            'offers' => OfferView::cards($offers['rows'], $this->app),
+        ]);
     }
 
     /**

@@ -1,0 +1,46 @@
+{% extends '@admin/layout.twig' %}
+
+{% block title %}{{ trans('core.admin.offers.title') }} – {{ site_name }}{% endblock %}
+
+{% block admin %}
+<h1>{{ trans('core.admin.offers.title') }}</h1>
+<p>{{ trans(approval_required ? 'core.admin.offers.approval_on' : 'core.admin.offers.approval_off') }}</p>
+
+<nav class="button-row">
+    <a href="{{ url('/admin/offers') }}" {{ status is null ? 'aria-current="page"' }}>{{ trans('core.admin.providers.all') }}</a>
+    {% for name, count in counts %}
+        <a href="{{ url('/admin/offers') }}?status={{ name }}" {{ status == name ? 'aria-current="page"' }}>{{ trans('core.offer.status.' ~ name) }} ({{ count }})</a>
+    {% endfor %}
+</nav>
+
+{% if offers is empty %}
+    <p>{{ trans('core.admin.offers.none') }}</p>
+{% else %}
+    <table>
+        <thead>
+        <tr>
+            <th scope="col">{{ trans('core.offer.field.title') }}</th>
+            <th scope="col">{{ trans('core.provider.field.name') }}</th>
+            <th scope="col">{{ trans('core.offer.field.status') }}</th>
+        </tr>
+        </thead>
+        <tbody>
+        {% for offer in offers %}
+            <tr>
+                <th scope="row"><a href="{{ url('/admin/offers/' ~ offer.id) }}">{{ offer.title }}</a></th>
+                <td><a href="{{ url('/admin/providers/' ~ offer.provider_id) }}">{{ offer.provider_name }}</a></td>
+                <td>{{ trans('core.offer.status.' ~ offer.status) }}</td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+
+{% if pages > 1 %}
+    <nav class="pager">
+        {% if page > 1 %}<a href="{{ url('/admin/offers') }}?page={{ page - 1 }}{{ status ? '&status=' ~ status }}" rel="prev">{{ trans('core.pager.previous') }}</a>{% endif %}
+        <span>{{ trans('core.pager.position', {page: page, pages: pages}) }}</span>
+        {% if page < pages %}<a href="{{ url('/admin/offers') }}?page={{ page + 1 }}{{ status ? '&status=' ~ status }}" rel="next">{{ trans('core.pager.next') }}</a>{% endif %}
+    </nav>
+{% endif %}
+{% endif %}
+{% endblock %}

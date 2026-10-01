@@ -15,8 +15,12 @@
     {# Plain text typed by the provider: escaped, line breaks kept. #}
     {% if provider.description %}<p>{{ provider.description|nl2br }}</p>{% endif %}
 
-    {# Extensions place what the provider offers here, by overriding or extending this template. #}
-    {% block offers %}{% endblock %}
+    {% if offers %}
+        <section>
+            <h2>{{ trans('core.offers.title') }}</h2>
+            {% include 'offer/_cards.twig' %}
+        </section>
+    {% endif %}
 
     {% if provider.legal %}
         <section>

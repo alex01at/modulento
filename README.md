@@ -10,9 +10,11 @@ MariaDB through PDO, vanilla JS/CSS.
 
 **Status: early.** The core has accounts (registration with e-mail
 confirmation, password reset, own data export and deletion), provider
-profiles with approval, roles and account administration, content pages and
-legal texts, several languages, themes, extensions, scheduled tasks and
-self-update. There is no catalogue, order or payment code yet.
+profiles and a catalogue of offers with approval, categories, pictures and
+search, roles and account administration, content pages and legal texts,
+several languages, themes, extensions, scheduled tasks and self-update. The
+extension `freelancer` adds services with packages as the first kind of offer.
+There is no order or payment code yet.
 
 Two rules shape everything:
 
@@ -116,7 +118,7 @@ themes/       default/ (site), admin/ (administration), further site themes
 public/       web root: index.php only
 bin/          migrate.php, cron.php, create-admin.php
 .github/      CI and release workflows
-var/          cache, logs, update backups - never reachable from the web
+var/          cache, logs, uploads, update backups - never reachable from the web
 ```
 
 ## Themes
@@ -152,13 +154,19 @@ Templates of the site theme, with the variables they receive:
 | `auth/reset.twig` | `errors`, `token`, `min_length` |
 | `account/index.twig` | `locales`, `min_length`, `is_last_admin`, `provider_status` |
 | `account/provider.twig` | `provider` (stored or typed values, `texts` by language), `status`, `status_note`, `public_path`, `certified`, `errors`, `locales`, `countries`, `approval_required` |
+| `offer/index.twig` | `offers` (cards), `total`, `categories` (tree), `category`, `search`, `sort`, `sorts`, `page`, `pages` |
+| `offer/_cards.twig` | `offers`: `title`, `summary`, `path`, `price_from`, `currency`, `thumb`, `provider_name`, `provider_path` |
+| `offer/show.twig` | `offer` (`title`, `summary`, `description` as plain text, `images`, `price_from`, `category`, `provider_*`, `is_own`), `type_template`, `type_data` |
+| `account/offers.twig` | `offers`, `types`, `provider_status` |
+| `account/offer_edit.twig` | `offer`, `type` (`id`, `label_key`, `template`), `type_data`, `texts`, `category_id`, `categories`, `locales`, `errors`, `approval_required`, `images_available`, `max_images`, `currency` |
 | `provider/index.twig` | `providers`, `page`, `pages` |
 | `provider/show.twig` | `provider`: `name`, `path`, `type`, `headline`, `description` (plain text), `city`, `country`, `legal` (only for a business); block `offers` for extensions |
 | `emails/*.txt.twig` | blocks `subject` and `body`; plain text, not HTML-escaped |
 
 E-mails are theme templates too: `verify_email`, `reset_password`,
 `already_registered`, `change_email`, `password_changed`, `provider_approved`,
-`provider_rejected`, `provider_suspended`, `account_blocked`. With `APP_ENV="dev"`
+`provider_rejected`, `provider_suspended`, `account_blocked`, `offer_published`,
+`offer_rejected`, `offer_contact`. With `APP_ENV="dev"`
 nothing is sent; mails are appended to `var/log/mail.log`.
 
 Available in every template:
@@ -169,6 +177,7 @@ Available in every template:
 | `url(path)` | Address of a path in the current language - use it for every link and form target |
 | `locale()`, `locale_urls()`, `locale_name(code)` | Current language; the current page in every language (`locale`, `name`, `url`, `absolute_url`, `current`) |
 | `page_links('header' \| 'footer' \| role)` | Published pages for a menu, as `title`/`url` |
+| `latest_offers(limit)` | The newest public offers as cards |
 | `registration_open()` | Whether new accounts can be created |
 | `theme_asset(path)`, `admin_asset(path)`, `ext_asset(id, path)` | URL of a file in an `assets/` folder, with cache busting |
 | `csrf_field()`, `csrf_token()` | Required in every `POST` form or AJAX call |
@@ -204,18 +213,35 @@ extensions/<id>/
 | `adminMenu(labelKey, path, permission)` | An entry in the administration menu |
 | `listen(EventClass, fn ($event, App $app) => ...)` | React to a core or extension event |
 | `task(name, everyMinutes, fn (App $app) => ...)` | Scheduled work, run by `bin/cron.php` |
+| `offerType(OfferType)` | A kind of offer for the catalogue, see below |
 
 Core services an extension uses instead of SQL on core tables, all on the
 `App` object: `accounts` (find, create, change accounts), `tokens` (one-time
 links), `mailer` (`send(to, '@<id>/emails/x.txt.twig', data, locale)`),
-`settings`, `locales`, `pages`, `providers`, `roles`, `auth`, `events`, and
-`url()`.
+`settings`, `locales`, `pages`, `providers`, `offers`, `categories`,
+`offerImages`, `roles`, `auth`, `events`, and `url()`.
 
-What an extension sells or lists belongs to a provider: reference
-`provider (id)` with `ON DELETE CASCADE` and show it only while the provider's
-status is `approved` (`$app->providers->findPublicBySlug()`, or listen to
-`ProviderStatusChanged`). Whether a new provider needs an administrator's
-approval is a setting; the extension does not have to care.
+### Offer types
+
+The core owns what every offer has: provider, category, status and approval,
+title and text per language with an address per language, pictures, search and
+the pages around it. An extension adds a kind of offer by registering a class
+that implements `Modulento\Core\Catalogue\OfferType`:
+
+- `formTemplate()` / `formData()` - its fields inside the core's offer form
+- `validate()` / `save()` - checking and storing them in the extension's own
+  tables, which reference `offer (id)` with `ON DELETE CASCADE`; `save()`
+  returns the lowest price for listings
+- `detailTemplate()` / `detailData()` - its part of the public offer page
+
+`extensions/freelancer` is the reference: packages with price, delivery time
+and revisions, extras, and requirements, each with a text per language.
+
+Visibility is the core's business: an offer is public while it is published,
+its provider approved and the account active, and offers of a disabled
+extension are hidden, not lost. `ProviderStatusChanged` and
+`OfferStatusChanged` tell an extension when that changes. Amounts are integer
+minor units; `Money::parse()` reads what people type, `money()` formats.
 
 An extension is multilingual from its first line: texts in `lang/de.php` and
 `lang/en.php`, links through `url()`, and content its users type stored per
@@ -223,7 +249,7 @@ language where it is shown to others (see `page_translation` for the
 pattern).
 
 Events to listen to: `AccountRegistered`, `AccountLoggedIn`, `AccountDeleted`,
-`AccountExport` and `ProviderStatusChanged`. An extension that stores personal data per account
+`AccountExport`, `ProviderStatusChanged` and `OfferStatusChanged`. An extension that stores personal data per account
 references `account (id)` with `ON DELETE CASCADE`, so deleting an account
 removes it, and adds its part to the data export in an `AccountExport`
 listener (see `extensions/example`).
