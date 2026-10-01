@@ -88,6 +88,44 @@ final class Accounts
         $stmt->execute(['id' => $id]);
     }
 
+    /**
+     * @param string $search part of an e-mail address or display name, empty for all
+     * @return array{rows: array<int, array>, total: int}
+     */
+    public function list(string $search, int $page, int $perPage): array
+    {
+        $where = '';
+        $params = [];
+        if ($search !== '') {
+            // The wildcard characters of LIKE are taken literally.
+            $where = "WHERE email LIKE :search ESCAPE '!' OR display_name LIKE :search2 ESCAPE '!'";
+            $pattern = '%' . strtr($search, ['!' => '!!', '%' => '!%', '_' => '!_']) . '%';
+            $params = ['search' => $pattern, 'search2' => $pattern];
+        }
+
+        $count = $this->db->prepare("SELECT COUNT(*) FROM account {$where}");
+        $count->execute($params);
+
+        $stmt = $this->db->prepare(
+            "SELECT id, email, display_name, status, email_verified_at, created_at, last_login_at FROM account {$where}
+             ORDER BY id DESC LIMIT " . max(1, $perPage) . ' OFFSET ' . max(0, ($page - 1) * $perPage)
+        );
+        $stmt->execute($params);
+
+        return ['rows' => $stmt->fetchAll(), 'total' => (int) $count->fetchColumn()];
+    }
+
+    /** A blocked account is logged out on its next request and cannot log in. */
+    public function setStatus(int $id, string $status, ?string $note): void
+    {
+        $stmt = $this->db->prepare('UPDATE account SET status = :status, status_note = :note WHERE id = :id');
+        $stmt->execute([
+            'status' => $status === 'blocked' ? 'blocked' : 'active',
+            'note' => $status === 'blocked' && $note !== null && trim($note) !== '' ? trim($note) : null,
+            'id' => $id,
+        ]);
+    }
+
     /** Whether deleting this account would leave nobody who may do everything. */
     public function isLastAdmin(int $id): bool
     {
@@ -99,6 +137,18 @@ final class Accounts
         )->fetchAll(PDO::FETCH_COLUMN);
 
         return array_map('intval', $admins) === [$id];
+    }
+
+    /** Whether the account may do everything (holds the wildcard permission). */
+    public function isAdmin(int $id): bool
+    {
+        $stmt = $this->db->prepare(
+            "SELECT COUNT(*) FROM account_role ar JOIN role_permission rp ON rp.role_id = ar.role_id
+             WHERE ar.account_id = :id AND rp.permission = '*'"
+        );
+        $stmt->execute(['id' => $id]);
+
+        return (int) $stmt->fetchColumn() > 0;
     }
 
     /** Registrations whose address was never confirmed. Returns how many were removed. */

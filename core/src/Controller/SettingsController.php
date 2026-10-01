@@ -18,6 +18,7 @@ final class SettingsController extends Controller
                 'site_name' => $app->siteName(),
                 'mail_from' => $app->settings->get('core.mail_from', $app->config['mail']['from']),
                 'registration' => $app->settings->get('core.registration', 'open'),
+                'provider_approval' => $app->providers->approvalRequired() ? 'required' : 'off',
             ],
             'available_locales' => $app->locales->available(),
             'enabled_locales' => $app->locales->enabled(),
@@ -45,6 +46,15 @@ final class SettingsController extends Controller
         $app->settings->set('core.mail_from', $mailFrom);
         $app->settings->set('core.registration', ($_POST['registration'] ?? '') === 'closed' ? 'closed' : 'open');
         $app->locales->save($default, $enabled);
+
+        $approvalRequired = ($_POST['provider_approval'] ?? '') !== 'off';
+        if ($approvalRequired !== $app->providers->approvalRequired()) {
+            // Switching approval off approves everyone who was waiting.
+            foreach ($app->providers->setApprovalRequired($approvalRequired) as $providerId) {
+                $provider = $app->providers->find($providerId);
+                AdminProviderController::announce($app, ['status' => 'pending'] + $provider, 'approved');
+            }
+        }
 
         // The administrator's own language may just have been switched off,
         // or the default - and with it every address - may have changed.

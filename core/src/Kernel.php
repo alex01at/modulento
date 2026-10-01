@@ -5,12 +5,15 @@ declare(strict_types=1);
 namespace Modulento\Core;
 
 use Modulento\Core\Controller\AccountController;
+use Modulento\Core\Controller\AdminAccountController;
 use Modulento\Core\Controller\AdminController;
+use Modulento\Core\Controller\AdminProviderController;
 use Modulento\Core\Controller\AssetController;
 use Modulento\Core\Controller\AuthController;
 use Modulento\Core\Controller\CronController;
 use Modulento\Core\Controller\HomeController;
 use Modulento\Core\Controller\PageController;
+use Modulento\Core\Controller\ProviderController;
 use Modulento\Core\Controller\RegistrationController;
 use Modulento\Core\Controller\SettingsController;
 use Modulento\Core\Controller\UpdateController;
@@ -121,6 +124,11 @@ final class Kernel
         $router->get('/account/confirm-email/{token}', [AccountController::class, 'confirmEmail']);
         $router->get('/account/export', [AccountController::class, 'export']);
         $router->post('/account/delete', [AccountController::class, 'delete']);
+        $router->get('/account/provider', [ProviderController::class, 'edit']);
+        $router->post('/account/provider', [ProviderController::class, 'save']);
+
+        $router->get('/providers', [ProviderController::class, 'index'], Router::PUBLIC);
+        $router->get('/providers/{slug}', [ProviderController::class, 'show'], Router::PUBLIC);
 
         $router->get('/admin', [AdminController::class, 'index'], 'core.admin.access');
         $router->get('/admin/extensions', [AdminController::class, 'extensions'], 'core.extensions.manage');
@@ -138,6 +146,26 @@ final class Kernel
         $router->post('/admin/pages/{id}', [PageController::class, 'save'], 'core.pages.manage');
         $router->post('/admin/pages/{id}/delete', [PageController::class, 'delete'], 'core.pages.manage');
 
+        $router->get('/admin/providers', [AdminProviderController::class, 'index'], 'core.providers.manage');
+        $router->get('/admin/providers/{id}', [AdminProviderController::class, 'show'], 'core.providers.manage');
+        $router->post('/admin/providers/{id}/decide', [AdminProviderController::class, 'decide'], 'core.providers.manage');
+
+        $router->get('/admin/accounts', [AdminAccountController::class, 'index'], 'core.accounts.manage');
+        $router->get('/admin/accounts/{id}', [AdminAccountController::class, 'show'], 'core.accounts.manage');
+        $router->post('/admin/accounts/{id}/block', [AdminAccountController::class, 'block'], 'core.accounts.manage');
+        $router->post('/admin/accounts/{id}/unblock', [AdminAccountController::class, 'unblock'], 'core.accounts.manage');
+        $router->post('/admin/accounts/{id}/verify', [AdminAccountController::class, 'verify'], 'core.accounts.manage');
+        $router->post('/admin/accounts/{id}/reset', [AdminAccountController::class, 'sendReset'], 'core.accounts.manage');
+        $router->post('/admin/accounts/{id}/delete', [AdminAccountController::class, 'delete'], 'core.accounts.manage');
+        $router->post('/admin/accounts/{id}/roles', [AdminAccountController::class, 'setRoles'], 'core.roles.manage');
+
+        $router->get('/admin/roles', [AdminAccountController::class, 'roles'], 'core.roles.manage');
+        $router->get('/admin/roles/new', [AdminAccountController::class, 'editRole'], 'core.roles.manage');
+        $router->post('/admin/roles/new', [AdminAccountController::class, 'saveRole'], 'core.roles.manage');
+        $router->get('/admin/roles/{id}', [AdminAccountController::class, 'editRole'], 'core.roles.manage');
+        $router->post('/admin/roles/{id}', [AdminAccountController::class, 'saveRole'], 'core.roles.manage');
+        $router->post('/admin/roles/{id}/delete', [AdminAccountController::class, 'deleteRole'], 'core.roles.manage');
+
         $router->get('/admin/themes', [AdminController::class, 'themes'], 'core.themes.manage');
         $router->post('/admin/themes/{id}/activate', [AdminController::class, 'activateTheme'], 'core.themes.manage');
 
@@ -152,10 +180,16 @@ final class Kernel
         $app->addPermission('core.themes.manage', 'core.permission.themes_manage');
         $app->addPermission('core.settings.manage', 'core.permission.settings_manage');
         $app->addPermission('core.pages.manage', 'core.permission.pages_manage');
+        $app->addPermission('core.providers.manage', 'core.permission.providers_manage');
+        $app->addPermission('core.accounts.manage', 'core.permission.accounts_manage');
+        $app->addPermission('core.roles.manage', 'core.permission.roles_manage');
         $app->addPermission('core.update.manage', 'core.permission.update_manage');
 
         $app->addAdminMenu('core.admin.menu.settings', '/admin/settings', 'core.settings.manage');
         $app->addAdminMenu('core.admin.menu.pages', '/admin/pages', 'core.pages.manage');
+        $app->addAdminMenu('core.admin.menu.providers', '/admin/providers', 'core.providers.manage');
+        $app->addAdminMenu('core.admin.menu.accounts', '/admin/accounts', 'core.accounts.manage');
+        $app->addAdminMenu('core.admin.menu.roles', '/admin/roles', 'core.roles.manage');
         $app->addAdminMenu('core.admin.menu.extensions', '/admin/extensions', 'core.extensions.manage');
         $app->addAdminMenu('core.admin.menu.themes', '/admin/themes', 'core.themes.manage');
         $app->addAdminMenu('core.admin.menu.tasks', '/admin/tasks', 'core.tasks.view');

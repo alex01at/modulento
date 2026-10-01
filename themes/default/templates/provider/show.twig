@@ -1,0 +1,41 @@
+{% extends 'layout/base.twig' %}
+
+{% block title %}{{ provider.name }} – {{ site_name }}{% endblock %}
+
+{% block head %}
+    {% if provider.headline %}<meta name="description" content="{{ provider.headline }}">{% endif %}
+{% endblock %}
+
+{% block content %}
+<article>
+    <h1>{{ provider.name }}</h1>
+    <p><small>{{ trans('core.provider.type.' ~ provider.type) }} · {{ provider.city }}, {{ trans('core.country.' ~ provider.country) }}</small></p>
+
+    {% if provider.headline %}<p><strong>{{ provider.headline }}</strong></p>{% endif %}
+    {# Plain text typed by the provider: escaped, line breaks kept. #}
+    {% if provider.description %}<p>{{ provider.description|nl2br }}</p>{% endif %}
+
+    {# Extensions place what the provider offers here, by overriding or extending this template. #}
+    {% block offers %}{% endblock %}
+
+    {% if provider.legal %}
+        <section>
+            <h2>{{ trans('core.provider.legal_title') }}</h2>
+            <address>
+                {{ provider.legal.legal_name }}<br>
+                {{ provider.legal.street }}<br>
+                {{ provider.legal.postal_code }} {{ provider.city }}<br>
+                {{ trans('core.country.' ~ provider.country) }}
+            </address>
+            <ul>
+                {% if provider.legal.contact_email %}<li>{{ trans('core.provider.field.contact_email') }}: <a href="mailto:{{ provider.legal.contact_email }}">{{ provider.legal.contact_email }}</a></li>{% endif %}
+                {% if provider.legal.phone %}<li>{{ trans('core.provider.field.phone') }}: {{ provider.legal.phone }}</li>{% endif %}
+                {% if provider.legal.vat_id %}<li>{{ trans('core.provider.field.vat_id') }}: {{ provider.legal.vat_id }}</li>{% endif %}
+                {% if provider.legal.company_register %}<li>{{ trans('core.provider.field.company_register') }}: {{ provider.legal.company_register }}</li>{% endif %}
+            </ul>
+        </section>
+    {% else %}
+        <p><small>{{ trans('core.provider.private_notice') }}</small></p>
+    {% endif %}
+</article>
+{% endblock %}

@@ -24,6 +24,14 @@
 </section>
 
 <section>
+    <h2>{{ trans('core.provider.title') }}</h2>
+    <p>
+        {{ provider_status ? trans('core.provider.status.' ~ provider_status) : trans('core.provider.none') }}
+    </p>
+    <p><a href="{{ url('/account/provider') }}">{{ provider_status ? trans('core.provider.edit') : trans('core.provider.create') }}</a></p>
+</section>
+
+<section>
     <h2>{{ trans('core.account.email.title') }}</h2>
     <p>{{ trans('core.account.email.current', {email: account.email}) }}</p>
     <form method="post" action="{{ url('/account/email') }}" class="stack-form">

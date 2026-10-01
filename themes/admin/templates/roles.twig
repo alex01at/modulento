@@ -1,0 +1,30 @@
+{% extends '@admin/layout.twig' %}
+
+{% block title %}{{ trans('core.admin.roles.title') }} – {{ site_name }}{% endblock %}
+
+{% block admin %}
+<h1>{{ trans('core.admin.roles.title') }}</h1>
+<p>{{ trans('core.admin.roles.intro') }}</p>
+<p><a href="{{ url('/admin/roles/new') }}">{{ trans('core.admin.roles.new') }}</a></p>
+
+<table>
+    <thead>
+    <tr>
+        <th scope="col">{{ trans('core.admin.extensions.name') }}</th>
+        <th scope="col">{{ trans('core.admin.roles.permissions') }}</th>
+        <th scope="col">{{ trans('core.admin.accounts.title') }}</th>
+    </tr>
+    </thead>
+    <tbody>
+    {% for role in roles %}
+        <tr>
+            <th scope="row">
+                {% if role.name == 'admin' %}{{ role.name }}{% else %}<a href="{{ url('/admin/roles/' ~ role.id) }}">{{ role.name }}</a>{% endif %}
+            </th>
+            <td>{{ '*' in role.permissions ? trans('core.admin.roles.everything') : role.permissions|length }}</td>
+            <td>{{ role.accounts }}</td>
+        </tr>
+    {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

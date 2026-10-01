@@ -165,7 +165,11 @@ $pdo = new PDO('sqlite::memory:', null, null, [
     PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
 ]);
 $pdo->exec("CREATE TABLE account (id INTEGER PRIMARY KEY, email TEXT UNIQUE, display_name TEXT, password_hash TEXT, status TEXT,
-    email_verified_at TEXT, terms_accepted_at TEXT, locale TEXT, created_at TEXT, last_login_at TEXT)");
+    status_note TEXT, email_verified_at TEXT, terms_accepted_at TEXT, locale TEXT, created_at TEXT, last_login_at TEXT)");
+$pdo->exec("CREATE TABLE provider (id INTEGER PRIMARY KEY, account_id INTEGER UNIQUE REFERENCES account (id) ON DELETE CASCADE, type TEXT, status TEXT,
+    status_note TEXT, name TEXT, slug TEXT UNIQUE, legal_name TEXT, street TEXT, postal_code TEXT, city TEXT, country TEXT, contact_email TEXT, phone TEXT,
+    vat_id TEXT, tax_id TEXT, company_register TEXT, self_certified_at TEXT, details_changed_at TEXT, decided_at TEXT, decided_by INTEGER, created_at TEXT, updated_at TEXT)");
+$pdo->exec("CREATE TABLE provider_translation (provider_id INTEGER REFERENCES provider (id) ON DELETE CASCADE, locale TEXT, headline TEXT, description TEXT, PRIMARY KEY (provider_id, locale))");
 $pdo->exec("CREATE TABLE page (id INTEGER PRIMARY KEY, status TEXT, role TEXT UNIQUE, in_header INTEGER, in_footer INTEGER, position INTEGER, created_at TEXT, updated_at TEXT)");
 $pdo->exec("CREATE TABLE page_translation (page_id INTEGER REFERENCES page (id) ON DELETE CASCADE, locale TEXT, title TEXT, slug TEXT,
     meta_description TEXT, body TEXT, PRIMARY KEY (page_id, locale), UNIQUE (locale, slug))");
@@ -175,8 +179,8 @@ $pdo->exec("CREATE TABLE rate_limit_attempt (id INTEGER PRIMARY KEY, action TEXT
 $pdo->exec("CREATE TABLE x_example_login (id INTEGER PRIMARY KEY, account_id INTEGER REFERENCES account (id) ON DELETE CASCADE, logged_in_at TEXT)");
 $pdo->exec("PRAGMA foreign_keys = ON");
 $pdo->exec("CREATE TABLE role (id INTEGER PRIMARY KEY, name TEXT)");
-$pdo->exec("CREATE TABLE role_permission (role_id INTEGER, permission TEXT)");
-$pdo->exec("CREATE TABLE account_role (account_id INTEGER, role_id INTEGER)");
+$pdo->exec("CREATE TABLE role_permission (role_id INTEGER REFERENCES role (id) ON DELETE CASCADE, permission TEXT)");
+$pdo->exec("CREATE TABLE account_role (account_id INTEGER REFERENCES account (id) ON DELETE CASCADE, role_id INTEGER REFERENCES role (id) ON DELETE CASCADE)");
 $pdo->exec("CREATE TABLE extension (id TEXT PRIMARY KEY, version TEXT, enabled INTEGER)");
 $pdo->exec("CREATE TABLE setting (name TEXT PRIMARY KEY, value TEXT)");
 $pdo->exec("INSERT INTO setting VALUES ('core.languages', 'de,en'), ('core.default_language', 'de')");
@@ -229,6 +233,7 @@ function request(PDO $pdo, array $config, string $method, string $path, int|fals
         $post += ['_csrf' => 'test-token'];
     }
     $_POST = $post;
+    parse_str((string) parse_url($path, PHP_URL_QUERY), $_GET);
     $_SERVER['REQUEST_URI'] = $path;
     unset($_SERVER['HTTP_X_REQUESTED_WITH'], $_SERVER['HTTP_REFERER']);
     http_response_code(200);
@@ -538,7 +543,171 @@ check('settings: the default language cannot be switched off', $locales()->enabl
 $post('/admin/settings', ['site_name' => 'Testseite', 'mail_from' => 'noreply@example.test', 'registration' => 'open', 'default_locale' => 'de', 'locales' => ['de', 'en']], 3);
 $pdo->exec('DELETE FROM page');
 $pdo->exec("DELETE FROM account WHERE email = 'terms@example.test'");
+
+// --- Providers ---------------------------------------------------------------
+$provider = fn (int $accountId) => $pdo->query('SELECT * FROM provider WHERE account_id = ' . $accountId)->fetch();
+$business = ['type' => 'business', 'name' => 'Müller Design', 'legal_name' => 'Müller Design GmbH', 'street' => 'Hauptstraße 1', 'postal_code' => '1010',
+    'city' => 'Wien', 'country' => 'AT', 'contact_email' => 'office@mueller.test', 'phone' => '+43 1 234', 'vat_id' => 'atu 1234-5678', 'tax_id' => '12 345/6789',
+    'self_certified' => '1', 'text' => ['de' => ['headline' => 'Logos & mehr', 'description' => "Zeile eins\n<b>Zeile zwei</b>"], 'en' => ['headline' => '', 'description' => '']]];
+
+check('provider form needs a login', $get('/account/provider', null)['body'] === '');
+$r = $post('/account/provider', ['type' => 'business', 'name' => 'X'] , 1);
+check('provider: incomplete form creates nothing and says why', $provider(1) === false && str_contains($r['body'], 'Bitte fülle Name'));
+$r = $post('/account/provider', array_diff_key($business, ['self_certified' => 1]), 1);
+check('provider: a business must give the self-declaration', $provider(1) === false && str_contains($r['body'], 'Erklärung'));
+$r = $post('/account/provider', ['vat_id' => '123'] + $business, 1);
+check('provider: malformed VAT ID is refused, typed values stay in the form', $provider(1) === false && str_contains($r['body'], 'value="Müller Design GmbH"'));
+
+$post('/account/provider', $business, 1);
+$p = $provider(1);
+check('provider: saved as pending while approval is required', $p !== false && $p['status'] === 'pending' && $p['slug'] === 'mueller-design' && $p['vat_id'] === 'ATU12345678' && $p['self_certified_at'] !== null);
+check('provider: only the filled language is stored', $pdo->query('SELECT COUNT(*) FROM provider_translation')->fetchColumn() == 1);
+check('provider: pending profile is not public', $get('/providers/mueller-design', null)['status'] === 404 && !str_contains($get('/providers', null)['body'], 'Müller Design'));
+
+$r = $get('/admin/providers', 1);
+check('provider administration needs its permission', $r['status'] === 403);
+$r = $get('/admin/providers?status=pending', 3);
+check('provider administration lists the waiting profile', $r['status'] === 200 && str_contains($r['body'], 'Müller Design'));
+$post('/admin/providers/' . $p['id'] . '/decide', ['decision' => 'reject', 'note' => ''], 3);
+check('provider: rejecting needs a reason', $provider(1)['status'] === 'pending');
+$post('/admin/providers/' . $p['id'] . '/decide', ['decision' => 'reject', 'note' => 'Adresse unvollständig'], 3);
+$mail = lastMail($mailLog, 'plain@example.test');
+check('provider: rejected with reason, owner is told', $provider(1)['status'] === 'rejected' && $provider(1)['status_note'] === 'Adresse unvollständig' && $mail['subject'] === 'Dein Anbieterprofil wurde nicht freigegeben');
+check('provider: owner sees the reason', str_contains($get('/account/provider', 1)['body'], 'Adresse unvollständig'));
+$post('/account/provider', ['street' => 'Hauptstraße 1/4'] + $business, 1);
+check('provider: a corrected rejected profile waits for review again', $provider(1)['status'] === 'pending' && $provider(1)['status_note'] === null);
+$post('/admin/providers/' . $p['id'] . '/decide', ['decision' => 'approve'], 3);
+check('provider: approved, owner is told with the public link', $provider(1)['status'] === 'approved' && $provider(1)['decided_by'] == 3
+    && lastMail($mailLog, 'plain@example.test')['link'] === '/providers/mueller-design');
+
+$r = $get('/providers/mueller-design', null);
+check('provider: public page shows the legal details of a business', $r['status'] === 200 && str_contains($r['body'], 'Müller Design GmbH') && str_contains($r['body'], 'ATU12345678') && str_contains($r['body'], 'Österreich'));
+check('provider: the tax number is never public', !str_contains($r['body'], '12 345/6789'));
+check('provider: description is escaped, line breaks kept', str_contains($r['body'], "Zeile eins<br />\n&lt;b&gt;Zeile zwei&lt;/b&gt;"));
+check('provider: listed in the directory, in every language', str_contains($get('/providers', null)['body'], 'href="/providers/mueller-design"') && str_contains($get('/en/providers', null)['body'], 'href="/en/providers/mueller-design"'));
+check('provider: another language shows the default text and translated labels', str_contains($get('/en/providers/mueller-design', null)['body'], 'Logos &amp; mehr') && str_contains($get('/en/providers/mueller-design', null)['body'], 'Business provider'));
+
+$post('/account/provider', ['text' => ['de' => ['headline' => 'Neu', 'description' => 'x'], 'en' => ['headline' => 'New', 'description' => 'y']]] + $business + ['street' => 'Hauptstraße 1/4'], 1);
+$r = $get('/admin/providers/' . $p['id'], 3);
+check('provider: changing only the presentation is not flagged', $provider(1)['status'] === 'approved' && !str_contains($r['body'], 'seit der letzten Entscheidung'));
+sleep(1);
+$post('/account/provider', ['street' => 'Nebenstraße 9', 'text' => $business['text']] + $business, 1);
+check('provider: changing legal details stays public but is flagged for review', $provider(1)['status'] === 'approved' && str_contains($get('/admin/providers/' . $p['id'], 3)['body'], 'seit der letzten Entscheidung'));
+
+$post('/admin/providers/' . $p['id'] . '/decide', ['decision' => 'suspend', 'note' => 'Beschwerden'], 3);
+check('provider: suspended profile is gone from public view', $get('/providers/mueller-design', null)['status'] === 404 && lastMail($mailLog, 'plain@example.test')['subject'] === 'Dein Anbieterprofil wurde gesperrt');
+$post('/account/provider', $business, 1);
+check('provider: saving does not lift a suspension', $provider(1)['status'] === 'suspended');
+$post('/admin/providers/' . $p['id'] . '/decide', ['decision' => 'approve'], 3);
+
+$private = ['type' => 'private', 'name' => 'Müller Design', 'street' => 'Weg 2', 'postal_code' => '80331', 'city' => 'München', 'country' => 'DE'];
+$post('/account/provider', $private, 2);
+check('provider: a private person needs neither contact nor declaration; same name gets its own address', $provider(2) !== false && $provider(2)['slug'] === 'mueller-design-2' && $provider(2)['legal_name'] === 'Müller Design');
+
+$settings = ['site_name' => 'Testseite', 'mail_from' => 'noreply@example.test', 'registration' => 'open', 'default_locale' => 'de', 'locales' => ['de', 'en']];
+$post('/admin/providers/' . $p['id'] . '/decide', ['decision' => 'suspend', 'note' => 'Test'], 3);
+$post('/admin/settings', $settings + ['provider_approval' => 'off'], 3);
+check('approval switched off: everyone waiting is approved and told', $provider(2)['status'] === 'approved' && lastMail($mailLog, 'editor@example.test')['subject'] === 'Dein Anbieterprofil ist freigegeben');
+check('approval switched off: a suspended profile stays suspended', $provider(1)['status'] === 'suspended');
+$r = $get('/providers/mueller-design-2', null);
+check('provider: of a private person only name and place are public', $r['status'] === 200 && str_contains($r['body'], 'München') && !str_contains($r['body'], 'Weg 2') && str_contains($r['body'], 'Privatperson'));
+$pdo->exec('DELETE FROM provider WHERE account_id = 2');
+$post('/account/provider', $private, 2);
+check('approval switched off: a new profile is active at once', $provider(2)['status'] === 'approved');
+$post('/admin/settings', $settings + ['provider_approval' => 'required'], 3);
+check('approval switched on again: existing profiles keep their status', $provider(2)['status'] === 'approved');
+
+$pdo->exec("UPDATE account SET status = 'blocked' WHERE id = 2");
+check('provider: profile of a blocked account is not public', $get('/providers/mueller-design', null)['status'] === 404 || $get('/providers/' . $provider(2)['slug'], null)['status'] === 404);
+$pdo->exec("UPDATE account SET status = 'active' WHERE id = 2");
+$export = json_decode($get('/account/export', 2)['body'], true);
+check('export contains the provider profile', ($export['provider']['city'] ?? '') === 'München' && !isset($export['provider']['account_email']));
+
+// --- Accounts and roles in the administration --------------------------------
+check('account administration needs its permission', $get('/admin/accounts', 2)['status'] === 403);
+$r = $get('/admin/accounts?q=plain', 3);
+check('account list finds by part of the address', str_contains($r['body'], 'plain@example.test') && !str_contains($r['body'], 'editor@example.test'));
+check('account search takes % literally', !str_contains($get('/admin/accounts?q=%25', 3)['body'], 'plain@example.test'));
+$r = $get('/admin/accounts/1', 3);
+check('account page shows the account and never its password hash', str_contains($r['body'], 'plain@example.test') && !str_contains($r['body'], '$2y$'));
+
+$post('/admin/accounts/1/block', ['note' => ''], 3);
+check('block: needs a reason', $row('plain@example.test')['status'] === 'active');
+$post('/admin/accounts/1/block', ['note' => 'Missbrauch'], 3);
+check('block: account is blocked, told why, and logged out', $row('plain@example.test')['status'] === 'blocked' && lastMail($mailLog, 'plain@example.test')['subject'] === 'Dein Konto wurde gesperrt' && $get('/account', 1)['body'] === '');
+$post('/admin/accounts/1/unblock', [], 3);
+check('unblock', $row('plain@example.test')['status'] === 'active' && $row('plain@example.test')['status_note'] === null);
+$post('/admin/accounts/3/block', ['note' => 'x'], 3);
+check('block: not the own account', $row('admin@example.test')['status'] === 'active');
+$post('/admin/accounts/3/delete', [], 3);
+check('delete: not the own account', $row('admin@example.test') !== false);
+
+$pdo->exec("UPDATE account SET email_verified_at = NULL WHERE id = 1");
+$post('/admin/accounts/1/verify', [], 3);
+check('verify by hand', $row('plain@example.test')['email_verified_at'] !== null);
+$post('/admin/accounts/1/reset', [], 3);
+check('reset link is sent to the owner', str_starts_with(lastMail($mailLog, 'plain@example.test')['link'], '/reset-password/'));
+
+$known = ['core.pages.manage', 'core.accounts.manage'];
+$post('/admin/roles/new', ['name' => 'Redaktion', 'permissions' => ['core.pages.manage', '*', 'made.up']], 3);
+$roleId = (int) $pdo->query("SELECT id FROM role WHERE name = 'Redaktion'")->fetchColumn();
+check('role: created with known permissions only - no wildcard, nothing made up', $roleId > 0
+    && $pdo->query("SELECT permission FROM role_permission WHERE role_id = {$roleId}")->fetchAll(PDO::FETCH_COLUMN) === ['core.pages.manage']);
+$post('/admin/roles/new', ['name' => 'Admin', 'permissions' => []], 3);
+$post('/admin/roles/new', ['name' => 'redaktion', 'permissions' => []], 3);
+check('role: the name admin and a taken name are refused', $pdo->query('SELECT COUNT(*) FROM role')->fetchColumn() == 3);
+$adminRoleId = (int) $pdo->query("SELECT id FROM role WHERE name = 'admin'")->fetchColumn();
+$post('/admin/roles/' . $adminRoleId, ['name' => 'admin', 'permissions' => []], 3);
+$post('/admin/roles/' . $adminRoleId . '/delete', [], 3);
+check('role: admin can be neither edited nor deleted', $pdo->query("SELECT permission FROM role_permission WHERE role_id = {$adminRoleId}")->fetchColumn() === '*');
+
+$post('/admin/accounts/1/roles', ['roles' => [$roleId]], 3);
+check('roles: assigned role gives its permission and nothing more', $get('/admin/pages', 1)['status'] === 200 && $get('/admin/settings', 1)['status'] === 403);
+check('roles: the admin menu only shows what the account may do', str_contains($get('/admin/pages', 1)['body'], 'href="/admin/pages"') && !str_contains($get('/admin/pages', 1)['body'], 'href="/admin/settings"'));
+$pdo->exec("INSERT INTO role_permission VALUES ({$roleId}, 'core.accounts.manage')");
+$post('/admin/accounts/1/roles', ['roles' => [$roleId, $adminRoleId]], 1);
+check('roles: managing accounts does not allow handing out roles', $get('/admin/settings', 1)['status'] === 403);
+$post('/admin/accounts/3/delete', [], 1);
+$post('/admin/accounts/3/block', ['note' => 'x'], 1);
+check('accounts: an account manager cannot act against an administrator', $row('admin@example.test') !== false && $row('admin@example.test')['status'] === 'active');
+$post('/admin/accounts/3/roles', ['roles' => []], 3);
+check('roles: the last administrator keeps the admin role', $get('/admin/settings', 3)['status'] === 200);
+$post('/admin/roles/' . $roleId . '/delete', [], 3);
+check('role: deleting it takes the permission from its accounts', $get('/admin/pages', 1)['status'] === 403);
+
+$accounts->create('gone@example.test', $pw, 'de', verified: true);
+$goneId = (int) $row('gone@example.test')['id'];
+$post('/admin/accounts/' . $goneId . '/delete', [], 3);
+check('accounts: an administrator can delete another account', $row('gone@example.test') === false);
+$pdo->exec('DELETE FROM provider');
 @unlink($mailLog);
+
+// --- Language keys -----------------------------------------------------------
+// Every key written out in a template or in PHP must exist, or a visitor
+// would read the raw key.
+$knownKeys = [];
+foreach ([$root . '/core/lang/de.php', ...glob($root . '/extensions/*/lang/de.php')] as $file) {
+    $knownKeys += require $file;
+}
+$missingKeys = [];
+$sources = [...glob($root . '/themes/*/templates/{,*/,*/*/}*.twig', GLOB_BRACE), ...glob($root . '/extensions/*/templates/{,*/}*.twig', GLOB_BRACE), ...glob($root . '/core/install/*.twig')];
+foreach ($sources as $file) {
+    preg_match_all("/trans\\('([a-z0-9_.]+[a-z0-9])'/", (string) file_get_contents($file), $found);
+    foreach ($found[1] as $key) {
+        if (!isset($knownKeys[$key])) {
+            $missingKeys[] = $key . ' in ' . basename($file);
+        }
+    }
+}
+foreach (glob($root . '/{core/src,extensions/*/src}/{,*/}*.php', GLOB_BRACE) as $file) {
+    preg_match_all("/(?:trans\\(|flash\\('[a-z]+', \\\$this->trans\\(|'key' => |back\\([^,]+, '[a-z]+', |Key\\) => |return |\\\$errors\\[\\] = |UpdateException\\(|result\\([a-z]+, '[a-z_]+', )'((?:core|example)\\.[a-z0-9_.]+[a-z0-9])'/", (string) file_get_contents($file), $found);
+    foreach ($found[1] as $key) {
+        if (!isset($knownKeys[$key])) {
+            $missingKeys[] = $key . ' in ' . basename($file);
+        }
+    }
+}
+check('every language key used exists: ' . implode(', ', array_unique($missingKeys)), $missingKeys === []);
 
 // --- Router: rest-of-path parameter --------------------------------------
 $r = request($pdo, $config, 'GET', '/assets/theme/theme.css', null);
