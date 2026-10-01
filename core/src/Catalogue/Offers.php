@@ -216,6 +216,29 @@ final class Offers
         return ['rows' => $this->hydrate($stmt->fetchAll()), 'total' => (int) $count->fetchColumn()];
     }
 
+    /** @return array<int, int> category id => number of public offers directly in it */
+    public function publicCountsByCategory(): array
+    {
+        $types = array_keys($this->types);
+        if ($types === []) {
+            return [];
+        }
+
+        $params = [];
+        $stmt = $this->db->prepare(
+            'SELECT o.category_id, COUNT(*) ' . self::FROM . ' WHERE ' . self::PUBLIC_WHERE
+            . ' AND o.category_id IS NOT NULL AND o.type IN (' . $this->placeholders('type', $types, $params) . ') GROUP BY o.category_id'
+        );
+        $stmt->execute($params);
+
+        $counts = [];
+        foreach ($stmt->fetchAll(PDO::FETCH_KEY_PAIR) as $categoryId => $count) {
+            $counts[(int) $categoryId] = (int) $count;
+        }
+
+        return $counts;
+    }
+
     /** @return array<string, int> status => number of offers */
     public function counts(): array
     {

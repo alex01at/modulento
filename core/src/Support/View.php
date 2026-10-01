@@ -7,6 +7,7 @@ namespace Modulento\Core\Support;
 use Modulento\Core\App;
 use Modulento\Core\Catalogue\OfferView;
 use Modulento\Core\Controller\AssetController;
+use Modulento\Core\Provider\ProviderView;
 use Twig\Environment;
 use Twig\Loader\FilesystemLoader;
 use Twig\TwigFunction;
@@ -111,6 +112,27 @@ final class View
 
             return OfferView::cards($list['rows'], $app);
         }));
+        // The category tree in the current language; each entry carries
+        // "offer_count" (a top category counts its subcategories too).
+        $this->twig->addFunction(new TwigFunction('categories', function () use ($app): array {
+            $counts = $app->offers->publicCountsByCategory();
+            $tree = $app->categories->tree($app->translator->locale());
+
+            foreach ($tree as &$top) {
+                $top['offer_count'] = $counts[$top['id']] ?? 0;
+                foreach ($top['children'] as &$child) {
+                    $child['offer_count'] = $counts[$child['id']] ?? 0;
+                    $top['offer_count'] += $child['offer_count'];
+                }
+            }
+
+            return $tree;
+        }));
+        // Public providers for a showcase, best rated first.
+        $this->twig->addFunction(new TwigFunction(
+            'top_providers',
+            fn (int $limit = 3) => ProviderView::all($app->providers->top($limit), $app)
+        ));
         $this->twig->addFunction(new TwigFunction('registration_open', fn () => $app->settings->get('core.registration', 'open') === 'open'));
         $this->twig->addFunction(new TwigFunction('locale_name', fn (string $locale) => $app->locales->name($locale)));
         $this->twig->addFunction(new TwigFunction('can', fn (string $permission) => $auth->can($permission)));

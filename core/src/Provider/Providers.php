@@ -111,6 +111,27 @@ final class Providers
         return ['rows' => array_map(fn (array $row) => $this->withTexts($row), $stmt->fetchAll()), 'total' => (int) $count->fetchColumn()];
     }
 
+    /**
+     * Public providers for a short showcase: the best rated first, then
+     * the newest.
+     *
+     * @return array<int, array>
+     */
+    public function top(int $limit): array
+    {
+        $stmt = $this->db->prepare(
+            "SELECT p.*, a.email AS account_email, a.status AS account_status
+             FROM provider p JOIN account a ON a.id = p.account_id
+             WHERE p.status = 'approved' AND a.status = 'active'
+             ORDER BY (p.rating_count = 0), (CASE WHEN p.rating_count > 0 THEN p.rating_sum * 1.0 / p.rating_count ELSE 0 END) DESC,
+                 p.rating_count DESC, p.id DESC
+             LIMIT " . max(1, min(48, $limit))
+        );
+        $stmt->execute();
+
+        return array_map(fn (array $row) => $this->withTexts($row), $stmt->fetchAll());
+    }
+
     /** @return array<string, int> status => number of profiles */
     public function counts(): array
     {

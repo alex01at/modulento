@@ -1,0 +1,22 @@
+{# A list of provider cards. Receives "providers". #}
+{% import '_icons.twig' as icons %}
+<ul class="card-list provider-cards">
+    {% for provider in providers %}
+        {% set parts = provider.name|split(' ') %}
+        <li>
+            <div class="provider-top">
+                <span class="avatar" aria-hidden="true">{{ parts[0]|first|upper }}{{ parts|length > 1 ? parts[1]|first|upper }}</span>
+                <div>
+                    <a class="card-title" href="{{ url(provider.path) }}">{{ provider.name }}</a>
+                    <small>{{ trans('core.provider.type.' ~ provider.type) }}</small>
+                </div>
+            </div>
+            {% if provider.headline %}<p>{{ provider.headline }}</p>{% endif %}
+            {% include 'review/_rating.twig' with {rating: provider.rating} only %}
+            <div class="card-foot">
+                <span>{{ provider.city }}, {{ trans('core.country.' ~ provider.country) }}</span>
+                <a class="more" href="{{ url(provider.path) }}">{{ trans('theme.providers.view') }} {{ icons.icon('arrow') }}</a>
+            </div>
+        </li>
+    {% endfor %}
+</ul>

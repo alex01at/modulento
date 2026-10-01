@@ -53,6 +53,7 @@ final class Kernel
         self::registerCore($app);
         $app->extensions->loadEnabled($app);
         self::registerLast($app);
+        self::loadThemeTexts($app);
         $app->translator->loadOverrides($root . '/lang');
 
         if ($web) {
@@ -62,6 +63,21 @@ final class Kernel
         }
 
         return $app;
+    }
+
+    /**
+     * A site theme can bring texts of its own (a slogan, the steps on its
+     * home page) in themes/<id>/lang/<locale>.php, with keys starting
+     * "theme.". Only the active theme's are loaded.
+     */
+    public static function loadThemeTexts(App $app): void
+    {
+        foreach ($app->themes->siteDirs('lang') as $dir) {
+            // siteDirs() lists the active theme first; "default" has no
+            // texts of its own, and only one theme may define "theme.".
+            $app->translator->load($dir, 'theme');
+            break;
+        }
     }
 
     /**
