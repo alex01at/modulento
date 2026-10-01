@@ -9,6 +9,7 @@ declare(strict_types=1);
 
 use Modulento\Core\Support\AdminAccount;
 use Modulento\Core\Support\Database;
+use Modulento\Core\Support\PasswordPolicy;
 
 if (PHP_SAPI !== 'cli') {
     exit(1);
@@ -37,7 +38,7 @@ if ($isTerminal) {
     fwrite(STDOUT, "\n");
 }
 
-if (strlen($password) < AdminAccount::MIN_PASSWORD_LENGTH) {
+if (strlen($password) < PasswordPolicy::MIN_LENGTH) {
     fwrite(STDERR, "The password needs at least 12 characters.\n");
     exit(1);
 }

@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace Modulento\Core;
 
+use Modulento\Core\Controller\AccountController;
 use Modulento\Core\Controller\AdminController;
 use Modulento\Core\Controller\AssetController;
 use Modulento\Core\Controller\AuthController;
 use Modulento\Core\Controller\CronController;
 use Modulento\Core\Controller\HomeController;
+use Modulento\Core\Controller\RegistrationController;
 use Modulento\Core\Controller\UpdateController;
 use Modulento\Core\Support\Database;
 use Modulento\Core\Support\RateLimiter;
@@ -77,6 +79,23 @@ final class Kernel
         $router->post('/login', [AuthController::class, 'login'], Router::PUBLIC);
         $router->post('/logout', [AuthController::class, 'logout']);
 
+        $router->get('/register', [RegistrationController::class, 'showRegister'], Router::PUBLIC);
+        $router->post('/register', [RegistrationController::class, 'register'], Router::PUBLIC);
+        $router->get('/verify-email/{token}', [AuthController::class, 'verifyEmail'], Router::PUBLIC);
+        $router->post('/verify-email/resend', [AuthController::class, 'resendVerification'], Router::PUBLIC);
+        $router->get('/forgot-password', [RegistrationController::class, 'showForgot'], Router::PUBLIC);
+        $router->post('/forgot-password', [RegistrationController::class, 'forgot'], Router::PUBLIC);
+        $router->get('/reset-password/{token}', [RegistrationController::class, 'showReset'], Router::PUBLIC);
+        $router->post('/reset-password/{token}', [RegistrationController::class, 'reset'], Router::PUBLIC);
+
+        $router->get('/account', [AccountController::class, 'index']);
+        $router->post('/account/profile', [AccountController::class, 'updateProfile']);
+        $router->post('/account/password', [AccountController::class, 'changePassword']);
+        $router->post('/account/email', [AccountController::class, 'changeEmail']);
+        $router->get('/account/confirm-email/{token}', [AccountController::class, 'confirmEmail']);
+        $router->get('/account/export', [AccountController::class, 'export']);
+        $router->post('/account/delete', [AccountController::class, 'delete']);
+
         $router->get('/admin', [AdminController::class, 'index'], 'core.admin.access');
         $router->get('/admin/extensions', [AdminController::class, 'extensions'], 'core.extensions.manage');
         $router->post('/admin/extensions/{id}/enable', [AdminController::class, 'enableExtension'], 'core.extensions.manage');
@@ -107,5 +126,11 @@ final class Kernel
             60,
             fn (App $app) => (new RateLimiter($app->db))->cleanup()
         );
+        // Expired mail links, and registrations whose address was never
+        // confirmed within a week.
+        $app->scheduler->register('core.account-cleanup', 60, function (App $app): void {
+            $app->tokens->purgeExpired();
+            $app->accounts->deleteUnverifiedOlderThan(7 * 86400);
+        });
     }
 }

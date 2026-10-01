@@ -21,13 +21,34 @@ final class Auth
 
     public function login(int $accountId): void
     {
+        $stmt = $this->db->prepare('SELECT password_hash FROM account WHERE id = :id');
+        $stmt->execute(['id' => $accountId]);
+
         Session::regenerate();
         Session::set('account_id', $accountId);
+        Session::set('auth_stamp', self::stamp((string) $stmt->fetchColumn()));
         $this->accountLoaded = false;
         $this->permissions = null;
 
-        $stmt = $this->db->prepare('UPDATE account SET last_login_at = NOW() WHERE id = :id');
-        $stmt->execute(['id' => $accountId]);
+        $stmt = $this->db->prepare('UPDATE account SET last_login_at = :now WHERE id = :id');
+        $stmt->execute(['now' => Clock::now(), 'id' => $accountId]);
+    }
+
+    /**
+     * After the logged-in account changed its own password: keeps this
+     * session valid while every other session of the account - which
+     * still carries the old stamp - is logged out.
+     */
+    public function refreshStamp(): void
+    {
+        $accountId = Session::get('account_id');
+        if ($accountId === null) {
+            return;
+        }
+
+        $stmt = $this->db->prepare('SELECT password_hash FROM account WHERE id = :id');
+        $stmt->execute(['id' => (int) $accountId]);
+        Session::set('auth_stamp', self::stamp((string) $stmt->fetchColumn()));
     }
 
     public function logout(): void
@@ -44,9 +65,12 @@ final class Auth
     }
 
     /**
-     * Re-read on every request and limited to active accounts, so blocking
-     * an account takes effect on its very next request instead of only at
-     * its next login.
+     * Re-read on every request, so two things take effect on the very next
+     * request rather than at the next login: blocking an account, and a
+     * changed password (the session's stamp no longer matches, which logs
+     * out a session an intruder may still hold).
+     *
+     * @return array{id: int, email: string, display_name: ?string, locale: string, created_at: string}|null
      */
     public function account(): ?array
     {
@@ -61,10 +85,29 @@ final class Auth
         }
 
         $stmt = $this->db->prepare(
-            "SELECT id, email, locale, created_at FROM account WHERE id = :id AND status = 'active'"
+            "SELECT id, email, display_name, locale, created_at, password_hash
+             FROM account WHERE id = :id AND status = 'active'"
         );
         $stmt->execute(['id' => (int) $accountId]);
-        $this->account = $stmt->fetch() ?: null;
+        $row = $stmt->fetch();
+
+        if (!$row) {
+            return null;
+        }
+
+        // A session from before stamps existed (logged in on a version
+        // older than 0.2.0) has none; it receives one instead of being
+        // logged out by the update.
+        if (Session::get('auth_stamp') === null) {
+            Session::set('auth_stamp', self::stamp($row['password_hash']));
+        }
+        if (!hash_equals(self::stamp($row['password_hash']), (string) Session::get('auth_stamp'))) {
+            return null;
+        }
+
+        unset($row['password_hash']);
+        $row['id'] = (int) $row['id'];
+        $this->account = $row;
 
         return $this->account;
     }
@@ -83,11 +126,17 @@ final class Auth
                  JOIN role_permission rp ON rp.role_id = ar.role_id
                  WHERE ar.account_id = :id'
             );
-            $stmt->execute(['id' => (int) $account['id']]);
+            $stmt->execute(['id' => $account['id']]);
             $this->permissions = $stmt->fetchAll(PDO::FETCH_COLUMN);
         }
 
         return in_array(self::WILDCARD, $this->permissions, true)
             || in_array($permission, $this->permissions, true);
+    }
+
+    /** A fingerprint of the password hash - reveals nothing about it, changes whenever it does. */
+    public static function stamp(string $passwordHash): string
+    {
+        return substr(hash('sha256', 'auth-stamp:' . $passwordHash), 0, 32);
     }
 }

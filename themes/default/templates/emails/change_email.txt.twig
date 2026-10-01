@@ -1,0 +1,7 @@
+{# Plain text: nothing here is HTML-escaped. Blocks: subject, body. #}
+{% block subject %}{{ trans('core.mail.change_email.subject') }}{% endblock %}
+{% block body %}
+{{ trans('core.mail.change_email.body', {link: link, hours: hours}) }}
+
+{{ trans('core.mail.signature') }}
+{% endblock %}

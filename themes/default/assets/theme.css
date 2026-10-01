@@ -51,3 +51,6 @@ button { background: var(--accent); border-color: var(--accent); color: #fff; cu
 .flash-success { border-color: var(--success); color: var(--success); }
 
 .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+section { margin-top: 2.5rem; }
+button.danger { background: var(--error); border-color: var(--error); }

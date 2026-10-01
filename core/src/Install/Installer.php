@@ -8,6 +8,7 @@ use Modulento\Core\Support\AdminAccount;
 use Modulento\Core\Support\Csrf;
 use Modulento\Core\Support\Database;
 use Modulento\Core\Support\Migrator;
+use Modulento\Core\Support\PasswordPolicy;
 use Modulento\Core\Support\Session;
 use Modulento\Core\Support\Translator;
 use PDOException;
@@ -142,7 +143,7 @@ final class Installer
         if (filter_var($values['admin_email'], FILTER_VALIDATE_EMAIL) === false) {
             $errors[] = $t->trans('core.install.error.admin_email');
         }
-        if (strlen($adminPassword) < AdminAccount::MIN_PASSWORD_LENGTH) {
+        if (strlen($adminPassword) < PasswordPolicy::MIN_LENGTH) {
             $errors[] = $t->trans('core.install.error.admin_password');
         } elseif ($adminPassword !== (string) ($_POST['admin_password_repeat'] ?? '')) {
             $errors[] = $t->trans('core.install.error.admin_password_repeat');

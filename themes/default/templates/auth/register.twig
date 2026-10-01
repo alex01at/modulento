@@ -1,0 +1,30 @@
+{% extends 'layout/base.twig' %}
+
+{% block title %}{{ trans('core.register.title') }} – {{ site_name }}{% endblock %}
+
+{% block content %}
+<h1>{{ trans('core.register.title') }}</h1>
+{% for error in errors %}
+    <p class="flash flash-error" role="alert">{{ error }}</p>
+{% endfor %}
+<form method="post" action="/register" class="stack-form">
+    {{ csrf_field() }}
+    <label for="email">{{ trans('core.login.email') }}</label>
+    <input id="email" name="email" type="email" value="{{ email }}" autocomplete="username" required>
+
+    <label for="password">{{ trans('core.password.new', {min: min_length}) }}</label>
+    <input id="password" name="password" type="password" minlength="{{ min_length }}" autocomplete="new-password" required>
+
+    <label for="password_repeat">{{ trans('core.password.repeat') }}</label>
+    <input id="password_repeat" name="password_repeat" type="password" minlength="{{ min_length }}" autocomplete="new-password" required>
+
+    {# Bot trap: hidden from people, must stay empty. Keep it in every theme. #}
+    <div class="visually-hidden" aria-hidden="true">
+        <label for="website">Website</label>
+        <input id="website" name="website" type="text" tabindex="-1" autocomplete="off">
+    </div>
+
+    <button type="submit">{{ trans('core.register.submit') }}</button>
+</form>
+<p><a href="/login">{{ trans('core.register.have_account') }}</a></p>
+{% endblock %}

@@ -56,12 +56,17 @@ final class Session
 
     public static function regenerate(): void
     {
-        session_regenerate_id(true);
+        if (session_status() === PHP_SESSION_ACTIVE) {
+            session_regenerate_id(true);
+        }
     }
 
     public static function destroy(): void
     {
         $_SESSION = [];
+        if (session_status() !== PHP_SESSION_ACTIVE) {
+            return;
+        }
         if (ini_get('session.use_cookies')) {
             $params = session_get_cookie_params();
             setcookie(self::COOKIE_NAME, '', [
