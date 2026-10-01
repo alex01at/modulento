@@ -1,0 +1,13 @@
+{% extends 'layout/admin.twig' %}
+
+{% block title %}{{ trans('core.admin.title') }} – {{ site_name }}{% endblock %}
+
+{% block admin %}
+<h1>{{ trans('core.admin.title') }}</h1>
+<p>{{ trans('core.admin.intro') }}</p>
+<ul>
+    {% for item in admin_menu %}
+        <li><a href="{{ item.path }}">{{ trans(item.label_key) }}</a></li>
+    {% endfor %}
+</ul>
+{% endblock %}

@@ -1,0 +1,26 @@
+{
+    "name": "modulento/modulento",
+    "description": "Self-hosted, extensible core for transaction platforms.",
+    "type": "project",
+    "license": "GPL-3.0-or-later",
+    "require": {
+        "php": ">=8.3",
+        "ext-curl": "*",
+        "ext-pdo": "*",
+        "ext-pdo_mysql": "*",
+        "ext-zip": "*",
+        "twig/twig": "^3.28",
+        "vlucas/phpdotenv": "^5.7"
+    },
+    "autoload": {
+        "psr-4": {
+            "Modulento\\Core\\": "core/src/"
+        }
+    },
+    "authors": [
+        {
+            "name": "alex01at",
+            "email": "alex01at@gmail.com"
+        }
+    ]
+}

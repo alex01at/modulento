@@ -1,0 +1,70 @@
+{% extends 'layout/admin.twig' %}
+
+{% block title %}{{ trans('core.admin.extensions.title') }} – {{ site_name }}{% endblock %}
+
+{% block admin %}
+<h1>{{ trans('core.admin.extensions.title') }}</h1>
+
+{% if extensions is empty %}
+    <p>{{ trans('core.admin.extensions.none') }}</p>
+{% else %}
+    <table>
+        <thead>
+        <tr>
+            <th scope="col">{{ trans('core.admin.extensions.name') }}</th>
+            <th scope="col">{{ trans('core.admin.extensions.version') }}</th>
+            <th scope="col">{{ trans('core.admin.extensions.status') }}</th>
+            <th scope="col"></th>
+        </tr>
+        </thead>
+        <tbody>
+        {% for extension in extensions %}
+            <tr>
+                <th scope="row">{{ extension.name }} <small>({{ extension.id }})</small></th>
+                <td>{{ extension.version }}</td>
+                <td>
+                    {% if not extension.compatible %}
+                        {{ trans('core.admin.extensions.status_incompatible', {needed: extension.api, provided: api_version}) }}
+                    {% elseif extension.enabled %}
+                        {{ trans('core.admin.extensions.status_enabled') }}
+                    {% else %}
+                        {{ trans('core.admin.extensions.status_disabled') }}
+                    {% endif %}
+                </td>
+                <td>
+                    {% if extension.enabled %}
+                        <form method="post" action="/admin/extensions/{{ extension.id }}/disable">
+                            {{ csrf_field() }}
+                            <button type="submit">{{ trans('core.admin.extensions.disable') }}</button>
+                        </form>
+                    {% elseif extension.compatible %}
+                        <form method="post" action="/admin/extensions/{{ extension.id }}/enable">
+                            {{ csrf_field() }}
+                            <button type="submit">{{ trans('core.admin.extensions.enable') }}</button>
+                        </form>
+                    {% endif %}
+                </td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+{% endif %}
+
+{% if invalid is not empty %}
+    <h2>{{ trans('core.admin.extensions.invalid_title') }}</h2>
+    <ul>
+        {% for folder, reason in invalid %}
+            <li><strong>{{ folder }}</strong>: {{ reason }}</li>
+        {% endfor %}
+    </ul>
+{% endif %}
+
+{% if missing is not empty %}
+    <h2>{{ trans('core.admin.extensions.missing_title') }}</h2>
+    <ul>
+        {% for id in missing %}
+            <li>{{ id }}</li>
+        {% endfor %}
+    </ul>
+{% endif %}
+{% endblock %}

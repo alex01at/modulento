@@ -1,0 +1,17 @@
+{% extends 'layout/base.twig' %}
+
+{% block title %}{{ trans('core.login.title') }} – {{ site_name }}{% endblock %}
+
+{% block content %}
+<h1>{{ trans('core.login.title') }}</h1>
+<form method="post" action="/login" class="stack-form">
+    {{ csrf_field() }}
+    <label for="email">{{ trans('core.login.email') }}</label>
+    <input id="email" name="email" type="email" autocomplete="username" required>
+
+    <label for="password">{{ trans('core.login.password') }}</label>
+    <input id="password" name="password" type="password" autocomplete="current-password" required>
+
+    <button type="submit">{{ trans('core.login.submit') }}</button>
+</form>
+{% endblock %}

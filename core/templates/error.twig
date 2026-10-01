@@ -1,0 +1,8 @@
+{% extends 'layout/base.twig' %}
+
+{% block title %}{{ status }} – {{ site_name }}{% endblock %}
+
+{% block content %}
+<h1>{{ status }} – {{ trans(message_key) }}</h1>
+<p><a href="/">{{ trans('core.error.back_home') }}</a></p>
+{% endblock %}

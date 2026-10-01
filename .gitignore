@@ -1,0 +1,13 @@
+/vendor/
+/var/cache/twig/*
+!/var/cache/twig/.gitkeep
+/var/log/*
+!/var/log/.gitkeep
+/var/uploads/
+/var/updates/
+/VERSION
+.env
+.DS_Store
+.vscode/sftp.json
+.claude/settings.local.json
+/dist/
