@@ -14,12 +14,14 @@ use Modulento\Core\Content\Pages;
 use Modulento\Core\Extension\ExtensionManager;
 use Modulento\Core\Order\OrderFiles;
 use Modulento\Core\Order\Orders;
+use Modulento\Core\Package\Packages;
 use Modulento\Core\Provider\Providers;
 use Modulento\Core\Review\Reviews;
 use Modulento\Core\Support\Auth;
 use Modulento\Core\Support\Events;
 use Modulento\Core\Support\Locales;
 use Modulento\Core\Support\Mailer;
+use Modulento\Core\Support\ReleaseClient;
 use Modulento\Core\Support\Router;
 use Modulento\Core\Support\Scheduler;
 use Modulento\Core\Support\Settings;
@@ -62,6 +64,7 @@ final class App
     public readonly Orders $orders;
     public readonly OrderFiles $orderFiles;
     public readonly Reviews $reviews;
+    public readonly Packages $packages;
 
     /** The request path without its language prefix - what routes are matched against. */
     public string $path = '/';
@@ -87,7 +90,11 @@ final class App
         $this->scheduler = new Scheduler($db);
         $this->auth = new Auth($db);
         $this->translator = new Translator($locale, $config['app']['name']);
-        $this->extensions = new ExtensionManager($db, $config['app']['root'] . '/extensions');
+        $root = $config['app']['root'];
+        // Tests point these at folders of their own.
+        $extensionsDir = $config['app']['extensions'] ?? $root . '/extensions';
+        $themesDir = $config['app']['themes'] ?? $root . '/themes';
+        $this->extensions = new ExtensionManager($db, $extensionsDir);
         $this->settings = new Settings($db);
         $this->locales = new Locales($this->settings, $config['app']['root'] . '/core/lang');
         $this->pages = new Pages($db, $this->locales);
@@ -99,7 +106,15 @@ final class App
         $this->reviews = new Reviews($db);
         $this->orderFiles = new OrderFiles($db, ($config['app']['uploads'] ?? $config['app']['root'] . '/var/uploads') . '/orders');
         $this->offerImages = new OfferImages($db, ($config['app']['uploads'] ?? $config['app']['root'] . '/var/uploads') . '/offers');
-        $this->themes = new ThemeManager($config['app']['root'] . '/themes', $this->settings);
+        $this->themes = new ThemeManager($themesDir, $this->settings);
+        $this->packages = new Packages(
+            $db,
+            new ReleaseClient($config['update']['token'] ?? ''),
+            $extensionsDir,
+            $themesDir,
+            $config['app']['work'] ?? $root . '/var/updates',
+            $config['packages']['sources'] ?? []
+        );
         $this->accounts = new Accounts($db);
         $this->tokens = new Tokens($db);
         $this->mailer = new Mailer($this);

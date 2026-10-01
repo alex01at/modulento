@@ -40,6 +40,13 @@ return [
         'repo' => $_ENV['UPDATE_REPO'] ?? 'alex01at/modulento',
         'token' => $_ENV['UPDATE_TOKEN'] ?? '',
     ],
+    'packages' => [
+        // Repositories extensions and themes may be installed from, as
+        // comma-separated patterns ("owner/*", "owner/name"). Without the
+        // setting: every repository of the owner of UPDATE_REPO.
+        'sources' => array_values(array_filter(array_map('trim', explode(',', $_ENV['PACKAGE_SOURCES']
+            ?? (str_contains($_ENV['UPDATE_REPO'] ?? 'alex01at/modulento', '/') ? explode('/', $_ENV['UPDATE_REPO'] ?? 'alex01at/modulento')[0] . '/*' : ''))))),
+    ],
     'db' => [
         'host' => $_ENV['DB_HOST'] ?? '127.0.0.1',
         'port' => $_ENV['DB_PORT'] ?? '3306',

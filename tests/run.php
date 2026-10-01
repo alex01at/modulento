@@ -44,6 +44,24 @@ function throws(string $exceptionClass, callable $fn): bool
     return false;
 }
 
+/** @param array<string, string> $files @param array<string, string> $symlinks name => target */
+function buildPackage(string $path, array $files, array $symlinks = []): string
+{
+    $zip = new ZipArchive();
+    $zip->open($path, ZipArchive::CREATE | ZipArchive::OVERWRITE);
+    foreach ($files as $name => $content) {
+        $zip->addFromString($name, $content);
+        $zip->setExternalAttributesName($name, ZipArchive::OPSYS_UNIX, 0100644 << 16);
+    }
+    foreach ($symlinks as $name => $target) {
+        $zip->addFromString($name, $target);
+        $zip->setExternalAttributesName($name, ZipArchive::OPSYS_UNIX, 0120777 << 16);
+    }
+    $zip->close();
+
+    return (string) hash_file('sha256', $path);
+}
+
 function manifestDir(string $folder, ?string $json): string
 {
     $dir = sys_get_temp_dir() . '/modulento-test-' . bin2hex(random_bytes(4)) . '/' . $folder;
@@ -206,6 +224,7 @@ $pdo->exec("ALTER TABLE offer ADD COLUMN rating_count INTEGER NOT NULL DEFAULT 0
 $pdo->exec("ALTER TABLE offer ADD COLUMN rating_sum INTEGER NOT NULL DEFAULT 0");
 $pdo->exec("ALTER TABLE provider ADD COLUMN rating_count INTEGER NOT NULL DEFAULT 0");
 $pdo->exec("ALTER TABLE provider ADD COLUMN rating_sum INTEGER NOT NULL DEFAULT 0");
+$pdo->exec("CREATE TABLE package (kind TEXT, id TEXT, repo TEXT, version TEXT, installed_at TEXT, PRIMARY KEY (kind, id))");
 $pdo->exec("PRAGMA foreign_keys = ON");
 $pdo->exec("CREATE TABLE role (id INTEGER PRIMARY KEY, name TEXT)");
 $pdo->exec("CREATE TABLE role_permission (role_id INTEGER REFERENCES role (id) ON DELETE CASCADE, permission TEXT)");
@@ -223,10 +242,33 @@ $pdo->exec("INSERT INTO role_permission VALUES (1, 'demo.edit'), (2, '*')");
 $pdo->exec("INSERT INTO account_role VALUES (2, 1), (3, 2), (4, 2)");
 $pdo->exec("INSERT INTO extension VALUES ('example', '0.1.0', 1)");
 
+$testThemes = sys_get_temp_dir() . '/modulento-test-themes-' . bin2hex(random_bytes(4));
+mkdir($testThemes . '/sample/templates', 0777, true);
+mkdir($testThemes . '/sample/assets');
+mkdir($testThemes . '/sample/lang');
+symlink($root . '/themes/default', $testThemes . '/default');
+symlink($root . '/themes/admin', $testThemes . '/admin');
+file_put_contents($testThemes . '/sample/theme.json', '{"id":"sample","name":"Sample","version":"1.0.0"}');
+file_put_contents($testThemes . '/sample/assets/theme.css', '.sample-theme { color: red; }');
+file_put_contents($testThemes . '/sample/lang/de.php', "<?php return ['theme.hello' => 'Hallo vom Beispiel-Theme'];");
+file_put_contents($testThemes . '/sample/lang/en.php', "<?php return ['theme.hello' => 'Hello from the sample theme'];");
+file_put_contents($testThemes . '/sample/templates/home.twig', <<<'TWIG'
+{% extends 'layout/base.twig' %}
+{% block content %}
+<h1 class="sample-home">{{ trans('theme.hello') }}</h1>
+<form method="get" action="{{ url('/offers') }}">
+    <select name="category">{% for top in categories() %}<option value="{{ top.id }}">{{ top.name }}</option>{% endfor %}</select>
+</form>
+<ul>{% for top in categories() %}<li><a href="{{ url(top.path) }}">{{ top.name }}</a> {{ top.offer_count }}</li>{% endfor %}</ul>
+<p>{{ top_providers(3)|length }} providers</p>
+{% endblock %}
+TWIG);
 $mailLog = sys_get_temp_dir() . '/modulento-test-mail-' . bin2hex(random_bytes(4)) . '.log';
 $config = [
     'app' => ['env' => 'dev', 'url' => 'https://example.test', 'name' => 'Testseite', 'root' => $root, 'cron_token' => 'secret-cron-token',
-        'uploads' => sys_get_temp_dir() . '/modulento-test-uploads-' . bin2hex(random_bytes(4))],
+        'uploads' => sys_get_temp_dir() . '/modulento-test-uploads-' . bin2hex(random_bytes(4)), 'themes' => $testThemes,
+        'work' => sys_get_temp_dir() . '/modulento-test-work-' . bin2hex(random_bytes(4))],
+    'packages' => ['sources' => ['acme/*', 'other/exact']],
     'mail' => ['from' => 'noreply@example.test', 'transport' => 'log', 'log_path' => $mailLog],
 ];
 
@@ -1213,37 +1255,111 @@ foreach ($serviceFlow->states() as $stateName => $definition) {
 }
 check('every language key used exists: ' . implode(', ', array_unique($missingKeys)), $missingKeys === []);
 
-// --- A second site theme ("indigo") --------------------------------------------
+// --- A second site theme --------------------------------------------------------
 $r = $get('/', null);
-check('default theme: no texts of another theme', $r['status'] === 200 && !str_contains($r['body'], 'theme.hero') && !str_contains($r['body'], 'brand-mark'));
-$pdo->exec("INSERT INTO setting VALUES ('core.theme', 'indigo')");
+check('default theme: no texts of another theme', $r['status'] === 200 && !str_contains($r['body'], 'sample-home'));
+$pdo->exec("INSERT INTO setting VALUES ('core.theme', 'sample')");
 $r = $get('/', null);
-check('indigo: home page with its own texts, in German', $r['status'] === 200 && str_contains($r['body'], 'class="hero"') && str_contains($r['body'], 'Finde den passenden Freelancer')
-    && str_contains($r['body'], 'In drei Schritten zum Ergebnis') && preg_match('/[> "]theme\.[a-z_.]+[<" ]/', $r['body']) === 0);
-check('indigo: home page in English', str_contains($get('/en', null)['body'], 'Find the right freelancer') && str_contains($get('/en', null)['body'], 'action="/en/offers"'));
-check('indigo: nothing inline and nothing from other hosts', preg_match('/\sstyle="|<style|<script|onclick=|https?:\/\/(?!example\.test)/', $r['body']) === 0);
+check('theme: its home page with its own texts, in German', $r['status'] === 200 && str_contains($r['body'], '<h1 class="sample-home">Hallo vom Beispiel-Theme</h1>'));
+check('theme: its texts in English', str_contains($get('/en', null)['body'], 'Hello from the sample theme') && str_contains($get('/en', null)['body'], 'action="/en/offers"'));
 $r = $get('/login', null);
-check('indigo: a page it does not bring comes from default, inside its layout', $r['status'] === 200 && str_contains($r['body'], 'brand-mark') && str_contains($r['body'], 'name="password"'));
-preg_match('#/assets/theme/theme\.css\?v=[0-9a-f]+#', $r['body'], $indigoCss);
+check('theme: a page it does not bring comes from default', $r['status'] === 200 && str_contains($r['body'], 'name="password"') && str_contains($r['body'], 'site-header'));
+preg_match('#/assets/theme/theme\.css\?v=[0-9a-f]+#', $r['body'], $sampleCss);
 $pdo->exec("DELETE FROM setting WHERE name = 'core.theme'");
 $defaultFile = $root . '/themes/default/assets/theme.css';
 $defaultTime = filemtime($defaultFile);
 // As after an update: both stylesheets carry the same change time.
-touch($defaultFile, filemtime($root . '/themes/indigo/assets/theme.css'));
+touch($defaultFile, filemtime($testThemes . '/sample/assets/theme.css'));
 clearstatcache();
 preg_match('#/assets/theme/theme\.css\?v=[0-9a-f]+#', $get('/login', null)['body'], $defaultCss);
 touch($defaultFile, $defaultTime);
 clearstatcache();
-$pdo->exec("INSERT INTO setting VALUES ('core.theme', 'indigo')");
-check('the stylesheets of two themes never share an address, even with the same change time', ($indigoCss[0] ?? '') !== '' && ($defaultCss[0] ?? '') !== '' && $indigoCss[0] !== $defaultCss[0]);
-check('indigo: stylesheet and font are served from the theme', str_contains($get('/assets/theme/theme.css', null)['body'], 'Plus Jakarta Sans') && $get('/assets/theme/fonts/plus-jakarta-sans-latin.woff2', null)['status'] === 200);
+$pdo->exec("INSERT INTO setting VALUES ('core.theme', 'sample')");
+check('the stylesheets of two themes never share an address, even with the same change time', ($sampleCss[0] ?? '') !== '' && ($defaultCss[0] ?? '') !== '' && $sampleCss[0] !== $defaultCss[0]);
+check('theme: its stylesheet is the one served', str_contains($get('/assets/theme/theme.css', null)['body'], '.sample-theme'));
 $post('/admin/categories/new', ['text' => ['de' => ['name' => 'Texte', 'slug' => ''], 'en' => ['name' => '', 'slug' => '']]], 3);
 $textId = (int) $pdo->query("SELECT category_id FROM category_translation WHERE slug = 'texte'")->fetchColumn();
 $r = $get('/', null);
-check('indigo: home lists categories with their number of offers', str_contains($r['body'], 'href="/categories/texte"') && str_contains($r['body'], '0 Angebote') && str_contains($r['body'], '<option value="' . $textId . '">Texte</option>'));
+check('templates get the category tree with offer counts and the provider showcase', str_contains($r['body'], '<a href="/categories/texte">Texte</a> 0')
+    && str_contains($r['body'], '<option value="' . $textId . '">Texte</option>') && str_contains($r['body'], 'providers</p>'));
 check('search with a category chosen leads to the category\'s own address', ($get('/offers?category=' . $textId . '&q=logo', null)['body'] ?? '') === '' && $get('/categories/texte?q=logo', null)['status'] === 200);
 $pdo->exec('DELETE FROM category');
 $pdo->exec("DELETE FROM setting WHERE name = 'core.theme'");
+
+// --- Packages: extensions and themes from their own repositories ---------------------
+use Modulento\Core\Package\Packages;
+use Modulento\Core\Support\UpdateException;
+
+$packageRoot = sys_get_temp_dir() . '/modulento-test-packages-' . bin2hex(random_bytes(4));
+mkdir($packageRoot . '/extensions', 0777, true);
+mkdir($packageRoot . '/themes');
+$packages = new Packages($pdo, new Modulento\Core\Support\ReleaseClient(''), $packageRoot . '/extensions', $packageRoot . '/themes', $packageRoot . '/work', ['acme/*', 'other/exact']);
+check('package sources: patterns decide, case does not matter', $packages->isAllowed('acme/modulento-theme-x') && $packages->isAllowed('ACME/anything') && $packages->isAllowed('other/exact')
+    && !$packages->isAllowed('other/else') && !$packages->isAllowed('evil/acme') && !$packages->isAllowed('acme/../x') && !$packages->isAllowed('not-a-repo'));
+
+/** A package zip from name => content; returns [path, sha256]. */
+$makePackage = function (array $files) use ($packageRoot): array {
+    $path = $packageRoot . '/' . bin2hex(random_bytes(4)) . '.zip';
+    return [$path, buildPackage($path, $files)];
+};
+$themeFiles = fn (string $version, string $css = 'a') => ['theme.json' => json_encode(['id' => 'ocean', 'name' => 'Ocean', 'version' => $version]), 'assets/theme.css' => $css, 'templates/home.twig' => 'x'];
+$packageError = function (callable $install): string {
+    try {
+        $install();
+    } catch (UpdateException $e) {
+        return $e->messageKey;
+    }
+
+    return '';
+};
+
+[$zip, $sha] = $makePackage($themeFiles('1.0.0'));
+$result = $packages->installArchive($zip, $sha, 'acme/modulento-theme-ocean', '1.0.0');
+check('package: a theme is unpacked into themes/<id> and remembered with its source', $result === ['kind' => 'theme', 'id' => 'ocean', 'version' => '1.0.0', 'updated' => false]
+    && is_file($packageRoot . '/themes/ocean/theme.json') && $packages->find('theme', 'ocean')['repo'] === 'acme/modulento-theme-ocean' && !is_file($zip));
+file_put_contents($packageRoot . '/themes/ocean/local-change.txt', 'x');
+[$zip, $sha] = $makePackage($themeFiles('1.1.0', 'b'));
+$result = $packages->installArchive($zip, $sha, 'acme/modulento-theme-ocean', '1.1.0');
+check('package: an update replaces the folder and keeps the old one as a backup', $result['updated'] && file_get_contents($packageRoot . '/themes/ocean/assets/theme.css') === 'b'
+    && !is_file($packageRoot . '/themes/ocean/local-change.txt') && count(glob($packageRoot . '/work/backups/packages/theme-ocean-*/local-change.txt')) === 1 && $packages->find('theme', 'ocean')['version'] === '1.1.0');
+[$zip, $sha] = $makePackage($themeFiles('2.0.0', 'evil'));
+check('package: a name stays with the repository it came from', $packageError(fn () => $packages->installArchive($zip, $sha, 'acme/other-repo', '2.0.0')) === 'core.package.error.other_source'
+    && file_get_contents($packageRoot . '/themes/ocean/assets/theme.css') === 'b');
+[$zip, $sha] = $makePackage($themeFiles('1.2.0'));
+check('package: a wrong checksum is refused', $packageError(fn () => $packages->installArchive($zip, str_repeat('0', 64), 'acme/modulento-theme-ocean', '1.2.0')) === 'core.update.error.checksum');
+[$zip, $sha] = $makePackage($themeFiles('1.2.0'));
+check('package: its version has to match the release', $packageError(fn () => $packages->installArchive($zip, $sha, 'acme/modulento-theme-ocean', '1.3.0')) === 'core.update.error.version_mismatch'
+    && $packages->find('theme', 'ocean')['version'] === '1.1.0');
+foreach (['default', 'admin'] as $shipped) {
+    [$zip, $sha] = $makePackage(['theme.json' => json_encode(['id' => $shipped, 'name' => 'x', 'version' => '9.0.0'])]);
+    check("package: cannot replace the shipped theme {$shipped}", $packageError(fn () => $packages->installArchive($zip, $sha, 'acme/x', '9.0.0')) === 'core.package.error.shipped');
+}
+[$zip, $sha] = $makePackage(['readme.txt' => 'nothing here']);
+check('package: a zip without a manifest is refused', $packageError(fn () => $packages->installArchive($zip, $sha, 'acme/x', '1.0.0')) === 'core.package.error.manifest');
+[$zip, $sha] = $makePackage(['theme.json' => json_encode(['id' => '../../evil', 'version' => '1.0.0'])]);
+check('package: an id that is a path is refused', $packageError(fn () => $packages->installArchive($zip, $sha, 'acme/x', '1.0.0')) === 'core.package.error.manifest');
+[$zip, $sha] = $makePackage(['theme.json' => json_encode(['id' => 'ocean', 'version' => '1.0.0']), '../outside.txt' => 'x']);
+check('package: an entry leaving the folder is refused', $packageError(fn () => $packages->installArchive($zip, $sha, 'acme/modulento-theme-ocean', '1.0.0')) === 'core.update.error.unsafe_entry');
+
+$extensionFiles = fn (int $api) => ['extension.json' => json_encode(['id' => 'shop', 'name' => 'Shop', 'version' => '0.1.0', 'api' => $api, 'namespace' => 'Acme\\Shop']), 'src/Extension.php' => '<?php'];
+[$zip, $sha] = $makePackage($extensionFiles(99));
+check('package: an extension for another interface version is refused', $packageError(fn () => $packages->installArchive($zip, $sha, 'acme/modulento-shop', '0.1.0')) === 'core.package.error.api' && !is_dir($packageRoot . '/extensions/shop'));
+[$zip, $sha] = $makePackage($extensionFiles(Modulento\Core\App::API_VERSION));
+check('package: an extension is unpacked into extensions/<id>', $packages->installArchive($zip, $sha, 'acme/modulento-shop', '0.1.0')['kind'] === 'extension' && is_file($packageRoot . '/extensions/shop/src/Extension.php'));
+foreach (['example', 'freelancer'] as $shipped) {
+    [$zip, $sha] = $makePackage(['extension.json' => json_encode(['id' => $shipped, 'version' => '9.0.0', 'api' => 1, 'namespace' => 'X']), 'src/Extension.php' => '<?php']);
+    check("package: cannot replace the shipped extension {$shipped}", $packageError(fn () => $packages->installArchive($zip, $sha, 'acme/x', '9.0.0')) === 'core.package.error.shipped');
+}
+check('package: install refuses a repository that is not allowed, before asking it anything', $packageError(fn () => $packages->install('evil/modulento-theme')) === 'core.package.error.source');
+$packages->remove('theme', 'ocean');
+check('package: removed from disk and from the list', !is_dir($packageRoot . '/themes/ocean') && $packages->find('theme', 'ocean') === null && count($packages->installed()) === 1);
+
+check('package administration needs its permission', $get('/admin/packages', 1)['status'] === 403);
+$r = $get('/admin/packages', 3);
+check('package administration lists packages and the allowed sources', $r['status'] === 200 && str_contains($r['body'], 'acme/modulento-shop') && str_contains($r['body'], 'acme/*, other/exact'));
+$post('/admin/packages/install', ['repo' => 'evil/thing'], 3);
+check('package administration refuses a source that is not allowed', str_contains($_SESSION['_flash']['error'] ?? '', 'evil/thing'));
+$pdo->exec('DELETE FROM package');
 
 // --- Router: rest-of-path parameter --------------------------------------
 $r = request($pdo, $config, 'GET', '/assets/theme/theme.css', null);
@@ -1313,24 +1429,6 @@ check('env file round trip', $parsed === ['A' => 'plain', 'B' => 'with space', '
 // --- Updater: applying a package -----------------------------------------
 // Downloading from GitHub is not covered; installPackage() is everything
 // that happens after the download.
-
-/** @param array<string, string> $files @param array<string, string> $symlinks name => target */
-function buildPackage(string $path, array $files, array $symlinks = []): string
-{
-    $zip = new ZipArchive();
-    $zip->open($path, ZipArchive::CREATE | ZipArchive::OVERWRITE);
-    foreach ($files as $name => $content) {
-        $zip->addFromString($name, $content);
-        $zip->setExternalAttributesName($name, ZipArchive::OPSYS_UNIX, 0100644 << 16);
-    }
-    foreach ($symlinks as $name => $target) {
-        $zip->addFromString($name, $target);
-        $zip->setExternalAttributesName($name, ZipArchive::OPSYS_UNIX, 0120777 << 16);
-    }
-    $zip->close();
-
-    return (string) hash_file('sha256', $path);
-}
 
 function installation(): string
 {

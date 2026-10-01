@@ -26,12 +26,13 @@ use ZipArchive;
  */
 final class Updater
 {
-    private const API = 'https://api.github.com';
     private const COPY_EXCLUDE_PREFIXES = ['var/'];
     private const COPY_EXCLUDE_FILES = ['.env', 'VERSION'];
     private const BACKUP_EXCLUDE_PREFIXES = ['var/cache/', 'var/updates/', 'var/uploads/', 'var/log/', '.git/'];
     private const BACKUP_RETENTION = 5;
     private const REQUIRED_PACKAGE_ENTRIES = ['public/index.php', 'core/src', 'themes/default/theme.json', 'themes/admin/theme.json', 'vendor/autoload.php', 'composer.json', 'VERSION'];
+
+    private ReleaseClient $releases;
 
     /**
      * @param Closure(): void $migrate runs the core and extension migrations
@@ -44,11 +45,12 @@ final class Updater
         private Closure $migrate
     ) {
         $this->root = rtrim($this->root, '/');
+        $this->releases = new ReleaseClient($this->token);
     }
 
     public function isEnabled(): bool
     {
-        return preg_match('#^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$#', $this->repo) === 1;
+        return ReleaseClient::isRepository($this->repo);
     }
 
     /**
@@ -103,40 +105,23 @@ final class Updater
             throw new UpdateException('core.update.error.disabled');
         }
 
-        [$status, $body] = $this->httpGet(self::API . '/repos/' . $this->repo . '/releases/latest', 'application/vnd.github+json');
-
-        if ($status === 404) {
-            throw new UpdateException('core.update.error.no_release', ['repo' => $this->repo]);
-        }
-        if ($status !== 200) {
-            throw new UpdateException('core.update.error.unreachable', ['status' => $status]);
-        }
-
-        $release = json_decode($body, true);
-        $version = is_array($release) && is_string($release['tag_name'] ?? null) ? ltrim($release['tag_name'], 'v') : '';
-        if (preg_match('/^\d+\.\d+\.\d+$/', $version) !== 1) {
-            throw new UpdateException('core.update.error.invalid_response');
-        }
+        $release = $this->releases->latest($this->repo);
+        $version = $release['version'];
 
         if (!version_compare($version, $this->currentVersion(), '>')) {
             return null;
         }
 
         $zipName = 'modulento-' . $version . '.zip';
-        $urls = [];
-        foreach ($release['assets'] ?? [] as $asset) {
-            if (is_array($asset) && is_string($asset['name'] ?? null) && is_string($asset['url'] ?? null)) {
-                $urls[$asset['name']] = $asset['url'];
-            }
-        }
+        $urls = $release['assets'];
         if (!isset($urls[$zipName], $urls[$zipName . '.sha256'])) {
             throw new UpdateException('core.update.error.assets_missing', ['version' => $version]);
         }
 
         return [
             'version' => $version,
-            'published_at' => (string) ($release['published_at'] ?? ''),
-            'changelog' => (string) ($release['body'] ?? ''),
+            'published_at' => $release['published_at'],
+            'changelog' => $release['changelog'],
             'zip_url' => $urls[$zipName],
             'sha256_url' => $urls[$zipName . '.sha256'],
         ];
@@ -190,7 +175,7 @@ final class Updater
 
             $stage = 'downloading';
             $this->writeLockInfo($lockPath, $stage, $version);
-            $sha256 = $this->downloadChecksum($meta['sha256_url']);
+            $sha256 = $this->releases->checksum($meta['sha256_url']);
             $zipPath = $this->download($meta['zip_url'], $version);
 
             $backupPath = $this->installPackage($zipPath, $version, $sha256, function (string $next) use (&$stage, $lockPath, $version): void {
@@ -260,7 +245,7 @@ final class Updater
         $onStage('finishing');
         $this->writeVersion($version);
         @unlink($zipPath);
-        $this->removeDir($extractDir);
+        SafeArchive::removeDir($extractDir);
 
         return $backupPath;
     }
@@ -285,151 +270,21 @@ final class Updater
         ]));
     }
 
-    /** @return array<int, string> */
-    private function headers(string $accept): array
-    {
-        $headers = [
-            'Accept: ' . $accept,
-            'User-Agent: Modulento-Updater',
-            'X-GitHub-Api-Version: 2022-11-28',
-        ];
-        // Only needed while the repository is private: a fine-grained
-        // token with read-only "Contents" access to it.
-        if ($this->token !== '') {
-            $headers[] = 'Authorization: Bearer ' . $this->token;
-        }
-
-        return $headers;
-    }
-
-    /** @return array<int, mixed> curl options shared by every request */
-    private function curlOptions(string $accept, int $timeout): array
-    {
-        return [
-            CURLOPT_HTTPHEADER => $this->headers($accept),
-            CURLOPT_TIMEOUT => $timeout,
-            CURLOPT_CONNECTTIMEOUT => 10,
-            // This connection delivers executable application code.
-            CURLOPT_SSL_VERIFYPEER => true,
-            CURLOPT_SSL_VERIFYHOST => 2,
-            // An asset download answers with a redirect to GitHub's file
-            // storage. curl drops the Authorization header when the host
-            // changes, so the token never leaves api.github.com.
-            CURLOPT_FOLLOWLOCATION => true,
-            CURLOPT_MAXREDIRS => 3,
-            CURLOPT_PROTOCOLS_STR => 'https',
-            CURLOPT_REDIR_PROTOCOLS_STR => 'https',
-        ];
-    }
-
-    /** @return array{0: int, 1: string} HTTP status (0 if the request failed) and body */
-    private function httpGet(string $url, string $accept): array
-    {
-        $ch = curl_init($url);
-        curl_setopt_array($ch, $this->curlOptions($accept, 20) + [CURLOPT_RETURNTRANSFER => true]);
-        $body = curl_exec($ch);
-        $status = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
-
-        return [is_string($body) ? $status : 0, is_string($body) ? $body : ''];
-    }
-
-    private function downloadChecksum(string $url): string
-    {
-        [$status, $body] = $this->httpGet($url, 'application/octet-stream');
-
-        // "sha256sum" format: the hash, then the file name.
-        if ($status !== 200 || preg_match('/^([0-9a-f]{64})\b/i', trim($body), $matches) !== 1) {
-            throw new UpdateException('core.update.error.download', ['reason' => 'sha256, HTTP ' . $status]);
-        }
-
-        return strtolower($matches[1]);
-    }
-
     private function download(string $url, string $version): string
     {
         $this->ensureDir($this->root . '/var/updates/staging');
         $zipPath = $this->root . '/var/updates/staging/modulento-' . $version . '.zip';
-
-        $fh = fopen($zipPath, 'wb');
-        if ($fh === false) {
-            throw new UpdateException('core.update.error.not_writable', ['path' => 'var/updates/staging']);
-        }
-
-        $ch = curl_init($url);
-        curl_setopt_array($ch, $this->curlOptions('application/octet-stream', 300) + [CURLOPT_FILE => $fh]);
-        $ok = curl_exec($ch);
-        $status = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $error = curl_error($ch);
-        curl_close($ch);
-        fclose($fh);
-
-        if ($ok === false || $status !== 200) {
-            @unlink($zipPath);
-            throw new UpdateException('core.update.error.download', ['reason' => $error !== '' ? $error : 'HTTP ' . $status]);
-        }
+        $this->releases->download($url, $zipPath);
 
         return $zipPath;
     }
 
-    /**
-     * Extraction with zip-slip AND symlink protection: every entry name is
-     * validated before extractTo() is called, and an entry whose Unix mode
-     * marks it as a symlink is rejected - a path check on the name alone
-     * would not catch a symlink that points outside the extraction
-     * directory under a harmless-looking name.
-     */
     private function extract(string $zipPath, string $version): string
     {
-        $zip = new ZipArchive();
-        if ($zip->open($zipPath) !== true) {
-            throw new UpdateException('core.update.error.archive');
-        }
-
-        $safeNames = [];
-        for ($i = 0; $i < $zip->numFiles; $i++) {
-            $name = $zip->getNameIndex($i);
-            if ($name === false) {
-                continue;
-            }
-
-            // The mode bits only mean what they look like when the entry
-            // was written on Unix, which every package built by
-            // release.yml is. Anything else is rejected outright.
-            if (!$this->isSafeZipEntryName($name)
-                || !$zip->getExternalAttributesIndex($i, $opsys, $attr)
-                || $opsys !== ZipArchive::OPSYS_UNIX
-                || (((int) $attr >> 16) & 0xF000) === 0xA000) {
-                $zip->close();
-                throw new UpdateException('core.update.error.unsafe_entry', ['name' => $name]);
-            }
-
-            $safeNames[] = $name;
-        }
-
         $extractDir = $this->root . '/var/updates/extract/' . $version;
-        $this->removeDir($extractDir);
-        $this->ensureDir($extractDir);
-
-        $extracted = $zip->extractTo($extractDir, $safeNames);
-        $zip->close();
-        if (!$extracted) {
-            throw new UpdateException('core.update.error.archive');
-        }
+        SafeArchive::extract($zipPath, $extractDir);
 
         return $extractDir;
-    }
-
-    private function isSafeZipEntryName(string $name): bool
-    {
-        if ($name === '' || str_contains($name, "\0") || str_contains($name, '\\')) {
-            return false;
-        }
-        if (str_starts_with($name, '/') || preg_match('#^[A-Za-z]:#', $name) === 1) {
-            return false;
-        }
-
-        return !in_array('..', explode('/', $name), true);
     }
 
     private function verifyStructure(string $extractDir, string $expectedVersion): void
@@ -523,22 +378,6 @@ final class Updater
         foreach (new RecursiveIteratorIterator($filter, RecursiveIteratorIterator::LEAVES_ONLY) as $item) {
             yield ltrim(substr($item->getPathname(), strlen($root)), '/') => $item->getPathname();
         }
-    }
-
-    private function removeDir(string $dir): void
-    {
-        if (!is_dir($dir)) {
-            return;
-        }
-
-        $iterator = new RecursiveIteratorIterator(
-            new RecursiveDirectoryIterator($dir, FilesystemIterator::SKIP_DOTS),
-            RecursiveIteratorIterator::CHILD_FIRST
-        );
-        foreach ($iterator as $item) {
-            $item->isDir() ? @rmdir($item->getPathname()) : @unlink($item->getPathname());
-        }
-        @rmdir($dir);
     }
 
     private function ensureDir(string $dir): void
