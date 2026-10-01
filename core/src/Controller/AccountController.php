@@ -24,6 +24,7 @@ final class AccountController extends Controller
             'locales' => $this->app->locales->enabled(),
             'min_length' => PasswordPolicy::MIN_LENGTH,
             'is_last_admin' => $this->app->accounts->isLastAdmin($this->accountId()),
+            'provider_status' => $this->app->providers->findByAccount($this->accountId())['status'] ?? null,
         ]);
     }
 
@@ -138,6 +139,11 @@ final class AccountController extends Controller
             'email_verified_at' => $row['email_verified_at'],
             'last_login_at' => $row['last_login_at'],
         ]);
+        $provider = $this->app->providers->findByAccount($this->accountId());
+        if ($provider !== null) {
+            unset($provider['account_email'], $provider['account_status'], $provider['account_locale'], $provider['decided_by'], $provider['changed_since_decision']);
+            $export->add('provider', $provider);
+        }
         $this->app->events->dispatch($export);
 
         header('Content-Type: application/json; charset=utf-8');

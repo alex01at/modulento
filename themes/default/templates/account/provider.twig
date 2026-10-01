@@ -1,0 +1,106 @@
+{% extends 'layout/base.twig' %}
+
+{% block title %}{{ trans('core.provider.title') }} – {{ site_name }}{% endblock %}
+
+{% block content %}
+<h1>{{ trans('core.provider.title') }}</h1>
+
+{% if status %}
+    <p class="flash {{ status == 'approved' ? 'flash-success' : (status == 'pending' ? '' : 'flash-error') }}">
+        {{ trans('core.provider.status.' ~ status) }}
+        {% if status_note %}<br>{{ trans('core.provider.status_note') }} {{ status_note }}{% endif %}
+    </p>
+    {% if public_path %}
+        <p><a href="{{ url(public_path) }}">{{ trans('core.provider.view_public') }}</a></p>
+    {% endif %}
+{% else %}
+    <p>{{ trans(approval_required ? 'core.provider.intro_approval' : 'core.provider.intro') }}</p>
+{% endif %}
+
+{% for error in errors %}
+    <p class="flash flash-error" role="alert">{{ error }}</p>
+{% endfor %}
+
+<form method="post" action="{{ url('/account/provider') }}" class="stack-form wide">
+    {{ csrf_field() }}
+
+    <fieldset>
+        <legend>{{ trans('core.provider.section.identity') }}</legend>
+
+        <label for="type">{{ trans('core.provider.field.type') }}</label>
+        <select id="type" name="type" required>
+            <option value="">{{ trans('core.provider.field.type_choose') }}</option>
+            <option value="business" {{ provider and provider.type == 'business' ? 'selected' }}>{{ trans('core.provider.type.business') }}</option>
+            <option value="private" {{ provider and provider.type == 'private' ? 'selected' }}>{{ trans('core.provider.type.private') }}</option>
+        </select>
+        <small>{{ trans('core.provider.field.type_hint') }}</small>
+
+        <label for="name">{{ trans('core.provider.field.name') }}</label>
+        <input id="name" name="name" value="{{ provider.name ?? '' }}" maxlength="150" required>
+        <small>{{ trans('core.provider.field.name_hint') }}</small>
+
+        <label for="legal_name">{{ trans('core.provider.field.legal_name') }}</label>
+        <input id="legal_name" name="legal_name" value="{{ provider.legal_name ?? '' }}" maxlength="200" autocomplete="organization">
+        <small>{{ trans('core.provider.field.legal_name_hint') }}</small>
+
+        <label for="street">{{ trans('core.provider.field.street') }}</label>
+        <input id="street" name="street" value="{{ provider.street ?? '' }}" maxlength="200" autocomplete="street-address" required>
+        <label for="postal_code">{{ trans('core.provider.field.postal_code') }}</label>
+        <input id="postal_code" name="postal_code" value="{{ provider.postal_code ?? '' }}" maxlength="20" autocomplete="postal-code" required>
+        <label for="city">{{ trans('core.provider.field.city') }}</label>
+        <input id="city" name="city" value="{{ provider.city ?? '' }}" maxlength="100" autocomplete="address-level2" required>
+
+        <label for="country">{{ trans('core.provider.field.country') }}</label>
+        <select id="country" name="country" autocomplete="country" required>
+            <option value=""></option>
+            {% for code in countries %}
+                <option value="{{ code }}" {{ provider and provider.country == code ? 'selected' }}>{{ trans('core.country.' ~ code) }}</option>
+            {% endfor %}
+        </select>
+    </fieldset>
+
+    <fieldset>
+        <legend>{{ trans('core.provider.section.contact') }}</legend>
+        <p><small>{{ trans('core.provider.section.contact_hint') }}</small></p>
+        <label for="contact_email">{{ trans('core.provider.field.contact_email') }}</label>
+        <input id="contact_email" name="contact_email" value="{{ provider.contact_email ?? '' }}" type="email" maxlength="255">
+        <label for="phone">{{ trans('core.provider.field.phone') }}</label>
+        <input id="phone" name="phone" value="{{ provider.phone ?? '' }}" type="tel" maxlength="50">
+    </fieldset>
+
+    <fieldset>
+        <legend>{{ trans('core.provider.section.tax') }}</legend>
+        <p><small>{{ trans('core.provider.section.tax_hint') }}</small></p>
+        <label for="vat_id">{{ trans('core.provider.field.vat_id') }}</label>
+        <input id="vat_id" name="vat_id" value="{{ provider.vat_id ?? '' }}" maxlength="20">
+        <label for="tax_id">{{ trans('core.provider.field.tax_id') }}</label>
+        <input id="tax_id" name="tax_id" value="{{ provider.tax_id ?? '' }}" maxlength="50">
+        <label for="company_register">{{ trans('core.provider.field.company_register') }}</label>
+        <input id="company_register" name="company_register" value="{{ provider.company_register ?? '' }}" maxlength="100">
+    </fieldset>
+
+    {% for code in locales %}
+        {% set text = provider ? (provider.texts[code] ?? {}) : {} %}
+        <fieldset>
+            <legend>{{ trans('core.provider.section.presentation') }} – {{ locale_name(code) }}</legend>
+            {% if not loop.first %}
+                <p><small>{{ trans('core.provider.section.presentation_optional') }}</small></p>
+            {% endif %}
+            <label for="headline_{{ code }}">{{ trans('core.provider.field.headline') }}</label>
+            <input id="headline_{{ code }}" name="text[{{ code }}][headline]" value="{{ text.headline ?? '' }}" maxlength="200" lang="{{ code }}">
+            <label for="description_{{ code }}">{{ trans('core.provider.field.description') }}</label>
+            <textarea id="description_{{ code }}" name="text[{{ code }}][description]" rows="8" maxlength="5000" lang="{{ code }}">{{ text.description ?? '' }}</textarea>
+        </fieldset>
+    {% endfor %}
+
+    {% if not certified %}
+        <label class="checkbox">
+            <input type="checkbox" name="self_certified" value="1" {{ provider and provider.self_certified ? 'checked' }}>
+            <span>{{ trans('core.provider.field.self_certified') }}</span>
+        </label>
+    {% endif %}
+
+    <button type="submit">{{ trans('core.account.save') }}</button>
+</form>
+<p><a href="{{ url('/account') }}">{{ trans('core.nav.account') }}</a></p>
+{% endblock %}

@@ -21,6 +21,13 @@
         <option value="closed" {{ settings.registration == 'closed' ? 'selected' }}>{{ trans('core.admin.settings.registration_closed') }}</option>
     </select>
 
+    <label for="provider_approval">{{ trans('core.admin.settings.provider_approval') }}</label>
+    <select id="provider_approval" name="provider_approval">
+        <option value="required" {{ settings.provider_approval == 'required' ? 'selected' }}>{{ trans('core.admin.settings.provider_approval_required') }}</option>
+        <option value="off" {{ settings.provider_approval == 'off' ? 'selected' }}>{{ trans('core.admin.settings.provider_approval_off') }}</option>
+    </select>
+    <small>{{ trans('core.admin.settings.provider_approval_hint') }}</small>
+
     <fieldset>
         <legend>{{ trans('core.admin.settings.languages') }}</legend>
         <p><small>{{ trans('core.admin.settings.languages_hint') }}</small></p>

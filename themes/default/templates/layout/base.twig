@@ -17,6 +17,7 @@
         {% for link in page_links('header') %}
             <a href="{{ link.url }}">{{ link.title }}</a>
         {% endfor %}
+        <a href="{{ url('/providers') }}">{{ trans('core.nav.providers') }}</a>
         {% if can('core.admin.access') %}
             <a href="{{ url('/admin') }}">{{ trans('core.nav.admin') }}</a>
         {% endif %}

@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace Modulento\Core;
 
 use Modulento\Core\Account\Accounts;
+use Modulento\Core\Account\Roles;
 use Modulento\Core\Account\Tokens;
 use Modulento\Core\Content\Pages;
 use Modulento\Core\Extension\ExtensionManager;
+use Modulento\Core\Provider\Providers;
 use Modulento\Core\Support\Auth;
 use Modulento\Core\Support\Events;
 use Modulento\Core\Support\Locales;
@@ -46,6 +48,8 @@ final class App
     public readonly Mailer $mailer;
     public readonly Locales $locales;
     public readonly Pages $pages;
+    public readonly Providers $providers;
+    public readonly Roles $roles;
 
     /** The request path without its language prefix - what routes are matched against. */
     public string $path = '/';
@@ -75,6 +79,8 @@ final class App
         $this->settings = new Settings($db);
         $this->locales = new Locales($this->settings, $config['app']['root'] . '/core/lang');
         $this->pages = new Pages($db, $this->locales);
+        $this->providers = new Providers($db, $this->settings, $this->locales);
+        $this->roles = new Roles($db);
         $this->themes = new ThemeManager($config['app']['root'] . '/themes', $this->settings);
         $this->accounts = new Accounts($db);
         $this->tokens = new Tokens($db);

@@ -1,0 +1,7 @@
+{# Plain text: nothing here is HTML-escaped. Blocks: subject, body. #}
+{% block subject %}{{ trans('core.mail.provider_suspended.subject') }}{% endblock %}
+{% block body %}
+{{ trans('core.mail.provider_suspended.body', {name: name, note: note}) }}
+
+{{ trans('core.mail.signature') }}
+{% endblock %}

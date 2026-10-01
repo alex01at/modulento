@@ -9,9 +9,10 @@ Plain PHP without a framework and without a build step: PHP ≥ 8.3, Twig,
 MariaDB through PDO, vanilla JS/CSS.
 
 **Status: early.** The core has accounts (registration with e-mail
-confirmation, password reset, own data export and deletion), roles, content
-pages and legal texts, several languages, themes, extensions, scheduled tasks
-and self-update. There is no catalogue, order or payment code yet.
+confirmation, password reset, own data export and deletion), provider
+profiles with approval, roles and account administration, content pages and
+legal texts, several languages, themes, extensions, scheduled tasks and
+self-update. There is no catalogue, order or payment code yet.
 
 Two rules shape everything:
 
@@ -149,11 +150,15 @@ Templates of the site theme, with the variables they receive:
 | `auth/register.twig` | `errors`, `email`, `min_length`, `legal` (terms and privacy pages to accept, as `title`/`url`); keep the hidden `website` field |
 | `auth/forgot.twig` | - |
 | `auth/reset.twig` | `errors`, `token`, `min_length` |
-| `account/index.twig` | `locales`, `min_length`, `is_last_admin` |
+| `account/index.twig` | `locales`, `min_length`, `is_last_admin`, `provider_status` |
+| `account/provider.twig` | `provider` (stored or typed values, `texts` by language), `status`, `status_note`, `public_path`, `certified`, `errors`, `locales`, `countries`, `approval_required` |
+| `provider/index.twig` | `providers`, `page`, `pages` |
+| `provider/show.twig` | `provider`: `name`, `path`, `type`, `headline`, `description` (plain text), `city`, `country`, `legal` (only for a business); block `offers` for extensions |
 | `emails/*.txt.twig` | blocks `subject` and `body`; plain text, not HTML-escaped |
 
 E-mails are theme templates too: `verify_email`, `reset_password`,
-`already_registered`, `change_email`, `password_changed`. With `APP_ENV="dev"`
+`already_registered`, `change_email`, `password_changed`, `provider_approved`,
+`provider_rejected`, `provider_suspended`, `account_blocked`. With `APP_ENV="dev"`
 nothing is sent; mails are appended to `var/log/mail.log`.
 
 Available in every template:
@@ -203,15 +208,22 @@ extensions/<id>/
 Core services an extension uses instead of SQL on core tables, all on the
 `App` object: `accounts` (find, create, change accounts), `tokens` (one-time
 links), `mailer` (`send(to, '@<id>/emails/x.txt.twig', data, locale)`),
-`settings`, `locales`, `pages`, `auth`, `events`, and `url()`.
+`settings`, `locales`, `pages`, `providers`, `roles`, `auth`, `events`, and
+`url()`.
+
+What an extension sells or lists belongs to a provider: reference
+`provider (id)` with `ON DELETE CASCADE` and show it only while the provider's
+status is `approved` (`$app->providers->findPublicBySlug()`, or listen to
+`ProviderStatusChanged`). Whether a new provider needs an administrator's
+approval is a setting; the extension does not have to care.
 
 An extension is multilingual from its first line: texts in `lang/de.php` and
 `lang/en.php`, links through `url()`, and content its users type stored per
 language where it is shown to others (see `page_translation` for the
 pattern).
 
-Events to listen to: `AccountRegistered`, `AccountLoggedIn`, `AccountDeleted`
-and `AccountExport`. An extension that stores personal data per account
+Events to listen to: `AccountRegistered`, `AccountLoggedIn`, `AccountDeleted`,
+`AccountExport` and `ProviderStatusChanged`. An extension that stores personal data per account
 references `account (id)` with `ON DELETE CASCADE`, so deleting an account
 removes it, and adds its part to the data export in an `AccountExport`
 listener (see `extensions/example`).
