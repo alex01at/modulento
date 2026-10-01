@@ -1359,6 +1359,11 @@ $r = $get('/admin/packages', 3);
 check('package administration lists packages and the allowed sources', $r['status'] === 200 && str_contains($r['body'], 'acme/modulento-shop') && str_contains($r['body'], 'acme/*, other/exact'));
 $post('/admin/packages/install', ['repo' => 'evil/thing'], 3);
 check('package administration refuses a source that is not allowed', str_contains($_SESSION['_flash']['error'] ?? '', 'evil/thing'));
+$pdo->exec("INSERT INTO package VALUES ('theme', 'sample', 'acme/modulento-theme-sample', '1.0.0', '2026-01-01 00:00:00')");
+$pdo->exec("INSERT INTO setting VALUES ('core.theme', 'sample')");
+$post('/admin/packages/theme/sample/remove', [], 3);
+check('package administration does not remove the active theme', $pdo->query("SELECT COUNT(*) FROM package WHERE id = 'sample'")->fetchColumn() == 1 && is_dir($testThemes . '/sample'));
+$pdo->exec("DELETE FROM setting WHERE name = 'core.theme'");
 $pdo->exec('DELETE FROM package');
 
 // --- Router: rest-of-path parameter --------------------------------------
