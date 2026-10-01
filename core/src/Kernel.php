@@ -20,6 +20,7 @@ use Modulento\Core\Controller\OrderController;
 use Modulento\Core\Controller\PageController;
 use Modulento\Core\Controller\ProviderController;
 use Modulento\Core\Controller\RegistrationController;
+use Modulento\Core\Controller\ReviewController;
 use Modulento\Core\Controller\SettingsController;
 use Modulento\Core\Controller\UpdateController;
 use Modulento\Core\Support\Database;
@@ -158,6 +159,8 @@ final class Kernel
         $router->post('/orders/{id}/message', [OrderController::class, 'message']);
         $router->post('/orders/{id}/paid', [OrderController::class, 'markPaid']);
         $router->get('/orders/{id}/files/{file}', [OrderController::class, 'download']);
+        $router->post('/orders/{id}/review', [ReviewController::class, 'create']);
+        $router->post('/orders/{id}/review/reply', [ReviewController::class, 'reply']);
         $router->get('/categories/{slug}', [OfferController::class, 'category'], Router::PUBLIC);
 
         $router->get('/providers', [ProviderController::class, 'index'], Router::PUBLIC);
@@ -183,6 +186,10 @@ final class Kernel
         $router->get('/admin/orders/{id}', [AdminOrderController::class, 'show'], 'core.orders.manage');
         $router->post('/admin/orders/{id}/transition', [AdminOrderController::class, 'transition'], 'core.orders.manage');
         $router->get('/admin/orders/{id}/files/{file}', [AdminOrderController::class, 'download'], 'core.orders.manage');
+
+        $router->get('/admin/reviews', [ReviewController::class, 'index'], 'core.reviews.manage');
+        $router->post('/admin/reviews/{id}/hide', [ReviewController::class, 'hide'], 'core.reviews.manage');
+        $router->post('/admin/reviews/{id}/show', [ReviewController::class, 'show'], 'core.reviews.manage');
 
         $router->get('/admin/offers', [AdminCatalogueController::class, 'offers'], 'core.offers.manage');
         $router->get('/admin/offers/{id}', [AdminCatalogueController::class, 'offer'], 'core.offers.manage');
@@ -230,6 +237,7 @@ final class Kernel
         $app->addPermission('core.settings.manage', 'core.permission.settings_manage');
         $app->addPermission('core.pages.manage', 'core.permission.pages_manage');
         $app->addPermission('core.orders.manage', 'core.permission.orders_manage');
+        $app->addPermission('core.reviews.manage', 'core.permission.reviews_manage');
         $app->addPermission('core.offers.manage', 'core.permission.offers_manage');
         $app->addPermission('core.categories.manage', 'core.permission.categories_manage');
         $app->addPermission('core.providers.manage', 'core.permission.providers_manage');
@@ -240,6 +248,7 @@ final class Kernel
         $app->addAdminMenu('core.admin.menu.settings', '/admin/settings', 'core.settings.manage');
         $app->addAdminMenu('core.admin.menu.pages', '/admin/pages', 'core.pages.manage');
         $app->addAdminMenu('core.admin.menu.orders', '/admin/orders', 'core.orders.manage');
+        $app->addAdminMenu('core.admin.menu.reviews', '/admin/reviews', 'core.reviews.manage');
         $app->addAdminMenu('core.admin.menu.offers', '/admin/offers', 'core.offers.manage');
         $app->addAdminMenu('core.admin.menu.categories', '/admin/categories', 'core.categories.manage');
         $app->addAdminMenu('core.admin.menu.providers', '/admin/providers', 'core.providers.manage');

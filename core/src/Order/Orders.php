@@ -213,6 +213,12 @@ final class Orders
         return $definition['done'] ?? $definition['label'] ?? 'core.order.event.unknown';
     }
 
+    /** Whether the order ended in a way that its buyer may review. */
+    public function isReviewable(array $order): bool
+    {
+        return (bool) ($this->flow($order['flow'])?->states()[$order['state']]['reviewable'] ?? false);
+    }
+
     /** Whether files may be attached to a transition. */
     public function acceptsFiles(array $order, string $transition): bool
     {

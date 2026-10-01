@@ -1,0 +1,7 @@
+{# Plain text: nothing here is HTML-escaped. Blocks: subject, body. #}
+{% block subject %}{{ trans('core.mail.review_reply.subject', {}) }}{% endblock %}
+{% block body %}
+{{ trans('core.mail.review_reply.body', {title: title, provider: provider, reply: reply, link: link}) }}
+
+{{ trans('core.mail.signature') }}
+{% endblock %}

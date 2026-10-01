@@ -150,6 +150,10 @@ final class AccountController extends Controller
                 ['number', 'offer_title', 'provider_name', 'state', 'total', 'currency', 'payment_state', 'created_at', 'closed_at']
             )), $orders));
         }
+        $reviews = $this->app->reviews->byAuthor($this->accountId());
+        if ($reviews !== []) {
+            $export->add('reviews', $reviews);
+        }
         $this->app->events->dispatch($export);
 
         header('Content-Type: application/json; charset=utf-8');

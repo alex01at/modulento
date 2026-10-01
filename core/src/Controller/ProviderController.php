@@ -7,6 +7,8 @@ namespace Modulento\Core\Controller;
 use Modulento\Core\Catalogue\OfferView;
 use Modulento\Core\Event\ProviderStatusChanged;
 use Modulento\Core\Provider\Providers;
+use Modulento\Core\Review\Reviews;
+use Modulento\Core\Review\ReviewView;
 use Modulento\Core\Support\Countries;
 use Modulento\Core\Support\Session;
 
@@ -76,6 +78,7 @@ final class ProviderController extends Controller
         $this->render('provider/show.twig', [
             'provider' => $this->publicView($provider),
             'offers' => OfferView::cards($offers['rows'], $this->app),
+            'reviews' => ReviewView::all($this->app->reviews->listPublic('provider', (int) $provider['id'], 1, 20)['rows']),
         ]);
     }
 
@@ -98,6 +101,7 @@ final class ProviderController extends Controller
             'description' => $text['description'] ?? '',
             'city' => $provider['city'],
             'country' => $provider['country'],
+            'rating' => Reviews::summary($provider),
             'legal' => $isBusiness ? [
                 'legal_name' => $provider['legal_name'],
                 'street' => $provider['street'],

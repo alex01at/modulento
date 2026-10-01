@@ -1,0 +1,7 @@
+{# Stars with a text alternative. Receives "rating" ({count, average}). #}
+{% if rating.count > 0 %}
+    <span class="rating" role="img" aria-label="{{ trans(rating.count == 1 ? 'core.review.average_one' : 'core.review.average', {average: rating.average|number_format(1, locale() == 'de' ? ',' : '.'), count: rating.count}) }}">
+        <span aria-hidden="true">{% for i in 1..5 %}{{ i <= rating.average|round ? '★' : '☆' }}{% endfor %}</span>
+        <small aria-hidden="true">{{ rating.average|number_format(1, locale() == 'de' ? ',' : '.') }} ({{ rating.count }})</small>
+    </span>
+{% endif %}

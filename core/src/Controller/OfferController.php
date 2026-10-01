@@ -8,6 +8,8 @@ use Modulento\Core\Catalogue\OfferImages;
 use Modulento\Core\Catalogue\Offers;
 use Modulento\Core\Catalogue\OfferView;
 use Modulento\Core\Event\OfferStatusChanged;
+use Modulento\Core\Review\Reviews;
+use Modulento\Core\Review\ReviewView;
 use Modulento\Core\Support\RateLimiter;
 use Modulento\Core\Support\Session;
 
@@ -104,9 +106,11 @@ final class OfferController extends Controller
                 'is_own' => $account !== null && $account['id'] === $offer['account_id'],
                 // Whether an extension registered a way to order this type.
                 'orderable' => $app->orders->flowForOfferType($offer['type']) !== null,
+                'rating' => Reviews::summary($offer),
             ],
             'type_template' => $type->detailTemplate(),
             'type_data' => $type->detailData($offer['id'], $locale, $app),
+            'reviews' => ReviewView::all($app->reviews->listPublic('offer', $offer['id'], 1, 20)['rows']),
         ]);
     }
 

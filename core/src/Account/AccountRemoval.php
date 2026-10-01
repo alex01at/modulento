@@ -23,6 +23,8 @@ final class AccountRemoval
             }
         }
 
+        // Reviews stay with what they were written about, without the name.
+        $app->reviews->anonymise($accountId);
         $app->accounts->delete($accountId);
         $app->events->dispatch(new AccountDeleted($accountId, $email));
     }

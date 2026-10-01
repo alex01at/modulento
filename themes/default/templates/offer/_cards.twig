@@ -7,6 +7,7 @@
             {% endif %}
             <a href="{{ url(offer.path) }}"><strong>{{ offer.title }}</strong></a>
             {% if offer.summary %}<p>{{ offer.summary }}</p>{% endif %}
+            {% include 'review/_rating.twig' with {rating: offer.rating} only %}
             <small>
                 <a href="{{ url(offer.provider_path) }}">{{ offer.provider_name }}</a>
                 {% if offer.price_from is not null %}· {{ trans('core.offer.price_from', {price: money(offer.price_from, offer.currency)}) }}{% endif %}

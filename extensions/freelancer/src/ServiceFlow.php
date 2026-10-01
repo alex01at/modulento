@@ -50,7 +50,7 @@ final class ServiceFlow implements OrderFlow
             'in_progress' => ['label' => 'freelancer.state.in_progress'],
             'delivered' => ['label' => 'freelancer.state.delivered'],
             'cancel_requested' => ['label' => 'freelancer.state.cancel_requested'],
-            'completed' => ['label' => 'freelancer.state.completed', 'final' => true],
+            'completed' => ['label' => 'freelancer.state.completed', 'final' => true, 'reviewable' => true],
             'declined' => ['label' => 'freelancer.state.declined', 'final' => true],
             'cancelled' => ['label' => 'freelancer.state.cancelled', 'final' => true],
         ];

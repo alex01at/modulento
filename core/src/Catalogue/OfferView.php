@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modulento\Core\Catalogue;
 
 use Modulento\Core\App;
+use Modulento\Core\Review\Reviews;
 
 /** Turns an offer row into what templates show, in the current language. */
 final class OfferView
@@ -12,7 +13,7 @@ final class OfferView
     /**
      * For lists: one card per offer.
      *
-     * @return array{id: int, title: string, summary: string, path: string, price_from: ?int, currency: string, thumb: ?string, provider_name: string, provider_path: string, type: string}
+     * @return array{id: int, title: string, summary: string, path: string, price_from: ?int, currency: string, thumb: ?string, provider_name: string, provider_path: string, type: string, rating: array{count: int, average: ?float}}
      */
     public static function card(array $offer, App $app): array
     {
@@ -30,6 +31,7 @@ final class OfferView
             'provider_name' => $offer['provider_name'],
             'provider_path' => '/providers/' . $offer['provider_slug'],
             'type' => $offer['type'],
+            'rating' => Reviews::summary($offer),
         ];
     }
 

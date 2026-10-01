@@ -14,7 +14,8 @@ profiles and a catalogue of offers with approval, categories, pictures and
 search, roles and account administration, content pages and legal texts,
 several languages, themes, extensions, scheduled tasks and self-update. The
 extension `freelancer` adds services with packages as the first kind of offer.
-Orders run as a state machine with history, messages and deadlines. Payment
+Orders run as a state machine with history, messages, attachments and
+deadlines; finished orders can be reviewed by their buyer. Payment
 is settled between buyer and provider for now; a payment service plugs in as
 an extension.
 
@@ -164,6 +165,8 @@ Templates of the site theme, with the variables they receive:
 | `order/new.twig` | `offer`, `flow_template`, `flow_data`, `note`, `payment_methods`, `terms`, `errors`, `file_limits`; keep the button's wording; forms with a file field need `enctype="multipart/form-data"` |
 | `order/index.twig` | `role` (`buyer` or `provider`), `orders`, `page`, `pages` |
 | `order/show.twig` | `order` (summary, `items`, `events` and `messages` each with `files`, payment), `role`, `actions` (with `note` and `files`), `can_mark_paid`, `counterpart`, `flow_template`, `flow_data`, `file_limits` |
+| `review/_rating.twig` | `rating` (`count`, `average`): stars with a text alternative |
+| `review/_list.twig` | `reviews`: `author` (empty for "a buyer"), `rating`, `body`, `locale`, `created_at`, `reply`; keep the note on where reviews come from |
 | `provider/index.twig` | `providers`, `page`, `pages` |
 | `provider/show.twig` | `provider`: `name`, `path`, `type`, `headline`, `description` (plain text), `city`, `country`, `legal` (only for a business); block `offers` for extensions |
 | `emails/*.txt.twig` | blocks `subject` and `body`; plain text, not HTML-escaped |
@@ -171,7 +174,8 @@ Templates of the site theme, with the variables they receive:
 E-mails are theme templates too: `verify_email`, `reset_password`,
 `already_registered`, `change_email`, `password_changed`, `provider_approved`,
 `provider_rejected`, `provider_suspended`, `account_blocked`, `offer_published`,
-`offer_rejected`, `offer_contact`, `order_update`, `order_message`. With `APP_ENV="dev"`
+`offer_rejected`, `offer_contact`, `order_update`, `order_message`, `review_new`,
+`review_reply`, `review_hidden`. With `APP_ENV="dev"`
 nothing is sent; mails are appended to `var/log/mail.log`.
 
 Available in every template:
@@ -256,6 +260,8 @@ An extension makes its offers orderable by registering an
   The target `Orders::PREVIOUS` leads back to the state before the current one.
 - a transition with `'files' => true` accepts attachments (a delivery);
   messages and the order form always do
+- a final state with `'reviewable' => true` lets the buyer review the order
+  (it was carried out, not declined or cancelled)
 - `deadline()` - what the scheduler applies if nobody acts in time
 - `allows()` - a further condition, e.g. revisions left
 - `build()` - turns the buyer's choices into items and a total, **reading
@@ -274,6 +280,11 @@ random names without extension, limited to a list of file types, and handed
 out only to the order's two parties and to administrators - always as a
 download, never displayed. The size limit is 20 MB per file or the server's
 `upload_max_filesize` / `post_max_size`, whichever is lower.
+
+Reviews (`$app->reviews`) belong to the core: one per order, by its buyer,
+with one public reply by the provider. Offers and providers carry the number
+and sum of their published ratings, so lists show and sort by them. An
+administrator can hide a review with a reason, which the author receives.
 
 A `PaymentMethod` decides how an order is paid. The core ships `core.offline`
 (buyer and provider settle it themselves; the provider confirms the receipt).

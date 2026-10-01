@@ -11,6 +11,8 @@
     <h1>{{ provider.name }}</h1>
     <p><small>{{ trans('core.provider.type.' ~ provider.type) }} · {{ provider.city }}, {{ trans('core.country.' ~ provider.country) }}</small></p>
 
+    {% include 'review/_rating.twig' with {rating: provider.rating} only %}
+
     {% if provider.headline %}<p><strong>{{ provider.headline }}</strong></p>{% endif %}
     {# Plain text typed by the provider: escaped, line breaks kept. #}
     {% if provider.description %}<p>{{ provider.description|nl2br }}</p>{% endif %}
@@ -21,6 +23,8 @@
             {% include 'offer/_cards.twig' %}
         </section>
     {% endif %}
+
+    {% include 'review/_list.twig' %}
 
     {% if provider.legal %}
         <section>

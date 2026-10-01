@@ -1,0 +1,55 @@
+{% extends '@admin/layout.twig' %}
+
+{% block title %}{{ trans('core.admin.reviews.title') }} – {{ site_name }}{% endblock %}
+
+{% block admin %}
+<h1>{{ trans('core.admin.reviews.title') }}</h1>
+<p>{{ trans('core.admin.reviews.intro') }}</p>
+
+<nav class="button-row">
+    <a href="{{ url('/admin/reviews') }}" {{ status is null ? 'aria-current="page"' }}>{{ trans('core.admin.providers.all') }}</a>
+    {% for name in ['published', 'hidden'] %}
+        <a href="{{ url('/admin/reviews') }}?status={{ name }}" {{ status == name ? 'aria-current="page"' }}>{{ trans('core.admin.reviews.status.' ~ name) }}</a>
+    {% endfor %}
+</nav>
+
+{% if reviews is empty %}
+    <p>{{ trans('core.admin.reviews.none') }}</p>
+{% endif %}
+
+{% for review in reviews %}
+    <article class="review-admin">
+        <p>
+            <strong>{{ review.rating }} / 5</strong> ·
+            <a href="{{ url('/admin/orders/' ~ review.order_id) }}">{{ review.offer_title }}</a> ·
+            <a href="{{ url('/admin/providers/' ~ review.provider_id) }}">{{ review.provider_name }}</a> ·
+            <small>{{ review.author_name ?: trans('core.review.anonymous') }}, {{ review.created_at }} UTC · {{ trans('core.admin.reviews.status.' ~ review.status) }}</small>
+        </p>
+        {% if review.body %}<p>{{ review.body|nl2br }}</p>{% endif %}
+        {% if review.reply %}<p><small>{{ trans('core.review.reply_by_provider') }}</small><br>{{ review.reply|nl2br }}</p>{% endif %}
+        {% if review.status_note %}<p><small>{{ trans('core.provider.status_note') }} {{ review.status_note }}</small></p>{% endif %}
+
+        {% if review.status == 'published' %}
+            <form method="post" action="{{ url('/admin/reviews/' ~ review.id ~ '/hide') }}" class="stack-form wide">
+                {{ csrf_field() }}
+                <label for="note_{{ review.id }}">{{ trans('core.admin.reviews.note') }}</label>
+                <textarea id="note_{{ review.id }}" name="note" rows="2" required></textarea>
+                <button type="submit" class="danger">{{ trans('core.admin.reviews.hide') }}</button>
+            </form>
+        {% else %}
+            <form method="post" action="{{ url('/admin/reviews/' ~ review.id ~ '/show') }}">
+                {{ csrf_field() }}
+                <button type="submit">{{ trans('core.admin.reviews.show') }}</button>
+            </form>
+        {% endif %}
+    </article>
+{% endfor %}
+
+{% if pages > 1 %}
+    <nav class="pager">
+        {% if page > 1 %}<a href="{{ url('/admin/reviews') }}?page={{ page - 1 }}{{ status ? '&status=' ~ status }}" rel="prev">{{ trans('core.pager.previous') }}</a>{% endif %}
+        <span>{{ trans('core.pager.position', {page: page, pages: pages}) }}</span>
+        {% if page < pages %}<a href="{{ url('/admin/reviews') }}?page={{ page + 1 }}{{ status ? '&status=' ~ status }}" rel="next">{{ trans('core.pager.next') }}</a>{% endif %}
+    </nav>
+{% endif %}
+{% endblock %}
