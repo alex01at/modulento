@@ -3,69 +3,90 @@
 {% block title %}{{ target.email }} – {{ site_name }}{% endblock %}
 
 {% block admin %}
-<p><a href="{{ url('/admin/accounts') }}">{{ trans('core.admin.accounts.title') }}</a></p>
-<h1>{{ target.email }}</h1>
+{% include '@admin/_page_header.twig' with {heading: target.email, crumbs: [{label: trans('core.admin.accounts.title'), path: '/admin/accounts'}]} only %}
 
-<table>
-    <tr><th scope="row">{{ trans('core.account.profile.display_name') }}</th><td>{{ target.display_name }}</td></tr>
-    <tr><th scope="row">{{ trans('core.admin.extensions.status') }}</th><td>{{ trans('core.admin.accounts.status.' ~ target.status) }}{% if target.status_note %} – {{ target.status_note }}{% endif %}</td></tr>
-    <tr><th scope="row">{{ trans('core.admin.accounts.verified_at') }}</th><td>{{ target.email_verified_at ? target.email_verified_at ~ ' UTC' : trans('core.admin.accounts.unverified') }}</td></tr>
-    <tr><th scope="row">{{ trans('core.nav.language') }}</th><td>{{ locale_name(target.locale) }}</td></tr>
-    <tr><th scope="row">{{ trans('core.admin.providers.created') }}</th><td>{{ target.created_at }} UTC</td></tr>
-    <tr><th scope="row">{{ trans('core.admin.accounts.last_login') }}</th><td>{{ target.last_login_at ? target.last_login_at ~ ' UTC' : '–' }}</td></tr>
-    <tr><th scope="row">{{ trans('core.admin.accounts.terms') }}</th><td>{{ target.terms_accepted_at ? target.terms_accepted_at ~ ' UTC' : '–' }}</td></tr>
-    <tr><th scope="row">{{ trans('core.provider.title') }}</th><td>{% if provider %}<a href="{{ url('/admin/providers/' ~ provider.id) }}">{{ provider.name }}</a> ({{ trans('core.provider.status_short.' ~ provider.status) }}){% else %}–{% endif %}</td></tr>
-</table>
+<div class="split">
+    <div>
+        <section class="card-box">
+            <h2>{{ trans('core.admin.layout.details') }}</h2>
+            <div class="table-wrap">
+                <table class="details">
+                    <tr><th scope="row">{{ trans('core.account.profile.display_name') }}</th><td>{{ target.display_name }}</td></tr>
+                    <tr><th scope="row">{{ trans('core.admin.extensions.status') }}</th><td><span class="badge badge-{{ target.status }}">{{ trans('core.admin.accounts.status.' ~ target.status) }}</span>{% if target.status_note %} – {{ target.status_note }}{% endif %}</td></tr>
+                    <tr><th scope="row">{{ trans('core.admin.accounts.verified_at') }}</th><td>{{ target.email_verified_at ? target.email_verified_at ~ ' UTC' : trans('core.admin.accounts.unverified') }}</td></tr>
+                    <tr><th scope="row">{{ trans('core.nav.language') }}</th><td>{{ locale_name(target.locale) }}</td></tr>
+                    <tr><th scope="row">{{ trans('core.admin.providers.created') }}</th><td>{{ target.created_at }} UTC</td></tr>
+                    <tr><th scope="row">{{ trans('core.admin.accounts.last_login') }}</th><td>{{ target.last_login_at ? target.last_login_at ~ ' UTC' : '–' }}</td></tr>
+                    <tr><th scope="row">{{ trans('core.admin.accounts.terms') }}</th><td>{{ target.terms_accepted_at ? target.terms_accepted_at ~ ' UTC' : '–' }}</td></tr>
+                    <tr><th scope="row">{{ trans('core.provider.title') }}</th><td>{% if provider %}<a href="{{ url('/admin/providers/' ~ provider.id) }}">{{ provider.name }}</a> ({{ trans('core.provider.status_short.' ~ provider.status) }}){% else %}–{% endif %}</td></tr>
+                </table>
+            </div>
+        </section>
 
-<h2>{{ trans('core.admin.accounts.actions') }}</h2>
-<div class="button-row">
-{% if not target.email_verified_at %}
-    <form method="post" action="{{ url('/admin/accounts/' ~ target.id ~ '/verify') }}" class="inline-form">
-        {{ csrf_field() }}
-        <button type="submit">{{ trans('core.admin.accounts.verify') }}</button>
-    </form>
-{% endif %}
-    <form method="post" action="{{ url('/admin/accounts/' ~ target.id ~ '/reset') }}" class="inline-form">
-        {{ csrf_field() }}
-        <button type="submit">{{ trans('core.admin.accounts.send_reset') }}</button>
-    </form>
-{% if target.status == 'blocked' %}
-    <form method="post" action="{{ url('/admin/accounts/' ~ target.id ~ '/unblock') }}" class="inline-form">
-        {{ csrf_field() }}
-        <button type="submit">{{ trans('core.admin.accounts.unblock') }}</button>
-    </form>
-{% endif %}
+        {% if can('core.roles.manage') %}
+            <section class="card-box">
+                <h2>{{ trans('core.admin.roles.title') }}</h2>
+                <form method="post" action="{{ url('/admin/accounts/' ~ target.id ~ '/roles') }}" class="stack-form wide">
+                    {{ csrf_field() }}
+                    <div class="check-list">
+                        {% for role in roles %}
+                            <label class="checkbox">
+                                <input type="checkbox" name="roles[]" value="{{ role.id }}" {{ role.id in role_ids ? 'checked' }}>
+                                <span>{{ role.name }}</span>
+                            </label>
+                        {% endfor %}
+                    </div>
+                    <button type="submit">{{ trans('core.account.save') }}</button>
+                </form>
+            </section>
+        {% endif %}
+    </div>
+
+    <div>
+        <section class="card-box">
+            <h2>{{ trans('core.admin.accounts.actions') }}</h2>
+            <div class="button-row">
+            {% if not target.email_verified_at %}
+                <form method="post" action="{{ url('/admin/accounts/' ~ target.id ~ '/verify') }}" class="inline-form">
+                    {{ csrf_field() }}
+                    <button type="submit">{{ trans('core.admin.accounts.verify') }}</button>
+                </form>
+            {% endif %}
+                <form method="post" action="{{ url('/admin/accounts/' ~ target.id ~ '/reset') }}" class="inline-form">
+                    {{ csrf_field() }}
+                    <button type="submit" class="btn-outline">{{ trans('core.admin.accounts.send_reset') }}</button>
+                </form>
+            {% if target.status == 'blocked' %}
+                <form method="post" action="{{ url('/admin/accounts/' ~ target.id ~ '/unblock') }}" class="inline-form">
+                    {{ csrf_field() }}
+                    <button type="submit">{{ trans('core.admin.accounts.unblock') }}</button>
+                </form>
+            {% endif %}
+            </div>
+        </section>
+
+        <section class="card-box">
+            <h2>{{ trans('core.admin.layout.danger_zone') }}</h2>
+            {% if is_self or is_last_admin %}
+                <p><small>{{ trans('core.admin.accounts.protected_hint') }}</small></p>
+            {% else %}
+                {% if target.status == 'active' %}
+                    <form method="post" action="{{ url('/admin/accounts/' ~ target.id ~ '/block') }}" class="danger-form">
+                        {{ csrf_field() }}
+                        <div class="field">
+                            <label for="note">{{ trans('core.admin.accounts.block_note') }}</label>
+                            <textarea id="note" name="note" rows="3" required></textarea>
+                        </div>
+                        <button type="submit" class="danger">{{ trans('core.admin.accounts.block') }}</button>
+                    </form>
+                {% endif %}
+                <form method="post" action="{{ url('/admin/accounts/' ~ target.id ~ '/delete') }}" class="danger-form">
+                    {{ csrf_field() }}
+                    <p><small>{{ trans('core.admin.accounts.delete_hint') }}</small></p>
+                    <button type="submit" class="danger">{{ trans('core.account.delete.submit') }}</button>
+                </form>
+            {% endif %}
+        </section>
+    </div>
 </div>
-
-{% if is_self or is_last_admin %}
-    <p><small>{{ trans('core.admin.accounts.protected_hint') }}</small></p>
-{% else %}
-    {% if target.status == 'active' %}
-        <form method="post" action="{{ url('/admin/accounts/' ~ target.id ~ '/block') }}" class="stack-form wide">
-            {{ csrf_field() }}
-            <label for="note">{{ trans('core.admin.accounts.block_note') }}</label>
-            <textarea id="note" name="note" rows="3" required></textarea>
-            <button type="submit" class="danger">{{ trans('core.admin.accounts.block') }}</button>
-        </form>
-    {% endif %}
-    <form method="post" action="{{ url('/admin/accounts/' ~ target.id ~ '/delete') }}">
-        {{ csrf_field() }}
-        <p><small>{{ trans('core.admin.accounts.delete_hint') }}</small></p>
-        <button type="submit" class="danger">{{ trans('core.account.delete.submit') }}</button>
-    </form>
-{% endif %}
-
-{% if can('core.roles.manage') %}
-    <h2>{{ trans('core.admin.roles.title') }}</h2>
-    <form method="post" action="{{ url('/admin/accounts/' ~ target.id ~ '/roles') }}" class="stack-form">
-        {{ csrf_field() }}
-        {% for role in roles %}
-            <label class="checkbox">
-                <input type="checkbox" name="roles[]" value="{{ role.id }}" {{ role.id in role_ids ? 'checked' }}>
-                <span>{{ role.name }}</span>
-            </label>
-        {% endfor %}
-        <button type="submit">{{ trans('core.account.save') }}</button>
-    </form>
-{% endif %}
 {% endblock %}

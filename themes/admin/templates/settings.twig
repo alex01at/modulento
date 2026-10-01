@@ -3,61 +3,87 @@
 {% block title %}{{ trans('core.admin.settings.title') }} – {{ site_name }}{% endblock %}
 
 {% block admin %}
-<h1>{{ trans('core.admin.settings.title') }}</h1>
+{% include '@admin/_page_header.twig' with {heading: trans('core.admin.settings.title')} only %}
 
-<form method="post" action="{{ url('/admin/settings') }}" class="stack-form">
+<form method="post" action="{{ url('/admin/settings') }}">
     {{ csrf_field() }}
 
-    <label for="site_name">{{ trans('core.admin.settings.site_name') }}</label>
-    <input id="site_name" name="site_name" value="{{ settings.site_name }}" maxlength="100" required>
+    <section class="card-box">
+        <h2>{{ trans('core.admin.settings.section.general') }}</h2>
+        <div class="field-grid">
+            <div class="field">
+                <label for="site_name">{{ trans('core.admin.settings.site_name') }}</label>
+                <input id="site_name" name="site_name" value="{{ settings.site_name }}" maxlength="100" required>
+            </div>
+            <div class="field">
+                <label for="mail_from">{{ trans('core.admin.settings.mail_from') }}</label>
+                <input id="mail_from" name="mail_from" type="email" value="{{ settings.mail_from }}" required>
+                <small>{{ trans('core.admin.settings.mail_from_hint') }}</small>
+            </div>
+            <div class="field">
+                <label for="registration">{{ trans('core.admin.settings.registration') }}</label>
+                <select id="registration" name="registration">
+                    <option value="open" {{ settings.registration == 'open' ? 'selected' }}>{{ trans('core.admin.settings.registration_open') }}</option>
+                    <option value="closed" {{ settings.registration == 'closed' ? 'selected' }}>{{ trans('core.admin.settings.registration_closed') }}</option>
+                </select>
+            </div>
+        </div>
+    </section>
 
-    <label for="mail_from">{{ trans('core.admin.settings.mail_from') }}</label>
-    <input id="mail_from" name="mail_from" type="email" value="{{ settings.mail_from }}" required>
-    <small>{{ trans('core.admin.settings.mail_from_hint') }}</small>
+    <section class="card-box">
+        <h2>{{ trans('core.admin.settings.section.catalogue') }}</h2>
+        <div class="field-grid">
+            <div class="field">
+                <label for="provider_approval">{{ trans('core.admin.settings.provider_approval') }}</label>
+                <select id="provider_approval" name="provider_approval">
+                    <option value="required" {{ settings.provider_approval == 'required' ? 'selected' }}>{{ trans('core.admin.settings.provider_approval_required') }}</option>
+                    <option value="off" {{ settings.provider_approval == 'off' ? 'selected' }}>{{ trans('core.admin.settings.provider_approval_off') }}</option>
+                </select>
+                <small>{{ trans('core.admin.settings.provider_approval_hint') }}</small>
+            </div>
+            <div class="field">
+                <label for="offer_approval">{{ trans('core.admin.settings.offer_approval') }}</label>
+                <select id="offer_approval" name="offer_approval">
+                    <option value="required" {{ settings.offer_approval == 'required' ? 'selected' }}>{{ trans('core.admin.settings.offer_approval_required') }}</option>
+                    <option value="off" {{ settings.offer_approval == 'off' ? 'selected' }}>{{ trans('core.admin.settings.offer_approval_off') }}</option>
+                </select>
+                <small>{{ trans('core.admin.settings.offer_approval_hint') }}</small>
+            </div>
+            <div class="field">
+                <label for="currency">{{ trans('core.admin.settings.currency') }}</label>
+                <input id="currency" name="currency" value="{{ settings.currency }}" maxlength="3" pattern="[A-Za-z]{3}" required>
+                <small>{{ trans('core.admin.settings.currency_hint') }}</small>
+            </div>
+        </div>
+    </section>
 
-    <label for="registration">{{ trans('core.admin.settings.registration') }}</label>
-    <select id="registration" name="registration">
-        <option value="open" {{ settings.registration == 'open' ? 'selected' }}>{{ trans('core.admin.settings.registration_open') }}</option>
-        <option value="closed" {{ settings.registration == 'closed' ? 'selected' }}>{{ trans('core.admin.settings.registration_closed') }}</option>
-    </select>
-
-    <label for="provider_approval">{{ trans('core.admin.settings.provider_approval') }}</label>
-    <select id="provider_approval" name="provider_approval">
-        <option value="required" {{ settings.provider_approval == 'required' ? 'selected' }}>{{ trans('core.admin.settings.provider_approval_required') }}</option>
-        <option value="off" {{ settings.provider_approval == 'off' ? 'selected' }}>{{ trans('core.admin.settings.provider_approval_off') }}</option>
-    </select>
-    <small>{{ trans('core.admin.settings.provider_approval_hint') }}</small>
-
-    <label for="offer_approval">{{ trans('core.admin.settings.offer_approval') }}</label>
-    <select id="offer_approval" name="offer_approval">
-        <option value="required" {{ settings.offer_approval == 'required' ? 'selected' }}>{{ trans('core.admin.settings.offer_approval_required') }}</option>
-        <option value="off" {{ settings.offer_approval == 'off' ? 'selected' }}>{{ trans('core.admin.settings.offer_approval_off') }}</option>
-    </select>
-    <small>{{ trans('core.admin.settings.offer_approval_hint') }}</small>
-
-    <label for="currency">{{ trans('core.admin.settings.currency') }}</label>
-    <input id="currency" name="currency" value="{{ settings.currency }}" maxlength="3" pattern="[A-Za-z]{3}" required>
-    <small>{{ trans('core.admin.settings.currency_hint') }}</small>
-
-    <fieldset>
+    <fieldset class="card-box">
         <legend>{{ trans('core.admin.settings.languages') }}</legend>
         <p><small>{{ trans('core.admin.settings.languages_hint') }}</small></p>
-        {% for code in available_locales %}
-            <label class="checkbox">
-                <input type="checkbox" name="locales[]" value="{{ code }}" {{ code in enabled_locales ? 'checked' }}>
-                <span>{{ locale_name(code) }} <small>({{ code }})</small></span>
-            </label>
-        {% endfor %}
-
-        <label for="default_locale">{{ trans('core.admin.settings.default_language') }}</label>
-        <select id="default_locale" name="default_locale">
+        <div class="check-list">
             {% for code in available_locales %}
-                <option value="{{ code }}" {{ code == default_locale ? 'selected' }}>{{ locale_name(code) }}</option>
+                <label class="checkbox">
+                    <input type="checkbox" name="locales[]" value="{{ code }}" {{ code in enabled_locales ? 'checked' }}>
+                    <span>{{ locale_name(code) }} <small>({{ code }})</small></span>
+                </label>
             {% endfor %}
-        </select>
-        <small>{{ trans('core.admin.settings.default_language_hint') }}</small>
-    </fieldset>
+        </div>
 
-    <button type="submit">{{ trans('core.account.save') }}</button>
+        <div class="field-grid">
+            <div class="field">
+                <label for="default_locale">{{ trans('core.admin.settings.default_language') }}</label>
+                <select id="default_locale" name="default_locale">
+                    {% for code in available_locales %}
+                        <option value="{{ code }}" {{ code == default_locale ? 'selected' }}>{{ locale_name(code) }}</option>
+                    {% endfor %}
+                </select>
+                <small>{{ trans('core.admin.settings.default_language_hint') }}</small>
+            </div>
+        </div>
+
+        <div class="button-row">
+            <button type="submit">{{ trans('core.account.save') }}</button>
+        </div>
+    </fieldset>
 </form>
 {% endblock %}

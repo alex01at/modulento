@@ -3,35 +3,47 @@
 {% block title %}{{ trans('core.admin.roles.title') }} – {{ site_name }}{% endblock %}
 
 {% block admin %}
-<p><a href="{{ url('/admin/roles') }}">{{ trans('core.admin.roles.title') }}</a></p>
-<h1>{{ role and role.id ? trans('core.admin.roles.edit') : trans('core.admin.roles.new') }}</h1>
+{% include '@admin/_page_header.twig' with {
+    heading: role and role.id ? trans('core.admin.roles.edit') : trans('core.admin.roles.new'),
+    crumbs: [{label: trans('core.admin.roles.title'), path: '/admin/roles'}]
+} only %}
 
 {% if error %}
     <p class="flash flash-error" role="alert">{{ error }}</p>
 {% endif %}
 
-<form method="post" action="{{ url(role and role.id ? '/admin/roles/' ~ role.id : '/admin/roles/new') }}" class="stack-form wide">
+<form method="post" action="{{ url(role and role.id ? '/admin/roles/' ~ role.id : '/admin/roles/new') }}">
     {{ csrf_field() }}
-    <label for="name">{{ trans('core.admin.extensions.name') }}</label>
-    <input id="name" name="name" value="{{ role ? role.name : '' }}" maxlength="64" required>
+    <div class="card-box stack-form">
+        <div class="field">
+            <label for="name">{{ trans('core.admin.extensions.name') }}</label>
+            <input id="name" name="name" value="{{ role ? role.name : '' }}" maxlength="64" required>
+        </div>
+    </div>
 
-    <fieldset>
+    <fieldset class="card-box">
         <legend>{{ trans('core.admin.roles.permissions') }}</legend>
-        {% for name, label_key in permissions %}
-            <label class="checkbox">
-                <input type="checkbox" name="permissions[]" value="{{ name }}" {{ role and name in role.permissions ? 'checked' }}>
-                <span>{{ trans(label_key) }} <small>({{ name }})</small></span>
-            </label>
-        {% endfor %}
-    </fieldset>
+        <div class="check-list">
+            {% for name, label_key in permissions %}
+                <label class="checkbox">
+                    <input type="checkbox" name="permissions[]" value="{{ name }}" {{ role and name in role.permissions ? 'checked' }}>
+                    <span>{{ trans(label_key) }} <small>({{ name }})</small></span>
+                </label>
+            {% endfor %}
+        </div>
 
-    <button type="submit">{{ trans('core.account.save') }}</button>
+        <div class="button-row">
+            <button type="submit">{{ trans('core.account.save') }}</button>
+        </div>
+    </fieldset>
 </form>
 
 {% if role and role.id %}
-    <form method="post" action="{{ url('/admin/roles/' ~ role.id ~ '/delete') }}">
-        {{ csrf_field() }}
-        <button type="submit" class="danger">{{ trans('core.admin.roles.delete') }}</button>
-    </form>
+    <section class="card-box">
+        <form method="post" action="{{ url('/admin/roles/' ~ role.id ~ '/delete') }}" class="danger-form">
+            {{ csrf_field() }}
+            <button type="submit" class="danger">{{ trans('core.admin.roles.delete') }}</button>
+        </form>
+    </section>
 {% endif %}
 {% endblock %}

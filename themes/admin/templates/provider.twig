@@ -3,52 +3,71 @@
 {% block title %}{{ provider.name }} – {{ site_name }}{% endblock %}
 
 {% block admin %}
-<p><a href="{{ url('/admin/providers') }}">{{ trans('core.admin.providers.title') }}</a></p>
-<h1>{{ provider.name }}</h1>
+{% include '@admin/_page_header.twig' with {heading: provider.name, crumbs: [{label: trans('core.admin.providers.title'), path: '/admin/providers'}]} only %}
 
-<p>
-    <strong>{{ trans('core.provider.status_short.' ~ provider.status) }}</strong>
-    {% if provider.decided_at %}<small>({{ provider.decided_at }} UTC)</small>{% endif %}
-    {% if provider.status_note %}<br>{{ trans('core.provider.status_note') }} {{ provider.status_note }}{% endif %}
-    {% if provider.changed_since_decision %}<br><strong>{{ trans('core.admin.providers.changed') }}</strong>{% endif %}
-</p>
+<div class="split">
+    <div>
+        <section class="card-box">
+            <h2>{{ trans('core.admin.layout.details') }}</h2>
+            <div class="table-wrap">
+                <table class="details">
+                    <tr><th scope="row">{{ trans('core.provider.field.type') }}</th><td>{{ trans('core.provider.type.' ~ provider.type) }}</td></tr>
+                    <tr><th scope="row">{{ trans('core.login.email') }}</th><td><a href="{{ url('/admin/accounts/' ~ provider.account_id) }}">{{ provider.account_email }}</a>{% if provider.account_status != 'active' %} ({{ trans('core.admin.accounts.status.blocked') }}){% endif %}</td></tr>
+                    <tr><th scope="row">{{ trans('core.provider.field.legal_name') }}</th><td>{{ provider.legal_name }}</td></tr>
+                    <tr><th scope="row">{{ trans('core.provider.field.street') }}</th><td>{{ provider.street }}, {{ provider.postal_code }} {{ provider.city }}, {{ trans('core.country.' ~ provider.country) }}</td></tr>
+                    <tr><th scope="row">{{ trans('core.provider.field.contact_email') }}</th><td>{{ provider.contact_email }}</td></tr>
+                    <tr><th scope="row">{{ trans('core.provider.field.phone') }}</th><td>{{ provider.phone }}</td></tr>
+                    <tr><th scope="row">{{ trans('core.provider.field.vat_id') }}</th><td>{{ provider.vat_id }}</td></tr>
+                    <tr><th scope="row">{{ trans('core.provider.field.tax_id') }}</th><td>{{ provider.tax_id }}</td></tr>
+                    <tr><th scope="row">{{ trans('core.provider.field.company_register') }}</th><td>{{ provider.company_register }}</td></tr>
+                    <tr><th scope="row">{{ trans('core.admin.providers.self_certified') }}</th><td>{{ provider.self_certified_at ? provider.self_certified_at ~ ' UTC' : '–' }}</td></tr>
+                    <tr><th scope="row">{{ trans('core.admin.providers.created') }}</th><td>{{ provider.created_at }} UTC</td></tr>
+                </table>
+            </div>
+        </section>
 
-<table>
-    <tr><th scope="row">{{ trans('core.provider.field.type') }}</th><td>{{ trans('core.provider.type.' ~ provider.type) }}</td></tr>
-    <tr><th scope="row">{{ trans('core.login.email') }}</th><td><a href="{{ url('/admin/accounts/' ~ provider.account_id) }}">{{ provider.account_email }}</a>{% if provider.account_status != 'active' %} ({{ trans('core.admin.accounts.status.blocked') }}){% endif %}</td></tr>
-    <tr><th scope="row">{{ trans('core.provider.field.legal_name') }}</th><td>{{ provider.legal_name }}</td></tr>
-    <tr><th scope="row">{{ trans('core.provider.field.street') }}</th><td>{{ provider.street }}, {{ provider.postal_code }} {{ provider.city }}, {{ trans('core.country.' ~ provider.country) }}</td></tr>
-    <tr><th scope="row">{{ trans('core.provider.field.contact_email') }}</th><td>{{ provider.contact_email }}</td></tr>
-    <tr><th scope="row">{{ trans('core.provider.field.phone') }}</th><td>{{ provider.phone }}</td></tr>
-    <tr><th scope="row">{{ trans('core.provider.field.vat_id') }}</th><td>{{ provider.vat_id }}</td></tr>
-    <tr><th scope="row">{{ trans('core.provider.field.tax_id') }}</th><td>{{ provider.tax_id }}</td></tr>
-    <tr><th scope="row">{{ trans('core.provider.field.company_register') }}</th><td>{{ provider.company_register }}</td></tr>
-    <tr><th scope="row">{{ trans('core.admin.providers.self_certified') }}</th><td>{{ provider.self_certified_at ? provider.self_certified_at ~ ' UTC' : '–' }}</td></tr>
-    <tr><th scope="row">{{ trans('core.admin.providers.created') }}</th><td>{{ provider.created_at }} UTC</td></tr>
-</table>
-
-{% for code, text in provider.texts %}
-    <h2>{{ trans('core.provider.section.presentation') }} – {{ locale_name(code) }}</h2>
-    <p><strong>{{ text.headline }}</strong></p>
-    <p>{{ text.description|nl2br }}</p>
-{% endfor %}
-
-<h2>{{ trans('core.admin.providers.decision') }}</h2>
-<form method="post" action="{{ url('/admin/providers/' ~ provider.id ~ '/decide') }}" class="stack-form wide">
-    {{ csrf_field() }}
-    <label for="note">{{ trans('core.admin.providers.note') }}</label>
-    <textarea id="note" name="note" rows="4"></textarea>
-    <small>{{ trans('core.admin.providers.note_hint') }}</small>
-    <div class="button-row">
-        {% if provider.status != 'approved' %}
-            <button type="submit" name="decision" value="approve">{{ trans('core.admin.providers.approve') }}</button>
-        {% endif %}
-        {% if provider.status == 'pending' %}
-            <button type="submit" name="decision" value="reject" class="danger">{{ trans('core.admin.providers.reject') }}</button>
-        {% endif %}
-        {% if provider.status == 'approved' %}
-            <button type="submit" name="decision" value="suspend" class="danger">{{ trans('core.admin.providers.suspend') }}</button>
-        {% endif %}
+        {% for code, text in provider.texts %}
+            <section class="card-box">
+                <h2>{{ trans('core.provider.section.presentation') }} – {{ locale_name(code) }}</h2>
+                <p><strong>{{ text.headline }}</strong></p>
+                <p>{{ text.description|nl2br }}</p>
+            </section>
+        {% endfor %}
     </div>
-</form>
+
+    <div>
+        <section class="card-box">
+            <h2>{{ trans('core.admin.extensions.status') }}</h2>
+            <div class="status-line">
+                <span class="badge badge-{{ provider.status }}">{{ trans('core.provider.status_short.' ~ provider.status) }}</span>
+                {% if provider.decided_at %}<small>({{ provider.decided_at }} UTC)</small>{% endif %}
+                {% if provider.status_note %}<p>{{ trans('core.provider.status_note') }} {{ provider.status_note }}</p>{% endif %}
+                {% if provider.changed_since_decision %}<p><span class="badge badge-changed">{{ trans('core.admin.providers.changed') }}</span></p>{% endif %}
+            </div>
+        </section>
+
+        <section class="card-box">
+            <h2>{{ trans('core.admin.providers.decision') }}</h2>
+            <form method="post" action="{{ url('/admin/providers/' ~ provider.id ~ '/decide') }}" class="stack-form wide">
+                {{ csrf_field() }}
+                <div class="field">
+                    <label for="note">{{ trans('core.admin.providers.note') }}</label>
+                    <textarea id="note" name="note" rows="4"></textarea>
+                    <small>{{ trans('core.admin.providers.note_hint') }}</small>
+                </div>
+                <div class="button-row">
+                    {% if provider.status != 'approved' %}
+                        <button type="submit" name="decision" value="approve">{{ trans('core.admin.providers.approve') }}</button>
+                    {% endif %}
+                    {% if provider.status == 'pending' %}
+                        <button type="submit" name="decision" value="reject" class="danger">{{ trans('core.admin.providers.reject') }}</button>
+                    {% endif %}
+                    {% if provider.status == 'approved' %}
+                        <button type="submit" name="decision" value="suspend" class="danger">{{ trans('core.admin.providers.suspend') }}</button>
+                    {% endif %}
+                </div>
+            </form>
+        </section>
+    </div>
+</div>
 {% endblock %}

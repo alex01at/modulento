@@ -3,37 +3,45 @@
 {% block title %}{{ trans('core.admin.reviews.title') }} – {{ site_name }}{% endblock %}
 
 {% block admin %}
-<h1>{{ trans('core.admin.reviews.title') }}</h1>
-<p>{{ trans('core.admin.reviews.intro') }}</p>
+{% include '@admin/_page_header.twig' with {heading: trans('core.admin.reviews.title')} only %}
 
-<nav class="button-row">
-    <a href="{{ url('/admin/reviews') }}" {{ status is null ? 'aria-current="page"' }}>{{ trans('core.admin.providers.all') }}</a>
-    {% for name in ['published', 'hidden'] %}
-        <a href="{{ url('/admin/reviews') }}?status={{ name }}" {{ status == name ? 'aria-current="page"' }}>{{ trans('core.admin.reviews.status.' ~ name) }}</a>
-    {% endfor %}
-</nav>
+<section class="card-box">
+    <div class="card-head">
+        <p>{{ trans('core.admin.reviews.intro') }}</p>
+    </div>
 
-{% if reviews is empty %}
-    <p>{{ trans('core.admin.reviews.none') }}</p>
-{% endif %}
+    <nav class="tabs" aria-label="{{ trans('core.admin.layout.filter') }}">
+        <a href="{{ url('/admin/reviews') }}" {{ status is null ? 'aria-current="page"' }}>{{ trans('core.admin.providers.all') }}</a>
+        {% for name in ['published', 'hidden'] %}
+            <a href="{{ url('/admin/reviews') }}?status={{ name }}" {{ status == name ? 'aria-current="page"' }}>{{ trans('core.admin.reviews.status.' ~ name) }}</a>
+        {% endfor %}
+    </nav>
+
+    {% if reviews is empty %}
+        <p class="empty">{{ trans('core.admin.reviews.none') }}</p>
+    {% endif %}
+</section>
 
 {% for review in reviews %}
-    <article class="review-admin">
-        <p>
-            <strong>{{ review.rating }} / 5</strong> ·
+    <article class="card-box review-admin">
+        <div class="review-head">
+            <strong class="rating">{{ review.rating }} / 5</strong>
+            <span class="badge badge-{{ review.status }}">{{ trans('core.admin.reviews.status.' ~ review.status) }}</span>
             <a href="{{ url('/admin/orders/' ~ review.order_id) }}">{{ review.offer_title }}</a> ·
             <a href="{{ url('/admin/providers/' ~ review.provider_id) }}">{{ review.provider_name }}</a> ·
-            <small>{{ review.author_name ?: trans('core.review.anonymous') }}, {{ review.created_at }} UTC · {{ trans('core.admin.reviews.status.' ~ review.status) }}</small>
-        </p>
+            <small>{{ review.author_name ?: trans('core.review.anonymous') }}, {{ review.created_at }} UTC</small>
+        </div>
         {% if review.body %}<p>{{ review.body|nl2br }}</p>{% endif %}
-        {% if review.reply %}<p><small>{{ trans('core.review.reply_by_provider') }}</small><br>{{ review.reply|nl2br }}</p>{% endif %}
+        {% if review.reply %}<p class="quote"><small>{{ trans('core.review.reply_by_provider') }}</small><br>{{ review.reply|nl2br }}</p>{% endif %}
         {% if review.status_note %}<p><small>{{ trans('core.provider.status_note') }} {{ review.status_note }}</small></p>{% endif %}
 
         {% if review.status == 'published' %}
             <form method="post" action="{{ url('/admin/reviews/' ~ review.id ~ '/hide') }}" class="stack-form wide">
                 {{ csrf_field() }}
-                <label for="note_{{ review.id }}">{{ trans('core.admin.reviews.note') }}</label>
-                <textarea id="note_{{ review.id }}" name="note" rows="2" required></textarea>
+                <div class="field">
+                    <label for="note_{{ review.id }}">{{ trans('core.admin.reviews.note') }}</label>
+                    <textarea id="note_{{ review.id }}" name="note" rows="2" required></textarea>
+                </div>
                 <button type="submit" class="danger">{{ trans('core.admin.reviews.hide') }}</button>
             </form>
         {% else %}
@@ -45,11 +53,5 @@
     </article>
 {% endfor %}
 
-{% if pages > 1 %}
-    <nav class="pager">
-        {% if page > 1 %}<a href="{{ url('/admin/reviews') }}?page={{ page - 1 }}{{ status ? '&status=' ~ status }}" rel="prev">{{ trans('core.pager.previous') }}</a>{% endif %}
-        <span>{{ trans('core.pager.position', {page: page, pages: pages}) }}</span>
-        {% if page < pages %}<a href="{{ url('/admin/reviews') }}?page={{ page + 1 }}{{ status ? '&status=' ~ status }}" rel="next">{{ trans('core.pager.next') }}</a>{% endif %}
-    </nav>
-{% endif %}
+{% include '@admin/_pager.twig' with {path: '/admin/reviews', page: page, pages: pages, extra: status ? '&status=' ~ status : ''} only %}
 {% endblock %}

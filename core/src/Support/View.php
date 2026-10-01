@@ -78,6 +78,9 @@ final class View
         // The language can change while rendering (an e-mail in the
         // recipient's language), so these are functions, not fixed values.
         $this->twig->addFunction(new TwigFunction('locale', fn () => $translator->locale()));
+        // The request path without its language prefix, e.g. to mark the
+        // menu entry of the current page.
+        $this->twig->addFunction(new TwigFunction('current_path', fn () => $app->path));
         $this->twig->addFunction(new TwigFunction(
             'url',
             fn (string $path, ?string $locale = null) => $app->url($path, $locale)

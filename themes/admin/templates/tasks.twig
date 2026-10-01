@@ -3,36 +3,43 @@
 {% block title %}{{ trans('core.admin.tasks.title') }} – {{ site_name }}{% endblock %}
 
 {% block admin %}
-<h1>{{ trans('core.admin.tasks.title') }}</h1>
-<p>{{ trans('core.admin.tasks.intro') }}</p>
-<ul>
-    <li>{{ trans('core.admin.tasks.setup_script') }}<br><code>{{ cron_command }}</code></li>
-    {% if cron_url %}
-        <li>{{ trans('core.admin.tasks.setup_url') }}<br><code>{{ cron_url }}</code></li>
-    {% endif %}
-</ul>
+{% include '@admin/_page_header.twig' with {heading: trans('core.admin.tasks.title')} only %}
 
-<table>
-    <thead>
-    <tr>
-        <th scope="col">{{ trans('core.admin.tasks.name') }}</th>
-        <th scope="col">{{ trans('core.admin.tasks.last_run') }}</th>
-        <th scope="col">{{ trans('core.admin.tasks.status') }}</th>
-    </tr>
-    </thead>
-    <tbody>
-    {% for task in tasks %}
-        <tr>
-            <th scope="row">{{ task.name }}</th>
-            <td>{{ task.last_started_at ?? trans('core.admin.tasks.never') }}</td>
-            <td>
-                {% if task.last_status %}
-                    {{ trans('core.admin.tasks.status_' ~ task.last_status) }}
-                    {% if task.last_error %}<br><small>{{ task.last_error }}</small>{% endif %}
-                {% endif %}
-            </td>
-        </tr>
-    {% endfor %}
-    </tbody>
-</table>
+<section class="card-box">
+    <p>{{ trans('core.admin.tasks.intro') }}</p>
+    <ul class="plain-list">
+        <li>{{ trans('core.admin.tasks.setup_script') }}<br><code>{{ cron_command }}</code></li>
+        {% if cron_url %}
+            <li>{{ trans('core.admin.tasks.setup_url') }}<br><code>{{ cron_url }}</code></li>
+        {% endif %}
+    </ul>
+</section>
+
+<section class="card-box">
+    <div class="table-wrap">
+        <table>
+            <thead>
+            <tr>
+                <th scope="col">{{ trans('core.admin.tasks.name') }}</th>
+                <th scope="col">{{ trans('core.admin.tasks.last_run') }}</th>
+                <th scope="col">{{ trans('core.admin.tasks.status') }}</th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for task in tasks %}
+                <tr>
+                    <th scope="row">{{ task.name }}</th>
+                    <td>{{ task.last_started_at ?? trans('core.admin.tasks.never') }}</td>
+                    <td>
+                        {% if task.last_status %}
+                            <span class="badge badge-{{ task.last_status }}">{{ trans('core.admin.tasks.status_' ~ task.last_status) }}</span>
+                            {% if task.last_error %}<br><small>{{ task.last_error }}</small>{% endif %}
+                        {% endif %}
+                    </td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
 {% endblock %}

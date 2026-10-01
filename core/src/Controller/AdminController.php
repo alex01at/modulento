@@ -13,7 +13,44 @@ final class AdminController extends Controller
 {
     public function index(array $params): void
     {
-        $this->render('@admin/index.twig');
+        $this->render('@admin/index.twig', ['stats' => $this->stats()]);
+    }
+
+    /**
+     * Figures for the dashboard, one entry per area the account may manage.
+     * "pending" is null where nothing waits for a decision.
+     *
+     * @return array<int, array{id: string, label_key: string, path: string, total: int, pending: ?int}>
+     */
+    private function stats(): array
+    {
+        $app = $this->app;
+        $stats = [];
+
+        if ($app->auth->can('core.providers.manage')) {
+            $counts = $app->providers->counts();
+            $stats[] = ['id' => 'providers', 'label_key' => 'core.admin.menu.providers', 'path' => '/admin/providers',
+                'total' => array_sum($counts), 'pending' => $counts['pending'] ?? 0];
+        }
+        if ($app->auth->can('core.offers.manage')) {
+            $counts = $app->offers->counts();
+            $stats[] = ['id' => 'offers', 'label_key' => 'core.admin.menu.offers', 'path' => '/admin/offers',
+                'total' => array_sum($counts), 'pending' => $counts['pending'] ?? 0];
+        }
+        if ($app->auth->can('core.orders.manage')) {
+            $stats[] = ['id' => 'orders', 'label_key' => 'core.admin.menu.orders', 'path' => '/admin/orders',
+                'total' => array_sum($app->orders->counts()), 'pending' => null];
+        }
+        if ($app->auth->can('core.accounts.manage')) {
+            $stats[] = ['id' => 'accounts', 'label_key' => 'core.admin.menu.accounts', 'path' => '/admin/accounts',
+                'total' => $app->accounts->list('', 1, 1)['total'], 'pending' => null];
+        }
+        if ($app->auth->can('core.reviews.manage')) {
+            $stats[] = ['id' => 'reviews', 'label_key' => 'core.admin.menu.reviews', 'path' => '/admin/reviews',
+                'total' => $app->reviews->listAll(null, 1, 1)['total'], 'pending' => null];
+        }
+
+        return $stats;
     }
 
     public function extensions(array $params): void
