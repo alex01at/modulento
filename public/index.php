@@ -19,6 +19,17 @@ use Modulento\Core\NotConfiguredException;
 
 $root = dirname(__DIR__);
 
+// vendor/ is part of a release package but not of the source code, so this
+// is what someone sees who uploaded GitHub's "Download ZIP" instead.
+if (!is_file($root . '/vendor/autoload.php')) {
+    http_response_code(503);
+    header('Content-Type: text/plain; charset=utf-8');
+    echo "Modulento: the folder vendor/ is missing.\n\n"
+        . "This is the source code, not a release package. Upload modulento-<version>.zip\n"
+        . "from the project's Releases page instead, or run \"composer install\" here.\n";
+    return;
+}
+
 require $root . '/vendor/autoload.php';
 
 // Errors never reach the visitor; they go to the log.
