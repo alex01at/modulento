@@ -151,8 +151,8 @@ final class View
         ));
 
         // URLs of files in a theme's or an extension's assets/ folder. They
-        // carry the file's change time, so a changed file is fetched anew
-        // although assets are served with a long cache lifetime.
+        // carry a stamp of the file, so a changed or different file is
+        // fetched anew although assets are served with a long cache lifetime.
         $this->twig->addFunction(new TwigFunction(
             'theme_asset',
             fn (string $path) => self::assetUrl('/assets/theme/', $path, AssetController::locate($themes->siteDirs('assets'), $path))
@@ -187,6 +187,15 @@ final class View
     {
         $url = $prefix . implode('/', array_map('rawurlencode', explode('/', $path)));
 
-        return $file !== null ? $url . '?v=' . filemtime($file) : $url;
+        if ($file === null) {
+            return $url;
+        }
+
+        // The stamp names the file itself, not only its change time: two
+        // themes have the same URL for "theme.css", and after an update
+        // their files carry the same time. With the time alone, switching
+        // themes would leave browsers showing the previous theme's cached
+        // stylesheet.
+        return $url . '?v=' . substr(md5($file . '|' . filemtime($file) . '|' . filesize($file)), 0, 12);
     }
 }

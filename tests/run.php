@@ -1224,6 +1224,18 @@ check('indigo: home page in English', str_contains($get('/en', null)['body'], 'F
 check('indigo: nothing inline and nothing from other hosts', preg_match('/\sstyle="|<style|<script|onclick=|https?:\/\/(?!example\.test)/', $r['body']) === 0);
 $r = $get('/login', null);
 check('indigo: a page it does not bring comes from default, inside its layout', $r['status'] === 200 && str_contains($r['body'], 'brand-mark') && str_contains($r['body'], 'name="password"'));
+preg_match('#/assets/theme/theme\.css\?v=[0-9a-f]+#', $r['body'], $indigoCss);
+$pdo->exec("DELETE FROM setting WHERE name = 'core.theme'");
+$defaultFile = $root . '/themes/default/assets/theme.css';
+$defaultTime = filemtime($defaultFile);
+// As after an update: both stylesheets carry the same change time.
+touch($defaultFile, filemtime($root . '/themes/indigo/assets/theme.css'));
+clearstatcache();
+preg_match('#/assets/theme/theme\.css\?v=[0-9a-f]+#', $get('/login', null)['body'], $defaultCss);
+touch($defaultFile, $defaultTime);
+clearstatcache();
+$pdo->exec("INSERT INTO setting VALUES ('core.theme', 'indigo')");
+check('the stylesheets of two themes never share an address, even with the same change time', ($indigoCss[0] ?? '') !== '' && ($defaultCss[0] ?? '') !== '' && $indigoCss[0] !== $defaultCss[0]);
 check('indigo: stylesheet and font are served from the theme', str_contains($get('/assets/theme/theme.css', null)['body'], 'Plus Jakarta Sans') && $get('/assets/theme/fonts/plus-jakarta-sans-latin.woff2', null)['status'] === 200);
 $post('/admin/categories/new', ['text' => ['de' => ['name' => 'Texte', 'slug' => ''], 'en' => ['name' => '', 'slug' => '']]], 3);
 $textId = (int) $pdo->query("SELECT category_id FROM category_translation WHERE slug = 'texte'")->fetchColumn();
