@@ -33,7 +33,7 @@ interface OrderFlow
     public function states(): array;
 
     /**
-     * @return array<string, array{from: string[], to: string, actor: string[], label: string, done?: string, note?: string, by?: string}>
+     * @return array<string, array{from: string[], to: string, actor: string[], label: string, done?: string, note?: string, files?: bool, by?: string}>
      *         transition name =>
      *         - from: states it can start in
      *         - to: the resulting state, or Orders::PREVIOUS for "back to
@@ -45,6 +45,7 @@ interface OrderFlow
      *           the action has happened ("Order accepted"); the label is
      *           used if it is missing
      *         - note: "required" or "optional"; without it no text is asked
+     *         - files: true lets files be attached to the step (a delivery)
      *         - by: "counterparty" allows only the other side than the one
      *           that caused the current state, "initiator" only that side
      */

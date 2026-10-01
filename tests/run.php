@@ -197,6 +197,8 @@ $pdo->exec("CREATE TABLE order_event (id INTEGER PRIMARY KEY, order_id INTEGER R
     actor_id INTEGER REFERENCES account (id) ON DELETE SET NULL, actor_role TEXT, note TEXT, created_at TEXT)");
 $pdo->exec("CREATE TABLE order_message (id INTEGER PRIMARY KEY, order_id INTEGER REFERENCES orders (id) ON DELETE CASCADE, account_id INTEGER REFERENCES account (id) ON DELETE SET NULL,
     author_role TEXT, body TEXT, created_at TEXT)");
+$pdo->exec("CREATE TABLE order_file (id INTEGER PRIMARY KEY, order_id INTEGER REFERENCES orders (id) ON DELETE CASCADE, event_id INTEGER REFERENCES order_event (id) ON DELETE CASCADE,
+    message_id INTEGER REFERENCES order_message (id) ON DELETE CASCADE, account_id INTEGER REFERENCES account (id) ON DELETE SET NULL, author_role TEXT, original_name TEXT, stored_name TEXT, size INTEGER, created_at TEXT)");
 $pdo->exec("PRAGMA foreign_keys = ON");
 $pdo->exec("CREATE TABLE role (id INTEGER PRIMARY KEY, name TEXT)");
 $pdo->exec("CREATE TABLE role_permission (role_id INTEGER REFERENCES role (id) ON DELETE CASCADE, permission TEXT)");
@@ -304,6 +306,17 @@ $r = request($pdo, $config, 'GET', '/edit/7', 4);
 check('blocked admin passes nothing', !$r['called']);
 $r = request($pdo, $config, 'POST', '/save', 1, ['_csrf' => '']);
 check('POST without CSRF token does not run', !$r['called']);
+$_SERVER['CONTENT_LENGTH'] = '99999999';
+$_SERVER['CONTENT_TYPE'] = 'multipart/form-data; boundary=x';
+$_POST = [];
+$oversized = new Modulento\Core\App($config, $pdo);
+$oversized->translator->load($root . '/core/lang', 'core');
+$oversized->translator->setLocale('de');
+$oversized->router->post('/upload', fn () => null);
+$_SESSION = ['_csrf' => 'test-token'];
+$oversized->router->dispatch('POST', '/upload');
+check('an upload beyond the server limit is named as such, not as a failed security check', str_contains($_SESSION['_flash']['error'] ?? '', 'zu groß'));
+unset($_SERVER['CONTENT_LENGTH'], $_SERVER['CONTENT_TYPE']);
 $r = request($pdo, $config, 'POST', '/save', 1, ['_csrf' => 'wrong']);
 check('POST with wrong CSRF token does not run', !$r['called']);
 $r = request($pdo, $config, 'POST', '/save', 1, ['_csrf' => 'test-token']);
@@ -922,6 +935,74 @@ check('administrator cancels; both sides are told', $orderRow($waiting)['state']
     && lastMail($mailLog, 'plain@example.test')['subject'] === 'Bestellung ' . sprintf('%06d', $waiting) . ': Durch die Plattform storniert');
 $export = json_decode($get('/account/export', 2)['body'], true);
 check('export lists the buyer\'s orders', count($export['orders'] ?? []) === 3 && ($export['orders'][0]['offer_title'] ?? '') === 'Ich gestalte dein Logo');
+
+// --- Files attached to orders ---------------------------------------------------
+use Modulento\Core\Order\OrderFiles;
+
+check('file name: path and odd characters are removed', OrderFiles::safeName('../../etc/passwd') === 'passwd' && OrderFiles::safeName('C:\\Users\\x\\Logo "final" <v2>.pdf') === 'Logo _final_ _v2_.pdf'
+    && OrderFiles::safeName("a\r\nb.zip") === 'a_b.zip' && OrderFiles::safeName('...') === 'file' && mb_strlen(OrderFiles::safeName(str_repeat('ä', 300) . '.pdf')) === 150);
+
+/** $_FILES for a multi-file field, from name => content. */
+$filesField = function (array $contents): array {
+    $field = ['name' => [], 'tmp_name' => [], 'error' => [], 'size' => []];
+    foreach ($contents as $fileName => $content) {
+        $tmp = tempnam(sys_get_temp_dir(), 'upl');
+        file_put_contents($tmp, $content);
+        $field['name'][] = $fileName;
+        $field['tmp_name'][] = $tmp;
+        $field['error'][] = UPLOAD_ERR_OK;
+        $field['size'][] = strlen($content);
+    }
+
+    return ['files' => $field];
+};
+$withFiles = function (array $contents, callable $request) use ($filesField) {
+    $_FILES = $filesField($contents);
+    $result = $request();
+    $_FILES = [];
+
+    return $result;
+};
+check('uploads: an empty file field is no upload', OrderFiles::uploads(['name' => [''], 'tmp_name' => [''], 'error' => [UPLOAD_ERR_NO_FILE], 'size' => [0]]) === [] && OrderFiles::uploads(null) === []);
+
+$ordersBefore = $lastOrder();
+$withFiles(['shell.php' => '<?php system($_GET["c"]);'], fn () => $post($orderPath, ['package' => '1'], 2));
+check('order with a forbidden file type is not placed at all', $lastOrder() === $ordersBefore);
+$withFiles(['empty.pdf' => ''], fn () => $post($orderPath, ['package' => '1'], 2));
+check('order with an empty file is not placed', $lastOrder() === $ordersBefore);
+
+$withFiles(['Briefing Café.txt' => 'Farben: blau'], fn () => $post($orderPath, ['package' => '1', 'note' => 'Siehe Anhang'], 2));
+$fileOrder = $lastOrder();
+$file = $pdo->query("SELECT * FROM order_file WHERE order_id = {$fileOrder}")->fetch();
+$storedPath = $config['app']['uploads'] . '/orders/' . $fileOrder . '/' . ($file['stored_name'] ?? '');
+check('order with a file: stored under a random name without extension, linked to the order\'s first entry', $fileOrder > $ordersBefore && $file !== false
+    && preg_match('/^[0-9a-f]{32}$/', $file['stored_name']) === 1 && is_file($storedPath) && $file['original_name'] === 'Briefing Café.txt' && $file['event_id'] !== null && $file['author_role'] === 'buyer');
+$r = $get('/orders/' . $fileOrder . '/files/' . $file['id'], 1);
+check('download: the provider gets the content', $r['status'] === 200 && $r['body'] === 'Farben: blau');
+check('download: the buyer too, an outsider not', $get('/orders/' . $fileOrder . '/files/' . $file['id'], 2)['body'] === 'Farben: blau' && $get('/orders/' . $fileOrder . '/files/' . $file['id'], 3)['status'] === 404);
+check('download: a file of another order is not reachable through this one', $get('/orders/' . $orderId . '/files/' . $file['id'], 2)['status'] === 404);
+check('download: an administrator through the administration only', $get('/admin/orders/' . $fileOrder . '/files/' . $file['id'], 3)['body'] === 'Farben: blau'
+    && $get('/admin/orders/' . $fileOrder . '/files/' . $file['id'], 2)['status'] === 403);
+check('order page lists the file where it belongs', str_contains($get('/orders/' . $fileOrder, 1)['body'], 'files/' . $file['id'] . '" download>Briefing Café.txt'));
+
+$withFiles(['x.zip' => 'PK'], fn () => $act($fileOrder, 'accept', 1));
+check('a step that takes no files ignores them', $orderRow($fileOrder)['state'] === 'in_progress' && $pdo->query("SELECT COUNT(*) FROM order_file WHERE order_id = {$fileOrder}")->fetchColumn() == 1);
+$withFiles(['virus.exe' => 'MZ'], fn () => $act($fileOrder, 'deliver', 1, 'Fertig'));
+check('delivery with a forbidden file: nothing happens, not even the delivery', $orderRow($fileOrder)['state'] === 'in_progress');
+$withFiles(array_combine(array_map(fn ($i) => "f{$i}.pdf", range(1, 6)), array_fill(0, 6, '%PDF')), fn () => $act($fileOrder, 'deliver', 1, 'Fertig'));
+check('delivery with too many files: nothing happens', $orderRow($fileOrder)['state'] === 'in_progress');
+$withFiles(['logo.zip' => 'PK-archive', 'Vorschau.PNG' => 'png-bytes'], fn () => $act($fileOrder, 'deliver', 1, 'Fertig'));
+check('delivery with files: delivered, both files attached to that step', $orderRow($fileOrder)['state'] === 'delivered'
+    && $pdo->query("SELECT COUNT(*) FROM order_file f JOIN order_event e ON e.id = f.event_id WHERE f.order_id = {$fileOrder} AND e.transition = 'deliver'")->fetchColumn() == 2);
+$delivered = $pdo->query("SELECT id FROM order_file WHERE original_name = 'logo.zip'")->fetchColumn();
+check('the buyer downloads the delivery', $get('/orders/' . $fileOrder . '/files/' . $delivered, 2)['body'] === 'PK-archive');
+
+$withFiles(['Rechnung.pdf' => '%PDF-1.4'], fn () => $post('/orders/' . $fileOrder . '/message', ['body' => ''], 1));
+check('a message can consist of a file alone; the other side is told', $pdo->query("SELECT COUNT(*) FROM order_file WHERE message_id IS NOT NULL AND order_id = {$fileOrder}")->fetchColumn() == 1
+    && lastMail($mailLog, 'editor@example.test')['subject'] === 'Neue Nachricht zur Bestellung ' . sprintf('%06d', $fileOrder));
+$post('/orders/' . $fileOrder . '/message', ['body' => ''], 1);
+check('a message with neither text nor file is refused', $pdo->query("SELECT COUNT(*) FROM order_message WHERE order_id = {$fileOrder}")->fetchColumn() == 1);
+$act($fileOrder, 'accept_delivery', 2);
 
 $pdo->exec("UPDATE extension SET enabled = 0 WHERE id = 'freelancer'");
 check('order of a disabled extension: still readable, no actions', $get('/orders/' . $orderId, 2)['status'] === 200 && str_contains($get('/orders/' . $orderId, 2)['body'], 'Unbekannter Status'));

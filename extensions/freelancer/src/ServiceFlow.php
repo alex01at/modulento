@@ -64,9 +64,9 @@ final class ServiceFlow implements OrderFlow
             'withdraw' => ['from' => ['placed'], 'to' => 'cancelled', 'actor' => ['buyer'], 'label' => 'freelancer.action.withdraw', 'done' => 'freelancer.done.withdraw'],
             'expire' => ['from' => ['placed'], 'to' => 'declined', 'actor' => ['system'], 'label' => 'freelancer.action.expire', 'done' => 'freelancer.done.expire'],
 
-            'deliver' => ['from' => ['in_progress'], 'to' => 'delivered', 'actor' => ['provider'], 'label' => 'freelancer.action.deliver', 'done' => 'freelancer.done.deliver', 'note' => 'required'],
+            'deliver' => ['from' => ['in_progress'], 'to' => 'delivered', 'actor' => ['provider'], 'label' => 'freelancer.action.deliver', 'done' => 'freelancer.done.deliver', 'note' => 'required', 'files' => true],
             'accept_delivery' => ['from' => ['delivered'], 'to' => 'completed', 'actor' => ['buyer'], 'label' => 'freelancer.action.accept_delivery', 'done' => 'freelancer.done.accept_delivery'],
-            'request_revision' => ['from' => ['delivered'], 'to' => 'in_progress', 'actor' => ['buyer'], 'label' => 'freelancer.action.request_revision', 'done' => 'freelancer.done.request_revision', 'note' => 'required'],
+            'request_revision' => ['from' => ['delivered'], 'to' => 'in_progress', 'actor' => ['buyer'], 'label' => 'freelancer.action.request_revision', 'done' => 'freelancer.done.request_revision', 'note' => 'required', 'files' => true],
             'auto_complete' => ['from' => ['delivered'], 'to' => 'completed', 'actor' => ['system'], 'label' => 'freelancer.action.auto_complete', 'done' => 'freelancer.done.auto_complete'],
 
             'request_cancel' => ['from' => ['in_progress', 'delivered'], 'to' => 'cancel_requested', 'actor' => ['buyer', 'provider'], 'label' => 'freelancer.action.request_cancel', 'done' => 'freelancer.done.request_cancel', 'note' => 'required'],

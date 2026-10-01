@@ -161,9 +161,9 @@ Templates of the site theme, with the variables they receive:
 | `offer/show.twig` | `offer` (`title`, `summary`, `description` as plain text, `images`, `price_from`, `category`, `provider_*`, `is_own`), `type_template`, `type_data` |
 | `account/offers.twig` | `offers`, `types`, `provider_status` |
 | `account/offer_edit.twig` | `offer`, `type` (`id`, `label_key`, `template`), `type_data`, `texts`, `category_id`, `categories`, `locales`, `errors`, `approval_required`, `images_available`, `max_images`, `currency` |
-| `order/new.twig` | `offer`, `flow_template`, `flow_data`, `note`, `payment_methods`, `terms`, `errors`; keep the button's wording |
+| `order/new.twig` | `offer`, `flow_template`, `flow_data`, `note`, `payment_methods`, `terms`, `errors`, `file_limits`; keep the button's wording; forms with a file field need `enctype="multipart/form-data"` |
 | `order/index.twig` | `role` (`buyer` or `provider`), `orders`, `page`, `pages` |
-| `order/show.twig` | `order` (summary, `items`, `events`, `messages`, payment), `role`, `actions`, `can_mark_paid`, `counterpart`, `flow_template`, `flow_data` |
+| `order/show.twig` | `order` (summary, `items`, `events` and `messages` each with `files`, payment), `role`, `actions` (with `note` and `files`), `can_mark_paid`, `counterpart`, `flow_template`, `flow_data`, `file_limits` |
 | `provider/index.twig` | `providers`, `page`, `pages` |
 | `provider/show.twig` | `provider`: `name`, `path`, `type`, `headline`, `description` (plain text), `city`, `country`, `legal` (only for a business); block `offers` for extensions |
 | `emails/*.txt.twig` | blocks `subject` and `body`; plain text, not HTML-escaped |
@@ -254,6 +254,8 @@ An extension makes its offers orderable by registering an
   whether a note is asked, and optionally `by` (`counterparty` or `initiator`)
   to tie an answer to the side that did not, or did, cause the current state.
   The target `Orders::PREVIOUS` leads back to the state before the current one.
+- a transition with `'files' => true` accepts attachments (a delivery);
+  messages and the order form always do
 - `deadline()` - what the scheduler applies if nobody acts in time
 - `allows()` - a further condition, e.g. revisions left
 - `build()` - turns the buyer's choices into items and a total, **reading
@@ -266,6 +268,12 @@ once cannot both succeed), writes the history, and `OrderNotifier` mails the
 other side in their language. `extensions/freelancer/src/ServiceFlow.php` is
 the reference: accept or decline, deliver, revisions, acceptance, mutual
 cancellation, expiry and automatic acceptance.
+
+Attachments (`$app->orderFiles`) are stored in `var/uploads/orders/` under
+random names without extension, limited to a list of file types, and handed
+out only to the order's two parties and to administrators - always as a
+download, never displayed. The size limit is 20 MB per file or the server's
+`upload_max_filesize` / `post_max_size`, whichever is lower.
 
 A `PaymentMethod` decides how an order is paid. The core ships `core.offline`
 (buyer and provider settle it themselves; the provider confirms the receipt).

@@ -141,12 +141,19 @@ final class Router
      */
     private function rejectCsrf(): void
     {
+        // A request larger than the server's post_max_size arrives with no
+        // fields at all, so the token is missing too. Saying "security
+        // check failed" would send people looking in the wrong place.
+        $tooLarge = $_POST === [] && (int) ($_SERVER['CONTENT_LENGTH'] ?? 0) > 0
+            && str_starts_with((string) ($_SERVER['CONTENT_TYPE'] ?? ''), 'multipart/form-data');
+        $messageKey = $tooLarge ? 'core.error.upload_too_large' : 'core.error.csrf';
+
         if ($this->isAjax()) {
-            $this->fail(403, 'core.error.csrf');
+            $this->fail($tooLarge ? 413 : 403, $messageKey);
             return;
         }
 
-        Session::flash('error', $this->app->translator->trans('core.error.csrf'));
+        Session::flash('error', $this->app->translator->trans($messageKey));
         header('Location: ' . $this->sameOriginReferer());
     }
 

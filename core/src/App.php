@@ -12,6 +12,7 @@ use Modulento\Core\Catalogue\OfferImages;
 use Modulento\Core\Catalogue\Offers;
 use Modulento\Core\Content\Pages;
 use Modulento\Core\Extension\ExtensionManager;
+use Modulento\Core\Order\OrderFiles;
 use Modulento\Core\Order\Orders;
 use Modulento\Core\Provider\Providers;
 use Modulento\Core\Support\Auth;
@@ -58,6 +59,7 @@ final class App
     public readonly Offers $offers;
     public readonly OfferImages $offerImages;
     public readonly Orders $orders;
+    public readonly OrderFiles $orderFiles;
 
     /** The request path without its language prefix - what routes are matched against. */
     public string $path = '/';
@@ -92,6 +94,7 @@ final class App
         $this->categories = new Categories($db, $this->locales);
         $this->offers = new Offers($db, $this->settings, $this->locales);
         $this->orders = new Orders($db);
+        $this->orderFiles = new OrderFiles($db, ($config['app']['uploads'] ?? $config['app']['root'] . '/var/uploads') . '/orders');
         $this->offerImages = new OfferImages($db, ($config['app']['uploads'] ?? $config['app']['root'] . '/var/uploads') . '/offers');
         $this->themes = new ThemeManager($config['app']['root'] . '/themes', $this->settings);
         $this->accounts = new Accounts($db);

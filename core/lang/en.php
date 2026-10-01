@@ -597,7 +597,7 @@ return [
     'core.order.message.new' => 'New message',
     'core.order.message.send' => 'Send',
     'core.order.message.none' => 'No messages yet.',
-    'core.order.message.error' => 'The message must not be empty and at most 5000 characters long.',
+    'core.order.message.error' => 'The message needs a text or a file; the text may be at most 5000 characters long.',
     'core.order.error.not_possible' => 'This step is not possible for this order right now.',
     'core.order.error.changed_meanwhile' => 'The order has changed in the meantime. Please look at its current state.',
     'core.order.error.note_required' => 'Please give a reason or message.',
@@ -612,4 +612,14 @@ return [
     'core.mail.order_message.subject' => 'New message about order {number}',
     'core.mail.order_message.body' => "Hello,\n\n{sender} wrote to you about order {number} (\"{title}\"):\n\n{message}\n\nYou can answer on the order page: {link}",
     'core.order.event.unknown' => 'Unknown step',
+
+    'core.order.file.attach' => 'Attach files',
+    'core.order.file.hint' => 'At most {max} files of {megabytes} MB each. Allowed: {types}.',
+    'core.order.file.sent_files' => 'Sent {count} file(s).',
+    'core.order.file.error.too_many' => 'At most {max} files can be attached at once.',
+    'core.order.file.error.too_large' => 'A file is too large (at most {megabytes} MB).',
+    'core.order.file.error.upload' => 'The upload failed. Please try again.',
+    'core.order.file.error.empty' => 'One of the files is empty.',
+    'core.order.file.error.type' => 'This file type is not allowed. Allowed: {types}. Please send anything else as a ZIP archive.',
+    'core.error.upload_too_large' => 'The uploaded files are too large together for this server. Please send fewer or smaller files.',
 ];
