@@ -1,0 +1,81 @@
+{% extends '@admin/layout.twig' %}
+
+{% block title %}{{ trans('core.package.title') }} – {{ site_name }}{% endblock %}
+
+{% block admin %}
+{% include '@admin/_page_header.twig' with {heading: trans('core.package.title')} only %}
+
+<section class="card-box">
+    <div class="card-head">
+        <p>{{ trans('core.package.intro') }}</p>
+    </div>
+
+    {% if packages is empty %}
+        <p>{{ trans('core.package.none_installed') }}</p>
+    {% else %}
+        <div class="table-wrap">
+            <table>
+                <thead>
+                <tr>
+                    <th scope="col">{{ trans('core.admin.extensions.name') }}</th>
+                    <th scope="col">{{ trans('core.package.kind') }}</th>
+                    <th scope="col">{{ trans('core.package.source') }}</th>
+                    <th scope="col">{{ trans('core.admin.extensions.version') }}</th>
+                    <th scope="col"></th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for package in packages %}
+                    <tr>
+                        <th scope="row">{{ package.id }}</th>
+                        <td>{{ trans('core.package.kind.' ~ package.kind) }}</td>
+                        <td>{{ package.repo }}</td>
+                        <td>
+                            {{ package.version }}
+                            {% if package.latest and package.latest != package.version %}
+                                <span class="badge badge-pending">{{ trans('core.package.newer', {version: package.latest}) }}</span>
+                            {% elseif package.latest %}
+                                <span class="badge badge-ok">{{ trans('core.package.current') }}</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div class="button-row">
+                                {% if package.latest and package.latest != package.version %}
+                                    <form method="post" action="{{ url('/admin/packages/' ~ package.kind ~ '/' ~ package.id ~ '/update') }}">
+                                        {{ csrf_field() }}
+                                        <button type="submit" class="btn-sm">{{ trans('core.package.update', {version: package.latest}) }}</button>
+                                    </form>
+                                {% endif %}
+                                {% if not package.in_use %}
+                                    <form method="post" action="{{ url('/admin/packages/' ~ package.kind ~ '/' ~ package.id ~ '/remove') }}">
+                                        {{ csrf_field() }}
+                                        <button type="submit" class="btn-sm danger">{{ trans('core.package.remove') }}</button>
+                                    </form>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <form method="post" action="{{ url('/admin/packages/check') }}">
+            {{ csrf_field() }}
+            <button type="submit">{{ trans('core.update.check') }}</button>
+        </form>
+    {% endif %}
+</section>
+
+<section class="card-box">
+    <h2>{{ trans('core.package.install_title') }}</h2>
+    <p>{{ trans('core.package.install_hint') }}</p>
+    <form method="post" action="{{ url('/admin/packages/install') }}" class="stack-form">
+        {{ csrf_field() }}
+        <label for="repo">{{ trans('core.package.repo') }}</label>
+        <input id="repo" name="repo" placeholder="owner/modulento-theme-name" required>
+        <small>{{ trans('core.package.sources', {sources: sources|join(', ')}) }}</small>
+        <button type="submit">{{ trans('core.package.install') }}</button>
+    </form>
+</section>
+{% endblock %}

@@ -17,6 +17,7 @@ use Modulento\Core\Controller\HomeController;
 use Modulento\Core\Controller\MediaController;
 use Modulento\Core\Controller\OfferController;
 use Modulento\Core\Controller\OrderController;
+use Modulento\Core\Controller\PackageController;
 use Modulento\Core\Controller\PageController;
 use Modulento\Core\Controller\ProviderController;
 use Modulento\Core\Controller\RegistrationController;
@@ -241,6 +242,12 @@ final class Kernel
         $router->get('/admin/themes', [AdminController::class, 'themes'], 'core.themes.manage');
         $router->post('/admin/themes/{id}/activate', [AdminController::class, 'activateTheme'], 'core.themes.manage');
 
+        $router->get('/admin/packages', [PackageController::class, 'index'], 'core.packages.manage');
+        $router->post('/admin/packages/install', [PackageController::class, 'install'], 'core.packages.manage');
+        $router->post('/admin/packages/check', [PackageController::class, 'check'], 'core.packages.manage');
+        $router->post('/admin/packages/{kind}/{id}/update', [PackageController::class, 'update'], 'core.packages.manage');
+        $router->post('/admin/packages/{kind}/{id}/remove', [PackageController::class, 'remove'], 'core.packages.manage');
+
         $router->get('/admin/updates', [UpdateController::class, 'index'], 'core.update.manage');
         $router->post('/admin/updates/migrate', [UpdateController::class, 'migrate'], 'core.update.manage');
         $router->post('/admin/updates/check', [UpdateController::class, 'check'], 'core.update.manage');
@@ -260,6 +267,7 @@ final class Kernel
         $app->addPermission('core.accounts.manage', 'core.permission.accounts_manage');
         $app->addPermission('core.roles.manage', 'core.permission.roles_manage');
         $app->addPermission('core.update.manage', 'core.permission.update_manage');
+        $app->addPermission('core.packages.manage', 'core.permission.packages_manage');
 
         $app->addAdminMenu('core.admin.menu.settings', '/admin/settings', 'core.settings.manage');
         $app->addAdminMenu('core.admin.menu.pages', '/admin/pages', 'core.pages.manage');
@@ -272,6 +280,7 @@ final class Kernel
         $app->addAdminMenu('core.admin.menu.roles', '/admin/roles', 'core.roles.manage');
         $app->addAdminMenu('core.admin.menu.extensions', '/admin/extensions', 'core.extensions.manage');
         $app->addAdminMenu('core.admin.menu.themes', '/admin/themes', 'core.themes.manage');
+        $app->addAdminMenu('core.admin.menu.packages', '/admin/packages', 'core.packages.manage');
         $app->addAdminMenu('core.admin.menu.tasks', '/admin/tasks', 'core.tasks.view');
         $app->addAdminMenu('core.admin.menu.updates', '/admin/updates', 'core.update.manage');
 

@@ -86,7 +86,32 @@ The database is not backed up - export it before updating.
   `composer install` and `php bin/migrate.php` there.
 - An extension or theme is installed or replaced by uploading its folder.
   "Run pending database updates" on the Updates page then applies an
-  extension's new migrations.
+  extension's new migrations. Or as a package, see below.
+
+## Packages
+
+Extensions and themes can live in repositories of their own and be installed
+and updated under **Administration → Packages**: enter `owner/name`, and the
+newest release of that GitHub repository is downloaded, checked against its
+SHA-256, unpacked into `extensions/<id>/` or `themes/<id>/` and remembered
+with its source. "Check for updates" then shows newer releases.
+
+A package is a release tagged `v<version>` with two assets, `<name>.zip` and
+`<name>.zip.sha256`. The zip holds the folder's content with `extension.json`
+or `theme.json` at the top, and the version in that file equals the tag.
+The Indigo theme's repository has a workflow that builds exactly this.
+
+Installing a package runs someone else's code on the server, so:
+
+- Only repositories matching `PACKAGE_SOURCES` in `.env` can be installed
+  from (comma-separated patterns such as `owner/*`). Without the setting,
+  every repository of the owner of `UPDATE_REPO` is allowed.
+- A package keeps the repository it first came from; another repository
+  cannot take over its name.
+- What the core ships (`default`, `admin`, `example`, `freelancer`) cannot be
+  replaced by a package.
+- An extension written for another interface version is refused.
+- The previous folder is kept under `var/updates/backups/packages/`.
 
 ## Languages
 
@@ -117,7 +142,7 @@ file of the folder (`php tests/run.php` checks that `de` and `en` match).
 core/         src/ (Modulento\Core), lang/, migrations/, install/ - no templates
 extensions/   one folder per extension
 lang/         this installation's own wording, see "Languages"
-themes/       default/ and indigo/ (site), admin/ (administration)
+themes/       default/ (site), admin/ (administration), installed themes
 public/       web root: index.php only
 bin/          migrate.php, cron.php, create-admin.php
 .github/      CI and release workflows
@@ -138,7 +163,8 @@ chosen under **Administration → Themes**.
   `themes/<theme>/extensions/<extension id>/`.
 - A theme can bring texts of its own (a slogan, the steps on its home page) in
   `themes/<theme>/lang/<code>.php`, with keys starting `theme.`.
-- `indigo` is a second site theme and shows how little a theme needs: a
+- [Indigo](https://github.com/alex01at/modulento-theme-indigo) is a second site
+  theme in a repository of its own and shows how little a theme needs: a
   layout, a home page, two card partials, a stylesheet and its font. Every
   other page comes from `default` and only looks different.
 
