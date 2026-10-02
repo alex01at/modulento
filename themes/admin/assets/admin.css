@@ -447,3 +447,18 @@ code { padding: .1rem .35rem; border: 1px solid var(--line); border-radius: 4px;
 .password-field { display: flex; gap: .4rem; }
 .password-field input { flex: 1 1 auto; min-width: 0; }
 .password-toggle, .stack-form .password-toggle { flex: none; margin: 0; border: 1px solid var(--line); background: var(--card); color: var(--text); font-size: .85rem; white-space: nowrap; }
+
+/* --- The account's menu in the top bar (markup from the site theme's layout/_account_menu.twig) --- */
+.account-menu summary { display: block; border-radius: 50%; cursor: pointer; list-style: none; }
+.account-menu summary::-webkit-details-marker { display: none; }
+.account-menu-picture { display: grid; place-items: center; width: 2.25rem; height: 2.25rem; border-radius: 50%; background: var(--primary); color: #fff; font-weight: 700; line-height: 1; object-fit: cover; }
+.account-menu summary:hover .account-menu-picture, .account-menu[open] .account-menu-picture { box-shadow: 0 0 0 2px var(--card), 0 0 0 4px var(--primary); }
+.account-menu-items { position: absolute; z-index: 30; top: calc(100% - .35rem); right: 1rem; display: grid; gap: .6rem; min-width: 13rem; max-width: calc(100% - 2rem); padding: .9rem 1rem; border: 1px solid var(--line); border-radius: .5rem; background: var(--card); box-shadow: 0 10px 25px rgb(0 0 0 / .15); }
+.account-menu-items a { color: var(--link); text-decoration: none; }
+.account-menu-name { padding-bottom: .6rem; border-bottom: 1px solid var(--line); color: var(--muted); font-size: .9rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.account-menu-items form { margin: 0; }
+.account-menu-items .link-button { padding: 0; border: 0; background: none; color: var(--link); font: inherit; cursor: pointer; }
+.account-menu-scheme { display: grid; gap: .35rem; font-size: .9rem; color: var(--muted); }
+.account-menu-choices { display: flex; gap: .3rem; }
+.account-menu-choices button { flex: 1 1 0; margin: 0; padding: .3rem .4rem; border: 1px solid var(--line); border-radius: .3rem; background: transparent; color: var(--text); font-size: .85rem; cursor: pointer; }
+.account-menu-choices button[aria-pressed="true"] { border-color: var(--primary); background: var(--primary); color: #fff; }
