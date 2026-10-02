@@ -256,6 +256,7 @@ $pdo->exec("CREATE TABLE report (id INTEGER PRIMARY KEY, url TEXT, category TEXT
 $pdo->exec("ALTER TABLE report ADD COLUMN offer_id INTEGER");
 $pdo->exec("ALTER TABLE report ADD COLUMN provider_id INTEGER");
 $pdo->exec("CREATE TABLE account_avatar (account_id INTEGER PRIMARY KEY REFERENCES account (id) ON DELETE CASCADE, name TEXT, extension TEXT, created_at TEXT)");
+$pdo->exec("CREATE TABLE account_preference (account_id INTEGER REFERENCES account (id) ON DELETE CASCADE, name TEXT, value TEXT, PRIMARY KEY (account_id, name))");
 $pdo->exec("ALTER TABLE withdrawal ADD COLUMN handled_at TEXT");
 $pdo->exec("ALTER TABLE withdrawal ADD COLUMN handled_by INTEGER");
 $pdo->exec("ALTER TABLE offer ADD COLUMN rating_count INTEGER NOT NULL DEFAULT 0");
@@ -2018,6 +2019,108 @@ foreach (['freelancer.service', 'auction.sale'] as $flowId) {
     }
 }
 check('every language key used exists: ' . implode(', ', array_unique($missingKeys)), $missingKeys === []);
+
+// --- Header menu, colour scheme, "show password" ------------------------------
+$r = $get('/', null);
+check('header: a visitor gets the login link, no dashboard link and no account menu', $r['status'] === 200 && str_contains($r['body'], 'href="/login"')
+    && !str_contains($r['body'], 'href="/account"') && !str_contains($r['body'], 'account-menu') && !str_contains($r['body'], 'action="/logout"'));
+check('colour scheme: a visitor\'s page leaves the choice to the device', str_contains($r['body'], '<html lang="de">'));
+$r = $get('/', 1);
+preg_match('#<details class="account-menu">.*?</details>#s', $r['body'], $menu);
+check('header: an account gets "Dashboard" and its menu', str_contains($r['body'], '<a href="/account">Dashboard</a>') && ($menu[0] ?? '') !== '' && !str_contains($r['body'], 'Mein Konto'));
+check('header: the menu leads to the settings and logs out by a form with a token', str_contains($menu[0] ?? '', '<a href="/account/settings">Profileinstellungen</a>')
+    && preg_match('#<form method="post" action="/logout">\s*<input type="hidden" name="_csrf" value="test-token">\s*<button type="submit" class="link-button">Abmelden</button>#', $menu[0] ?? '') === 1
+    && substr_count($r['body'], 'action="/logout"') === 1);
+check('header: the menu has a name for screen readers and an initial as placeholder', str_contains($menu[0] ?? '', '<span class="visually-hidden">Kontomenü</span>')
+    && str_contains($menu[0] ?? '', '<span class="account-menu-picture" aria-hidden="true">P</span>'));
+check('header: no link to the administration without the permission', !str_contains($r['body'], 'href="/admin"') && !str_contains($get('/', 2)['body'], 'href="/admin"'));
+check('header: "Administration" with the permission', str_contains($get('/', 3)['body'], '<a href="/admin">Administration</a>'));
+check('header: the same in English', str_contains($get('/en', 3)['body'], '<a href="/en/admin">Administration</a>') && str_contains($get('/en', 3)['body'], '<a href="/en/account/settings">Profile settings</a>'));
+$_FILES = ['avatar' => ['tmp_name' => $makeImage(80, 80), 'error' => UPLOAD_ERR_OK]];
+$post('/account/avatar', [], 1);
+$_FILES = [];
+check('header: the menu shows the account\'s picture once it has one', preg_match('#<img class="account-menu-picture" src="/media/avatars/[a-f0-9]{32}\.(webp|jpg)" alt=""#', $get('/', 1)['body']) === 1
+    && !str_contains($get('/', 2)['body'], '/media/avatars/'));
+$post('/account/avatar/delete', [], 1);
+$r = $get('/account', 1);
+check('account pages: the overview is called "Dashboard"', str_contains($r['body'], '<title>Dashboard – ') && str_contains($r['body'], '<a href="/account">Dashboard</a>'));
+$r = $get('/admin', 3);
+check('administration: called "Administration" in title and menu', str_contains($r['body'], '<title>Administration – ') && str_contains($r['body'], 'aria-label="Administration"') && str_contains($r['body'], '<html lang="de">'));
+
+$schemeOf = fn (int $id) => $pdo->query("SELECT value FROM account_preference WHERE name = 'color_scheme' AND account_id = {$id}")->fetchColumn();
+$r = $get('/account/settings', 1);
+check('colour scheme: the settings offer three choices, "automatic" first and chosen', preg_match('#<form method="post" action="/account/appearance".*?<option value="auto" selected>Automatisch \(wie System\)</option>\s*<option value="light" >Hell</option>\s*<option value="dark" >Dunkel</option>#s', $r['body']) === 1);
+$post('/account/appearance', ['color_scheme' => 'dark'], 1);
+check('colour scheme: a fixed choice is stored for the account', $schemeOf(1) === 'dark' && isset($_SESSION['_flash']['success']));
+$r = $get('/account/settings', 1);
+check('colour scheme: a fixed choice appears as data-theme and in the form', str_contains($r['body'], '<html lang="de" data-theme="dark">') && str_contains($r['body'], '<option value="dark" selected>'));
+check('colour scheme: it is the account\'s own', str_contains($get('/', 2)['body'], '<html lang="de">') && str_contains($get('/', null)['body'], '<html lang="de">'));
+foreach (['pink', '', ['dark'], 'DARK'] as $invalid) {
+    $post('/account/appearance', ['color_scheme' => $invalid], 1);
+    check('colour scheme: ' . json_encode($invalid) . ' is refused and the choice stays', $schemeOf(1) === 'dark' && str_contains($_SESSION['_flash']['error'] ?? '', 'Farbschemata'));
+}
+$r = $post('/account/appearance', ['color_scheme' => 'light', '_csrf' => 'wrong'], 1);
+check('colour scheme: not changed without the token', $schemeOf(1) === 'dark');
+$post('/account/appearance', ['color_scheme' => 'light'], 1);
+check('colour scheme: changing replaces the one row', $schemeOf(1) === 'light' && $pdo->query('SELECT COUNT(*) FROM account_preference')->fetchColumn() == 1
+    && str_contains($get('/offers', 1)['body'], '<html lang="de" data-theme="light">'));
+check('colour scheme: a visitor cannot set one', $post('/account/appearance', ['color_scheme' => 'dark'], null)['status'] === 403 && $pdo->query('SELECT COUNT(*) FROM account_preference')->fetchColumn() == 1);
+$post('/account/appearance', ['color_scheme' => 'dark'], 3);
+$r = $get('/admin', 3);
+check('colour scheme: the administration takes the account\'s choice', str_contains($r['body'], '<html lang="de" data-theme="dark">') && str_contains($get('/admin/settings', 3)['body'], 'data-theme="dark"'));
+check('colour scheme: part of the data export', (json_decode($get('/account/export', 3)['body'], true)['preferences'] ?? null) === ['color_scheme' => 'dark']);
+$post('/account/appearance', ['color_scheme' => 'auto'], 3);
+$post('/account/appearance', ['color_scheme' => 'auto'], 1);
+check('colour scheme: "automatic" needs no row and writes no attribute', $pdo->query('SELECT COUNT(*) FROM account_preference')->fetchColumn() == 0
+    && str_contains($get('/account/settings', 1)['body'], '<html lang="de">') && str_contains($get('/admin', 3)['body'], '<html lang="de">'));
+$app = new Modulento\Core\App($config, $pdo);
+$app->preferences->set(4, 'color_scheme', 'dark');
+$app->preferences->set(4, 'color_scheme', 'sepia');
+check('preferences: an unknown stored scheme counts as automatic', $app->preferences->colorScheme(4) === 'auto' && $app->preferences->colorScheme(null) === 'auto' && $app->preferences->all(4) === ['color_scheme' => 'sepia']);
+$app->preferences->set(4, 'color_scheme', null);
+check('preferences: before the migration ran, everything has its default', (new Modulento\Core\Account\Preferences(new PDO('sqlite::memory:')))->colorScheme(1) === 'auto'
+    && (new Modulento\Core\Account\Preferences(new PDO('sqlite::memory:')))->all(1) === []);
+check('preferences: the migration parses', count(Migrator::statements((string) file_get_contents($root . '/core/migrations/016_account_preference.sql'))) === 1);
+foreach (['themes/default/assets/theme.css', 'themes/admin/assets/admin.css'] as $stylesheet) {
+    $css = (string) file_get_contents($root . '/' . $stylesheet);
+    check("colour scheme: {$stylesheet} is dark for the device unless \"light\" is chosen, and for \"dark\"", preg_match('/@media \(prefers-color-scheme: dark\) \{\s*:root:not\(\[data-theme="light"\]\) \{\s*color-scheme: dark;/', $css) === 1
+        && preg_match('/\n:root\[data-theme="dark"\] \{\s*color-scheme: dark;/', $css) === 1);
+    preg_match_all('/(?:not\(\[data-theme="light"\]\)|\[data-theme="dark"\]) \{([^}]*)\}/', $css, $darkBlocks);
+    check("colour scheme: {$stylesheet} has the same dark values in both places", count($darkBlocks[1]) === 2 && preg_replace('/\s+/', ' ', $darkBlocks[1][0]) === preg_replace('/\s+/', ' ', $darkBlocks[1][1]));
+}
+
+$toggle = '#<script src="/assets/theme/password-toggle\.js\?v=[0-9a-f]+" defer data-show="Passwort anzeigen" data-hide="Passwort verbergen"></script>#';
+$resetToken = $app->tokens->create(1, Modulento\Core\Account\Tokens::RESET_PASSWORD, 3600);
+foreach (['/login' => null, '/register' => null, '/reset-password/' . $resetToken => null, '/account/settings' => 1] as $path => $as) {
+    $r = $get($path, $as);
+    check('show password: the script is loaded on ' . explode('/', $path)[1] . ($as ? '/settings' : ''), $r['status'] === 200 && str_contains($r['body'], 'type="password"') && preg_match($toggle, $r['body']) === 1);
+}
+$pdo->exec('DELETE FROM account_token');
+check('show password: wording in the visitor\'s language', str_contains($get('/en/login', null)['body'], 'data-show="Show password" data-hide="Hide password"'));
+$r = $get('/assets/theme/password-toggle.js', null);
+check('show password: the script is served and adds a button of type "button"', $r['status'] === 200 && str_contains($r['body'], "button.type = 'button'") && str_contains($r['body'], 'aria-pressed'));
+// A page with a password field that brought its own layout would miss the
+// script, which every layout has to load.
+$unscripted = [];
+foreach ([...glob($root . '/themes/*/templates/{,*/,*/*/}*.twig', GLOB_BRACE), ...glob($root . '/extensions/*/templates/{,*/}*.twig', GLOB_BRACE)] as $file) {
+    $source = (string) file_get_contents($file);
+    if (str_contains($source, 'type="password"') && !str_contains($source, "{% extends 'layout/base.twig' %}")) {
+        $unscripted[] = basename($file);
+    }
+}
+check('show password: every template with a password field uses the site layout: ' . implode(', ', $unscripted), $unscripted === []);
+check('show password: the setup page loads its own copy of the same script', file_get_contents($root . '/core/install/password-toggle.js') === file_get_contents($root . '/themes/default/assets/password-toggle.js')
+    && str_contains((string) file_get_contents($root . '/core/install/install.twig'), '<script src="/password-toggle.js" defer data-show="{{ password_show }}" data-hide="{{ password_hide }}"></script>'));
+ob_start();
+(new Modulento\Core\Install\Installer($root))->handle('GET', '/password-toggle.js');
+check('show password: the setup page serves the script', str_contains((string) ob_get_clean(), 'aria-pressed'));
+$inline = [];
+foreach ([...glob($root . '/themes/*/templates/{,*/,*/*/}*.twig', GLOB_BRACE), ...glob($root . '/core/install/*.twig')] as $file) {
+    if (preg_match('/<script(?![^>]*\ssrc=)|\sstyle="|\son[a-z]+="/', (string) file_get_contents($file)) === 1) {
+        $inline[] = basename($file);
+    }
+}
+check('templates carry no inline script or style, which the content security policy would block: ' . implode(', ', $inline), $inline === []);
 
 // --- A second site theme --------------------------------------------------------
 $r = $get('/', null);

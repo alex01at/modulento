@@ -1,5 +1,8 @@
 <!DOCTYPE html>
-<html lang="{{ locale() }}">
+{# A fixed choice of the account is written out; without one the stylesheet
+   follows the device (prefers-color-scheme). #}
+{% set scheme = color_scheme() %}
+<html lang="{{ locale() }}"{% if scheme != 'auto' %} data-theme="{{ scheme }}"{% endif %}>
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -8,6 +11,10 @@
         <link rel="alternate" hreflang="{{ language.locale }}" href="{{ language.absolute_url }}">
     {% endfor %}
     <link rel="stylesheet" href="{{ theme_asset('theme.css') }}">
+    <script src="{{ theme_asset('password-toggle.js') }}" defer data-show="{{ trans('core.password.show') }}" data-hide="{{ trans('core.password.hide') }}"></script>
+    {% if account %}
+        <script src="{{ theme_asset('account-menu.js') }}" defer></script>
+    {% endif %}
     {% block head %}{% endblock %}
 </head>
 <body>
@@ -26,11 +33,8 @@
             {% if provider_status() %}
                 <a href="{{ url('/account/offers') }}">{{ trans('core.offer.mine.title') }}</a>
             {% endif %}
-            <a href="{{ url('/account') }}">{{ trans('core.nav.account') }}</a>
-            <form method="post" action="{{ url('/logout') }}" class="inline-form">
-                {{ csrf_field() }}
-                <button type="submit" class="link-button">{{ trans('core.nav.logout') }}</button>
-            </form>
+            <a href="{{ url('/account') }}">{{ trans('core.nav.dashboard') }}</a>
+            {% include 'layout/_account_menu.twig' %}
         {% else %}
             <a href="{{ url('/login') }}">{{ trans('core.nav.login') }}</a>
             {% if registration_open() %}

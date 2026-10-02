@@ -45,6 +45,22 @@
 </section>
 
 <section>
+    <h2>{{ trans('core.account.appearance.title') }}</h2>
+    <form method="post" action="{{ url('/account/appearance') }}" class="stack-form">
+        {{ csrf_field() }}
+        <label for="color_scheme">{{ trans('core.account.appearance.scheme') }}</label>
+        {% set chosen = color_scheme() %}
+        <select id="color_scheme" name="color_scheme">
+            {% for scheme in color_schemes %}
+                <option value="{{ scheme }}" {{ scheme == chosen ? 'selected' }}>{{ trans('core.account.appearance.' ~ scheme) }}</option>
+            {% endfor %}
+        </select>
+
+        <button type="submit">{{ trans('core.account.save') }}</button>
+    </form>
+</section>
+
+<section>
     <h2>{{ trans('core.order.list.buyer') }}</h2>
     <p><a href="{{ url('/account/orders') }}">{{ trans('core.order.list.buyer') }}</a></p>
 </section>

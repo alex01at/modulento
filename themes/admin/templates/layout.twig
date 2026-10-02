@@ -1,6 +1,8 @@
 {% import '@admin/_icons.twig' as icons %}
 <!DOCTYPE html>
-<html lang="{{ locale() }}">
+{# The account's own choice of colour scheme; without one the device decides. #}
+{% set scheme = color_scheme() %}
+<html lang="{{ locale() }}"{% if scheme != 'auto' %} data-theme="{{ scheme }}"{% endif %}>
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">

@@ -169,6 +169,7 @@ final class Kernel
         $router->post('/account/avatar', [AccountController::class, 'setAvatar']);
         $router->post('/account/avatar/delete', [AccountController::class, 'deleteAvatar']);
         $router->post('/account/profile', [AccountController::class, 'updateProfile']);
+        $router->post('/account/appearance', [AccountController::class, 'updateAppearance']);
         $router->post('/account/password', [AccountController::class, 'changePassword']);
         $router->post('/account/sessions/revoke', [AccountController::class, 'revokeSessions']);
         $router->post('/account/email', [AccountController::class, 'changeEmail']);

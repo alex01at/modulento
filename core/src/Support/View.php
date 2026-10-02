@@ -162,6 +162,20 @@ final class View
 
             return $status;
         }));
+        // The logged-in account's profile picture as a path, or null: for a
+        // layout that shows it next to the account's menu.
+        $this->twig->addFunction(new TwigFunction('account_avatar', function () use ($app, $auth): ?string {
+            $account = $auth->account();
+
+            return $account !== null ? $app->avatars->url($account['id']) : null;
+        }));
+        // "auto", "light" or "dark": what the logged-in account has chosen.
+        // A layout writes a fixed choice as data-theme on <html>; "auto"
+        // (every visitor) leaves the decision to the device.
+        $this->twig->addFunction(new TwigFunction(
+            'color_scheme',
+            fn (): string => $app->preferences->colorScheme($auth->account()['id'] ?? null)
+        ));
         $this->twig->addFunction(new TwigFunction('registration_open', fn () => $app->settings->get('core.registration', 'open') === 'open'));
         $this->twig->addFunction(new TwigFunction('locale_name', fn (string $locale) => $app->locales->name($locale)));
         $this->twig->addFunction(new TwigFunction('can', fn (string $permission) => $auth->can($permission)));

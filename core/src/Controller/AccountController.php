@@ -7,6 +7,7 @@ namespace Modulento\Core\Controller;
 use Modulento\Core\Account\Accounts;
 use Modulento\Core\Account\Avatars;
 use Modulento\Core\Account\LoginTokens;
+use Modulento\Core\Account\Preferences;
 use Modulento\Core\Catalogue\OfferView;
 use Modulento\Core\Account\Tokens;
 use Modulento\Core\Account\AccountRemoval;
@@ -24,7 +25,7 @@ final class AccountController extends Controller
     private const RECENT = 5;
     private const DEVICE_NAME_LENGTH = 80;
 
-    /** Where someone lands after "My account": what is going on, and the ways onward. */
+    /** Where someone lands after "Dashboard": what is going on, and the ways onward. */
     public function dashboard(array $params): void
     {
         $app = $this->app;
@@ -100,6 +101,7 @@ final class AccountController extends Controller
         $this->render('account/index.twig', [
             'avatar' => $this->app->avatars->url($this->accountId()),
             'locales' => $this->app->locales->enabled(),
+            'color_schemes' => Preferences::COLOR_SCHEMES,
             'min_length' => PasswordPolicy::MIN_LENGTH,
             'is_last_admin' => $this->app->accounts->isLastAdmin($this->accountId()),
             'provider_status' => $this->app->providers->findByAccount($this->accountId())['status'] ?? null,
@@ -138,6 +140,20 @@ final class AccountController extends Controller
         // Answer in the language just chosen.
         $this->app->translator->setLocale($locale);
         $this->back('success', 'core.account.profile.saved');
+    }
+
+    public function updateAppearance(array $params): void
+    {
+        $scheme = $_POST['color_scheme'] ?? null;
+
+        if (!is_string($scheme) || !in_array($scheme, Preferences::COLOR_SCHEMES, true)) {
+            $this->back('error', 'core.account.appearance.invalid');
+            return;
+        }
+
+        // "auto" is the default and needs no row.
+        $this->app->preferences->set($this->accountId(), Preferences::COLOR_SCHEME, $scheme !== 'auto' ? $scheme : null);
+        $this->back('success', 'core.account.appearance.saved');
     }
 
     public function changePassword(array $params): void
@@ -238,6 +254,10 @@ final class AccountController extends Controller
             'email_verified_at' => $row['email_verified_at'],
             'last_login_at' => $row['last_login_at'],
         ]);
+        $preferences = $this->app->preferences->all($this->accountId());
+        if ($preferences !== []) {
+            $export->add('preferences', $preferences);
+        }
         $provider = $this->app->providers->findByAccount($this->accountId());
         if ($provider !== null) {
             unset($provider['account_email'], $provider['account_status'], $provider['account_locale'], $provider['decided_by'], $provider['changed_since_decision']);

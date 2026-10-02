@@ -208,7 +208,8 @@ Templates of the site theme, with the variables they receive:
 
 | Template | Variables |
 |---|---|
-| `layout/base.twig` | blocks `title`, `head`, `content` |
+| `layout/base.twig` | blocks `title`, `head`, `content`; see "The layout" below for what it has to carry |
+| `layout/_account_menu.twig` | - ; the logged-in account's menu for the header, included by the layout |
 | `home.twig` | - |
 | `page.twig` | `page`: `title`, `body` (cleaned HTML, output with `raw`), `meta_description`, `locale`, `role` |
 | `error.twig` | `status`, `message_key` |
@@ -218,8 +219,8 @@ Templates of the site theme, with the variables they receive:
 | `auth/forgot.twig` | - |
 | `auth/reset.twig` | `errors`, `token`, `min_length` |
 | `account/_nav.twig` | - ; the account's pages, included on top of each; `provider_status()` says whether the account has a provider profile |
-| `account/dashboard.twig` | `name`, `avatar`, `recent` (offer cards viewed last, from the session), `purchases` (`open`, `closed`, `recent`), `provider` (null or `name`, `status`, `path`, `rating`, `offers`, `offers_public`, `sales` like `purchases`, `types`); the page behind "My account" |
-| `account/index.twig` | the settings: `avatar` (path of the profile picture or null), `locales`, `min_length`, `is_last_admin`, `provider_status`, `devices` (where the account stays logged in: `created_at`, `last_used_at`, `browser`, `current`), `remember_days` |
+| `account/dashboard.twig` | `name`, `avatar`, `recent` (offer cards viewed last, from the session), `purchases` (`open`, `closed`, `recent`), `provider` (null or `name`, `status`, `path`, `rating`, `offers`, `offers_public`, `sales` like `purchases`, `types`); the page behind "Dashboard" |
+| `account/index.twig` | the settings: `avatar` (path of the profile picture or null), `locales`, `color_schemes` (`auto`, `light`, `dark`; the form posts `color_scheme` to `/account/appearance`), `min_length`, `is_last_admin`, `provider_status`, `devices` (where the account stays logged in: `created_at`, `last_used_at`, `browser`, `current`), `remember_days` |
 | `account/provider.twig` | `provider` (stored or typed values, `texts` by language), `status`, `status_note`, `public_path`, `certified`, `errors`, `locales`, `countries`, `approval_required` |
 | `offer/index.twig` | `offers` (cards), `total`, `categories` (tree), `category`, `search`, `sort`, `sorts`, `page`, `pages` |
 | `offer/_cards.twig` | `offers`: `title`, `summary`, `path`, `price_from`, `currency`, `thumb`, `provider_name`, `provider_path` |
@@ -261,6 +262,9 @@ Available in every template:
 | `categories()` | The category tree with `name`, `path`, `children` and `offer_count` |
 | `top_providers(limit)` | Public providers, best rated first, as shown on `provider/show.twig` |
 | `registration_open()` | Whether new accounts can be created |
+| `provider_status()` | Status of the logged-in account's provider profile, or null without one |
+| `account_avatar()` | Path of the logged-in account's profile picture, or null without one (or without an account) |
+| `color_scheme()` | `auto`, `light` or `dark`: what the logged-in account has chosen; `auto` for visitors |
 | `theme_asset(path)`, `admin_asset(path)`, `ext_asset(id, path)` | URL of a file in an `assets/` folder, with cache busting |
 | `csrf_field()`, `csrf_token()` | Required in every `POST` form or AJAX call |
 | `can(permission)` | Whether the logged-in account has a permission |
@@ -271,6 +275,66 @@ Assets are served from the theme folder itself (`/assets/theme/...`), so a
 theme works by upload alone - no symlink, no copy step, no build. The content
 security policy allows scripts and styles from the site's own origin only: no
 inline `<script>`, no inline `style`, no external hosts.
+
+### The layout
+
+A theme that brings its own `layout/base.twig` takes over three things from
+the default one. Indigo shows all of them.
+
+**The account menu.** A logged-in account finds "Dashboard" (`/account`) in
+the header and next to it its picture, which opens a menu with the profile
+settings and the logout form. `{% include 'layout/_account_menu.twig' %}`
+brings the markup: a `<details class="account-menu">` whose `<summary>` holds
+the picture from `account_avatar()` or the initial letter
+(`.account-menu-picture`), and `.account-menu-items` with the links. It works
+without scripts; `account-menu.js` closes it on Escape and on a click
+elsewhere. The theme's stylesheet places the menu. "My offers" (with a
+provider profile) and "Administration" (with `can('core.admin.access')`) stay
+in the header.
+
+**The colour scheme.** An account chooses "automatic", "light" or "dark" in
+its settings; visitors are always "automatic". The layout writes a fixed
+choice onto the root element and nothing for "automatic":
+
+```twig
+{% set scheme = color_scheme() %}
+<html lang="{{ locale() }}"{% if scheme != 'auto' %} data-theme="{{ scheme }}"{% endif %}>
+```
+
+The stylesheet defines its colours as variables with the light values, and
+replaces them in two places with the same dark values - for a device that
+asks for dark unless the account chose light, and for an account that chose
+dark:
+
+```css
+:root { color-scheme: light; --ground: #fff; --text: #1c2430; }
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) { color-scheme: dark; --ground: #14181f; --text: #e6e9ee; }
+}
+:root[data-theme="dark"] { color-scheme: dark; --ground: #14181f; --text: #e6e9ee; }
+```
+
+`color-scheme` makes form fields and scrollbars follow. A colour written out
+anywhere else in the stylesheet stays the same in both schemes, so check
+text on filled buttons, borders, placeholders and messages in both. The
+administration follows the same choice. A theme without dark values simply
+stays light.
+
+**"Show password".** Every password field gets a button that shows what was
+typed. `password-toggle.js` adds it, so without scripts there is none and no
+template needs markup for it; the layout loads the file and hands it the
+wording:
+
+```twig
+<script src="{{ theme_asset('password-toggle.js') }}" defer data-show="{{ trans('core.password.show') }}" data-hide="{{ trans('core.password.hide') }}"></script>
+```
+
+The script wraps each `input[type="password"]` in `.password-field` and
+appends a `button.password-toggle` (`type="button"`, `aria-pressed`); the
+field's `autocomplete` stays, and it is sent as a password field. Both
+scripts come from `default` unless the theme brings files of the same name.
+The setup page loads its own copy from `core/install/`, which has to stay
+identical.
 
 ## Writing an extension
 

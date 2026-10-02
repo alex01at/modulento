@@ -1,0 +1,23 @@
+{# The logged-in account's menu in the header: its picture opens the way to
+   the settings and to logging out. A <details> element, so it works without
+   scripts; account-menu.js only closes it on Escape or a click elsewhere. #}
+{% set picture = account_avatar() %}
+{% set name = account.display_name ?: account.email %}
+<details class="account-menu">
+    <summary>
+        {% if picture %}
+            <img class="account-menu-picture" src="{{ picture }}" alt="" width="36" height="36">
+        {% else %}
+            <span class="account-menu-picture" aria-hidden="true">{{ name|first|upper }}</span>
+        {% endif %}
+        <span class="visually-hidden">{{ trans('core.nav.account_menu') }}</span>
+    </summary>
+    <div class="account-menu-items">
+        <span class="account-menu-name">{{ name }}</span>
+        <a href="{{ url('/account/settings') }}">{{ trans('core.nav.profile_settings') }}</a>
+        <form method="post" action="{{ url('/logout') }}">
+            {{ csrf_field() }}
+            <button type="submit" class="link-button">{{ trans('core.nav.logout') }}</button>
+        </form>
+    </div>
+</details>

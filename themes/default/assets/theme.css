@@ -1,13 +1,61 @@
 /* Site theme "default". Deliberately small: it only has to be usable and
    to show a theme author every template that exists. */
+/* Colours are variables, so that the dark scheme only has to replace them.
+   Light is the default. Dark applies when the device asks for it and the
+   account has not chosen "light" (data-theme on <html>, see color_scheme()),
+   or when the account has chosen "dark". Both blocks carry the same values. */
 :root {
+    color-scheme: light;
+    --ground: #fff;
     --text: #1c2430;
     --muted: #55606e;
     --line: #d5dae1;
     --surface: #f5f7fa;
+    --field: #fff;
+    --field-line: #8791a0;
     --accent: #1f5fbf;
+    /* Text and icons on a filled accent, error or success area. */
+    --on-accent: #fff;
     --error: #a3231f;
     --success: #1c6b3a;
+    --rating: #a15c00;
+    --shadow: 0 .5rem 1.5rem rgb(0 0 0 / .15);
+}
+
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+        color-scheme: dark;
+        --ground: #14181f;
+        --text: #e6e9ee;
+        --muted: #a7b0bd;
+        --line: #3a4452;
+        --surface: #1e242e;
+        --field: #1a1f28;
+        --field-line: #77828f;
+        --accent: #8ab4f8;
+        --on-accent: #10161f;
+        --error: #ff9a94;
+        --success: #7ad9a0;
+        --rating: #f2b866;
+        --shadow: 0 .5rem 1.5rem rgb(0 0 0 / .5);
+    }
+}
+
+:root[data-theme="dark"] {
+    color-scheme: dark;
+    --ground: #14181f;
+    --text: #e6e9ee;
+    --muted: #a7b0bd;
+    --line: #3a4452;
+    --surface: #1e242e;
+    --field: #1a1f28;
+    --field-line: #77828f;
+    --accent: #8ab4f8;
+    --on-accent: #10161f;
+    --error: #ff9a94;
+    --success: #7ad9a0;
+    --rating: #f2b866;
+    --shadow: 0 .5rem 1.5rem rgb(0 0 0 / .5);
 }
 
 * { box-sizing: border-box; }
@@ -18,13 +66,17 @@ body {
     flex-direction: column;
     min-height: 100vh;
     margin: 0;
+    background: var(--ground);
     color: var(--text);
     font: 1rem/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }
 
 a { color: var(--accent); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 .site-header {
+    /* The account menu opens below the header, against its right edge. */
+    position: relative;
     display: flex;
     flex-wrap: wrap;
     align-items: center;
@@ -49,9 +101,11 @@ main { flex: 1 0 auto; width: 100%; max-width: 64rem; margin: 0 auto; padding: 1
 .stack-form { display: grid; gap: .5rem; max-width: 24rem; }
 .stack-form button { margin-top: .5rem; justify-self: start; }
 
-input, select, button { font: inherit; padding: .45rem .6rem; border: 1px solid var(--line); border-radius: .3rem; }
-button { background: var(--accent); border-color: var(--accent); color: #fff; cursor: pointer; }
-.link-button { border-radius: 0; }
+input, select, button { font: inherit; padding: .45rem .6rem; border: 1px solid var(--field-line); border-radius: .3rem; background: var(--field); color: var(--text); }
+button { background: var(--accent); border-color: var(--accent); color: var(--on-accent); cursor: pointer; }
+.link-button { border-radius: 0; background: none; color: var(--accent); }
+::placeholder { color: var(--muted); opacity: 1; }
+:disabled { opacity: .6; cursor: not-allowed; }
 
 .flash { padding: .6rem .8rem; border-left: .25rem solid var(--muted); background: var(--surface); }
 .flash-error { border-color: var(--error); color: var(--error); }
@@ -60,7 +114,7 @@ button { background: var(--accent); border-color: var(--accent); color: #fff; cu
 .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 
 section { margin-top: 2.5rem; }
-button.danger { background: var(--error); border-color: var(--error); }
+button.danger { background: var(--error); border-color: var(--error); color: var(--on-accent); }
 
 .site-footer { display: flex; flex-wrap: wrap; justify-content: space-between; gap: .75rem 2rem; padding: 1rem; border-top: 1px solid var(--line); background: var(--surface); }
 .site-footer nav { display: flex; flex-wrap: wrap; gap: 1rem; }
@@ -72,7 +126,7 @@ article { overflow-wrap: anywhere; }
 .stack-form.wide { max-width: 44rem; }
 fieldset { margin: 1.5rem 0 0; padding: 1rem; border: 1px solid var(--line); border-radius: .3rem; display: grid; gap: .5rem; }
 legend { font-weight: 700; padding: 0 .4rem; }
-textarea { font: inherit; padding: .45rem .6rem; border: 1px solid var(--line); border-radius: .3rem; width: 100%; }
+textarea { font: inherit; padding: .45rem .6rem; border: 1px solid var(--field-line); border-radius: .3rem; width: 100%; background: var(--field); color: var(--text); }
 small { color: var(--muted); }
 .card-list { list-style: none; padding: 0; display: grid; gap: 1rem; grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr)); }
 .card-list li { padding: 1rem; border: 1px solid var(--line); border-radius: .3rem; display: grid; gap: .25rem; }
@@ -91,7 +145,7 @@ address { font-style: normal; }
 table { width: 100%; border-collapse: collapse; }
 th, td { padding: .5rem .6rem; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
 
-a.button { display: inline-block; margin-top: .5rem; padding: .45rem .8rem; border-radius: .3rem; background: var(--accent); color: #fff; text-decoration: none; }
+a.button { display: inline-block; margin-top: .5rem; padding: .45rem .8rem; border-radius: .3rem; background: var(--accent); color: var(--on-accent); text-decoration: none; }
 .history { padding-left: 1.2rem; display: grid; gap: .6rem; }
 .history p, .message { margin: .25rem 0; padding: .5rem .7rem; background: var(--surface); border-left: .2rem solid var(--line); }
 .message.own { border-left-color: var(--accent); }
@@ -99,7 +153,7 @@ a.button { display: inline-block; margin-top: .5rem; padding: .45rem .8rem; bord
 .files { list-style: none; padding: 0; margin: .25rem 0; }
 .files li::before { content: "📎 "; }
 
-.rating { color: #a15c00; white-space: nowrap; }
+.rating { color: var(--rating); white-space: nowrap; }
 .rating small { color: var(--muted); }
 .review { padding: .75rem 0; border-top: 1px solid var(--line); }
 .review p { margin: .25rem 0; }
@@ -110,7 +164,7 @@ a.button { display: inline-block; margin-top: .5rem; padding: .45rem .8rem; bord
 .dashboard-side { display: grid; gap: 1.5rem; }
 .dashboard-card { padding: 1.25rem; border: 1px solid var(--line); border-radius: .5rem; background: var(--surface); }
 .dashboard-card h2 { margin: 0 0 .5rem; font-size: 1.1rem; }
-.avatar { display: grid; place-items: center; width: 5rem; height: 5rem; margin: 0 auto 1rem; border-radius: 50%; background: var(--accent); color: #fff; font-size: 2rem; font-weight: 700; }
+.avatar { display: grid; place-items: center; width: 5rem; height: 5rem; margin: 0 auto 1rem; border-radius: 50%; background: var(--accent); color: var(--on-accent); font-size: 2rem; font-weight: 700; }
 .dashboard-welcome { margin: 0 0 1rem; padding-bottom: 1rem; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; }
 .dashboard-links { list-style: none; margin: 0; padding: 0; display: grid; gap: .5rem; }
 .dashboard-links a { font-weight: 600; text-decoration: none; }
@@ -122,3 +176,19 @@ a.button { display: inline-block; margin-top: .5rem; padding: .45rem .8rem; bord
 .dashboard-main section { margin-bottom: 2rem; }
 @media (max-width: 48rem) { .dashboard { grid-template-columns: minmax(0, 1fr); } }
 img.avatar { display: block; object-fit: cover; }
+
+/* --- The account menu in the header --- */
+.account-menu summary { display: block; border-radius: 50%; cursor: pointer; list-style: none; }
+.account-menu summary::-webkit-details-marker { display: none; }
+.account-menu-picture { display: grid; place-items: center; width: 2.25rem; height: 2.25rem; border-radius: 50%; background: var(--accent); color: var(--on-accent); font-weight: 700; line-height: 1; object-fit: cover; }
+.account-menu summary:hover .account-menu-picture, .account-menu[open] .account-menu-picture { box-shadow: 0 0 0 2px var(--ground), 0 0 0 4px var(--accent); }
+/* Placed against the header, not against the picture: wherever the picture
+   ends up when the header wraps on a narrow screen, the menu stays inside. */
+.account-menu-items { position: absolute; z-index: 10; top: calc(100% - .35rem); right: 1rem; display: grid; gap: .6rem; min-width: 12rem; max-width: calc(100% - 2rem); padding: .9rem 1rem; border: 1px solid var(--line); border-radius: .4rem; background: var(--ground); box-shadow: var(--shadow); }
+.account-menu-name { padding-bottom: .6rem; border-bottom: 1px solid var(--line); color: var(--muted); font-size: .9rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.account-menu-items form { margin: 0; }
+
+/* --- "Show password", added by password-toggle.js --- */
+.password-field { display: flex; gap: .4rem; }
+.password-field input { flex: 1 1 auto; min-width: 0; }
+.password-toggle, .stack-form .password-toggle { flex: none; margin: 0; border-color: var(--field-line); background: var(--surface); color: var(--text); font-size: .85rem; white-space: nowrap; }
