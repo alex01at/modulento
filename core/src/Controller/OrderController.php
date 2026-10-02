@@ -14,6 +14,7 @@ use Modulento\Core\Support\Session;
 final class OrderController extends Controller
 {
     private const PER_PAGE = 30;
+    private const MAX_OPEN_PER_OFFER = 3;
 
     // --- Placing an order -----------------------------------------------------
 
@@ -61,12 +62,16 @@ final class OrderController extends Controller
         if ($mustAccept && !isset($_POST['accept_terms'])) {
             $errors[] = 'core.register.error.terms';
         }
+        // Someone ordering the same thing over and over is not buying.
+        if ($errors === [] && $app->orders->openCount($app->auth->account()['id'], $offer['id']) >= self::MAX_OPEN_PER_OFFER) {
+            $errors[] = 'core.order.error.too_many_open';
+        }
         if ($errors === [] && (new RateLimiter($app->db))->hit('order-place', (string) $app->auth->account()['id'], 20, 3600)) {
             $errors[] = 'core.error.too_many_requests';
         }
 
         if ($errors !== [] || $built['items'] === []) {
-            $this->renderForm($context, $_POST, array_map(fn (string $key) => $this->trans($key, self::fileLimits()), array_unique($errors)));
+            $this->renderForm($context, $_POST, array_map(fn (string $key) => $this->trans($key, self::fileLimits() + ['open' => self::MAX_OPEN_PER_OFFER]), array_unique($errors)));
             return;
         }
 
@@ -235,7 +240,7 @@ final class OrderController extends Controller
         // Files are checked first: a refused file must not leave the
         // step done without it.
         $uploads = $app->orders->acceptsFiles($order, $name) ? OrderFiles::uploads($_FILES['files'] ?? null) : [];
-        $problem = OrderFiles::problem($uploads)
+        $problem = OrderFiles::problem($uploads) ?? $app->orderFiles->quotaProblem($order['id'], $uploads)
             ?? $app->orders->apply($order['id'], $name, $role, $app->auth->account()['id'], $note, $app);
 
         if ($problem === null) {
@@ -284,6 +289,7 @@ final class OrderController extends Controller
     {
         return [
             'max' => OrderFiles::MAX_FILES,
+            'quota' => intdiv(OrderFiles::MAX_ORDER_BYTES, 1024 * 1024),
             'megabytes' => max(1, intdiv(OrderFiles::maxBytes(), 1024 * 1024)),
             'types' => implode(', ', OrderFiles::EXTENSIONS),
         ];
@@ -302,7 +308,7 @@ final class OrderController extends Controller
         $body = trim(str_replace("\r\n", "\n", (string) ($_POST['body'] ?? '')));
 
         $uploads = OrderFiles::uploads($_FILES['files'] ?? null);
-        $fileProblem = OrderFiles::problem($uploads);
+        $fileProblem = OrderFiles::problem($uploads) ?? $app->orderFiles->quotaProblem($order['id'], $uploads);
 
         // A message is text, files, or both.
         if (($body === '' && $uploads === []) || mb_strlen($body) > 5000) {

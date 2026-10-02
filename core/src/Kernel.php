@@ -134,8 +134,9 @@ final class Kernel
 
         $router->get('/register', [RegistrationController::class, 'showRegister'], Router::PUBLIC);
         $router->post('/register', [RegistrationController::class, 'register'], Router::PUBLIC);
-        $router->get('/verify-email/{token}', [AuthController::class, 'verifyEmail'], Router::PUBLIC);
+        $router->get('/verify-email/{token}', [AuthController::class, 'showVerifyEmail'], Router::PUBLIC);
         $router->post('/verify-email/resend', [AuthController::class, 'resendVerification'], Router::PUBLIC);
+        $router->post('/verify-email/{token}', [AuthController::class, 'verifyEmail'], Router::PUBLIC);
         $router->get('/forgot-password', [RegistrationController::class, 'showForgot'], Router::PUBLIC);
         $router->post('/forgot-password', [RegistrationController::class, 'forgot'], Router::PUBLIC);
         $router->get('/reset-password/{token}', [RegistrationController::class, 'showReset'], Router::PUBLIC);
