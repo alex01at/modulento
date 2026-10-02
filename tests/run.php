@@ -251,6 +251,9 @@ $pdo->exec("CREATE TABLE withdrawal (id INTEGER PRIMARY KEY, order_id INTEGER RE
     locale TEXT, account_id INTEGER REFERENCES account (id) ON DELETE SET NULL, matched INTEGER NOT NULL DEFAULT 0, created_at TEXT)");
 $pdo->exec("CREATE TABLE report (id INTEGER PRIMARY KEY, url TEXT, category TEXT, explanation TEXT, name TEXT, email TEXT, locale TEXT,
     account_id INTEGER REFERENCES account (id) ON DELETE SET NULL, status TEXT DEFAULT 'open', decision_note TEXT, decided_at TEXT, decided_by INTEGER, created_at TEXT)");
+$pdo->exec("ALTER TABLE report ADD COLUMN offer_id INTEGER");
+$pdo->exec("ALTER TABLE report ADD COLUMN provider_id INTEGER");
+$pdo->exec("CREATE TABLE account_avatar (account_id INTEGER PRIMARY KEY REFERENCES account (id) ON DELETE CASCADE, name TEXT, extension TEXT, created_at TEXT)");
 $pdo->exec("ALTER TABLE withdrawal ADD COLUMN handled_at TEXT");
 $pdo->exec("ALTER TABLE withdrawal ADD COLUMN handled_by INTEGER");
 $pdo->exec("ALTER TABLE offer ADD COLUMN rating_count INTEGER NOT NULL DEFAULT 0");
@@ -866,6 +869,25 @@ check('image: the thumbnail is small', getimagesize("{$uploadDir}/{$image['name'
 $r = $get("/media/offers/{$offerId}/{$image['name']}_thumb.{$image['extension']}", null);
 check('image: served through the media route', $r['status'] === 200 && strlen($r['body']) > 100);
 check('image: only generated names are served', $get("/media/offers/{$offerId}/../../../.env", null)['status'] === 404 && $get("/media/offers/{$offerId}/x.php", null)['status'] === 404);
+$_FILES = ['avatar' => ['tmp_name' => $makeImage(300, 120), 'error' => UPLOAD_ERR_OK]];
+$post('/account/avatar', [], 2);
+$avatar = $pdo->query('SELECT * FROM account_avatar WHERE account_id = 2')->fetch();
+$avatarFile = $avatar ? $config['app']['uploads'] . '/avatars/' . $avatar['name'] . '.' . $avatar['extension'] : '';
+check('avatar: stored re-encoded as a square under a random name', $avatar !== false && is_file($avatarFile) && getimagesize($avatarFile)[0] === 256 && getimagesize($avatarFile)[1] === 256 && preg_match('/^[a-f0-9]{32}$/', $avatar['name']) === 1);
+check('avatar: shown in the overview and in the settings', str_contains($get('/account', 2)['body'], 'src="/media/avatars/' . $avatar['name']) && str_contains($get('/account/settings', 2)['body'], 'src="/media/avatars/' . $avatar['name']));
+$app = new Modulento\Core\App($config, $pdo);
+check('avatar: only files the upload created are served', $app->avatars->path($avatar['name'] . '.' . $avatar['extension']) === $avatarFile && $app->avatars->path('../offers/x.webp') === null && $app->avatars->path($avatar['name'] . '.php') === null);
+file_put_contents($config['app']['uploads'] . '/not-a-picture.png', '<?php echo 1;');
+$_FILES = ['avatar' => ['tmp_name' => $config['app']['uploads'] . '/not-a-picture.png', 'error' => UPLOAD_ERR_OK]];
+$post('/account/avatar', [], 2);
+check('avatar: a file that is no picture is refused, the old one stays', is_file($avatarFile) && $pdo->query('SELECT name FROM account_avatar WHERE account_id = 2')->fetchColumn() === $avatar['name']);
+$_FILES = ['avatar' => ['tmp_name' => $makeImage(64, 64, 'jpeg'), 'error' => UPLOAD_ERR_OK]];
+$post('/account/avatar', [], 2);
+check('avatar: a new picture replaces the old file', !is_file($avatarFile) && $pdo->query('SELECT COUNT(*) FROM account_avatar')->fetchColumn() == 1);
+$_FILES = [];
+$post('/account/avatar/delete', [], 2);
+check('avatar: removing deletes row and file', $pdo->query('SELECT COUNT(*) FROM account_avatar')->fetchColumn() == 0 && count(glob($config['app']['uploads'] . '/avatars/*')) === 0 && !str_contains($get('/account', 2)['body'], '/media/avatars/'));
+
 $_FILES = ['image' => ['tmp_name' => $makeImage(10, 10), 'error' => UPLOAD_ERR_OK]];
 $post('/account/offers/' . $offerId . '/images', [], 2);
 $_FILES = [];
@@ -949,8 +971,34 @@ $orderPath = '/offers/ich-gestalte-dein-logo/order';
 
 $r = $get('/offers/ich-gestalte-dein-logo', 2);
 check('offer page offers to order each package', str_contains($r['body'], $orderPath . '?package=1') && str_contains($r['body'], $orderPath . '?package=2'));
-check('offer and provider pages link to the report form with their own address', str_contains($r['body'], 'href="/report?url=%2Foffers%2Fich-gestalte-dein-logo"')
-    && str_contains($get('/en/providers/mueller-design', null)['body'], 'href="/en/report?url=%2Fen%2Fproviders%2Fmueller-design"'));
+check('offer and provider pages link to the report form with their own address', substr_count($r['body'], 'href="/report?url=https%3A%2F%2Fexample.test%2Foffers%2Fich-gestalte-dein-logo"') === 2
+    && str_contains($get('/en/providers/mueller-design', null)['body'], 'href="/en/report?url=https%3A%2F%2Fexample.test%2Fen%2Fproviders%2Fmueller-design"'));
+check('the report link in the footer names the page it is on, but not the account\'s own pages', str_contains($get('/offers', null)['body'], 'href="/report?url=https%3A%2F%2Fexample.test%2Foffers"')
+    && str_contains($get('/account', 1)['body'], '<a href="/report">'));
+
+// A notice about this offer: the administrator gets to it with a click,
+// and the provider hears about action taken - not who reported.
+$post('/report', ['url' => 'https://example.test/offers/ich-gestalte-dein-logo', 'category' => 'fraud', 'explanation' => 'Dieses Angebot ist nicht in Ordnung.', 'name' => 'Erika', 'email' => 'erika@example.test', 'good_faith' => '1'], null);
+$post('/report', ['url' => 'https://elsewhere.test/offers/ich-gestalte-dein-logo', 'category' => 'fraud', 'explanation' => 'Dieses Angebot ist nicht in Ordnung.', 'name' => 'Erika', 'email' => 'erika@example.test', 'good_faith' => '1'], null);
+$post('/report', ['url' => '/en/providers/mueller-design', 'category' => 'other', 'explanation' => 'Dieser Anbieter ist nicht in Ordnung.', 'name' => 'Erika', 'email' => 'erika@example.test', 'good_faith' => '1'], null);
+$subjects = $pdo->query('SELECT offer_id, provider_id FROM report ORDER BY id')->fetchAll();
+check('report: an address of this site is matched to its offer or provider, another site is not', (int) $subjects[0]['offer_id'] === $offerId && (int) $subjects[0]['provider_id'] === $providerId
+    && $subjects[1]['offer_id'] === null && $subjects[1]['provider_id'] === null && $subjects[2]['offer_id'] === null && (int) $subjects[2]['provider_id'] === $providerId);
+check('report: the administration links to the offer and the provider', str_contains($get('/admin/reports', 3)['body'], 'href="/admin/offers/' . $offerId . '"') && str_contains($get('/admin/reports', 3)['body'], 'href="/admin/providers/' . $providerId . '"'));
+$firstReport = (int) $pdo->query('SELECT MIN(id) FROM report')->fetchColumn();
+$post('/admin/reports/' . ($firstReport + 2) . '/decide', ['decision' => 'rejected', 'note' => 'Kein Verstoß.'], 3);
+check('report: a provider is not told about a notice that led to nothing', lastMail($mailLog, 'plain@example.test')['subject'] !== 'Maßnahme zu einem deiner Inhalte');
+$post('/admin/reports/' . $firstReport . '/decide', ['decision' => 'actioned', 'note' => 'Das Angebot wurde pausiert.'], 3);
+$log = (string) file_get_contents($mailLog);
+$providerMail = substr($log, (int) strrpos($log, 'To: plain@example.test'));
+check('report: the provider is told about action and its reasons, not who reported', lastMail($mailLog, 'plain@example.test')['subject'] === 'Maßnahme zu einem deiner Inhalte' && str_contains($providerMail, 'Das Angebot wurde pausiert.')
+    && !str_contains($providerMail, 'Erika') && !str_contains($providerMail, 'erika@example.test'));
+$pdo->exec('DELETE FROM report');
+$pdo->exec('DELETE FROM rate_limit_attempt');
+
+$get('/offers/ich-gestalte-dein-logo', 2);
+$r = $get('/account');
+check('overview: what was looked at last is shown, from the visitor\'s own session', str_contains($r['body'], 'Zuletzt angesehen') && ($_SESSION['recent_offers'] ?? []) === [$offerId] && !str_contains($get('/account', 3)['body'], 'Zuletzt angesehen'));
 check('the provider sees no order button on the own offer', !str_contains($get('/offers/ich-gestalte-dein-logo', 1)['body'], $orderPath . '?package='));
 check('ordering needs a login', $get($orderPath, null)['body'] === '');
 $r = $get($orderPath . '?package=2', 2);
@@ -1609,9 +1657,12 @@ check('withdrawal: no more than five an hour from one address of the network', c
 
 check('withdrawal: the list in the administration needs its permission', $get('/admin/withdrawals', 2)['status'] === 403 && $get('/admin/withdrawals', null)['body'] === '');
 $r = $get('/admin/withdrawals', 3);
-check('withdrawal: the administration lists every declaration with its order', $r['status'] === 200 && str_contains($r['body'], 'Erika Muster') && str_contains($r['body'], 'href="/admin/orders/9001"')
-    && str_contains($r['body'], 'nicht zugeordnet') && str_contains($r['body'], 'stranger@example.test') && str_contains($r['body'], $first['created_at'] . ' UTC')
-    && str_contains($r['body'], '&lt;b&gt;fett&lt;/b&gt;') && !str_contains($r['body'], '<b>fett') && str_contains($r['body'], 'href="/admin/withdrawals" aria-current="page"'));
+// One check per claim: this list failed once without saying which part.
+check('withdrawal: the administration lists every declaration with its order', $r['status'] === 200 && str_contains($r['body'], 'Erika Muster') && str_contains($r['body'], 'href="/admin/orders/9001"'));
+check('withdrawal: the list shows what could not be assigned', str_contains($r['body'], 'nicht zugeordnet') && str_contains($r['body'], 'stranger@example.test'));
+check('withdrawal: the list shows when a declaration arrived', str_contains($r['body'], $first['created_at'] . ' UTC'));
+check('withdrawal: the list escapes what was typed', str_contains($r['body'], '&lt;b&gt;fett&lt;/b&gt;') && !str_contains($r['body'], '<b>fett'));
+check('withdrawal: the list is marked in the menu', str_contains($r['body'], 'href="/admin/withdrawals" aria-current="page"'));
 $export = json_decode($get('/account/export', 2)['body'], true);
 check('withdrawal: an account\'s declarations are part of its data', count($export['withdrawals'] ?? []) >= 2 && ($export['withdrawals'][0]['order_number'] ?? '') === '009001'
     && ($export['withdrawals'][0]['matched'] ?? null) === true && !isset(json_decode($get('/account/export', 1)['body'], true)['withdrawals']));
@@ -1841,6 +1892,14 @@ $extensionFiles = fn (int $api) => ['extension.json' => json_encode(['id' => 'sh
 check('package: an extension for another interface version is refused', $packageError(fn () => $packages->installArchive($zip, $sha, 'acme/modulento-shop', '0.1.0')) === 'core.package.error.api' && !is_dir($packageRoot . '/extensions/shop'));
 [$zip, $sha] = $makePackage($extensionFiles(Modulento\Core\App::API_VERSION));
 check('package: an extension is unpacked into extensions/<id>', $packages->installArchive($zip, $sha, 'acme/modulento-shop', '0.1.0')['kind'] === 'extension' && is_file($packageRoot . '/extensions/shop/src/Extension.php'));
+$needsNewer = new Packages($pdo, new Modulento\Core\Support\ReleaseClient(''), $packageRoot . '/extensions', $packageRoot . '/themes', $packageRoot . '/work', ['acme/*'], '0.12.0');
+[$zip, $sha] = $makePackage(['theme.json' => '{"id":"future","name":"Future","version":"1.0.0","requires":"0.13.0"}', 'templates/home.twig' => 'x']);
+check('package: one that needs a newer core is refused and says which', $packageError(fn () => $needsNewer->installArchive($zip, $sha, 'acme/modulento-theme-future', '1.0.0')) === 'core.package.error.core_version' && !is_dir($packageRoot . '/themes/future'));
+[$zip, $sha] = $makePackage(['theme.json' => '{"id":"future","name":"Future","version":"1.0.0","requires":"0.12.0"}', 'templates/home.twig' => 'x']);
+check('package: one whose minimum the core meets is installed', $needsNewer->installArchive($zip, $sha, 'acme/modulento-theme-future', '1.0.0')['id'] === 'future');
+[$zip, $sha] = $makePackage(['theme.json' => '{"id":"later","name":"Later","version":"1.0.0","requires":"9.0.0"}', 'templates/home.twig' => 'x']);
+check('package: a development checkout without a version takes everything', $packages->installArchive($zip, $sha, 'acme/modulento-theme-later', '1.0.0')['id'] === 'later');
+$pdo->exec("DELETE FROM package WHERE id IN ('future', 'later')");
 foreach (['example'] as $shipped) {
     [$zip, $sha] = $makePackage(['extension.json' => json_encode(['id' => $shipped, 'version' => '9.0.0', 'api' => 1, 'namespace' => 'X']), 'src/Extension.php' => '<?php']);
     check("package: cannot replace the shipped extension {$shipped}", $packageError(fn () => $packages->installArchive($zip, $sha, 'acme/x', '9.0.0')) === 'core.package.error.shipped');

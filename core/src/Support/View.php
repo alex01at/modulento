@@ -83,7 +83,7 @@ final class View
         $this->twig->addFunction(new TwigFunction('current_path', fn () => $app->path));
         $this->twig->addFunction(new TwigFunction(
             'url',
-            fn (string $path, ?string $locale = null) => $app->url($path, $locale)
+            fn (string $path, ?string $locale = null, bool $absolute = false) => $app->url($path, $locale, $absolute)
         ));
         // The current page in every enabled language, for the language
         // menu and for <link rel="alternate" hreflang>.
@@ -113,7 +113,13 @@ final class View
             // layout of its own shows it without knowing about it.
             if ($where === 'footer') {
                 $links[] = ['title' => $app->translator->trans('core.withdrawal.link'), 'url' => $app->url('/withdrawal'), 'role' => 'withdrawal'];
-                $links[] = ['title' => $app->translator->trans('core.report.link'), 'url' => $app->url('/report'), 'role' => 'report'];
+                // The report form is told which page it was opened from, so
+                // the address of the content is already filled in. Not from
+                // the form itself or the administration.
+                $here = preg_match('#^/(report|admin|account|orders|login|register)(/|$)#', $app->path) === 1 || $app->path === '/'
+                    ? ''
+                    : '?url=' . rawurlencode($app->url($app->path, null, true));
+                $links[] = ['title' => $app->translator->trans('core.report.link'), 'url' => $app->url('/report') . $here, 'role' => 'report'];
             }
 
             return $links;

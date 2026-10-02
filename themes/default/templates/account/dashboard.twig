@@ -25,7 +25,11 @@
 <div class="dashboard">
     <aside class="dashboard-side">
         <section class="dashboard-card">
-            <span class="avatar" aria-hidden="true">{{ name|first|upper }}</span>
+            {% if avatar %}
+                <img class="avatar" src="{{ avatar }}" alt="" width="80" height="80">
+            {% else %}
+                <span class="avatar" aria-hidden="true">{{ name|first|upper }}</span>
+            {% endif %}
             <p class="dashboard-welcome">{{ trans('core.dashboard.welcome') }} <strong>{{ name }}</strong></p>
             <ul class="dashboard-links">
                 <li><a href="{{ url('/account/orders') }}">{{ trans('core.order.list.buyer') }}</a></li>
@@ -90,6 +94,15 @@
             </div>
             {{ _self.orders(purchases.recent, 'core.dashboard.no_purchases') }}
         </section>
+
+        {% if recent %}
+            <section>
+                <div class="dashboard-heading">
+                    <h2>{{ trans('core.dashboard.recent') }}</h2>
+                </div>
+                {% include 'offer/_cards.twig' with {offers: recent} %}
+            </section>
+        {% endif %}
 
         {% set latest = latest_offers(3) %}
         {% if latest %}

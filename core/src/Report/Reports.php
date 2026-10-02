@@ -22,12 +22,12 @@ final class Reports
     {
     }
 
-    /** @param array{url: string, category: string, explanation: string, name: string, email: string, locale: string, account_id: ?int} $fields */
+    /** @param array{url: string, category: string, explanation: string, name: string, email: string, locale: string, account_id: ?int, offer_id: ?int, provider_id: ?int} $fields */
     public function create(array $fields, string $receivedAt): int
     {
         $stmt = $this->db->prepare(
-            "INSERT INTO report (url, category, explanation, name, email, locale, account_id, status, created_at)
-             VALUES (:url, :category, :explanation, :name, :email, :locale, :account_id, 'open', :now)"
+            "INSERT INTO report (url, category, explanation, name, email, locale, account_id, offer_id, provider_id, status, created_at)
+             VALUES (:url, :category, :explanation, :name, :email, :locale, :account_id, :offer_id, :provider_id, 'open', :now)"
         );
         $stmt->execute($fields + ['now' => $receivedAt]);
 

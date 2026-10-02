@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modulento\Core;
 
 use Modulento\Core\Account\Accounts;
+use Modulento\Core\Account\Avatars;
 use Modulento\Core\Account\Roles;
 use Modulento\Core\Account\Tokens;
 use Modulento\Core\Catalogue\Categories;
@@ -67,6 +68,7 @@ final class App
     public readonly OrderFiles $orderFiles;
     public readonly Withdrawals $withdrawals;
     public readonly Reports $reports;
+    public readonly Avatars $avatars;
     public readonly Reviews $reviews;
     public readonly Packages $packages;
 
@@ -119,8 +121,11 @@ final class App
             $extensionsDir,
             $themesDir,
             $config['app']['work'] ?? $root . '/var/updates',
-            $config['packages']['sources'] ?? []
+            $config['packages']['sources'] ?? [],
+            // VERSION only exists inside a release package.
+            is_file($root . '/VERSION') ? (trim((string) file_get_contents($root . '/VERSION')) ?: '0.0.0') : '0.0.0'
         );
+        $this->avatars = new Avatars($db, ($config['app']['uploads'] ?? $config['app']['root'] . '/var/uploads') . '/avatars');
         $this->accounts = new Accounts($db);
         $this->tokens = new Tokens($db);
         $this->mailer = new Mailer($this);

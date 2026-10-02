@@ -27,7 +27,11 @@
             <dd>{{ report.created_at }} UTC</dd>
             <dt>{{ trans('core.report.field.url') }}</dt>
             {# Shown as text: an address someone typed is not a link to follow blindly. #}
-            <dd>{{ report.url }}</dd>
+            <dd>
+                {{ report.url }}
+                {% if report.offer_id %}<br><a href="{{ url('/admin/offers/' ~ report.offer_id) }}">{{ trans('core.admin.reports.to_offer') }}</a>{% endif %}
+                {% if report.provider_id %}<br><a href="{{ url('/admin/providers/' ~ report.provider_id) }}">{{ trans('core.admin.reports.to_provider') }}</a>{% endif %}
+            </dd>
             <dt>{{ trans('core.report.field.category') }}</dt>
             <dd>{{ trans('core.report.category.' ~ report.category) }}</dd>
             <dt>{{ trans('core.report.field.explanation') }}</dt>
@@ -51,7 +55,7 @@
                 </select>
                 <label for="note_{{ report.id }}">{{ trans('core.admin.reports.note') }}</label>
                 <textarea id="note_{{ report.id }}" name="note" rows="4" maxlength="{{ max_note }}" required></textarea>
-                <small>{{ trans('core.admin.reports.note_hint') }}</small>
+                <small>{{ trans(report.provider_id ? 'core.admin.reports.note_hint_provider' : 'core.admin.reports.note_hint') }}</small>
                 <button type="submit">{{ trans('core.admin.reports.decide') }}</button>
             </form>
         {% endif %}

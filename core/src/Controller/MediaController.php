@@ -16,8 +16,16 @@ final class MediaController extends Controller
 
     public function offerImage(array $params): void
     {
-        $file = $this->app->offerImages->path((int) $params['id'], $params['file']);
+        $this->send($this->app->offerImages->path((int) $params['id'], $params['file']));
+    }
 
+    public function avatar(array $params): void
+    {
+        $this->send($this->app->avatars->path($params['file']));
+    }
+
+    private function send(?string $file): void
+    {
         if ($file === null) {
             http_response_code(404);
             header('Content-Type: text/plain; charset=utf-8');

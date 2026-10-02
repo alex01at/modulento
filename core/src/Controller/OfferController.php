@@ -95,6 +95,10 @@ final class OfferController extends Controller
             return;
         }
 
+        // Remembered in the visitor's own session for "viewed recently".
+        $recent = array_values(array_filter((array) Session::get('recent_offers', []), fn ($id) => $id !== $offer['id']));
+        Session::set('recent_offers', array_slice([$offer['id'], ...$recent], 0, 8));
+
         $text = $app->offers->text($offer, $locale);
         foreach ($app->locales->enabled() as $other) {
             $app->alternatePaths[$other] = '/offers/' . ($offer['texts'][$other]['slug'] ?? $text['slug']);

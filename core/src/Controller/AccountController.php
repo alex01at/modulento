@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Modulento\Core\Controller;
 
 use Modulento\Core\Account\Accounts;
+use Modulento\Core\Account\Avatars;
+use Modulento\Core\Catalogue\OfferView;
 use Modulento\Core\Account\Tokens;
 use Modulento\Core\Account\AccountRemoval;
 use Modulento\Core\Event\AccountExport;
@@ -39,6 +41,8 @@ final class AccountController extends Controller
 
         $this->render('account/dashboard.twig', [
             'name' => ($account['display_name'] ?? '') !== '' ? $account['display_name'] : strstr($account['email'], '@', true),
+            'avatar' => $app->avatars->url($account['id']),
+            'recent' => $this->recentlyViewed(),
             'purchases' => $app->orders->tally('buyer', $account['id']) + ['recent' => $rows('buyer', $account['id'])],
             'provider' => $provider !== null ? [
                 'name' => $provider['name'],
@@ -53,9 +57,46 @@ final class AccountController extends Controller
         ]);
     }
 
+    /**
+     * The offers this visitor looked at last, as far as they are still
+     * public. The list lives in the session: nothing is recorded about who
+     * looked at what.
+     */
+    private function recentlyViewed(): array
+    {
+        $app = $this->app;
+        $offers = [];
+        foreach (array_slice((array) Session::get('recent_offers', []), 0, 4) as $id) {
+            $offer = is_int($id) ? $app->offers->find($id) : null;
+            if ($offer !== null && $app->offers->isPublic($offer)) {
+                $offers[] = $offer;
+            }
+        }
+
+        return OfferView::cards($offers, $app);
+    }
+
+    public function setAvatar(array $params): void
+    {
+        $problem = (new RateLimiter($this->app->db))->hit('avatar', (string) $this->accountId(), 20, 3600)
+            ? 'core.error.too_many_requests'
+            : $this->app->avatars->set($this->accountId(), is_array($_FILES['avatar'] ?? null) ? $_FILES['avatar'] : []);
+
+        $this->back($problem === null ? 'success' : 'error', $problem ?? 'core.account.avatar.saved', [
+            'megabytes' => intdiv(Avatars::MAX_BYTES, 1024 * 1024),
+        ]);
+    }
+
+    public function deleteAvatar(array $params): void
+    {
+        $this->app->avatars->delete($this->accountId());
+        $this->back('success', 'core.account.avatar.deleted');
+    }
+
     public function index(array $params): void
     {
         $this->render('account/index.twig', [
+            'avatar' => $this->app->avatars->url($this->accountId()),
             'locales' => $this->app->locales->enabled(),
             'min_length' => PasswordPolicy::MIN_LENGTH,
             'is_last_admin' => $this->app->accounts->isLastAdmin($this->accountId()),
