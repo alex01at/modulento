@@ -52,6 +52,11 @@ final class Installer
             readfile($this->root . '/core/install/install.css');
             return;
         }
+        if ($path === '/password-toggle.js') {
+            header('Content-Type: text/javascript; charset=utf-8');
+            readfile($this->root . '/core/install/password-toggle.js');
+            return;
+        }
 
         Session::start();
         $available = Translator::localesIn($this->root . '/core/lang');
@@ -91,6 +96,8 @@ final class Installer
                 fn (string $key) => str_starts_with($key, 'core.install.'),
                 ARRAY_FILTER_USE_KEY
             ),
+            'password_show' => $this->translator->trans('core.password.show'),
+            'password_hide' => $this->translator->trans('core.password.hide'),
             'requirements' => $this->requirements(),
             'values' => $values,
             'errors' => $errors,

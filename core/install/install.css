@@ -9,3 +9,6 @@ button { margin-top: 1.75rem; padding: .6rem 1.2rem; border: 0; border-radius: .
 .checks { padding-left: 1.2rem; }
 .checks .ok { color: #1c6b3a; }
 .checks .missing { color: #a3231f; font-weight: 600; }
+.password-field { display: flex; gap: .4rem; }
+.password-field input { flex: 1 1 auto; min-width: 0; }
+.password-toggle { flex: none; margin: 0; padding: .5rem .7rem; border: 1px solid #b9c0ca; background: #fff; color: #1c2430; font-size: .85rem; white-space: nowrap; }
