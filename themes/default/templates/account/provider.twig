@@ -3,6 +3,7 @@
 {% block title %}{{ trans('core.provider.title') }} – {{ site_name }}{% endblock %}
 
 {% block content %}
+{% include 'account/_nav.twig' %}
 <h1>{{ trans('core.provider.title') }}</h1>
 
 {% if status %}

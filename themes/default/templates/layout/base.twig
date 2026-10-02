@@ -23,6 +23,9 @@
             <a href="{{ url('/admin') }}">{{ trans('core.nav.admin') }}</a>
         {% endif %}
         {% if account %}
+            {% if provider_status() %}
+                <a href="{{ url('/account/offers') }}">{{ trans('core.offer.mine.title') }}</a>
+            {% endif %}
             <a href="{{ url('/account') }}">{{ trans('core.nav.account') }}</a>
             <form method="post" action="{{ url('/logout') }}" class="inline-form">
                 {{ csrf_field() }}

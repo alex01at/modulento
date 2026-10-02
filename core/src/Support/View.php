@@ -136,6 +136,17 @@ final class View
             'top_providers',
             fn (int $limit = 3) => ProviderView::all($app->providers->top($limit), $app)
         ));
+        // The logged-in account's provider profile: its status, or null
+        // without one. For menus that show a provider's own pages.
+        $this->twig->addFunction(new TwigFunction('provider_status', function () use ($app, $auth): ?string {
+            static $status = false;
+            if ($status === false) {
+                $account = $auth->account();
+                $status = $account !== null ? ($app->providers->findByAccount($account['id'])['status'] ?? null) : null;
+            }
+
+            return $status;
+        }));
         $this->twig->addFunction(new TwigFunction('registration_open', fn () => $app->settings->get('core.registration', 'open') === 'open'));
         $this->twig->addFunction(new TwigFunction('locale_name', fn (string $locale) => $app->locales->name($locale)));
         $this->twig->addFunction(new TwigFunction('can', fn (string $permission) => $auth->can($permission)));

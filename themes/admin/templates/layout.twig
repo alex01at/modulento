@@ -46,7 +46,7 @@
                     <a class="topbar-link" href="{{ language.url }}" hreflang="{{ language.locale }}" lang="{{ language.locale }}">{{ icons.icon('globe') }}<span>{{ language.name }}</span></a>
                 {% endif %}
             {% endfor %}
-            <a class="topbar-link" href="{{ url('/') }}">{{ icons.icon('external') }}<span class="topbar-label">{{ trans('core.nav.to_site') }}</span></a>
+            <a class="topbar-link" href="{{ url('/') }}" target="_blank" rel="noopener">{{ icons.icon('external') }}<span class="topbar-label">{{ trans('core.nav.to_site') }}</span></a>
             {% if account %}
                 <a class="topbar-link topbar-account" href="{{ url('/account') }}">
                     <span class="avatar">{{ icons.icon('user') }}</span>

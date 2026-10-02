@@ -13,6 +13,10 @@
 * { box-sizing: border-box; }
 
 body {
+    /* The footer stays at the bottom of the window on short pages. */
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
     margin: 0;
     color: var(--text);
     font: 1rem/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
@@ -34,7 +38,10 @@ a { color: var(--accent); }
 .site-header nav { display: flex; flex-wrap: wrap; align-items: center; gap: 1rem; }
 .site-name { font-weight: 700; text-decoration: none; color: var(--text); }
 
-main { max-width: 64rem; margin: 0 auto; padding: 1.5rem 1rem 3rem; }
+main { flex: 1 0 auto; width: 100%; max-width: 64rem; margin: 0 auto; padding: 1.5rem 1rem 3rem; }
+.account-nav { display: flex; flex-wrap: wrap; gap: .5rem; margin-bottom: 1.5rem; padding-bottom: 1rem; border-bottom: 1px solid var(--line); }
+.account-nav a { padding: .35rem .8rem; border: 1px solid var(--line); border-radius: 2rem; text-decoration: none; }
+.account-nav a:hover { border-color: var(--accent); }
 
 .inline-form { display: inline; margin: 0; }
 .link-button { padding: 0; border: 0; background: none; color: var(--accent); font: inherit; text-decoration: underline; cursor: pointer; }
