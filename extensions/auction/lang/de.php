@@ -30,7 +30,7 @@ return [
     'auction.detail.current' => 'Aktuelles Gebot',
     'auction.detail.bid' => '{count} Gebot',
     'auction.detail.bids' => '{count} Gebote',
-    'auction.detail.left' => 'Noch {days} T. {hours} Std. {minutes} Min.',
+    'auction.detail.left' => 'Noch {days} T. {hours} Std. {minutes} Min. {seconds} Sek.',
     'auction.detail.ends' => 'Endet am {date} UTC',
     'auction.detail.ended' => 'Beendet am {date} UTC',
     'auction.detail.pending' => 'Die Auktion hat noch nicht begonnen.',

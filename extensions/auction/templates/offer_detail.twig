@@ -13,7 +13,9 @@
             </li>
             <li>
                 {% if type_data.running %}
-                    <strong>{{ trans('auction.detail.left', type_data.left) }}</strong>
+                    {# countdown.js keeps this running; the text is complete without it. #}
+                    <strong data-auction-ends="{{ type_data.ends_at_iso }}" data-auction-now="{{ type_data.now_iso }}" data-auction-template="{{ trans('auction.detail.left', {days: '{days}', hours: '{hours}', minutes: '{minutes}', seconds: '{seconds}'}) }}">{{ trans('auction.detail.left', type_data.left) }}</strong>
+                    <script src="{{ ext_asset('auction', 'countdown.js') }}" defer></script>
                     <small>{{ trans('auction.detail.ends', {date: type_data.ends_at}) }}</small>
                 {% elseif type_data.status == 'pending' %}
                     <strong>{{ trans('auction.detail.pending') }}</strong>
