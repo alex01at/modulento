@@ -1,0 +1,9 @@
+{% extends 'layout/base.twig' %}
+
+{% block title %}{{ trans('core.withdrawal.done.title') }} – {{ site_name }}{% endblock %}
+
+{% block content %}
+<h1>{{ trans('core.withdrawal.done.title') }}</h1>
+<p class="flash flash-success" role="status">{{ trans('core.withdrawal.done.text', {received_at: received_at, email: email}) }}</p>
+<p><small>{{ trans('core.withdrawal.done.hint') }}</small></p>
+{% endblock %}

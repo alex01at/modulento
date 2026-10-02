@@ -227,6 +227,9 @@ Templates of the site theme, with the variables they receive:
 | `order/new.twig` | `offer`, `flow_template`, `flow_data`, `note`, `payment_methods`, `terms`, `errors`, `file_limits`; keep the button's wording; forms with a file field need `enctype="multipart/form-data"` |
 | `order/index.twig` | `role` (`buyer` or `provider`), `orders`, `page`, `pages` |
 | `order/show.twig` | `order` (summary, `items`, `events` and `messages` each with `files`, payment), `role`, `actions` (with `note` and `files`), `can_mark_paid`, `counterpart`, `flow_template`, `flow_data`, `file_limits` |
+| `withdrawal/form.twig` | `name`, `email`, `order_number`, `order_choice`, `statement`, `orders` (the logged-in buyer's own: `number`, `title`, `created_at`), `limits`, `errors`; keep the hidden `website` field and the note on what the form does |
+| `withdrawal/review.twig` | `name`, `email`, `order_number`, `statement`, `errors`; a form that posts to `/withdrawal/confirm` - keep the button's wording |
+| `withdrawal/done.twig` | `email`, `received_at` (UTC) |
 | `review/_rating.twig` | `rating` (`count`, `average`): stars with a text alternative |
 | `review/_list.twig` | `reviews`: `author` (empty for "a buyer"), `rating`, `body`, `locale`, `created_at`, `reply`; keep the note on where reviews come from |
 | `provider/index.twig` | `providers`, `page`, `pages` |
@@ -237,7 +240,8 @@ E-mails are theme templates too: `verify_email`, `reset_password`,
 `already_registered`, `change_email`, `password_changed`, `provider_approved`,
 `provider_rejected`, `provider_suspended`, `account_blocked`, `offer_published`,
 `offer_rejected`, `offer_contact`, `order_update`, `order_message`, `review_new`,
-`review_reply`, `review_hidden`. With `APP_ENV="dev"`
+`review_reply`, `review_hidden`, `withdrawal_receipt`, `withdrawal_provider`,
+`withdrawal_platform`. With `APP_ENV="dev"`
 nothing is sent; mails are appended to `var/log/mail.log`.
 
 Available in every template:
@@ -248,7 +252,7 @@ Available in every template:
 | `url(path)` | Address of a path in the current language - use it for every link and form target |
 | `locale()`, `locale_urls()`, `locale_name(code)` | Current language; the current page in every language (`locale`, `name`, `url`, `absolute_url`, `current`) |
 | `current_path()` | Path of the current page without its language prefix, e.g. to mark the active menu entry |
-| `page_links('header' \| 'footer' \| role)` | Published pages for a menu, as `title`/`url` |
+| `page_links('header' \| 'footer' \| role)` | Published pages for a menu, as `title`/`url`/`role`; `'footer'` ends with the link to the withdrawal form (`role` is `withdrawal`) |
 | `latest_offers(limit)` | The newest public offers as cards |
 | `categories()` | The category tree with `name`, `path`, `children` and `offer_count` |
 | `top_providers(limit)` | Public providers, best rated first, as shown on `provider/show.twig` |
@@ -371,6 +375,19 @@ Reviews (`$app->reviews`) belong to the core: one per order, by its buyer,
 with one public reply by the provider. Offers and providers carry the number
 and sum of their published ratings, so lists show and sort by them. An
 administrator can hide a review with a reason, which the author receives.
+
+The withdrawal form (`/withdrawal`, linked in the footer of every page and on
+the buyer's order page) lets a buyer declare a withdrawal without logging in:
+name, order number and the address for the acknowledgement, checked on a
+second page and sent with "Confirm withdrawal". The sender receives an
+acknowledgement of receipt by e-mail with the declaration and the time it
+arrived. A declaration is assigned to an order only if the number fits the
+buyer (the logged-in account, or the address of the buyer's account); it is
+then passed on to the provider and shown among the order's messages, otherwise
+it goes to the administrators. The answer is the same either way, and no order
+changes state: whether a right of withdrawal exists is the provider's to
+decide. **Administration → Withdrawals** lists every declaration
+(`$app->withdrawals`). The wording is a starting point, not legal advice.
 
 A `PaymentMethod` decides how an order is paid. The core ships `core.offline`
 (buyer and provider settle it themselves; the provider confirms the receipt).

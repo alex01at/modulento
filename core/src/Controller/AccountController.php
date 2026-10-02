@@ -189,6 +189,10 @@ final class AccountController extends Controller
         if ($reviews !== []) {
             $export->add('reviews', $reviews);
         }
+        $withdrawals = $this->app->withdrawals->byAccount($this->accountId());
+        if ($withdrawals !== []) {
+            $export->add('withdrawals', $withdrawals);
+        }
         $this->app->events->dispatch($export);
 
         header('Content-Type: application/json; charset=utf-8');

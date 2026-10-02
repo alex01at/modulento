@@ -1,0 +1,9 @@
+{# Plain text: nothing here is HTML-escaped. Blocks: subject, body.
+   The acknowledgement of receipt: keep the whole declaration and the time
+   it arrived in it. #}
+{% block subject %}{{ trans('core.mail.withdrawal_receipt.subject', {number: number}) }}{% endblock %}
+{% block body %}
+{{ trans('core.mail.withdrawal_receipt.body', {received_at: received_at, number: number, email: email, name: name, statement: statement}) }}
+
+{{ trans('core.mail.signature') }}
+{% endblock %}

@@ -104,10 +104,18 @@ final class View
         // Published pages for a menu: "header", "footer" (includes the
         // legal pages) or a role such as "terms".
         $this->twig->addFunction(new TwigFunction('page_links', function (string $where) use ($app): array {
-            return array_map(
+            $links = array_map(
                 fn (array $link) => ['title' => $link['title'], 'url' => $app->url($link['path']), 'role' => $link['role']],
                 $app->pages->links($where, $app->translator->locale())
             );
+            // The withdrawal form has to be reachable from every page. It
+            // is added here rather than in a template, so a theme with a
+            // layout of its own shows it without knowing about it.
+            if ($where === 'footer') {
+                $links[] = ['title' => $app->translator->trans('core.withdrawal.link'), 'url' => $app->url('/withdrawal'), 'role' => 'withdrawal'];
+            }
+
+            return $links;
         }));
         // The newest public offers as cards, e.g. for the home page.
         $this->twig->addFunction(new TwigFunction('latest_offers', function (int $limit = 6) use ($app): array {

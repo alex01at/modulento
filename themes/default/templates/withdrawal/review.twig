@@ -1,0 +1,33 @@
+{% extends 'layout/base.twig' %}
+
+{% block title %}{{ trans('core.withdrawal.review.title') }} – {{ site_name }}{% endblock %}
+
+{% block content %}
+<h1>{{ trans('core.withdrawal.review.title') }}</h1>
+<p>{{ trans('core.withdrawal.review.intro') }}</p>
+
+{% for error in errors %}
+    <p class="flash flash-error" role="alert">{{ error }}</p>
+{% endfor %}
+
+<table>
+    <tr><th scope="row">{{ trans('core.withdrawal.field.name') }}</th><td>{{ name }}</td></tr>
+    <tr><th scope="row">{{ trans('core.withdrawal.field.email') }}</th><td>{{ email }}</td></tr>
+    <tr><th scope="row">{{ trans('core.withdrawal.field.order_number') }}</th><td>{{ order_number }}</td></tr>
+    <tr><th scope="row">{{ trans('core.withdrawal.field.statement') }}</th><td>{{ statement ? statement|nl2br : '–' }}</td></tr>
+</table>
+
+<p><strong>{{ trans('core.withdrawal.review.declaration') }}</strong></p>
+
+{# Keep the button's wording: it has to say that the withdrawal is declared with it. #}
+<form method="post" action="{{ url('/withdrawal/confirm') }}" class="stack-form wide">
+    {{ csrf_field() }}
+    <div class="visually-hidden" aria-hidden="true">
+        <label for="withdrawal_website">Website</label>
+        <input id="withdrawal_website" name="website" type="text" tabindex="-1" autocomplete="off">
+    </div>
+    <button type="submit">{{ trans('core.withdrawal.confirm') }}</button>
+</form>
+<p><a href="{{ url('/withdrawal') }}">{{ trans('core.withdrawal.review.change') }}</a></p>
+<p><small>{{ trans('core.withdrawal.hint') }}</small></p>
+{% endblock %}

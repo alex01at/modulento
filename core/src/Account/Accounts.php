@@ -139,6 +139,22 @@ final class Accounts
         return array_map('intval', $admins) === [$id];
     }
 
+    /**
+     * Who runs the platform: every active account that may do everything.
+     * For what has to reach a person rather than a party of an order.
+     *
+     * @return array<int, array{id: int|string, email: string, locale: string}>
+     */
+    public function administrators(): array
+    {
+        return $this->db->query(
+            "SELECT DISTINCT a.id, a.email, a.locale FROM account a
+             JOIN account_role ar ON ar.account_id = a.id
+             JOIN role_permission rp ON rp.role_id = ar.role_id
+             WHERE rp.permission = '*' AND a.status = 'active' ORDER BY a.id"
+        )->fetchAll();
+    }
+
     /** Whether the account may do everything (holds the wildcard permission). */
     public function isAdmin(int $id): bool
     {

@@ -1,0 +1,50 @@
+{% extends 'layout/base.twig' %}
+
+{% block title %}{{ trans('core.withdrawal.title') }} – {{ site_name }}{% endblock %}
+
+{% block content %}
+<h1>{{ trans('core.withdrawal.title') }}</h1>
+<p>{{ trans('core.withdrawal.intro') }}</p>
+{# Keep this note: it says what the form does and what it does not. #}
+<p><small>{{ trans('core.withdrawal.hint') }}</small></p>
+
+{% for error in errors %}
+    <p class="flash flash-error" role="alert">{{ error }}</p>
+{% endfor %}
+
+<form method="post" action="{{ url('/withdrawal') }}" class="stack-form wide">
+    {{ csrf_field() }}
+    <label for="withdrawal_name">{{ trans('core.withdrawal.field.name') }}</label>
+    <input id="withdrawal_name" name="name" type="text" value="{{ name }}" maxlength="{{ limits.name }}" autocomplete="name" required>
+
+    <label for="withdrawal_email">{{ trans('core.withdrawal.field.email') }}</label>
+    <input id="withdrawal_email" name="email" type="email" value="{{ email }}" maxlength="255" autocomplete="email" required>
+    <small>{{ trans('core.withdrawal.field.email_hint') }}</small>
+
+    {% if orders %}
+        <label for="withdrawal_order_choice">{{ trans('core.withdrawal.field.order_choice') }}</label>
+        <select id="withdrawal_order_choice" name="order_choice">
+            <option value="">{{ trans('core.withdrawal.field.order_other') }}</option>
+            {% for order in orders %}
+                <option value="{{ order.number }}" {{ order.number == order_choice ? 'selected' }}>{{ order.number }} – {{ order.title }} ({{ order.created_at|slice(0, 10) }})</option>
+            {% endfor %}
+        </select>
+    {% endif %}
+
+    <label for="withdrawal_order_number">{{ trans(orders ? 'core.withdrawal.field.order_number_other' : 'core.withdrawal.field.order_number') }}</label>
+    <input id="withdrawal_order_number" name="order_number" type="text" value="{{ order_number }}" maxlength="{{ limits.order_number }}" autocomplete="off" {{ orders ? '' : 'required' }}>
+    <small>{{ trans('core.withdrawal.field.order_number_hint') }}</small>
+
+    <label for="withdrawal_statement">{{ trans('core.withdrawal.field.statement') }}</label>
+    <textarea id="withdrawal_statement" name="statement" rows="5" maxlength="{{ limits.statement }}">{{ statement }}</textarea>
+    <small>{{ trans('core.withdrawal.field.statement_hint') }}</small>
+
+    {# Bot trap: hidden from people, must stay empty. Keep it in every theme. #}
+    <div class="visually-hidden" aria-hidden="true">
+        <label for="withdrawal_website">Website</label>
+        <input id="withdrawal_website" name="website" type="text" tabindex="-1" autocomplete="off">
+    </div>
+
+    <button type="submit">{{ trans('core.withdrawal.next') }}</button>
+</form>
+{% endblock %}

@@ -104,6 +104,10 @@
         {% if counterpart.path %}<a href="{{ url(counterpart.path) }}">{{ counterpart.name }}</a>{% else %}{{ counterpart.name }}{% endif %}
         {% if counterpart.email %}· <a href="mailto:{{ counterpart.email }}">{{ counterpart.email }}</a>{% endif %}
     </p>
+    {% if role == 'buyer' %}
+        {# Keep this link in every theme: the withdrawal form has to be easy to find. #}
+        <p><small><a href="{{ url('/withdrawal') }}?order={{ order.number }}">{{ trans('core.withdrawal.link') }}</a></small></p>
+    {% endif %}
 </section>
 
 <section>
