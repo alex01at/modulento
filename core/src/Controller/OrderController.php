@@ -96,7 +96,7 @@ final class OrderController extends Controller
         $offer = $app->offers->findPublicBySlug($app->translator->locale(), $params['slug']);
         $flow = $offer !== null ? $app->orders->flowForOfferType($offer['type']) : null;
 
-        if ($offer === null || $flow === null) {
+        if ($offer === null || $flow === null || !$flow->checkout()) {
             $this->notFound();
             return null;
         }

@@ -43,10 +43,13 @@ interface OfferType
      * Checks this type's part of the submitted form.
      *
      * @param array<string, mixed> $input the request's POST data
+     * @param int|null $offerId null for a new offer; a type whose offers
+     *        may not change any more once something depends on them (bids
+     *        on a lot) decides that here
      * @return array{values: array<string, mixed>, errors: string[]} errors
      *         as language keys; values are handed to save() unchanged
      */
-    public function validate(array $input, App $app): array;
+    public function validate(array $input, ?int $offerId, App $app): array;
 
     /**
      * Stores this type's data for an offer the core has just saved.

@@ -1,0 +1,6 @@
+{# Included on the order page. Receives flow_data. #}
+<ul>
+    <li>{{ trans(flow_data.bids == 1 ? 'auction.order.won_bid' : 'auction.order.won_bids', {count: flow_data.bids, start: money(flow_data.start_price, flow_data.currency)}) }}</li>
+    {% if flow_data.ended_at %}<li>{{ trans('auction.detail.ended', {date: flow_data.ended_at}) }}</li>{% endif %}
+    <li>{{ trans('auction.order.settle') }}</li>
+</ul>

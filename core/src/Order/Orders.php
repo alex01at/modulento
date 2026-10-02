@@ -47,7 +47,7 @@ final class Orders
         return $this->flows[$id] ?? null;
     }
 
-    /** The flow through which offers of a type are ordered, or null if they cannot be ordered. */
+    /** The flow through which offers of a type become orders, or null if they cannot be ordered. */
     public function flowForOfferType(string $offerType): ?OrderFlow
     {
         foreach ($this->flows as $flow) {
@@ -205,7 +205,9 @@ final class Orders
     public function eventLabel(array $order, string $transition): string
     {
         if ($transition === 'place') {
-            return 'core.order.event.place';
+            $flow = $this->flow($order['flow']);
+
+            return $flow?->states()[$flow->initialState()]['entered'] ?? 'core.order.event.place';
         }
 
         $definition = $this->flow($order['flow'])?->transitions()[$transition] ?? null;

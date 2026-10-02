@@ -1,0 +1,7 @@
+{# Plain text: nothing here is HTML-escaped. Blocks: subject, body. #}
+{% block subject %}{{ trans('auction.mail.outbid.subject', {title: title}) }}{% endblock %}
+{% block body %}
+{{ trans('auction.mail.outbid.body', {title: title, amount: amount, link: link}) }}
+
+{{ trans('core.mail.signature') }}
+{% endblock %}
