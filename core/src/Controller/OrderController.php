@@ -4,11 +4,16 @@ declare(strict_types=1);
 
 namespace Modulento\Core\Controller;
 
+use Modulento\Core\App;
 use Modulento\Core\Order\OrderFiles;
 use Modulento\Core\Order\OrderNotifier;
+use Modulento\Core\Order\ProviderPaymentMethod;
+use Modulento\Core\Payment\BankAccount;
+use Modulento\Core\Payment\Payments;
 use Modulento\Core\Review\ReviewView;
 use Modulento\Core\Support\RateLimiter;
 use Modulento\Core\Support\Session;
+use RuntimeException;
 
 /** Ordering an offer, and an order as buyer and provider see it. Every route here is login-only. */
 final class OrderController extends Controller
@@ -50,9 +55,15 @@ final class OrderController extends Controller
             $errors[] = $fileProblem;
         }
 
-        $methods = $app->orders->paymentMethods();
-        $methodId = (string) ($_POST['payment_method'] ?? array_key_first($methods));
-        if (!isset($methods[$methodId])) {
+        // Only what the operator allows and this offer's provider has set
+        // up - whatever the form claims.
+        $methods = $app->payments->availableFor($offer['provider_id'], $app);
+        // Nothing sent is only an answer where there is nothing to choose.
+        $chosen = $_POST['payment_method'] ?? (count($methods) === 1 ? array_key_first($methods) : '');
+        $methodId = is_string($chosen) ? $chosen : '';
+        if ($methods === []) {
+            $errors[] = 'core.order.error.no_payment_method';
+        } elseif (!isset($methods[$methodId])) {
             $errors[] = 'core.order.error.payment_method';
         }
 
@@ -84,13 +95,22 @@ final class OrderController extends Controller
 
         OrderNotifier::stateChanged($app, null, $order, 'place', 'buyer', $note !== '' ? $note : null);
 
-        $payUrl = $methods[$methodId]->begin($order, $app);
+        Session::flash('success', $this->trans('core.order.placed'));
+
+        try {
+            $payUrl = $methods[$methodId]->begin($order, $app);
+        } catch (RuntimeException $e) {
+            // The order stands; it can be paid from its page, now or with
+            // another way to pay.
+            Session::flash('error', $this->trans(Payments::report($e)));
+            $payUrl = null;
+        }
+
         if ($payUrl !== null) {
             header('Location: ' . $payUrl);
             return;
         }
 
-        Session::flash('success', $this->trans('core.order.placed'));
         $this->redirect('/orders/' . $orderId);
     }
 
@@ -121,6 +141,7 @@ final class OrderController extends Controller
         $locale = $app->translator->locale();
         $text = $app->offers->text($offer, $locale);
         $provider = $app->providers->find($offer['provider_id']);
+        $methods = self::methodChoices($app->payments->availableFor($offer['provider_id'], $app));
 
         $this->render('order/new.twig', [
             'offer' => [
@@ -133,10 +154,9 @@ final class OrderController extends Controller
             'flow_template' => $flow->orderFormTemplate(),
             'flow_data' => $flow->orderFormData($offer, $input, $locale, $app),
             'note' => (string) ($input['note'] ?? ''),
-            'payment_methods' => array_map(
-                fn ($method) => ['id' => $method->id(), 'label_key' => $method->labelKey(), 'description_key' => $method->descriptionKey()],
-                array_values($app->orders->paymentMethods())
-            ),
+            'payment_methods' => $methods,
+            // The one typed before, or the only one there is.
+            'payment_method' => is_string($input['payment_method'] ?? null) ? $input['payment_method'] : (count($methods) === 1 ? $methods[0]['id'] : null),
             'terms' => $app->pages->links('terms', $locale)[0] ?? null,
             'file_limits' => self::fileLimits(),
             'errors' => $errors,
@@ -188,6 +208,13 @@ final class OrderController extends Controller
         $locale = $app->translator->locale();
         $flow = $app->orders->flow($order['flow']);
         $method = $app->orders->paymentMethods()[$order['payment_method']] ?? null;
+        $available = $app->payments->availableFor($order['provider_id'], $app);
+        // An order an extension created (an auction's sale) starts with
+        // "core.offline" whether or not the operator allows it; its buyer
+        // is then asked to choose.
+        $offered = isset($available[$order['payment_method']]);
+        $payable = $role === 'buyer' && $app->orders->isPayable($order);
+        $transfer = $payable && $offered && $order['payment_method'] === Payments::TRANSFER ? $app->payments->transferDetails($order['provider_id']) : null;
         $provider = $order['provider_id'] !== null ? $app->providers->find($order['provider_id']) : null;
         $buyer = $order['buyer_id'] !== null ? $app->accounts->findById($order['buyer_id']) : null;
         $files = $app->orderFiles->ofOrder($order['id']);
@@ -211,6 +238,16 @@ final class OrderController extends Controller
             'role' => $role,
             'actions' => $app->orders->available($order, $role, $app),
             'can_mark_paid' => $role === 'provider' && $order['payment_state'] === 'unpaid' && ($method?->confirmedByProvider() ?? false),
+            'payment' => [
+                'paid_at' => $order['paid_at'],
+                'needs_choice' => $payable && !$offered,
+                'can_pay_now' => $payable && $offered && $method instanceof ProviderPaymentMethod && !$method->confirmedByProvider(),
+                // Bank details are for the buyer of this order only.
+                'transfer' => $transfer !== null ? ['iban' => BankAccount::formatIban($transfer['iban']), 'reference' => $this->trans('core.payment.transfer.reference', ['number' => $order['number']])] + $transfer : null,
+                'choices' => $payable ? self::methodChoices(array_diff_key($available, $offered ? [$order['payment_method'] => true] : [])) : [],
+                // What the provider needs to find the payment in the service's own account.
+                'attempts' => $role === 'provider' ? self::attempts($app, $order['id']) : [],
+            ],
             // Each side sees how to reach the other: needed to settle
             // payment and invoice between them.
             'counterpart' => $role === 'buyer'
@@ -342,6 +379,41 @@ final class OrderController extends Controller
         }
 
         $this->redirect('/orders/' . $order['id']);
+    }
+
+    /** @return array<int, array{id: string, label_key: string, description_key: string}> ways to pay, as templates list them */
+    private static function methodChoices(array $methods): array
+    {
+        return array_map(
+            fn ($method) => ['id' => $method->id(), 'label_key' => $method->labelKey(), 'description_key' => $method->descriptionKey()],
+            array_values($methods)
+        );
+    }
+
+    /**
+     * The payments started at a service for an order, for provider and
+     * administration. Attempts the service refused are left out.
+     *
+     * @return array<int, array{label_key: ?string, method: string, reference: string, status: string, amount: int, currency: string, at: string}>
+     */
+    public static function attempts(App $app, int $orderId): array
+    {
+        $attempts = [];
+        foreach ($app->payments->ofOrder($orderId) as $payment) {
+            if ($payment['provider_reference'] !== null) {
+                $attempts[] = [
+                    'label_key' => ($app->orders->paymentMethods()[$payment['method']] ?? null)?->labelKey(),
+                    'method' => (string) $payment['method'],
+                    'reference' => (string) $payment['provider_reference'],
+                    'status' => (string) $payment['status'],
+                    'amount' => (int) $payment['amount'],
+                    'currency' => (string) $payment['currency'],
+                    'at' => (string) $payment['updated_at'],
+                ];
+            }
+        }
+
+        return $attempts;
     }
 
     /** @return array{0: array, 1: string}|null the order and the side the logged-in account is on; anyone else gets a 404 */

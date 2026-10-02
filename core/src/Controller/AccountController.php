@@ -262,6 +262,11 @@ final class AccountController extends Controller
         if ($provider !== null) {
             unset($provider['account_email'], $provider['account_status'], $provider['account_locale'], $provider['decided_by'], $provider['changed_since_decision']);
             $export->add('provider', $provider);
+            // Bank details and account ids at payment services; API keys are left out.
+            $payments = $this->app->payments->export((int) $provider['id']);
+            if ($payments !== []) {
+                $export->add('payment_methods', $payments);
+            }
         }
         $orders = $this->app->orders->list('buyer', $this->accountId(), null, 1, 100000)['rows'];
         if ($orders !== []) {

@@ -6,6 +6,7 @@
         <a href="{{ url('/account/offers') }}">{{ trans('core.offer.mine.title') }}</a>
         <a href="{{ url('/account/sales') }}">{{ trans('core.order.list.provider') }}</a>
         <a href="{{ url('/account/provider') }}">{{ trans('core.provider.title') }}</a>
+        <a href="{{ url('/account/payments') }}">{{ trans('core.payment.settings.title') }}</a>
     {% else %}
         <a href="{{ url('/account/provider') }}">{{ trans('core.provider.create') }}</a>
     {% endif %}

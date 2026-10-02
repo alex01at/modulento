@@ -9,6 +9,7 @@ use Modulento\Core\Controller\AdminAccountController;
 use Modulento\Core\Controller\AdminCatalogueController;
 use Modulento\Core\Controller\AdminController;
 use Modulento\Core\Controller\AdminOrderController;
+use Modulento\Core\Controller\AdminPaymentController;
 use Modulento\Core\Controller\AdminProviderController;
 use Modulento\Core\Controller\AssetController;
 use Modulento\Core\Controller\AuthController;
@@ -19,6 +20,8 @@ use Modulento\Core\Controller\OfferController;
 use Modulento\Core\Controller\OrderController;
 use Modulento\Core\Controller\PackageController;
 use Modulento\Core\Controller\PageController;
+use Modulento\Core\Controller\PaymentController;
+use Modulento\Core\Controller\PaymentSettingsController;
 use Modulento\Core\Controller\ProviderController;
 use Modulento\Core\Controller\RegistrationController;
 use Modulento\Core\Controller\ReviewController;
@@ -105,10 +108,10 @@ final class Kernel
         $app->translator->setFallback($app->locales->default());
         $app->translator->setSiteName($app->siteName());
 
-        // Asset and cron requests need neither a login nor a language, so
-        // they skip the session: no session file per cron call, and assets
+        // Asset, cron and webhook requests need neither a login nor a
+        // language, so they skip the session: no session file per cron call, and assets
         // load in parallel instead of queueing on the session lock.
-        if (preg_match('#^/(assets|cron|media)/#', $path) === 1) {
+        if (preg_match('#^/(assets|cron|media|webhooks)/#', $path) === 1) {
             $app->path = $path;
             $app->translator->setLocale($app->locales->default());
             return null;
@@ -179,6 +182,17 @@ final class Kernel
         $router->get('/account/provider', [ProviderController::class, 'edit']);
         $router->post('/account/provider', [ProviderController::class, 'save']);
 
+        $router->get('/account/payments', [PaymentSettingsController::class, 'index']);
+        $router->post('/account/payments/transfer', [PaymentSettingsController::class, 'saveTransfer']);
+        $router->post('/account/payments/paypal', [PaymentSettingsController::class, 'savePaypal']);
+        $router->post('/account/payments/paypal/check', [PaymentSettingsController::class, 'checkPaypal']);
+        $router->post('/account/payments/stripe/connect', [PaymentSettingsController::class, 'connectStripe']);
+        // Stripe sends the provider back to these two with a plain link.
+        $router->get('/account/payments/stripe/return', [PaymentSettingsController::class, 'stripeStatus']);
+        $router->get('/account/payments/stripe/refresh', [PaymentSettingsController::class, 'resumeStripe']);
+        $router->post('/account/payments/stripe/status', [PaymentSettingsController::class, 'stripeStatus']);
+        $router->post('/account/payments/{method}/delete', [PaymentSettingsController::class, 'delete']);
+
         $router->get('/account/offers', [OfferController::class, 'mine']);
         $router->get('/account/offers/new', [OfferController::class, 'create']);
         $router->post('/account/offers/new', [OfferController::class, 'save']);
@@ -203,6 +217,12 @@ final class Kernel
         $router->post('/orders/{id}/transition', [OrderController::class, 'transition']);
         $router->post('/orders/{id}/message', [OrderController::class, 'message']);
         $router->post('/orders/{id}/paid', [OrderController::class, 'markPaid']);
+        $router->post('/orders/{id}/pay', [PaymentController::class, 'pay']);
+        $router->post('/orders/{id}/payment-method', [PaymentController::class, 'choose']);
+        $router->get('/orders/{id}/payments/{payment}/return', [PaymentController::class, 'back']);
+        // Called by Stripe, not by a browser: no session, no CSRF token.
+        // The signature of the request is what authenticates it.
+        $router->post('/webhooks/stripe', [PaymentController::class, 'stripeWebhook'], Router::PUBLIC, csrfExempt: true);
         $router->get('/orders/{id}/files/{file}', [OrderController::class, 'download']);
         $router->post('/orders/{id}/review', [ReviewController::class, 'create']);
         $router->post('/orders/{id}/review/reply', [ReviewController::class, 'reply']);
@@ -232,6 +252,8 @@ final class Kernel
 
         $router->get('/admin/settings', [SettingsController::class, 'index'], 'core.settings.manage');
         $router->post('/admin/settings', [SettingsController::class, 'save'], 'core.settings.manage');
+        $router->get('/admin/payments', [AdminPaymentController::class, 'index'], 'core.settings.manage');
+        $router->post('/admin/payments', [AdminPaymentController::class, 'save'], 'core.settings.manage');
 
         $router->get('/admin/pages', [PageController::class, 'index'], 'core.pages.manage');
         $router->get('/admin/pages/new', [PageController::class, 'edit'], 'core.pages.manage');
@@ -320,6 +342,7 @@ final class Kernel
         $app->addPermission('core.packages.manage', 'core.permission.packages_manage');
 
         $app->addAdminMenu('core.admin.menu.settings', '/admin/settings', 'core.settings.manage');
+        $app->addAdminMenu('core.admin.menu.payments', '/admin/payments', 'core.settings.manage');
         $app->addAdminMenu('core.admin.menu.pages', '/admin/pages', 'core.pages.manage');
         $app->addAdminMenu('core.admin.menu.orders', '/admin/orders', 'core.orders.manage');
         $app->addAdminMenu('core.admin.menu.withdrawals', '/admin/withdrawals', 'core.orders.manage');

@@ -20,9 +20,9 @@ services with packages as the first kind of offer,
 are sold to the highest bidder. Both are installed under
 **Administration → Packages**.
 Orders run as a state machine with history, messages, attachments and
-deadlines; finished orders can be reviewed by their buyer. Payment
-is settled between buyer and provider for now; a payment service plugs in as
-an extension.
+deadlines; finished orders can be reviewed by their buyer. Buyers pay the
+provider directly - by bank transfer, PayPal or Stripe, or as the two agree;
+the platform never holds the money and takes no fee. See "Payment methods".
 
 Two rules shape everything:
 
@@ -143,6 +143,80 @@ are. They then appear on the page as "Present, but not a package"; "Take
 over as package" installs the newest release of their repository in their
 place and from then on they are updated like any other package.
 
+## Payment methods
+
+Money always goes from the buyer straight to the provider. The platform has
+no account it passes through and keeps no commission; it only records that
+an order was paid. Four ways to pay ship with the core:
+
+| Id | What happens | Who confirms the payment |
+|---|---|---|
+| `core.offline` | Buyer and provider settle it between themselves | the provider, on the order page |
+| `core.transfer` | The buyer sees the provider's bank details on the order page, with "Order <number>" as payment reference | the provider, on the order page |
+| `core.paypal` | The buyer pays at PayPal into the provider's PayPal account | PayPal, when the buyer returns |
+| `core.stripe` | The buyer pays on a Stripe Checkout page into the provider's Stripe account | Stripe, by webhook and when the buyer returns |
+
+**The operator** chooses under **Administration → Payment methods** which of
+them the site allows (permission `core.settings.manage`). `core.offline` is
+on, the other three are off until switched on; at least one stays allowed.
+Bank transfer and PayPal need nothing else from the platform. Stripe does:
+
+1. A Stripe account of the platform with **Connect** activated. Providers
+   get connected accounts of the type "Standard"; payments are direct
+   charges on those accounts without an application fee.
+2. Its secret API key (`sk_...`) goes into the page.
+3. The page shows the webhook address, `<APP_URL>/webhooks/stripe`. Create it
+   in the Stripe dashboard as a webhook that listens to events **on connected
+   accounts**, for the event `checkout.session.completed` (and, where
+   payment methods that complete later are switched on,
+   `checkout.session.async_payment_succeeded`), and enter its signing secret
+   (`whsec_...`). Without the webhook a payment is recorded only when the
+   buyer returns to the site after paying.
+
+Stored keys are never shown again, only their last four characters; an empty
+field keeps what is stored. `APP_URL` has to be the site's real HTTPS
+address: the services send buyers and providers back to it.
+
+**A provider** sets up under **My account → Payment methods** what buyers
+are offered: bank details (the IBAN is checked), the client ID and secret of
+the provider's *own* PayPal app (developer.paypal.com → "Apps & Credentials",
+"Live"; "Check connection" tells whether PayPal accepts them; a test mode
+uses the sandbox), and "Connect with Stripe", which creates the connected
+account and leads to Stripe's own pages to complete it. An order form offers
+exactly the methods that are allowed *and* set up by the offer's provider.
+While an order is unpaid its buyer can pay it from the order page ("Pay
+now", also after breaking off) or choose another of the available methods.
+An order an extension creates itself starts with `core.offline`; where that
+is switched off, the buyer is asked to choose on the order page.
+
+What the site stores and checks:
+
+- API keys - the platform's Stripe keys, the providers' PayPal secrets - are
+  stored encrypted (libsodium). The key for that is the file
+  **`var/secret.key`**, created on first need, never in the database.
+  **It belongs to every backup: without it the stored keys cannot be read
+  and have to be entered again.** `var/` is not reachable from the web. On
+  a PHP without the `sodium` extension PayPal and Stripe cannot be switched
+  on, and the page says so.
+- A payment is recorded as paid only if the service reports it as completed
+  with the order's amount and currency, for the session or PayPal order that
+  was stored when the payment was started. Webhooks need a valid signature
+  not older than five minutes. Reported twice, a payment is recorded once.
+  Buyer and provider are told by e-mail.
+- Buyers are sent to the services by redirect; no script of a payment
+  service runs on the site. The content security policy lets forms lead to
+  `checkout.stripe.com`, `connect.stripe.com`, `www.paypal.com` and
+  `www.sandbox.paypal.com`, and an address a service returns is only
+  followed if it is on one of these hosts.
+- Amounts are sent as integer minor units to Stripe and with two decimals
+  to PayPal. Currencies without decimals (JPY) or with three are not
+  supported.
+
+**Refunds are not part of the platform.** A provider refunds in the own
+Stripe or PayPal account, or by bank transfer; the order's payment state
+does not change by that. The wording around payments is a starting point,
+not legal or tax advice.
+
 ## Languages
 
 - A language is a file `core/lang/<code>.php` (two-letter code), plus one per
@@ -176,7 +250,7 @@ themes/       default/ (site), admin/ (administration), installed themes
 public/       web root: index.php only
 bin/          migrate.php, cron.php, create-admin.php
 .github/      CI and release workflows
-var/          cache, logs, uploads, update backups - never reachable from the web
+var/          cache, logs, uploads, update backups, secret.key - never reachable from the web
 ```
 
 ## Themes
@@ -225,11 +299,12 @@ Templates of the site theme, with the variables they receive:
 | `offer/index.twig` | `offers` (cards), `total`, `categories` (tree), `category`, `search`, `sort`, `sorts`, `page`, `pages` |
 | `offer/_cards.twig` | `offers`: `title`, `summary`, `path`, `price_from`, `currency`, `thumb`, `provider_name`, `provider_path` |
 | `offer/show.twig` | `offer` (`title`, `summary`, `description` as plain text, `images`, `price_from`, `category`, `provider_*`, `is_own`), `type_template`, `type_data` |
+| `account/payments.twig` | `transfer` (`ready`, `holder`, `iban`, `bic`, `bank`), `paypal` (`status`: null, `unverified` or `ready`; `client_id`, `sandbox`, `has_secret`), `stripe` (`platform_ready`, `status`: null, `pending` or `ready`; `account`) - each null if the operator does not allow the method -, `offline`, `errors`; forms post to `/account/payments/transfer`, `/paypal`, `/paypal/check`, `/stripe/connect`, `/stripe/status` and `/<method>/delete`; keep the note on refunds; a secret is never passed to the template |
 | `account/offers.twig` | `offers`, `types`, `provider_status` |
 | `account/offer_edit.twig` | `offer`, `type` (`id`, `label_key`, `template`), `type_data`, `texts`, `category_id`, `categories`, `locales`, `errors`, `approval_required`, `images_available`, `max_images`, `currency` |
-| `order/new.twig` | `offer`, `flow_template`, `flow_data`, `note`, `payment_methods`, `terms`, `errors`, `file_limits`; keep the button's wording; forms with a file field need `enctype="multipart/form-data"` |
+| `order/new.twig` | `offer`, `flow_template`, `flow_data`, `note`, `payment_methods` (the ones available for this provider; may be empty), `payment_method` (the one to preselect, or null), `terms`, `errors`, `file_limits`; keep the button's wording; forms with a file field need `enctype="multipart/form-data"` |
 | `order/index.twig` | `role` (`buyer` or `provider`), `orders`, `page`, `pages` |
-| `order/show.twig` | `order` (summary, `items`, `events` and `messages` each with `files`, payment), `role`, `actions` (with `note` and `files`), `can_mark_paid`, `counterpart`, `flow_template`, `flow_data`, `file_limits` |
+| `order/show.twig` | `order` (summary, `items`, `events` and `messages` each with `files`, payment), `role`, `actions` (with `note` and `files`), `can_mark_paid`, `payment` (`paid_at`; for the buyer of an unpaid order: `needs_choice`, `can_pay_now` - a form posting to `/orders/<id>/pay` -, `transfer` with `holder`, `iban`, `bic`, `bank`, `reference`, and `choices` - other methods, posted as `payment_method` to `/orders/<id>/payment-method`; for the provider: `attempts` with `label_key`, `method`, `reference`, `status`, `amount`, `currency`, `at`), `counterpart`, `flow_template`, `flow_data`, `file_limits` |
 | `withdrawal/form.twig` | `name`, `email`, `order_number`, `order_choice`, `statement`, `orders` (the logged-in buyer's own: `number`, `title`, `created_at`), `limits`, `errors`; keep the hidden `website` field and the note on what the form does |
 | `withdrawal/review.twig` | `name`, `email`, `order_number`, `statement`, `errors`; a form that posts to `/withdrawal/confirm` - keep the button's wording |
 | `withdrawal/done.twig` | `email`, `received_at` (UTC) |
@@ -244,7 +319,7 @@ Templates of the site theme, with the variables they receive:
 E-mails are theme templates too: `verify_email`, `reset_password`,
 `already_registered`, `change_email`, `password_changed`, `provider_approved`,
 `provider_rejected`, `provider_suspended`, `account_blocked`, `offer_published`,
-`offer_rejected`, `offer_contact`, `order_update`, `order_message`, `review_new`,
+`offer_rejected`, `offer_contact`, `order_update`, `order_message`, `order_paid`, `review_new`,
 `review_reply`, `review_hidden`, `withdrawal_receipt`, `withdrawal_provider`,
 `withdrawal_platform`, `report_receipt`, `report_platform`, `report_decision`. With `APP_ENV="dev"`
 nothing is sent; mails are appended to `var/log/mail.log`.
@@ -494,10 +569,17 @@ Behind a reverse proxy or CDN, list its addresses as `TRUSTED_PROXIES` in
 from `X-Forwarded-For`; without it all visitors would share one limit for
 logins and registrations. IPv6 visitors are counted by their /64 network.
 
-A `PaymentMethod` decides how an order is paid. The core ships `core.offline`
-(buyer and provider settle it themselves; the provider confirms the receipt).
-A payment service implements the same interface, sends the buyer to pay from
-`begin()` and reports the result with `Orders::markPaid()`.
+A `PaymentMethod` decides how an order is paid. The core ships four (see
+"Payment methods"); an extension can still register its own with
+`paymentMethod()`: it sends the buyer to pay from `begin()` and reports the
+result with `Orders::markPaid()`. Such a method appears under
+**Administration → Payment methods**, allowed until the operator switches it
+off, and is offered for every provider. A method that each provider has to
+set up implements `Modulento\Core\Order\ProviderPaymentMethod` in addition
+(`availableFor()`): it is then only offered for providers it is available
+for, the buyer gets "Pay now" on the order page, and `begin()` may be called
+again while the order is unpaid. If `begin()` throws, the order stands
+unpaid and the buyer is told on the order page.
 
 Visibility is the core's business: an offer is public while it is published,
 its provider approved and the account active, and offers of a disabled
@@ -544,7 +626,8 @@ Version 1 consists of:
 - the interfaces `Modulento\Core\Catalogue\OfferType`,
   `Modulento\Core\Order\OrderFlow` and `Modulento\Core\Order\PaymentMethod`,
   including the keys of the arrays they return (states, transitions,
-  deadlines)
+  deadlines); `Modulento\Core\Order\ProviderPaymentMethod` is an optional
+  addition to the last one
 - the events in `Modulento\Core\Event`: `AccountRegistered`,
   `AccountLoggedIn`, `AccountDeleted`, `AccountExport`,
   `ProviderStatusChanged`, `OfferStatusChanged`, `OrderStateChanged`, with

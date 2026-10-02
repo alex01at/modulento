@@ -1,0 +1,119 @@
+{% extends 'layout/base.twig' %}
+
+{% block title %}{{ trans('core.payment.settings.title') }} – {{ site_name }}{% endblock %}
+
+{% block content %}
+{% include 'account/_nav.twig' %}
+<h1>{{ trans('core.payment.settings.title') }}</h1>
+<p>{{ trans('core.payment.settings.intro') }}</p>
+
+{% for error in errors %}
+    <p class="flash flash-error" role="alert">{{ error }}</p>
+{% endfor %}
+
+{% if not transfer and not paypal and not stripe %}
+    <p>{{ trans(offline ? 'core.payment.settings.only_offline' : 'core.payment.settings.nothing') }}</p>
+{% elseif offline %}
+    <p><small>{{ trans('core.payment.settings.offline_too') }}</small></p>
+{% endif %}
+
+{% if transfer %}
+    <section>
+        <h2>{{ trans('core.payment.transfer.label') }}</h2>
+        <p class="flash {{ transfer.ready ? 'flash-success' }}">{{ trans(transfer.ready ? 'core.payment.status.ready' : 'core.payment.status.none') }}</p>
+        <p><small>{{ trans('core.payment.transfer.settings_hint') }}</small></p>
+        <form method="post" action="{{ url('/account/payments/transfer') }}" class="stack-form wide">
+            {{ csrf_field() }}
+            <label for="holder">{{ trans('core.payment.transfer.holder') }}</label>
+            <input id="holder" name="holder" value="{{ transfer.holder }}" maxlength="100" required>
+            <label for="iban">{{ trans('core.payment.transfer.iban') }}</label>
+            <input id="iban" name="iban" value="{{ transfer.iban }}" maxlength="50" autocomplete="off" required>
+            <label for="bic">{{ trans('core.payment.transfer.bic') }}</label>
+            <input id="bic" name="bic" value="{{ transfer.bic }}" maxlength="15" autocomplete="off">
+            <small>{{ trans('core.payment.optional') }}</small>
+            <label for="bank">{{ trans('core.payment.transfer.bank') }}</label>
+            <input id="bank" name="bank" value="{{ transfer.bank }}" maxlength="100">
+            <small>{{ trans('core.payment.optional') }}</small>
+            <button type="submit">{{ trans('core.account.save') }}</button>
+        </form>
+        {% if transfer.ready %}
+            <form method="post" action="{{ url('/account/payments/transfer/delete') }}">
+                {{ csrf_field() }}
+                <button type="submit">{{ trans('core.payment.transfer.remove') }}</button>
+            </form>
+        {% endif %}
+    </section>
+{% endif %}
+
+{% if paypal %}
+    <section>
+        <h2>{{ trans('core.payment.paypal.label') }}</h2>
+        <p class="flash {{ paypal.status == 'ready' ? 'flash-success' : (paypal.status ? 'flash-error') }}">
+            {{ trans(paypal.status == 'ready' ? 'core.payment.status.ready' : (paypal.status ? 'core.payment.paypal.status.unverified' : 'core.payment.status.none')) }}
+            {% if paypal.status and paypal.sandbox %}<br>{{ trans('core.payment.paypal.sandbox_on') }}{% endif %}
+        </p>
+        <p><small>{{ trans('core.payment.paypal.settings_hint') }}</small></p>
+        <form method="post" action="{{ url('/account/payments/paypal') }}" class="stack-form wide" autocomplete="off">
+            {{ csrf_field() }}
+            <label for="client_id">{{ trans('core.payment.paypal.client_id') }}</label>
+            <input id="client_id" name="client_id" value="{{ paypal.client_id }}" maxlength="255" autocomplete="off" required>
+            <label for="secret">{{ trans('core.payment.paypal.secret') }}</label>
+            {# Never filled in again: a stored secret is not sent back to a browser. #}
+            <input id="secret" name="secret" type="password" value="" maxlength="255" autocomplete="off" {{ not paypal.has_secret ? 'required' }}>
+            <small>{{ trans(paypal.has_secret ? 'core.payment.paypal.secret_set' : 'core.payment.paypal.secret_hint') }}</small>
+            <label class="checkbox">
+                <input type="checkbox" name="sandbox" value="1" {{ paypal.sandbox ? 'checked' }}>
+                <span>{{ trans('core.payment.paypal.sandbox') }}</span>
+            </label>
+            <button type="submit">{{ trans('core.payment.paypal.save') }}</button>
+        </form>
+        {% if paypal.status %}
+            <form method="post" action="{{ url('/account/payments/paypal/check') }}">
+                {{ csrf_field() }}
+                <button type="submit">{{ trans('core.payment.paypal.check') }}</button>
+            </form>
+            <form method="post" action="{{ url('/account/payments/paypal/delete') }}">
+                {{ csrf_field() }}
+                <button type="submit">{{ trans('core.payment.paypal.remove') }}</button>
+            </form>
+        {% endif %}
+    </section>
+{% endif %}
+
+{% if stripe %}
+    <section>
+        <h2>{{ trans('core.payment.stripe.label') }}</h2>
+        {% if not stripe.platform_ready %}
+            <p class="flash">{{ trans('core.payment.stripe.platform_missing') }}</p>
+        {% else %}
+            <p class="flash {{ stripe.status == 'ready' ? 'flash-success' : (stripe.status ? 'flash-error') }}">
+                {{ trans(stripe.status == 'ready' ? 'core.payment.status.ready' : (stripe.status ? 'core.payment.stripe.status.pending' : 'core.payment.stripe.status.none')) }}
+                {% if stripe.account %}<br><small>{{ trans('core.payment.stripe.account', {account: stripe.account}) }}</small>{% endif %}
+            </p>
+            <p><small>{{ trans('core.payment.stripe.settings_hint') }}</small></p>
+            {% if stripe.status != 'ready' %}
+                {# Answers with a redirect to Stripe's own pages. #}
+                <form method="post" action="{{ url('/account/payments/stripe/connect') }}">
+                    {{ csrf_field() }}
+                    <button type="submit">{{ trans(stripe.status ? 'core.payment.stripe.continue' : 'core.payment.stripe.connect') }}</button>
+                </form>
+            {% endif %}
+            {% if stripe.status %}
+                <form method="post" action="{{ url('/account/payments/stripe/status') }}">
+                    {{ csrf_field() }}
+                    <button type="submit">{{ trans('core.payment.stripe.refresh') }}</button>
+                </form>
+            {% endif %}
+        {% endif %}
+        {% if stripe.status %}
+            <form method="post" action="{{ url('/account/payments/stripe/delete') }}">
+                {{ csrf_field() }}
+                <button type="submit">{{ trans('core.payment.stripe.remove') }}</button>
+            </form>
+        {% endif %}
+    </section>
+{% endif %}
+
+{# Keep this note in every theme: the site cannot give money back. #}
+<p><small>{{ trans('core.payment.settings.refunds') }}</small></p>
+{% endblock %}

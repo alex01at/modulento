@@ -24,6 +24,9 @@ return [
         // cannot run bin/cron.php itself. Empty switches that URL off.
         'cron_token' => $_ENV['CRON_TOKEN'] ?? '',
         'root' => $root,
+        // The key that API keys of payment services are encrypted with in
+        // the database. Created on first need; belongs to every backup.
+        'secret_key' => $root . '/var/secret.key',
         // Addresses or networks of reverse proxies in front of this site.
         // Only requests from these may name the visitor in X-Forwarded-For.
         'trusted_proxies' => array_values(array_filter(array_map('trim', explode(',', $_ENV['TRUSTED_PROXIES'] ?? '')))),

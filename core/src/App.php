@@ -20,15 +20,21 @@ use Modulento\Core\Order\Orders;
 use Modulento\Core\Order\Withdrawals;
 use Modulento\Core\Report\Reports;
 use Modulento\Core\Package\Packages;
+use Modulento\Core\Payment\Payments;
+use Modulento\Core\Payment\PaypalPayment;
+use Modulento\Core\Payment\StripePayment;
+use Modulento\Core\Payment\TransferPayment;
 use Modulento\Core\Provider\Providers;
 use Modulento\Core\Review\Reviews;
 use Modulento\Core\Support\Auth;
+use Modulento\Core\Support\CurlHttpClient;
 use Modulento\Core\Support\Events;
 use Modulento\Core\Support\Locales;
 use Modulento\Core\Support\Mailer;
 use Modulento\Core\Support\ReleaseClient;
 use Modulento\Core\Support\Router;
 use Modulento\Core\Support\Scheduler;
+use Modulento\Core\Support\Secrets;
 use Modulento\Core\Support\Settings;
 use Modulento\Core\Support\Translator;
 use Modulento\Core\Support\View;
@@ -75,6 +81,7 @@ final class App
     public readonly Preferences $preferences;
     public readonly Reviews $reviews;
     public readonly Packages $packages;
+    public readonly Payments $payments;
 
     /** The request path without its language prefix - what routes are matched against. */
     public string $path = '/';
@@ -113,6 +120,17 @@ final class App
         $this->categories = new Categories($db, $this->locales);
         $this->offers = new Offers($db, $this->settings, $this->locales);
         $this->orders = new Orders($db);
+        $this->payments = new Payments(
+            $db,
+            $this->settings,
+            $this->orders,
+            new Secrets($config['app']['secret_key'] ?? $root . '/var/secret.key'),
+            // Tests put a stand-in here that answers without any network.
+            $config['payment']['http'] ?? new CurlHttpClient()
+        );
+        $this->orders->registerPaymentMethod(new TransferPayment());
+        $this->orders->registerPaymentMethod(new PaypalPayment());
+        $this->orders->registerPaymentMethod(new StripePayment());
         $this->withdrawals = new Withdrawals($db);
         $this->reports = new Reports($db);
         $this->reviews = new Reviews($db);

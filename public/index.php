@@ -42,7 +42,12 @@ header_remove('X-Powered-By');
 header('X-Content-Type-Options: nosniff');
 header('X-Frame-Options: DENY');
 header('Referrer-Policy: strict-origin-when-cross-origin');
-header("Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'");
+// form-action also covers where a submitted form is redirected to (in
+// Chromium-based browsers), and paying or connecting an account starts with
+// a form of this site that answers with a redirect to the payment service.
+// Hence their hosts - the same ones Payments accepts as a target.
+header("Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; frame-ancestors 'none'; base-uri 'self'; "
+    . "form-action 'self' https://checkout.stripe.com https://connect.stripe.com https://www.paypal.com https://www.sandbox.paypal.com");
 if (!empty($_SERVER['HTTPS'])) {
     header('Strict-Transport-Security: max-age=31536000');
 }

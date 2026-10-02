@@ -27,13 +27,16 @@
     <input id="files" name="files[]" type="file" multiple>
     <small>{{ trans('core.order.file.hint', file_limits) }}</small>
 
+    {# Only the ways to pay that this provider has set up. #}
     <fieldset>
         <legend>{{ trans('core.order.payment') }}</legend>
         {% for method in payment_methods %}
             <label class="checkbox">
-                <input type="radio" name="payment_method" value="{{ method.id }}" {{ loop.first ? 'checked' }} required>
+                <input type="radio" name="payment_method" value="{{ method.id }}" {{ method.id == payment_method ? 'checked' }} required>
                 <span><strong>{{ trans(method.label_key) }}</strong><br><small>{{ trans(method.description_key) }}</small></span>
             </label>
+        {% else %}
+            <p class="flash flash-error">{{ trans('core.order.error.no_payment_method') }}</p>
         {% endfor %}
     </fieldset>
 

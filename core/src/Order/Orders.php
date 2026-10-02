@@ -64,7 +64,12 @@ final class Orders
         $this->paymentMethods[$method->id()] = $method;
     }
 
-    /** @return array<string, PaymentMethod> */
+    /**
+     * Every registered way to pay. Which of them a buyer is offered for an
+     * order is decided by Payments::availableFor().
+     *
+     * @return array<string, PaymentMethod>
+     */
     public function paymentMethods(): array
     {
         return $this->paymentMethods;
@@ -219,6 +224,15 @@ final class Orders
     public function isReviewable(array $order): bool
     {
         return (bool) ($this->flow($order['flow'])?->states()[$order['state']]['reviewable'] ?? false);
+    }
+
+    /**
+     * Whether paying the order still makes sense: it is unpaid and has not
+     * ended without being carried out (declined, cancelled, expired).
+     */
+    public function isPayable(array $order): bool
+    {
+        return $order['payment_state'] === 'unpaid' && (!$this->isFinal($order) || $this->isReviewable($order));
     }
 
     /** Whether files may be attached to a transition. */
@@ -380,6 +394,13 @@ final class Orders
         $stmt->execute(['now' => Clock::now(), 'now2' => Clock::now(), 'id' => $orderId]);
 
         return $stmt->rowCount() === 1;
+    }
+
+    /** Changes how an order is to be paid. Nothing happens once it is paid. */
+    public function setPaymentMethod(int $orderId, string $paymentMethod): void
+    {
+        $stmt = $this->db->prepare("UPDATE orders SET payment_method = :method, updated_at = :now WHERE id = :id AND payment_state = 'unpaid'");
+        $stmt->execute(['method' => $paymentMethod, 'now' => Clock::now(), 'id' => $orderId]);
     }
 
     /** Whether an account still has orders that are not finished, as buyer or as provider. */

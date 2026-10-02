@@ -110,20 +110,77 @@
     {% endif %}
 </section>
 
-<section>
+<section id="payment">
     <h2>{{ trans('core.order.payment') }}</h2>
-    <p>
-        {% if order.payment_label_key %}<strong>{{ trans(order.payment_label_key) }}</strong> – {% endif %}
-        {{ trans('core.order.payment_state.' ~ order.payment_state) }}
-    </p>
-    {% if order.payment_description_key and order.payment_state == 'unpaid' %}
-        <p><small>{{ trans(order.payment_description_key) }}</small></p>
+    {% if payment.needs_choice %}
+        {# The order has no way to pay that its provider offers: the buyer chooses one below. #}
+        <p class="flash flash-error">{{ trans(payment.choices ? 'core.payment.choose' : 'core.payment.none_available') }}</p>
+    {% else %}
+        <p>
+            {% if order.payment_label_key %}<strong>{{ trans(order.payment_label_key) }}</strong> – {% endif %}
+            {{ trans('core.order.payment_state.' ~ order.payment_state) }}
+            {% if order.payment_state == 'paid' and payment.paid_at %}<small>({{ trans('core.payment.paid_at', {date: payment.paid_at}) }})</small>{% endif %}
+        </p>
+        {% if order.payment_description_key and order.payment_state == 'unpaid' %}
+            <p><small>{{ trans(order.payment_description_key) }}</small></p>
+        {% endif %}
     {% endif %}
+
+    {% if payment.transfer %}
+        <table>
+            <tr><th scope="row">{{ trans('core.payment.transfer.holder') }}</th><td>{{ payment.transfer.holder }}</td></tr>
+            <tr><th scope="row">{{ trans('core.payment.transfer.iban') }}</th><td>{{ payment.transfer.iban }}</td></tr>
+            {% if payment.transfer.bic %}<tr><th scope="row">{{ trans('core.payment.transfer.bic') }}</th><td>{{ payment.transfer.bic }}</td></tr>{% endif %}
+            {% if payment.transfer.bank %}<tr><th scope="row">{{ trans('core.payment.transfer.bank') }}</th><td>{{ payment.transfer.bank }}</td></tr>{% endif %}
+            <tr><th scope="row">{{ trans('core.order.total') }}</th><td>{{ money(order.total, order.currency) }}</td></tr>
+            <tr><th scope="row">{{ trans('core.payment.transfer.reference_label') }}</th><td>{{ payment.transfer.reference }}</td></tr>
+        </table>
+    {% endif %}
+
+    {% if payment.can_pay_now %}
+        {# Answers with a redirect to the payment service; no script of the service runs on this site. #}
+        <form method="post" action="{{ url('/orders/' ~ order.id ~ '/pay') }}">
+            {{ csrf_field() }}
+            <button type="submit">{{ trans('core.payment.pay_now', {amount: money(order.total, order.currency)}) }}</button>
+        </form>
+    {% endif %}
+
+    {% if payment.choices %}
+        <form method="post" action="{{ url('/orders/' ~ order.id ~ '/payment-method') }}" class="stack-form wide">
+            {{ csrf_field() }}
+            <fieldset>
+                <legend>{{ trans(payment.needs_choice ? 'core.payment.choose_legend' : 'core.payment.change_legend') }}</legend>
+                {% for method in payment.choices %}
+                    <label class="checkbox">
+                        <input type="radio" name="payment_method" value="{{ method.id }}" {{ payment.choices|length == 1 ? 'checked' }} required>
+                        <span><strong>{{ trans(method.label_key) }}</strong><br><small>{{ trans(method.description_key) }}</small></span>
+                    </label>
+                {% endfor %}
+            </fieldset>
+            <button type="submit">{{ trans('core.payment.change_submit') }}</button>
+        </form>
+    {% endif %}
+
     {% if can_mark_paid %}
         <form method="post" action="{{ url('/orders/' ~ order.id ~ '/paid') }}">
             {{ csrf_field() }}
             <button type="submit">{{ trans('core.order.mark_paid') }}</button>
         </form>
+    {% endif %}
+
+    {% if payment.attempts %}
+        <table>
+            <caption>{{ trans('core.payment.attempts') }}</caption>
+            {% for attempt in payment.attempts %}
+                <tr>
+                    <th scope="row">{{ attempt.label_key ? trans(attempt.label_key) : attempt.method }}</th>
+                    <td>{{ trans('core.payment.attempt.' ~ attempt.status) }}</td>
+                    <td><code>{{ attempt.reference }}</code></td>
+                    <td>{{ money(attempt.amount, attempt.currency) }}</td>
+                    <td><small>{{ attempt.at }} UTC</small></td>
+                </tr>
+            {% endfor %}
+        </table>
     {% endif %}
 </section>
 
