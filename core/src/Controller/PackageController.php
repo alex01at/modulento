@@ -8,6 +8,7 @@ use Modulento\Core\Package\Packages;
 use Modulento\Core\Support\Migrator;
 use Modulento\Core\Support\Session;
 use Modulento\Core\Support\UpdateException;
+use Throwable;
 
 /** Extensions and themes installed from their own repositories. */
 final class PackageController extends Controller
@@ -33,7 +34,7 @@ final class PackageController extends Controller
             foreach (array_keys($found) as $id) {
                 $present[] = $kind . ':' . $id;
                 if (!Packages::isShipped($kind, $id) && !in_array($kind . ':' . $id, $known, true)) {
-                    $unmanaged[] = ['kind' => $kind, 'id' => $id, 'repo' => $owner . '/modulento-' . ($kind === 'theme' ? 'theme-' : 'ext-') . $id];
+                    $unmanaged[] = ['kind' => $kind, 'id' => $id, 'in_use' => $this->inUse($kind, $id), 'repo' => $owner . '/modulento-' . ($kind === 'theme' ? 'theme-' : 'ext-') . $id];
                 }
             }
         }
@@ -125,6 +126,44 @@ final class PackageController extends Controller
         Session::set('package_versions', ['at' => time(), 'versions' => $versions]);
 
         return $versions;
+    }
+
+    /** Switches an extension on, or makes a theme the site's theme, without leaving this page. */
+    public function enable(array $params): void
+    {
+        $this->switch($params['kind'], $params['id'], true);
+    }
+
+    /** Switches an extension off; for the active theme, back to the default theme. */
+    public function disable(array $params): void
+    {
+        $this->switch($params['kind'], $params['id'], false);
+    }
+
+    private function switch(string $kind, string $id, bool $on): void
+    {
+        $app = $this->app;
+        // The same right as on the page this action belongs to.
+        $allowed = $kind === 'extension' ? $app->auth->can('core.extensions.manage') : $app->auth->can('core.themes.manage');
+
+        if (!$allowed) {
+            Session::flash('error', $this->trans('core.error.forbidden'));
+        } elseif ($kind === 'extension' && isset($app->extensions->discover()[$id])) {
+            try {
+                $on ? $app->extensions->enable($id) : $app->extensions->disable($id);
+                Session::flash('success', $this->trans($on ? 'core.admin.extensions.enabled' : 'core.admin.extensions.disabled', ['id' => $id]));
+            } catch (Throwable $e) {
+                error_log('Enabling extension ' . $id . ' failed: ' . $e);
+                Session::flash('error', $this->trans('core.admin.extensions.enable_failed', ['id' => $id, 'reason' => $e->getMessage()]));
+            }
+        } elseif ($kind === 'theme' && isset($app->themes->siteThemes()[$id])) {
+            $target = $on ? $id : 'default';
+            if (($on || $app->themes->active() === $id) && $app->themes->activate($target)) {
+                Session::flash('success', $this->trans('core.admin.themes.activated', ['id' => $target]));
+            }
+        }
+
+        $this->redirect('/admin/packages');
     }
 
     public function remove(array $params): void

@@ -8,6 +8,7 @@ use Modulento\Core\Account\Accounts;
 use Modulento\Core\Account\Tokens;
 use Modulento\Core\Event\AccountRegistered;
 use Modulento\Core\Support\PasswordPolicy;
+use Modulento\Core\Support\ClientIp;
 use Modulento\Core\Support\RateLimiter;
 use Modulento\Core\Support\Session;
 
@@ -90,7 +91,7 @@ final class RegistrationController extends Controller
         if ($errors === [] && ($shownAt === null || time() - (int) $shownAt < self::MIN_FILL_SECONDS)) {
             $errors[] = $this->trans('core.register.error.too_fast');
         }
-        if ($errors === [] && (new RateLimiter($this->app->db))->hit('register', $_SERVER['REMOTE_ADDR'] ?? 'unknown', 10, 3600)) {
+        if ($errors === [] && (new RateLimiter($this->app->db))->hit('register', ClientIp::key(), 10, 3600)) {
             $errors[] = $this->trans('core.error.too_many_requests');
         }
 
@@ -158,7 +159,7 @@ final class RegistrationController extends Controller
         $email = Accounts::normalizeEmail((string) ($_POST['email'] ?? ''));
         $limiter = new RateLimiter($this->app->db);
 
-        $limited = $limiter->hit('forgot', $_SERVER['REMOTE_ADDR'] ?? 'unknown', 5, 900)
+        $limited = $limiter->hit('forgot', ClientIp::key(), 5, 900)
             || $limiter->hit('forgot-email', $email, 3, 3600);
         $account = $limited ? null : $this->app->accounts->findByEmail($email);
 

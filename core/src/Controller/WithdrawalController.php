@@ -6,6 +6,7 @@ namespace Modulento\Core\Controller;
 
 use Modulento\Core\Account\Accounts;
 use Modulento\Core\Support\Clock;
+use Modulento\Core\Support\ClientIp;
 use Modulento\Core\Support\RateLimiter;
 use Modulento\Core\Support\Session;
 
@@ -124,7 +125,7 @@ final class WithdrawalController extends Controller
             // else's address must not be able to fill that person's mailbox.
             // Both refusals are said openly - a declaration that silently
             // went nowhere would cost its sender the deadline.
-            if ($limiter->hit('withdrawal', $_SERVER['REMOTE_ADDR'] ?? 'unknown', 5, 3600)
+            if ($limiter->hit('withdrawal', ClientIp::key(), 5, 3600)
                 || $limiter->hit('withdrawal-email', $draft['email'], 3, 3600)) {
                 $this->renderReview($draft, [$this->trans('core.withdrawal.error.too_many')]);
                 return;
@@ -160,7 +161,15 @@ final class WithdrawalController extends Controller
             'withdrawals' => $list['rows'],
             'page' => $page,
             'pages' => max(1, (int) ceil($list['total'] / self::PER_PAGE)),
+            'waiting' => $this->app->withdrawals->waiting(),
         ]);
+    }
+
+    /** An administrator ticks off a declaration that was passed on by hand, or reopens it. */
+    public function handled(array $params): void
+    {
+        $this->app->withdrawals->setHandled((int) $params['id'], self::posted('handled') === '1', $this->app->auth->account()['id']);
+        $this->redirect('/admin/withdrawals');
     }
 
     /** @param array{name: string, email: string, order_number: string, statement: string} $draft */

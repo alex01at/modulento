@@ -7,6 +7,7 @@ namespace Modulento\Core\Controller;
 use Modulento\Core\Account\Tokens;
 use Modulento\Core\App;
 use Modulento\Core\Event\AccountLoggedIn;
+use Modulento\Core\Support\ClientIp;
 use Modulento\Core\Support\RateLimiter;
 use Modulento\Core\Support\Session;
 
@@ -37,7 +38,7 @@ final class AuthController extends Controller
     {
         $email = strtolower(trim(is_string($_POST['email'] ?? null) ? $_POST['email'] : ''));
         $password = is_string($_POST['password'] ?? null) ? $_POST['password'] : '';
-        $ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
+        $ip = ClientIp::key();
 
         // The tight limit counts per address and network address together:
         // wrong passwords typed somewhere else must not lock the owner

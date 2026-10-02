@@ -8,6 +8,7 @@
 <section class="card-box">
     <div class="card-head">
         <p>{{ trans('core.admin.withdrawals.intro') }}</p>
+        {% if waiting > 0 %}<p><span class="badge badge-pending">{{ trans('core.admin.withdrawals.waiting', {count: waiting}) }}</span></p>{% endif %}
     </div>
 
     {% if withdrawals is empty %}
@@ -23,6 +24,7 @@
                     <th scope="col">{{ trans('core.order.number') }}</th>
                     <th scope="col">{{ trans('core.admin.withdrawals.matched') }}</th>
                     <th scope="col">{{ trans('core.withdrawal.field.statement') }}</th>
+                    <th scope="col">{{ trans('core.admin.withdrawals.handled') }}</th>
                 </tr>
                 </thead>
                 <tbody>
@@ -42,6 +44,21 @@
                             {% endif %}
                         </td>
                         <td>{{ withdrawal.statement ? withdrawal.statement|nl2br : '–' }}</td>
+                        <td>
+                            <form method="post" action="{{ url('/admin/withdrawals/' ~ withdrawal.id ~ '/handled') }}" class="button-row">
+                                {{ csrf_field() }}
+                                {% if withdrawal.handled_at %}
+                                    <span class="badge badge-ok">{{ trans('core.admin.withdrawals.handled.yes', {date: withdrawal.handled_at}) }}</span>
+                                    <input type="hidden" name="handled" value="0">
+                                    <button type="submit" class="btn-sm">{{ trans('core.admin.withdrawals.reopen') }}</button>
+                                {% else %}
+                                    {# One that reached the provider needs nobody here; the rest waits. #}
+                                    {% if not withdrawal.order_id %}<span class="badge badge-pending">{{ trans('core.admin.withdrawals.handled.no') }}</span>{% endif %}
+                                    <input type="hidden" name="handled" value="1">
+                                    <button type="submit" class="btn-sm">{{ trans('core.admin.withdrawals.mark_handled') }}</button>
+                                {% endif %}
+                            </form>
+                        </td>
                     </tr>
                 {% endfor %}
                 </tbody>

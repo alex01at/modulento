@@ -2,6 +2,14 @@
 
 {% block title %}{{ trans('core.package.title') }} – {{ site_name }}{% endblock %}
 
+{% macro switch(item) %}
+    {# Extensions are switched on and off; a theme is chosen, and "off" means back to the default theme. #}
+    <form method="post" action="{{ url('/admin/packages/' ~ item.kind ~ '/' ~ item.id ~ '/' ~ (item.in_use ? 'disable' : 'enable')) }}">
+        {{ csrf_field() }}
+        <button type="submit" class="btn-sm">{{ trans(item.in_use ? 'core.admin.extensions.disable' : 'core.admin.extensions.enable') }}</button>
+    </form>
+{% endmacro %}
+
 {% block admin %}
 {% include '@admin/_page_header.twig' with {heading: trans('core.package.title')} only %}
 
@@ -27,7 +35,7 @@
                 <tbody>
                 {% for package in packages %}
                     <tr>
-                        <th scope="row">{{ package.id }}</th>
+                        <th scope="row">{{ package.id }} <span class="badge badge-{{ package.in_use ? 'enabled' : 'disabled' }}">{{ trans(package.in_use ? 'core.package.active' : 'core.package.inactive') }}</span></th>
                         <td>{{ trans('core.package.kind.' ~ package.kind) }}</td>
                         <td>{{ package.repo }}</td>
                         <td>
@@ -40,6 +48,7 @@
                         </td>
                         <td>
                             <div class="button-row">
+                                {{ _self.switch(package) }}
                                 {# Always there: without a known newer version it asks the repository first. #}
                                 <form method="post" action="{{ url('/admin/packages/' ~ package.kind ~ '/' ~ package.id ~ '/update') }}">
                                     {{ csrf_field() }}
@@ -75,8 +84,9 @@
             <tbody>
             {% for item in unmanaged %}
                 <tr>
-                    <th scope="row">{{ item.id }}</th>
+                    <th scope="row">{{ item.id }} <span class="badge badge-{{ item.in_use ? 'enabled' : 'disabled' }}">{{ trans(item.in_use ? 'core.package.active' : 'core.package.inactive') }}</span></th>
                     <td>{{ trans('core.package.kind.' ~ item.kind) }}</td>
+                    <td>{{ _self.switch(item) }}</td>
                     <td>
                         <form method="post" action="{{ url('/admin/packages/install') }}" class="button-row">
                             {{ csrf_field() }}
