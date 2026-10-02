@@ -10,6 +10,7 @@
     <title>{% block title %}{{ trans('core.admin.title') }} – {{ site_name }}{% endblock %}</title>
     <link rel="stylesheet" href="{{ admin_asset('admin.css') }}">
     <script src="{{ admin_asset('admin.js') }}"></script>
+    <script src="{{ theme_asset('account-menu.js') }}" defer></script>
     {# The same script as on the site: a "show" button next to every password field. #}
     <script src="{{ admin_asset('password-toggle.js') }}" defer data-show="{{ trans('core.password.show') }}" data-hide="{{ trans('core.password.hide') }}"></script>
     {% block head %}{% endblock %}
@@ -51,16 +52,10 @@
                 {% endif %}
             {% endfor %}
             <a class="topbar-link" href="{{ url('/') }}" target="_blank" rel="noopener">{{ icons.icon('external') }}<span class="topbar-label">{{ trans('core.nav.to_site') }}</span></a>
+            {# The same menu as on the site: picture, settings, colour scheme, log out. #}
             {% if account %}
-                <a class="topbar-link topbar-account" href="{{ url('/account') }}">
-                    <span class="avatar">{{ icons.icon('user') }}</span>
-                    <span class="topbar-label">{{ account.display_name ?: account.email }}</span>
-                </a>
+                {% include 'layout/_account_menu.twig' %}
             {% endif %}
-            <form method="post" action="{{ url('/logout') }}" class="inline-form">
-                {{ csrf_field() }}
-                <button type="submit" class="btn btn-outline btn-sm">{{ icons.icon('logout') }}<span class="topbar-label">{{ trans('core.nav.logout') }}</span></button>
-            </form>
         </nav>
     </header>
 

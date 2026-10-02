@@ -153,6 +153,15 @@ final class AccountController extends Controller
 
         // "auto" is the default and needs no row.
         $this->app->preferences->set($this->accountId(), Preferences::COLOR_SCHEME, $scheme !== 'auto' ? $scheme : null);
+
+        // Chosen from the menu in the header: back to the page one was on,
+        // which shows the result by itself. Only a path of this site.
+        $return = $_POST['return'] ?? null;
+        if (is_string($return) && str_starts_with($return, '/') && !str_starts_with($return, '//')
+            && !str_contains($return, '\\') && preg_match('/[\x00-\x20]/', $return) !== 1) {
+            $this->redirect($return);
+            return;
+        }
         $this->back('success', 'core.account.appearance.saved');
     }
 

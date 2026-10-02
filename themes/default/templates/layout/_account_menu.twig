@@ -1,5 +1,5 @@
 {# The logged-in account's menu in the header: its picture opens the way to
-   the settings and to logging out. A <details> element, so it works without
+   the settings, the colour scheme and to logging out. A <details> element, so it works without
    scripts; account-menu.js only closes it on Escape or a click elsewhere. #}
 {% set picture = account_avatar() %}
 {% set name = account.display_name ?: account.email %}
@@ -15,6 +15,18 @@
     <div class="account-menu-items">
         <span class="account-menu-name">{{ name }}</span>
         <a href="{{ url('/account/settings') }}">{{ trans('core.nav.profile_settings') }}</a>
+        {# The colour scheme is chosen right here; the page one is on comes back. #}
+        {% set chosen = color_scheme() %}
+        <form method="post" action="{{ url('/account/appearance') }}" class="account-menu-scheme">
+            {{ csrf_field() }}
+            <input type="hidden" name="return" value="{{ current_path() }}">
+            <span id="account-menu-scheme">{{ trans('core.account.appearance.scheme') }}</span>
+            <span class="account-menu-choices" role="group" aria-labelledby="account-menu-scheme">
+                {% for scheme in ['auto', 'light', 'dark'] %}
+                    <button type="submit" name="color_scheme" value="{{ scheme }}" aria-pressed="{{ scheme == chosen ? 'true' : 'false' }}">{{ trans('core.account.appearance.short.' ~ scheme) }}</button>
+                {% endfor %}
+            </span>
+        </form>
         <form method="post" action="{{ url('/logout') }}">
             {{ csrf_field() }}
             <button type="submit" class="link-button">{{ trans('core.nav.logout') }}</button>

@@ -2709,11 +2709,20 @@ check('administration: called "Administration" in title and menu', str_contains(
 
 $schemeOf = fn (int $id) => $pdo->query("SELECT value FROM account_preference WHERE name = 'color_scheme' AND account_id = {$id}")->fetchColumn();
 $r = $get('/account/settings', 1);
-check('colour scheme: the settings offer three choices, "automatic" first and chosen', preg_match('#<form method="post" action="/account/appearance".*?<option value="auto" selected>Automatisch \(wie System\)</option>\s*<option value="light" >Hell</option>\s*<option value="dark" >Dunkel</option>#s', $r['body']) === 1);
+check('colour scheme: the account menu offers three choices, "automatic" chosen', preg_match('#<form method="post" action="/account/appearance" class="account-menu-scheme">.*?value="auto" aria-pressed="true">Auto</button>\s*<button type="submit" name="color_scheme" value="light" aria-pressed="false">Hell</button>\s*<button type="submit" name="color_scheme" value="dark" aria-pressed="false">Dunkel</button>#s', $r['body']) === 1
+    && str_contains($r['body'], '<input type="hidden" name="return" value="/account/settings">'));
 $post('/account/appearance', ['color_scheme' => 'dark'], 1);
 check('colour scheme: a fixed choice is stored for the account', $schemeOf(1) === 'dark' && isset($_SESSION['_flash']['success']));
 $r = $get('/account/settings', 1);
-check('colour scheme: a fixed choice appears as data-theme and in the form', str_contains($r['body'], '<html lang="de" data-theme="dark">') && str_contains($r['body'], '<option value="dark" selected>'));
+check('colour scheme: a fixed choice appears as data-theme and in the form', str_contains($r['body'], '<html lang="de" data-theme="dark">') && str_contains($r['body'], 'value="dark" aria-pressed="true"'));
+$r = $post('/account/appearance', ['color_scheme' => 'dark', 'return' => '/offers'], 1);
+check('colour scheme: chosen from the menu, the page one was on comes back without a detour over the settings', !isset($_SESSION['_flash']['success']));
+foreach (['//evil.example', 'https://evil.example/', '/\\evil', "/a\nb"] as $elsewhere) {
+    $post('/account/appearance', ['color_scheme' => 'dark', 'return' => $elsewhere], 1);
+    check('colour scheme: never back to another site (' . json_encode($elsewhere) . ')', isset($_SESSION['_flash']['success']));
+}
+$r = $get('/admin', 3);
+check('administration: the top bar has the same account menu', str_contains($r['body'], '<details class="account-menu">') && str_contains($r['body'], 'action="/account/appearance"') && str_contains($r['body'], 'account-menu.js'));
 check('colour scheme: it is the account\'s own', str_contains($get('/', 2)['body'], '<html lang="de">') && str_contains($get('/', null)['body'], '<html lang="de">'));
 foreach (['pink', '', ['dark'], 'DARK'] as $invalid) {
     $post('/account/appearance', ['color_scheme' => $invalid], 1);

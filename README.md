@@ -294,7 +294,7 @@ Templates of the site theme, with the variables they receive:
 | `auth/reset.twig` | `errors`, `token`, `min_length` |
 | `account/_nav.twig` | - ; the account's pages, included on top of each; `provider_status()` says whether the account has a provider profile |
 | `account/dashboard.twig` | `name`, `avatar`, `recent` (offer cards viewed last, from the session), `purchases` (`open`, `closed`, `recent`), `provider` (null or `name`, `status`, `path`, `rating`, `offers`, `offers_public`, `sales` like `purchases`, `types`); the page behind "Dashboard" |
-| `account/index.twig` | the settings: `avatar` (path of the profile picture or null), `locales`, `color_schemes` (`auto`, `light`, `dark`; the form posts `color_scheme` to `/account/appearance`), `min_length`, `is_last_admin`, `provider_status`, `devices` (where the account stays logged in: `created_at`, `last_used_at`, `browser`, `current`), `remember_days` |
+| `account/index.twig` | the settings: `avatar` (path of the profile picture or null), `locales`, `min_length`, `is_last_admin`, `provider_status`, `devices` (where the account stays logged in: `created_at`, `last_used_at`, `browser`, `current`), `remember_days` |
 | `account/provider.twig` | `provider` (stored or typed values, `texts` by language), `status`, `status_note`, `public_path`, `certified`, `errors`, `locales`, `countries`, `approval_required` |
 | `offer/index.twig` | `offers` (cards), `total`, `categories` (tree), `category`, `search`, `sort`, `sorts`, `page`, `pages` |
 | `offer/_cards.twig` | `offers`: `title`, `summary`, `path`, `price_from`, `currency`, `thumb`, `provider_name`, `provider_path` |
