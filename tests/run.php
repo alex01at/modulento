@@ -232,6 +232,8 @@ $pdo->exec("CREATE TABLE order_file (id INTEGER PRIMARY KEY, order_id INTEGER RE
 $pdo->exec("CREATE TABLE review (id INTEGER PRIMARY KEY, order_id INTEGER UNIQUE REFERENCES orders (id) ON DELETE CASCADE, offer_id INTEGER REFERENCES offer (id) ON DELETE SET NULL,
     provider_id INTEGER REFERENCES provider (id) ON DELETE CASCADE, author_id INTEGER REFERENCES account (id) ON DELETE SET NULL, author_name TEXT, rating INTEGER, body TEXT, locale TEXT,
     status TEXT DEFAULT 'published', status_note TEXT, reply TEXT, replied_at TEXT, created_at TEXT)");
+$pdo->exec("CREATE TABLE withdrawal (id INTEGER PRIMARY KEY, order_id INTEGER REFERENCES orders (id) ON DELETE SET NULL, order_number TEXT, name TEXT, email TEXT, statement TEXT,
+    locale TEXT, account_id INTEGER REFERENCES account (id) ON DELETE SET NULL, matched INTEGER NOT NULL DEFAULT 0, created_at TEXT)");
 $pdo->exec("ALTER TABLE offer ADD COLUMN rating_count INTEGER NOT NULL DEFAULT 0");
 $pdo->exec("ALTER TABLE offer ADD COLUMN rating_sum INTEGER NOT NULL DEFAULT 0");
 $pdo->exec("ALTER TABLE provider ADD COLUMN rating_count INTEGER NOT NULL DEFAULT 0");
@@ -315,6 +317,7 @@ function request(PDO $pdo, array $config, string $method, string $path, int|fals
     $_SESSION['_csrf'] = 'test-token';
     // As if the registration form had been open for a while.
     $_SESSION['register_form_at'] ??= time() - 60;
+    $_SESSION['withdrawal_form_at'] ??= time() - 60;
     if ($method === 'POST') {
         $post += ['_csrf' => 'test-token'];
     }
@@ -1443,6 +1446,161 @@ $goneId = (int) $row('gone@example.test')['id'];
 $post('/admin/accounts/' . $goneId . '/delete', [], 3);
 check('accounts: an administrator can delete another account', $row('gone@example.test') === false);
 $pdo->exec('DELETE FROM provider');
+@unlink($mailLog);
+
+// --- Withdrawal form: declare, confirm, acknowledge, pass on -----------------------
+$pdo->exec("INSERT INTO provider (id, account_id, type, status, name, slug, created_at, updated_at)
+    VALUES (901, 1, 'business', 'approved', 'Testanbieter', 'testanbieter-widerruf', '2026-01-01 00:00:00', '2026-01-01 00:00:00')");
+$pdo->exec("INSERT INTO orders (id, buyer_id, provider_id, flow, state, state_actor, buyer_name, provider_name, offer_title, total, currency, locale, payment_method, data, created_at, updated_at)
+    VALUES (9001, 2, 901, 'gone.flow', 'done', 'buyer', 'editor@example.test', 'Testanbieter', 'Ein Logo', 1000, 'EUR', 'de', 'core.offline', '{}', '2026-01-01 00:00:00', '2026-01-01 00:00:00')");
+// The provider reads English: what is passed on has to arrive in that language.
+$pdo->exec("UPDATE account SET locale = 'en' WHERE id = 1");
+$pdo->exec('DELETE FROM rate_limit_attempt');
+$withdrawals = fn (): array => $pdo->query('SELECT * FROM withdrawal ORDER BY id')->fetchAll();
+$orderNotes = fn (): array => $pdo->query('SELECT * FROM order_message WHERE order_id = 9001 ORDER BY id')->fetchAll();
+$mailText = function (string $to) use ($mailLog): string {
+    $mails = is_file($mailLog) ? array_filter(explode("\n--\n", (string) file_get_contents($mailLog))) : [];
+    foreach (array_reverse($mails) as $mail) {
+        if (str_starts_with(ltrim($mail), 'To: ' . $to . "\n")) {
+            return $mail;
+        }
+    }
+
+    return '';
+};
+$declaration = ['name' => 'Erika Muster', 'email' => 'Editor@Example.test ', 'order_number' => '009001', 'statement' => "Nur das Extra.\n<b>fett</b>"];
+// Both steps as a visitor would take them; returns the answer of the second.
+// Unless told otherwise, earlier declarations do not count against the limits.
+$declare = function (array $fields, int|null $as = null, bool $counted = false) use ($post, $pdo): array {
+    if (!$counted) {
+        $pdo->exec('DELETE FROM rate_limit_attempt');
+    }
+    $post('/withdrawal', $fields, $as);
+
+    return $post('/withdrawal/confirm', []);
+};
+
+check('withdrawal: the footer of every page links to the form', str_contains($get('/', null)['body'], '<a href="/withdrawal">Vertrag widerrufen</a>')
+    && str_contains($get('/login', null)['body'], '<a href="/withdrawal">Vertrag widerrufen</a>'));
+check('withdrawal: the link in another language', str_contains($get('/en', null)['body'], '<a href="/en/withdrawal">Withdraw from contract</a>'));
+$r = $get('/withdrawal', null);
+check('withdrawal: the form is public and says what it does not do', $r['status'] === 200 && str_contains($r['body'], 'name="order_number"') && str_contains($r['body'], 'name="website"')
+    && str_contains($r['body'], '>Weiter</button>') && str_contains($r['body'], 'ändert sich dadurch nicht automatisch') && !str_contains($r['body'], '<select'));
+$r = $get('/withdrawal?order=009001', 2);
+check('withdrawal: a logged-in buyer finds address and own orders filled in', str_contains($r['body'], 'value="editor@example.test"') && str_contains($r['body'], '<option value="009001" selected>'));
+check('withdrawal: an order of someone else is not offered', !str_contains($get('/withdrawal', 1)['body'], '009001'));
+check('withdrawal: a query parameter that is not text is ignored', $get('/withdrawal?order[]=1', null)['status'] === 200);
+check('withdrawal: the buyer\'s order page links to the form with its number, the provider\'s does not',
+    str_contains($get('/orders/9001', 2)['body'], 'href="/withdrawal?order=009001"') && !str_contains($get('/orders/9001', 1)['body'], '/withdrawal?order='));
+
+$r = $post('/withdrawal', ['name' => '', 'email' => 'editor@example.test', 'order_number' => ''], null);
+check('withdrawal: name and order number are required', str_contains($r['body'], 'Bitte gib deinen Namen an') && str_contains($r['body'], 'Bitte gib die Bestellnummer an') && !isset($_SESSION['withdrawal_draft']));
+$r = $post('/withdrawal', ['email' => 'not-an-address'] + $declaration, null);
+check('withdrawal: an invalid address is refused', str_contains($r['body'], 'gültige E-Mail-Adresse') && !isset($_SESSION['withdrawal_draft']));
+$r = $post('/withdrawal', ['statement' => str_repeat('ä', 5001)] + $declaration, null);
+check('withdrawal: a text that is too long is refused', str_contains($r['body'], 'höchstens 5000 Zeichen') && !isset($_SESSION['withdrawal_draft']));
+$r = $post('/withdrawal', ['name' => ['x'], 'email' => ['y'], 'order_number' => ['z'], 'statement' => ['s'], 'order_choice' => ['c']], null);
+check('withdrawal: fields that are not text count as empty', $r['status'] === 200 && str_contains($r['body'], 'Bitte gib deinen Namen an') && !isset($_SESSION['withdrawal_draft']));
+$get('/withdrawal', null);
+$r = $post('/withdrawal', $declaration);
+check('withdrawal: a form sent back the moment it was shown is refused', str_contains($r['body'], 'Das ging sehr schnell') && !isset($_SESSION['withdrawal_draft']));
+
+$r = $post('/withdrawal', $declaration, null);
+check('withdrawal: the first step shows the details and a clearly worded button', str_contains($r['body'], 'action="/withdrawal/confirm"') && str_contains($r['body'], '>Widerruf bestätigen</button>')
+    && str_contains($r['body'], 'Erika Muster') && str_contains($r['body'], '&lt;b&gt;fett&lt;/b&gt;') && !str_contains($r['body'], '<b>fett'));
+check('withdrawal: without the second step nothing is stored and nothing sent', $withdrawals() === [] && !is_file($mailLog) && $orderNotes() === []);
+check('withdrawal: going back keeps what was entered', str_contains($get('/withdrawal')['body'], 'value="Erika Muster"'));
+$post('/withdrawal/confirm', [], null);
+check('withdrawal: confirming without the first step stores nothing', $withdrawals() === [] && str_contains($_SESSION['_flash']['error'] ?? '', 'liegen nicht mehr vor'));
+
+$post('/withdrawal', $declaration, null);
+$post('/withdrawal/confirm', ['name' => 'Jemand anders', 'email' => 'other@example.test', 'order_number' => '1', 'statement' => 'x']);
+$stored = $withdrawals();
+$first = $stored[0] ?? [];
+check('withdrawal: the second step stores what the first one checked, nothing it is sent itself', count($stored) === 1 && $first['name'] === 'Erika Muster'
+    && $first['email'] === 'editor@example.test' && $first['order_number'] === '009001' && $first['locale'] === 'de' && str_contains($first['statement'], 'Nur das Extra.'));
+check('withdrawal: number and buyer\'s address together assign it to the order', (int) $first['matched'] === 1 && (int) $first['order_id'] === 9001 && (int) $first['account_id'] === 2);
+$receipt = $mailText('editor@example.test');
+check('withdrawal: acknowledgement with the declaration, date and time of receipt', str_contains($receipt, 'Subject: Eingangsbestätigung: dein Widerruf zur Bestellung 009001')
+    && str_contains($receipt, 'Eingang: ' . $first['created_at'] . ' UTC') && str_contains($receipt, 'Name: Erika Muster') && str_contains($receipt, "Nur das Extra.\n<b>fett</b>")
+    && str_contains($receipt, 'nicht die Anerkennung des Widerrufs') && abs(strtotime($first['created_at'] . ' UTC') - time()) < 5);
+$forwarded = $mailText('plain@example.test');
+check('withdrawal: passed on to the provider in their language, with the order', str_contains($forwarded, 'Subject: Withdrawal for order 009001') && str_contains($forwarded, 'Reply-To: editor@example.test')
+    && str_contains($forwarded, 'Nur das Extra.') && lastMail($mailLog, 'plain@example.test')['link'] === '/en/orders/9001' && lastMail($mailLog, 'admin@example.test') === null);
+check('withdrawal: both sides read it on the order page', count($orderNotes()) === 1 && $orderNotes()[0]['author_role'] === 'buyer' && (int) $orderNotes()[0]['account_id'] === 2
+    && str_contains($get('/orders/9001', 1)['body'], 'Widerrufserklärung über das Widerrufsformular') && str_contains($get('/orders/9001', 2)['body'], 'Name: Erika Muster'));
+check('withdrawal: the order itself is not changed', $orderRow(9001)['state'] === 'done' && $orderRow(9001)['closed_at'] === null);
+
+// What the sender is told must not depend on whether the order was found.
+$answer = function (array $fields, int|null $as = null) use ($declare, $get, $withdrawals): string {
+    $declare($fields, $as);
+    $body = $get('/withdrawal/done')['body'];
+    $row = $withdrawals()[count($withdrawals()) - 1];
+
+    return str_replace([$row['email'], $row['created_at']], ['ADDRESS', 'TIME'], $body);
+};
+$pdo->exec('DELETE FROM withdrawal');
+$matchedAnswer = $answer($declaration);
+check('withdrawal: the answer names the time of receipt and the address', str_contains($matchedAnswer, 'Widerruf eingegangen') && str_contains($matchedAnswer, 'am TIME UTC') && str_contains($matchedAnswer, 'an ADDRESS'));
+$post('/withdrawal/confirm', []);
+check('withdrawal: a second click on the button declares nothing twice', count($withdrawals()) === 1);
+
+@unlink($mailLog);
+$strangerAnswer = $answer(['email' => 'stranger@example.test'] + $declaration);
+$second = $withdrawals()[1] ?? [];
+check('withdrawal: a number with another address is stored but not assigned', count($withdrawals()) === 2 && (int) $second['matched'] === 0 && $second['order_id'] === null && $second['account_id'] === null
+    && count($orderNotes()) === 2 && $mailText('plain@example.test') === '');
+check('withdrawal: the sender gets the same answer and the same acknowledgement', $strangerAnswer === $matchedAnswer
+    && str_contains($mailText('stranger@example.test'), 'Subject: Eingangsbestätigung: dein Widerruf zur Bestellung 009001'));
+check('withdrawal: what cannot be assigned goes to the active administrators', str_contains($mailText('admin@example.test'), 'Subject: Widerruf ohne zugeordnete Bestellung (009001)')
+    && str_contains($mailText('admin@example.test'), 'Reply-To: stranger@example.test') && lastMail($mailLog, 'admin@example.test')['link'] === '/admin/withdrawals' && $mailText('blocked@example.test') === '');
+check('withdrawal: a number that does not exist gets the same answer', $answer(['order_number' => '999999'] + $declaration) === $matchedAnswer && (int) $withdrawals()[2]['matched'] === 0);
+check('withdrawal: something that is not a number gets the same answer', $answer(['order_number' => '9001 OR 1=1'] + $declaration) === $matchedAnswer && (int) $withdrawals()[3]['matched'] === 0);
+
+$declare(['email' => 'private@example.test', 'order_number' => '#9001'] + $declaration, 2);
+$own = $withdrawals()[4] ?? [];
+check('withdrawal: the logged-in buyer is assigned whatever address the acknowledgement goes to', (int) ($own['matched'] ?? 0) === 1 && (int) $own['account_id'] === 2
+    && str_contains($mailText('private@example.test'), 'Eingangsbestätigung') && $own['order_number'] === '#9001');
+$declare(['order_number' => '9001'] + $declaration, 3);
+check('withdrawal: another logged-in account with the buyer\'s address is assigned by the address only', (int) $withdrawals()[5]['matched'] === 1 && (int) $withdrawals()[5]['account_id'] === 3);
+$pdo->exec("UPDATE account SET status = 'blocked' WHERE id = 1");
+@unlink($mailLog);
+$declare($declaration);
+check('withdrawal: a provider who cannot be reached leaves it to the platform', (int) $withdrawals()[6]['matched'] === 1 && $mailText('plain@example.test') === '' && $mailText('admin@example.test') !== '');
+$pdo->exec("UPDATE account SET status = 'active' WHERE id = 1");
+
+$before = count($withdrawals());
+@unlink($mailLog);
+$r = $declare(['email' => 'bot@example.test', 'website' => 'http://spam'] + $declaration);
+check('withdrawal: a filled bot trap gets the usual answer, and nothing is stored or sent', count($withdrawals()) === $before && !is_file($mailLog) && str_contains($get('/withdrawal/done')['body'], 'Widerruf eingegangen'));
+
+$pdo->exec('DELETE FROM rate_limit_attempt');
+for ($i = 0; $i < 3; $i++) {
+    $declare(['email' => 'flood@example.test'] + $declaration, null, true);
+}
+$before = count($withdrawals());
+$r = $declare(['email' => 'flood@example.test'] + $declaration, null, true);
+check('withdrawal: no more than three an hour to one address, and the sender is told', count($withdrawals()) === $before && str_contains($r['body'], 'NICHT übermittelt') && str_contains($r['body'], 'Widerruf bestätigen'));
+$declare(['email' => 'calm@example.test'] + $declaration, null, true);
+$r = $declare(['email' => 'late@example.test'] + $declaration, null, true);
+check('withdrawal: no more than five an hour from one address of the network', count($withdrawals()) === $before + 1 && str_contains($r['body'], 'NICHT übermittelt') && $mailText('late@example.test') === '');
+
+check('withdrawal: the list in the administration needs its permission', $get('/admin/withdrawals', 2)['status'] === 403 && $get('/admin/withdrawals', null)['body'] === '');
+$r = $get('/admin/withdrawals', 3);
+check('withdrawal: the administration lists every declaration with its order', $r['status'] === 200 && str_contains($r['body'], 'Erika Muster') && str_contains($r['body'], 'href="/admin/orders/9001"')
+    && str_contains($r['body'], 'nicht zugeordnet') && str_contains($r['body'], 'stranger@example.test') && str_contains($r['body'], $first['created_at'] . ' UTC')
+    && str_contains($r['body'], '&lt;b&gt;fett&lt;/b&gt;') && !str_contains($r['body'], '<b>fett') && str_contains($r['body'], 'href="/admin/withdrawals" aria-current="page"'));
+$export = json_decode($get('/account/export', 2)['body'], true);
+check('withdrawal: an account\'s declarations are part of its data', count($export['withdrawals'] ?? []) >= 2 && ($export['withdrawals'][0]['order_number'] ?? '') === '009001'
+    && ($export['withdrawals'][0]['matched'] ?? null) === true && !isset(json_decode($get('/account/export', 1)['body'], true)['withdrawals']));
+$pdo->exec('DELETE FROM orders WHERE id = 9001');
+check('withdrawal: a declaration outlives its order', count($withdrawals()) === $before + 1 && $withdrawals()[0]['order_id'] === null && (int) $withdrawals()[0]['matched'] === 1
+    && str_contains($get('/admin/withdrawals', 3)['body'], 'Bestellung gelöscht'));
+
+$pdo->exec('DELETE FROM withdrawal');
+$pdo->exec('DELETE FROM provider');
+$pdo->exec("UPDATE account SET locale = 'de' WHERE id = 1");
+$pdo->exec('DELETE FROM rate_limit_attempt');
 @unlink($mailLog);
 
 // --- Language keys -----------------------------------------------------------

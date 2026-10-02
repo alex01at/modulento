@@ -14,6 +14,7 @@ use Modulento\Core\Content\Pages;
 use Modulento\Core\Extension\ExtensionManager;
 use Modulento\Core\Order\OrderFiles;
 use Modulento\Core\Order\Orders;
+use Modulento\Core\Order\Withdrawals;
 use Modulento\Core\Package\Packages;
 use Modulento\Core\Provider\Providers;
 use Modulento\Core\Review\Reviews;
@@ -63,6 +64,7 @@ final class App
     public readonly OfferImages $offerImages;
     public readonly Orders $orders;
     public readonly OrderFiles $orderFiles;
+    public readonly Withdrawals $withdrawals;
     public readonly Reviews $reviews;
     public readonly Packages $packages;
 
@@ -103,6 +105,7 @@ final class App
         $this->categories = new Categories($db, $this->locales);
         $this->offers = new Offers($db, $this->settings, $this->locales);
         $this->orders = new Orders($db);
+        $this->withdrawals = new Withdrawals($db);
         $this->reviews = new Reviews($db);
         $this->orderFiles = new OrderFiles($db, ($config['app']['uploads'] ?? $config['app']['root'] . '/var/uploads') . '/orders');
         $this->offerImages = new OfferImages($db, ($config['app']['uploads'] ?? $config['app']['root'] . '/var/uploads') . '/offers');

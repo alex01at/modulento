@@ -1,0 +1,7 @@
+{# Plain text: nothing here is HTML-escaped. Blocks: subject, body. #}
+{% block subject %}{{ trans('core.mail.withdrawal_provider.subject', {number: number}) }}{% endblock %}
+{% block body %}
+{{ trans('core.mail.withdrawal_provider.body', {received_at: received_at, title: title, link: link, number: number, email: email, name: name, statement: statement}) }}
+
+{{ trans('core.mail.signature') }}
+{% endblock %}

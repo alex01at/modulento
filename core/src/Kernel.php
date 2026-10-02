@@ -24,6 +24,7 @@ use Modulento\Core\Controller\RegistrationController;
 use Modulento\Core\Controller\ReviewController;
 use Modulento\Core\Controller\SettingsController;
 use Modulento\Core\Controller\UpdateController;
+use Modulento\Core\Controller\WithdrawalController;
 use Modulento\Core\Support\Database;
 use Modulento\Core\Support\RateLimiter;
 use Modulento\Core\Support\Router;
@@ -182,6 +183,13 @@ final class Kernel
         $router->post('/orders/{id}/review/reply', [ReviewController::class, 'reply']);
         $router->get('/categories/{slug}', [OfferController::class, 'category'], Router::PUBLIC);
 
+        // The withdrawal form is public on purpose: it has to be reachable
+        // for the whole withdrawal period, also by someone who cannot log in.
+        $router->get('/withdrawal', [WithdrawalController::class, 'form'], Router::PUBLIC);
+        $router->post('/withdrawal', [WithdrawalController::class, 'review'], Router::PUBLIC);
+        $router->post('/withdrawal/confirm', [WithdrawalController::class, 'confirm'], Router::PUBLIC);
+        $router->get('/withdrawal/done', [WithdrawalController::class, 'done'], Router::PUBLIC);
+
         $router->get('/providers', [ProviderController::class, 'index'], Router::PUBLIC);
         $router->get('/providers/{slug}', [ProviderController::class, 'show'], Router::PUBLIC);
 
@@ -205,6 +213,8 @@ final class Kernel
         $router->get('/admin/orders/{id}', [AdminOrderController::class, 'show'], 'core.orders.manage');
         $router->post('/admin/orders/{id}/transition', [AdminOrderController::class, 'transition'], 'core.orders.manage');
         $router->get('/admin/orders/{id}/files/{file}', [AdminOrderController::class, 'download'], 'core.orders.manage');
+
+        $router->get('/admin/withdrawals', [WithdrawalController::class, 'index'], 'core.orders.manage');
 
         $router->get('/admin/reviews', [ReviewController::class, 'index'], 'core.reviews.manage');
         $router->post('/admin/reviews/{id}/hide', [ReviewController::class, 'hide'], 'core.reviews.manage');
@@ -274,6 +284,7 @@ final class Kernel
         $app->addAdminMenu('core.admin.menu.settings', '/admin/settings', 'core.settings.manage');
         $app->addAdminMenu('core.admin.menu.pages', '/admin/pages', 'core.pages.manage');
         $app->addAdminMenu('core.admin.menu.orders', '/admin/orders', 'core.orders.manage');
+        $app->addAdminMenu('core.admin.menu.withdrawals', '/admin/withdrawals', 'core.orders.manage');
         $app->addAdminMenu('core.admin.menu.reviews', '/admin/reviews', 'core.reviews.manage');
         $app->addAdminMenu('core.admin.menu.offers', '/admin/offers', 'core.offers.manage');
         $app->addAdminMenu('core.admin.menu.categories', '/admin/categories', 'core.categories.manage');

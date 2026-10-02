@@ -1,0 +1,54 @@
+{% extends '@admin/layout.twig' %}
+
+{% block title %}{{ trans('core.admin.withdrawals.title') }} – {{ site_name }}{% endblock %}
+
+{% block admin %}
+{% include '@admin/_page_header.twig' with {heading: trans('core.admin.withdrawals.title')} only %}
+
+<section class="card-box">
+    <div class="card-head">
+        <p>{{ trans('core.admin.withdrawals.intro') }}</p>
+    </div>
+
+    {% if withdrawals is empty %}
+        <p class="empty">{{ trans('core.admin.withdrawals.none') }}</p>
+    {% else %}
+        <div class="table-wrap">
+            <table>
+                <thead>
+                <tr>
+                    <th scope="col">{{ trans('core.admin.withdrawals.received') }}</th>
+                    <th scope="col">{{ trans('core.withdrawal.field.name') }}</th>
+                    <th scope="col">{{ trans('core.login.email') }}</th>
+                    <th scope="col">{{ trans('core.order.number') }}</th>
+                    <th scope="col">{{ trans('core.admin.withdrawals.matched') }}</th>
+                    <th scope="col">{{ trans('core.withdrawal.field.statement') }}</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for withdrawal in withdrawals %}
+                    <tr>
+                        <th scope="row">{{ withdrawal.created_at }} UTC</th>
+                        <td>{{ withdrawal.name }}</td>
+                        <td><a href="mailto:{{ withdrawal.email }}">{{ withdrawal.email }}</a></td>
+                        <td>{{ withdrawal.order_number }}</td>
+                        <td>
+                            {% if withdrawal.order_id %}
+                                <a class="badge badge-ok" href="{{ url('/admin/orders/' ~ withdrawal.order_id) }}">{{ trans('core.admin.withdrawals.matched.yes') }}</a>
+                            {% elseif withdrawal.matched %}
+                                <span class="badge badge-draft">{{ trans('core.admin.withdrawals.matched.gone') }}</span>
+                            {% else %}
+                                <span class="badge badge-pending">{{ trans('core.admin.withdrawals.matched.no') }}</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ withdrawal.statement ? withdrawal.statement|nl2br : '–' }}</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        {% include '@admin/_pager.twig' with {path: '/admin/withdrawals', page: page, pages: pages} only %}
+    {% endif %}
+</section>
+{% endblock %}
