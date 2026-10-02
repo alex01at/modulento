@@ -24,6 +24,9 @@ return [
         // cannot run bin/cron.php itself. Empty switches that URL off.
         'cron_token' => $_ENV['CRON_TOKEN'] ?? '',
         'root' => $root,
+        // Addresses or networks of reverse proxies in front of this site.
+        // Only requests from these may name the visitor in X-Forwarded-For.
+        'trusted_proxies' => array_values(array_filter(array_map('trim', explode(',', $_ENV['TRUSTED_PROXIES'] ?? '')))),
     ],
     'mail' => [
         // Sender address; without one, noreply@<host of APP_URL>.

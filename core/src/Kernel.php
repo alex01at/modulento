@@ -25,6 +25,7 @@ use Modulento\Core\Controller\ReviewController;
 use Modulento\Core\Controller\SettingsController;
 use Modulento\Core\Controller\UpdateController;
 use Modulento\Core\Controller\WithdrawalController;
+use Modulento\Core\Support\ClientIp;
 use Modulento\Core\Support\Database;
 use Modulento\Core\Support\RateLimiter;
 use Modulento\Core\Support\Router;
@@ -92,6 +93,11 @@ final class Kernel
     {
         $path = parse_url($uri, PHP_URL_PATH) ?: '/';
         $query = parse_url($uri, PHP_URL_QUERY);
+
+        // From here on REMOTE_ADDR is the visitor, also behind a proxy.
+        if (isset($_SERVER['REMOTE_ADDR'])) {
+            $_SERVER['REMOTE_ADDR'] = ClientIp::resolve($_SERVER, $app->config['app']['trusted_proxies'] ?? []);
+        }
 
         $app->translator->setFallback($app->locales->default());
         $app->translator->setSiteName($app->siteName());
@@ -215,6 +221,7 @@ final class Kernel
         $router->get('/admin/orders/{id}/files/{file}', [AdminOrderController::class, 'download'], 'core.orders.manage');
 
         $router->get('/admin/withdrawals', [WithdrawalController::class, 'index'], 'core.orders.manage');
+        $router->post('/admin/withdrawals/{id}/handled', [WithdrawalController::class, 'handled'], 'core.orders.manage');
 
         $router->get('/admin/reviews', [ReviewController::class, 'index'], 'core.reviews.manage');
         $router->post('/admin/reviews/{id}/hide', [ReviewController::class, 'hide'], 'core.reviews.manage');
@@ -259,6 +266,8 @@ final class Kernel
         $router->post('/admin/packages/check', [PackageController::class, 'check'], 'core.packages.manage');
         $router->post('/admin/packages/{kind}/{id}/update', [PackageController::class, 'update'], 'core.packages.manage');
         $router->post('/admin/packages/{kind}/{id}/remove', [PackageController::class, 'remove'], 'core.packages.manage');
+        $router->post('/admin/packages/{kind}/{id}/enable', [PackageController::class, 'enable'], 'core.packages.manage');
+        $router->post('/admin/packages/{kind}/{id}/disable', [PackageController::class, 'disable'], 'core.packages.manage');
 
         $router->get('/admin/updates', [UpdateController::class, 'index'], 'core.update.manage');
         $router->post('/admin/updates/migrate', [UpdateController::class, 'migrate'], 'core.update.manage');

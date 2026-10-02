@@ -55,6 +55,19 @@ final class Withdrawals
         return ['rows' => array_map([self::class, 'typed'], $rows), 'total' => $total];
     }
 
+    /** Records that an administrator has dealt with a declaration, or takes that back. */
+    public function setHandled(int $id, bool $handled, ?int $by): void
+    {
+        $stmt = $this->db->prepare('UPDATE withdrawal SET handled_at = :at, handled_by = :by WHERE id = :id');
+        $stmt->execute(['at' => $handled ? Clock::now() : null, 'by' => $handled ? $by : null, 'id' => $id]);
+    }
+
+    /** How many declarations wait for an administrator: not assigned to an order and not dealt with. */
+    public function waiting(): int
+    {
+        return (int) $this->db->query('SELECT COUNT(*) FROM withdrawal WHERE order_id IS NULL AND handled_at IS NULL')->fetchColumn();
+    }
+
     /** @return array<int, array> what an account declared, for its data export */
     public function byAccount(int $accountId): array
     {

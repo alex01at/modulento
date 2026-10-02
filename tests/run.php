@@ -174,6 +174,21 @@ check('csrf accepts own token', Csrf::verify($token));
 check('csrf rejects wrong token', !Csrf::verify('nope'));
 check('csrf rejects missing token', !Csrf::verify(null));
 
+// --- The visitor's address behind a proxy -----------------------------------
+$from = fn (string $remote, ?string $forwarded, array $trusted) => Modulento\Core\Support\ClientIp::resolve(['REMOTE_ADDR' => $remote] + ($forwarded !== null ? ['HTTP_X_FORWARDED_FOR' => $forwarded] : []), $trusted);
+check('client address: the header is ignored without trusted proxies', $from('198.51.100.7', '203.0.113.5', []) === '198.51.100.7');
+check('client address: the header is ignored from an address that is no proxy', $from('198.51.100.7', '203.0.113.5', ['10.0.0.0/8']) === '198.51.100.7');
+check('client address: a trusted proxy names the visitor', $from('10.1.2.3', '203.0.113.5', ['10.0.0.0/8']) === '203.0.113.5');
+check('client address: what the visitor claims further left does not count', $from('10.1.2.3', '1.2.3.4, 203.0.113.5, 10.9.9.9', ['10.0.0.0/8']) === '203.0.113.5');
+check('client address: nonsense in the header falls back to the connection', $from('10.1.2.3', 'not-an-address', ['10.0.0.0/8']) === '10.1.2.3' && $from('10.1.2.3', '10.2.2.2', ['10.0.0.0/8']) === '10.1.2.3');
+check('client address: networks are matched bit by bit, also IPv6', Modulento\Core\Support\ClientIp::isTrusted('192.168.5.130', ['192.168.5.128/25']) && !Modulento\Core\Support\ClientIp::isTrusted('192.168.5.127', ['192.168.5.128/25'])
+    && Modulento\Core\Support\ClientIp::isTrusted('2001:db8:1::5', ['2001:db8::/32']) && !Modulento\Core\Support\ClientIp::isTrusted('2001:db9::1', ['2001:db8::/32']) && !Modulento\Core\Support\ClientIp::isTrusted('10.0.0.1', ['2001:db8::/32', 'junk']));
+$_SERVER['REMOTE_ADDR'] = '2001:db8:1:2:aaaa:bbbb:cccc:dddd';
+check('client address: an IPv6 visitor is counted by network', Modulento\Core\Support\ClientIp::key() === '2001:db8:1:2::/64');
+$_SERVER['REMOTE_ADDR'] = '203.0.113.5';
+check('client address: an IPv4 visitor is counted by address', Modulento\Core\Support\ClientIp::key() === '203.0.113.5');
+unset($_SERVER['REMOTE_ADDR']);
+
 // --- Manifest ------------------------------------------------------------
 $valid = '{"id":"shop","name":"Shop","version":"1.0.0","api":1,"namespace":"Acme\\\\Shop"}';
 $manifest = Manifest::fromDir(manifestDir('shop', $valid));
@@ -234,6 +249,8 @@ $pdo->exec("CREATE TABLE review (id INTEGER PRIMARY KEY, order_id INTEGER UNIQUE
     status TEXT DEFAULT 'published', status_note TEXT, reply TEXT, replied_at TEXT, created_at TEXT)");
 $pdo->exec("CREATE TABLE withdrawal (id INTEGER PRIMARY KEY, order_id INTEGER REFERENCES orders (id) ON DELETE SET NULL, order_number TEXT, name TEXT, email TEXT, statement TEXT,
     locale TEXT, account_id INTEGER REFERENCES account (id) ON DELETE SET NULL, matched INTEGER NOT NULL DEFAULT 0, created_at TEXT)");
+$pdo->exec("ALTER TABLE withdrawal ADD COLUMN handled_at TEXT");
+$pdo->exec("ALTER TABLE withdrawal ADD COLUMN handled_by INTEGER");
 $pdo->exec("ALTER TABLE offer ADD COLUMN rating_count INTEGER NOT NULL DEFAULT 0");
 $pdo->exec("ALTER TABLE offer ADD COLUMN rating_sum INTEGER NOT NULL DEFAULT 0");
 $pdo->exec("ALTER TABLE provider ADD COLUMN rating_count INTEGER NOT NULL DEFAULT 0");
@@ -1597,6 +1614,18 @@ $pdo->exec('DELETE FROM orders WHERE id = 9001');
 check('withdrawal: a declaration outlives its order', count($withdrawals()) === $before + 1 && $withdrawals()[0]['order_id'] === null && (int) $withdrawals()[0]['matched'] === 1
     && str_contains($get('/admin/withdrawals', 3)['body'], 'Bestellung gelöscht'));
 
+$open = (int) $pdo->query('SELECT id FROM withdrawal WHERE order_id IS NULL ORDER BY id LIMIT 1')->fetchColumn();
+$r = $get('/admin/withdrawals', 3);
+check('withdrawal: the administration shows what still has to be passed on', str_contains($r['body'], 'warten auf Weiterleitung') && str_contains($r['body'], '/admin/withdrawals/' . $open . '/handled'));
+check('withdrawal: ticking one off needs the permission', $post('/admin/withdrawals/' . $open . '/handled', ['handled' => '1'], 2)['status'] === 403);
+$waitingBefore = (int) $pdo->query('SELECT COUNT(*) FROM withdrawal WHERE order_id IS NULL AND handled_at IS NULL')->fetchColumn();
+$post('/admin/withdrawals/' . $open . '/handled', ['handled' => '1'], 3);
+$handled = $pdo->query("SELECT handled_at, handled_by FROM withdrawal WHERE id = {$open}")->fetch();
+check('withdrawal: a declaration is ticked off with time and administrator', $handled['handled_at'] !== null && (int) $handled['handled_by'] === 3
+    && (int) $pdo->query('SELECT COUNT(*) FROM withdrawal WHERE order_id IS NULL AND handled_at IS NULL')->fetchColumn() === $waitingBefore - 1 && str_contains($get('/admin/withdrawals', 3)['body'], 'erledigt am'));
+$post('/admin/withdrawals/' . $open . '/handled', ['handled' => '0'], 3);
+check('withdrawal: and can be reopened', $pdo->query("SELECT handled_at FROM withdrawal WHERE id = {$open}")->fetchColumn() === null);
+
 $pdo->exec('DELETE FROM withdrawal');
 $pdo->exec('DELETE FROM provider');
 $pdo->exec("UPDATE account SET locale = 'de' WHERE id = 1");
@@ -1787,6 +1816,22 @@ $pdo->exec("INSERT INTO package VALUES ('theme', 'sample', 'acme/modulento-theme
 $pdo->exec("INSERT INTO setting VALUES ('core.theme', 'sample')");
 $post('/admin/packages/theme/sample/remove', [], 3);
 check('package administration does not remove the active theme', $pdo->query("SELECT COUNT(*) FROM package WHERE id = 'sample'")->fetchColumn() == 1 && is_dir($testThemes . '/sample'));
+$pdo->exec("DELETE FROM setting WHERE name = 'core.theme'");
+$r = $get('/admin/packages', 3);
+check('package administration: each package shows whether it is in use and can be switched', str_contains($r['body'], '/admin/packages/theme/sample/enable') && str_contains($r['body'], 'inaktiv'));
+$post('/admin/packages/theme/sample/enable', [], 3);
+check('package administration: a theme is chosen from the list', $pdo->query("SELECT value FROM setting WHERE name = 'core.theme'")->fetchColumn() === 'sample' && str_contains($get('/admin/packages', 3)['body'], '/admin/packages/theme/sample/disable'));
+$post('/admin/packages/theme/sample/disable', [], 3);
+check('package administration: switching the active theme off leads back to the default theme', $pdo->query("SELECT value FROM setting WHERE name = 'core.theme'")->fetchColumn() === 'default');
+$pdo->exec("INSERT INTO package VALUES ('extension', 'example', 'acme/modulento-ext-example', '0.1.0', '2026-01-01 00:00:00')");
+// Switching on runs the extension's migrations, which need MariaDB; off is plain.
+$enabledBefore = (int) $pdo->query("SELECT enabled FROM extension WHERE id = 'example'")->fetchColumn();
+$pdo->exec("UPDATE extension SET enabled = 1 WHERE id = 'example'");
+check('package administration: an active extension offers to be switched off', str_contains($get('/admin/packages', 3)['body'], '/admin/packages/extension/example/disable'));
+$post('/admin/packages/extension/example/disable', [], 3);
+check('package administration: an extension is switched off from the list', (int) $pdo->query("SELECT enabled FROM extension WHERE id = 'example'")->fetchColumn() === 0);
+$pdo->exec("UPDATE extension SET enabled = {$enabledBefore} WHERE id = 'example'");
+check('package administration: switching needs the permission', $post('/admin/packages/theme/sample/enable', [], 1)['status'] === 403);
 $pdo->exec("DELETE FROM setting WHERE name = 'core.theme'");
 $pdo->exec('DELETE FROM package');
 
