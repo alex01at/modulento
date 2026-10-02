@@ -1,0 +1,11 @@
+{% extends '@admin/layout.twig' %}
+
+{% block title %}{{ trans('core.admin.docs.title') }} – {{ site_name }}{% endblock %}
+
+{% block admin %}
+{% include '@admin/_page_header.twig' with {heading: trans('core.admin.docs.title')} only %}
+{# One file per language; a language without its own gets the English one. #}
+<div class="docs">
+    {% include ['@admin/docs/' ~ locale() ~ '.twig', '@admin/docs/en.twig'] %}
+</div>
+{% endblock %}

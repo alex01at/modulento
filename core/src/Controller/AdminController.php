@@ -16,6 +16,12 @@ final class AdminController extends Controller
         $this->render('@admin/index.twig', ['stats' => $this->stats()]);
     }
 
+    /** How themes and extensions are built, for whoever administers the site. */
+    public function docs(array $params): void
+    {
+        $this->render('@admin/docs.twig');
+    }
+
     /**
      * Figures for the dashboard, one entry per area the account may manage.
      * "pending" is null where nothing waits for a decision.

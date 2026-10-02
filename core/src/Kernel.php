@@ -245,6 +245,7 @@ final class Kernel
         $router->get('/providers/{slug}', [ProviderController::class, 'show'], Router::PUBLIC);
 
         $router->get('/admin', [AdminController::class, 'index'], 'core.admin.access');
+        $router->get('/admin/docs', [AdminController::class, 'docs'], 'core.admin.access');
         $router->get('/admin/extensions', [AdminController::class, 'extensions'], 'core.extensions.manage');
         $router->post('/admin/extensions/{id}/enable', [AdminController::class, 'enableExtension'], 'core.extensions.manage');
         $router->post('/admin/extensions/{id}/disable', [AdminController::class, 'disableExtension'], 'core.extensions.manage');
@@ -358,6 +359,7 @@ final class Kernel
         $app->addAdminMenu('core.admin.menu.packages', '/admin/packages', 'core.packages.manage');
         $app->addAdminMenu('core.admin.menu.tasks', '/admin/tasks', 'core.tasks.view');
         $app->addAdminMenu('core.admin.menu.updates', '/admin/updates', 'core.update.manage');
+        $app->addAdminMenu('core.admin.docs.title', '/admin/docs', 'core.admin.access');
 
         $app->scheduler->register(
             'core.rate-limit-cleanup',
