@@ -185,6 +185,7 @@ Templates of the site theme, with the variables they receive:
 | `error.twig` | `status`, `message_key` |
 | `auth/login.twig` | `can_resend_verification` |
 | `auth/register.twig` | `errors`, `email`, `min_length`, `legal` (terms and privacy pages to accept, as `title`/`url`); keep the hidden `website` field |
+| `auth/verify.twig` | `token`; a form that posts to `/verify-email/<token>` - the address is confirmed by the button, not by opening the link |
 | `auth/forgot.twig` | - |
 | `auth/reset.twig` | `errors`, `token`, `min_length` |
 | `account/index.twig` | `locales`, `min_length`, `is_last_admin`, `provider_status` |
