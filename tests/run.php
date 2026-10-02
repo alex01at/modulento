@@ -1875,10 +1875,10 @@ check('withdrawal: no more than five an hour from one address of the network', c
 
 check('withdrawal: the list in the administration needs its permission', $get('/admin/withdrawals', 2)['status'] === 403 && $get('/admin/withdrawals', null)['body'] === '');
 $r = $get('/admin/withdrawals', 3);
-// One check per claim: this list failed once without saying which part.
 check('withdrawal: the administration lists every declaration with its order', $r['status'] === 200 && str_contains($r['body'], 'Erika Muster') && str_contains($r['body'], 'href="/admin/orders/9001"'));
 check('withdrawal: the list shows what could not be assigned', str_contains($r['body'], 'nicht zugeordnet') && str_contains($r['body'], 'stranger@example.test'));
-check('withdrawal: the list shows when a declaration arrived', str_contains($r['body'], $first['created_at'] . ' UTC'));
+// The time of a row that is in the list now - not of one deleted further up.
+check('withdrawal: the list shows when a declaration arrived', str_contains($r['body'], $withdrawals()[0]['created_at'] . ' UTC'));
 check('withdrawal: the list escapes what was typed', str_contains($r['body'], '&lt;b&gt;fett&lt;/b&gt;') && !str_contains($r['body'], '<b>fett'));
 check('withdrawal: the list is marked in the menu', str_contains($r['body'], 'href="/admin/withdrawals" aria-current="page"'));
 $export = json_decode($get('/account/export', 2)['body'], true);
