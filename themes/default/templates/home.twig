@@ -10,4 +10,9 @@
     {% include 'offer/_cards.twig' %}
     <p><a href="{{ url('/offers') }}">{{ trans('core.offers.all') }}</a></p>
 {% endif %}
+
+{# What extensions show on the home page, e.g. the latest posts of a blog. #}
+{% for section in home_sections() %}
+    {% include section %}
+{% endfor %}
 {% endblock %}

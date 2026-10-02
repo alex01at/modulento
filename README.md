@@ -334,6 +334,9 @@ Available in every template:
 | `current_path()` | Path of the current page without its language prefix, e.g. to mark the active menu entry |
 | `page_links('header' \| 'footer' \| role)` | Published pages for a menu, as `title`/`url`/`role`; `'footer'` ends with the links to the withdrawal form and the report form (`role` is `withdrawal` and `report`) |
 | `latest_offers(limit)` | The newest public offers as cards |
+| `has_catalogue()` | Whether an extension adds a kind of offer; without one, hide the links to offers and providers |
+| `nav_links()` | Entries extensions add to the main menu, as `title`/`url`/`path` |
+| `home_sections()` | Templates extensions want included on the home page: `{% for section in home_sections() %}{% include section %}{% endfor %}` |
 | `categories()` | The category tree with `name`, `path`, `children` and `offer_count` |
 | `top_providers(limit)` | Public providers, best rated first, as shown on `provider/show.twig` |
 | `registration_open()` | Whether new accounts can be created |
@@ -434,6 +437,8 @@ extensions/<id>/
 | `routes(fn (Router $r) => ...)` | Routes. Each states its access: `Router::PUBLIC`, `Router::AUTH` (default) or a permission name |
 | `permission(name, labelKey)` | A permission that roles can be given |
 | `adminMenu(labelKey, path, permission)` | An entry in the administration menu |
+| `navigation(labelKey, path)` | An entry in the site's main menu |
+| `homeSection(template)` | A template of the extension included on the home page; it gets no variables |
 | `listen(EventClass, fn ($event, App $app) => ...)` | React to a core or extension event |
 | `task(name, everyMinutes, fn (App $app) => ...)` | Scheduled work, run by `bin/cron.php` |
 | `offerType(OfferType)` | A kind of offer for the catalogue, see below |
@@ -621,7 +626,7 @@ Version 1 consists of:
 
 - `Modulento\Core\Extension\Extension` with `register(Registrar)`, and
   `extension.json` with `id`, `name`, `version`, `api`, `namespace`
-- the `Registrar` methods `routes`, `permission`, `adminMenu`, `listen`,
+- the `Registrar` methods `routes`, `permission`, `adminMenu`, `navigation`, `homeSection`, `listen`,
   `task`, `offerType`, `orderFlow`, `paymentMethod`, and its `manifest`
 - the interfaces `Modulento\Core\Catalogue\OfferType`,
   `Modulento\Core\Order\OrderFlow` and `Modulento\Core\Order\PaymentMethod`,

@@ -430,6 +430,10 @@ $r = request($pdo, $config, 'GET', '/nowhere', 3);
 check('unknown path: 404', !$r['called'] && $r['status'] === 404 && str_contains($r['body'], 'Seite nicht gefunden'));
 
 $r = request($pdo, $config, 'GET', '/example', null);
+$home = request($pdo, $config, 'GET', '/', null)['body'];
+check('enabled extension: its entry in the main menu and its section on the home page', str_contains($home, '<a href="/example">Beispiel</a>') && str_contains($home, 'Aus der Beispiel-Erweiterung'));
+check('without an extension that adds offers the site shows no catalogue links', !str_contains($home, 'href="/offers"') && !str_contains($home, 'href="/providers"')
+    && !str_contains(request($pdo, $config, 'GET', '/account', 1)['body'], 'Anbieter werden'));
 check('enabled extension: route, template and language file work', $r['status'] === 200 && str_contains($r['body'], 'Diese Seite stammt aus der Erweiterung'));
 $r = request($pdo, $config, 'GET', '/admin/example', 2);
 check('extension permission route: 403 without it', $r['status'] === 403);
@@ -1193,6 +1197,7 @@ $orderPath = '/offers/ich-gestalte-dein-logo/order';
 
 $r = $get('/offers/ich-gestalte-dein-logo', 2);
 check('offer page offers to order each package', str_contains($r['body'], $orderPath . '?package=1') && str_contains($r['body'], $orderPath . '?package=2'));
+check('with an extension that adds offers the catalogue links are there', str_contains($r['body'], 'href="/offers"') && str_contains($r['body'], 'href="/providers"'));
 check('offer and provider pages link to the report form with their own address', substr_count($r['body'], 'href="/report?url=https%3A%2F%2Fexample.test%2Foffers%2Fich-gestalte-dein-logo"') === 2
     && str_contains($get('/en/providers/mueller-design', null)['body'], 'href="/en/report?url=https%3A%2F%2Fexample.test%2Fen%2Fproviders%2Fmueller-design"'));
 check('the report link in the footer names the page it is on, but not the account\'s own pages', str_contains($get('/offers', null)['body'], 'href="/report?url=https%3A%2F%2Fexample.test%2Foffers"')
@@ -2639,7 +2644,7 @@ foreach ($sources as $file) {
     }
 }
 foreach (glob($root . '/{core/src,extensions/*/src}/{,*/}*.php', GLOB_BRACE) as $file) {
-    preg_match_all("/(?:trans\\(|flash\\('[a-z]+', \\\$this->trans\\(|'key' => |back\\([^,]+, '[a-z]+', |Key\\) => |return |\\\$errors\\[\\] = |UpdateException\\(|result\\([a-z]+, '[a-z_]+', )'((?:core|example|freelancer|auction)\\.[a-z0-9_.]+[a-z0-9])'/", (string) file_get_contents($file), $found);
+    preg_match_all("/(?:trans\\(|flash\\('[a-z]+', \\\$this->trans\\(|'key' => |back\\([^,]+, '[a-z]+', |Key\\) => |return |\\\$errors\\[\\] = |UpdateException\\(|result\\([a-z]+, '[a-z_]+', )'((?:core|" . implode('|', array_map('basename', glob($root . '/extensions/*', GLOB_ONLYDIR))) . ")\\.[a-z0-9_.]+[a-z0-9])'/", (string) file_get_contents($file), $found);
     foreach ($found[1] as $key) {
         // Offer type ids look like keys but are not.
         if (!isset($knownKeys[$key]) && !in_array($key, ['freelancer.service', 'auction.lot', 'auction.sale', 'core.offline'], true)) {

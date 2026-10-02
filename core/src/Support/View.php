@@ -176,6 +176,17 @@ final class View
             'color_scheme',
             fn (): string => $app->preferences->colorScheme($auth->account()['id'] ?? null)
         ));
+        // Whether any extension adds a kind of offer. Without one there is
+        // no catalogue to link to, and the site is pages, accounts and
+        // whatever else the extensions bring.
+        $this->twig->addFunction(new TwigFunction('has_catalogue', fn () => $app->offers->types() !== []));
+        // Entries extensions add to the main menu, as title/url.
+        $this->twig->addFunction(new TwigFunction('nav_links', fn () => array_map(
+            fn (array $link) => ['title' => $app->translator->trans($link['label_key']), 'url' => $app->url($link['path']), 'path' => $link['path']],
+            $app->navigation()
+        )));
+        // Templates extensions want included on the home page.
+        $this->twig->addFunction(new TwigFunction('home_sections', fn () => $app->homeSections()));
         $this->twig->addFunction(new TwigFunction('registration_open', fn () => $app->settings->get('core.registration', 'open') === 'open'));
         $this->twig->addFunction(new TwigFunction('locale_name', fn (string $locale) => $app->locales->name($locale)));
         $this->twig->addFunction(new TwigFunction('can', fn (string $permission) => $auth->can($permission)));
