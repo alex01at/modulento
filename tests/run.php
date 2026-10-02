@@ -703,7 +703,8 @@ check('provider: description is escaped, line breaks kept', str_contains($r['bod
 check('provider: listed in the directory, in every language', str_contains($get('/providers', null)['body'], 'href="/providers/mueller-design"') && str_contains($get('/en/providers', null)['body'], 'href="/en/providers/mueller-design"'));
 check('provider: another language shows the default text and translated labels', str_contains($get('/en/providers/mueller-design', null)['body'], 'Logos &amp; mehr') && str_contains($get('/en/providers/mueller-design', null)['body'], 'Business provider'));
 
-$post('/account/provider', ['text' => ['de' => ['headline' => 'Neu', 'description' => 'x'], 'en' => ['headline' => 'New', 'description' => 'y']]] + $business + ['street' => 'Hauptstraße 1/4'], 1);
+// The street as it was approved comes first: "+" keeps the left value.
+$post('/account/provider', ['street' => 'Hauptstraße 1/4', 'text' => ['de' => ['headline' => 'Neu', 'description' => 'x'], 'en' => ['headline' => 'New', 'description' => 'y']]] + $business, 1);
 $r = $get('/admin/providers/' . $p['id'], 3);
 check('provider: changing only the presentation is not flagged', $provider(1)['status'] === 'approved' && !str_contains($r['body'], 'seit der letzten Entscheidung'));
 sleep(1);
