@@ -59,7 +59,8 @@ final class Updater
      */
     public function isDevelopmentCheckout(): bool
     {
-        return is_dir($this->root . '/.git');
+        // A folder in a clone, a file in a linked working tree.
+        return file_exists($this->root . '/.git');
     }
 
     /** VERSION only exists inside a release package, stamped from the tag. */

@@ -121,7 +121,7 @@ final class Reviews
 
         $stmt = $this->db->prepare(
             "SELECT * FROM review WHERE {$column} = :id AND status = 'published'
-             ORDER BY id DESC LIMIT " . max(1, $perPage) . ' OFFSET ' . max(0, ($page - 1) * $perPage)
+             ORDER BY id DESC LIMIT " . max(1, $perPage) . ' OFFSET ' . max(0, (min($page, 100000) - 1) * $perPage)
         );
         $stmt->execute(['id' => $id]);
 
@@ -140,7 +140,7 @@ final class Reviews
         $stmt = $this->db->prepare(
             "SELECT r.*, p.name AS provider_name, o.offer_title FROM review r
              JOIN provider p ON p.id = r.provider_id JOIN orders o ON o.id = r.order_id {$where}
-             ORDER BY r.id DESC LIMIT " . max(1, $perPage) . ' OFFSET ' . max(0, ($page - 1) * $perPage)
+             ORDER BY r.id DESC LIMIT " . max(1, $perPage) . ' OFFSET ' . max(0, (min($page, 100000) - 1) * $perPage)
         );
         $stmt->execute($params);
 

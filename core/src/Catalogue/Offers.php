@@ -177,7 +177,7 @@ final class Offers
         $stmt = $this->db->prepare(
             'SELECT o.*, p.account_id, p.name AS provider_name, p.slug AS provider_slug, p.status AS provider_status,
                     a.email AS account_email, a.locale AS account_locale, a.status AS account_status '
-            . self::FROM . " WHERE {$whereSql} ORDER BY {$order} LIMIT " . max(1, $perPage) . ' OFFSET ' . max(0, ($page - 1) * $perPage)
+            . self::FROM . " WHERE {$whereSql} ORDER BY {$order} LIMIT " . max(1, $perPage) . ' OFFSET ' . max(0, (min($page, 100000) - 1) * $perPage)
         );
         $stmt->execute($params);
 
@@ -209,7 +209,7 @@ final class Offers
         $stmt = $this->db->prepare(
             'SELECT o.*, p.account_id, p.name AS provider_name, p.slug AS provider_slug, p.status AS provider_status,
                     a.email AS account_email, a.locale AS account_locale, a.status AS account_status '
-            . self::FROM . " WHERE {$whereSql} ORDER BY o.updated_at DESC, o.id DESC LIMIT " . max(1, $perPage) . ' OFFSET ' . max(0, ($page - 1) * $perPage)
+            . self::FROM . " WHERE {$whereSql} ORDER BY o.updated_at DESC, o.id DESC LIMIT " . max(1, $perPage) . ' OFFSET ' . max(0, (min($page, 100000) - 1) * $perPage)
         );
         $stmt->execute($params);
 

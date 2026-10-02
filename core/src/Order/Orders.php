@@ -194,7 +194,7 @@ final class Orders
         $count->execute($params);
 
         $stmt = $this->db->prepare(
-            "SELECT * FROM orders {$whereSql} ORDER BY id DESC LIMIT " . max(1, $perPage) . ' OFFSET ' . max(0, ($page - 1) * $perPage)
+            "SELECT * FROM orders {$whereSql} ORDER BY id DESC LIMIT " . max(1, $perPage) . ' OFFSET ' . max(0, (min($page, 100000) - 1) * $perPage)
         );
         $stmt->execute($params);
 

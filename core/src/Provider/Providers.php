@@ -104,7 +104,7 @@ final class Providers
         $stmt = $this->db->prepare(
             "SELECT p.*, a.email AS account_email, a.status AS account_status
              FROM provider p JOIN account a ON a.id = p.account_id {$whereSql}
-             ORDER BY p.name, p.id LIMIT " . max(1, $perPage) . ' OFFSET ' . max(0, ($page - 1) * $perPage)
+             ORDER BY p.name, p.id LIMIT " . max(1, $perPage) . ' OFFSET ' . max(0, (min($page, 100000) - 1) * $perPage)
         );
         $stmt->execute($params);
 

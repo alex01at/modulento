@@ -115,6 +115,12 @@ final class RegistrationController extends Controller
     {
         $existing = $this->app->accounts->findByEmail($email);
 
+        // The same work whether or not the address is known, so the time
+        // the answer takes says nothing either.
+        if ($existing !== null) {
+            password_hash($password, PASSWORD_DEFAULT);
+        }
+
         if ($existing === null) {
             $accountId = $this->app->accounts->create($email, $password, $this->app->translator->locale(), verified: false, termsAccepted: $termsAccepted);
             AuthController::sendVerification($this->app, $accountId, $email);
