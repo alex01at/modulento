@@ -2756,11 +2756,13 @@ check('show password: the script is served and adds a button of type "button"', 
 $unscripted = [];
 foreach ([...glob($root . '/themes/*/templates/{,*/,*/*/}*.twig', GLOB_BRACE), ...glob($root . '/extensions/*/templates/{,*/}*.twig', GLOB_BRACE)] as $file) {
     $source = (string) file_get_contents($file);
-    if (str_contains($source, 'type="password"') && !str_contains($source, "{% extends 'layout/base.twig' %}")) {
+    if (str_contains($source, 'type="password"') && !str_contains($source, "{% extends 'layout/base.twig' %}") && !str_contains($source, "{% extends '@admin/layout.twig' %}")) {
         $unscripted[] = basename($file);
     }
 }
-check('show password: every template with a password field uses the site layout: ' . implode(', ', $unscripted), $unscripted === []);
+check('show password: every template with a password field uses a layout that loads the script: ' . implode(', ', $unscripted), $unscripted === []
+    && str_contains((string) file_get_contents($root . '/themes/admin/templates/layout.twig'), 'password-toggle.js')
+    && file_get_contents($root . '/themes/admin/assets/password-toggle.js') === file_get_contents($root . '/themes/default/assets/password-toggle.js'));
 check('show password: the setup page loads its own copy of the same script', file_get_contents($root . '/core/install/password-toggle.js') === file_get_contents($root . '/themes/default/assets/password-toggle.js')
     && str_contains((string) file_get_contents($root . '/core/install/install.twig'), '<script src="/password-toggle.js" defer data-show="{{ password_show }}" data-hide="{{ password_hide }}"></script>'));
 ob_start();
