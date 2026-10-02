@@ -2916,7 +2916,9 @@ check('package administration: extensions that moved out of the core can be take
 check('package administration: no official packages without knowing whose they are', !str_contains($r['body'], 'Offizielle Pakete'));
 $r = request($pdo, ['update' => ['repo' => 'acme/modulento']] + $config, 'GET', '/admin/packages', 3);
 check('package administration offers the official packages that are not here yet', str_contains($r['body'], 'Offizielle Pakete') && str_contains($r['body'], 'name="repo" value="acme/modulento-theme-indigo"')
-    && !str_contains($r['body'], 'type="hidden" name="repo" value="acme/modulento-ext-'));
+    && !str_contains($r['body'], 'type="hidden" name="repo" value="acme/modulento-ext-freelancer"') && !str_contains($r['body'], 'type="hidden" name="repo" value="acme/modulento-ext-auction"')
+    // The blog is offered exactly where its folder is not there (it is not needed for these tests).
+    && str_contains($r['body'], 'type="hidden" name="repo" value="acme/modulento-ext-blog"') === !is_dir($root . '/extensions/blog'));
 $r = request($pdo, ['update' => ['repo' => 'elsewhere/modulento']] + $config, 'GET', '/admin/packages', 3);
 check('package administration: official packages only from an allowed source', $r['status'] === 200 && !str_contains($r['body'], 'Offizielle Pakete'));
 $post('/admin/packages/install', ['repo' => 'evil/thing'], 3);
