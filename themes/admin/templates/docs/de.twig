@@ -1,0 +1,113 @@
+<section class="card-box">
+    <h2>Überblick</h2>
+    <p>Modulento besteht aus einem Kern und aus Paketen. Der Kern bringt Konten, Seiten, Bestellungen, Zahlungsarten und die Administration mit. <strong>Erweiterungen</strong> fügen Funktionen hinzu (Dienstleistungen, Auktionen, Blog), <strong>Themes</strong> bestimmen das Aussehen der Website. Beides sind schlichte Ordner – ohne Build-Schritt, ohne Composer.</p>
+    <ul>
+        <li>Erweiterungen liegen in <code>extensions/&lt;id&gt;/</code>, Themes in <code>themes/&lt;id&gt;/</code>.</li>
+        <li>Installiert wird unter <a href="{{ url('/admin/packages') }}">Pakete</a> aus einem GitHub-Repository oder per FTP durch Hochladen des Ordners.</li>
+        <li>Die vollständige Referenz (alle Templates, Variablen und Twig-Funktionen) steht in der <code>README.md</code> des Kerns.</li>
+    </ul>
+</section>
+
+<section class="card-box">
+    <h2>Ein Theme bauen</h2>
+    <p>Ein Theme muss nur enthalten, was es anders macht. Jede Datei, die fehlt, kommt aus dem Theme <code>default</code>.</p>
+<pre><code>themes/meintheme/
+  theme.json            Pflicht
+  templates/            Twig-Vorlagen, gleiche Pfade wie in themes/default/templates
+  assets/theme.css      Stylesheet, dazu Schriften und Bilder
+  lang/de.php, en.php   eigene Texte, Schlüssel beginnen mit "theme."</code></pre>
+<pre><code>{
+    "id": "meintheme",
+    "name": "Mein Theme",
+    "version": "1.0.0",
+    "requires": "0.15.0"
+}</code></pre>
+    <ul>
+        <li><strong>id</strong> ist der Ordnername: Kleinbuchstaben, Ziffern, Unterstrich. <strong>requires</strong> nennt die älteste Kern-Version, auf der das Theme läuft.</li>
+        <li>Der einfachste Start: nur <code>assets/theme.css</code> und <code>templates/layout/base.twig</code> aus <code>default</code> kopieren und anpassen.</li>
+        <li>Assets werden mit <code>{{ '{{ theme_asset(\'theme.css\') }}' }}</code> eingebunden, Links mit <code>{{ '{{ url(\'/pfad\') }}' }}</code>, Texte mit <code>{{ '{{ trans(\'schluessel\') }}' }}</code>.</li>
+        <li>Vorlagen einer Erweiterung überschreibt ein Theme unter <code>extensions/&lt;id&gt;/</code>, also <code>themes/meintheme/extensions/blog/index.twig</code>.</li>
+        <li>Menü und Startseite sollen zeigen, was Erweiterungen mitbringen: <code>nav_links()</code>, <code>home_sections()</code>, und <code>has_catalogue()</code> für die Links zu Angeboten und Anbietern.</li>
+    </ul>
+    <h3>Dunkles Farbschema</h3>
+    <p>Farben als CSS-Variablen anlegen und zweimal dunkle Werte setzen – für das Gerät und für die feste Wahl des Kontos:</p>
+<pre><code>:root { --ground: #fff; --text: #1a1a1a; }
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) { --ground: #0b1020; --text: #e8ecf5; }
+}
+:root[data-theme="dark"] { --ground: #0b1020; --text: #e8ecf5; }</code></pre>
+    <p>Im Layout: <code>&lt;html lang="…" data-theme="…"&gt;</code> nur, wenn <code>color_scheme()</code> nicht <code>auto</code> liefert.</p>
+    <h3>Was nicht geht</h3>
+    <p>Die Website erlaubt nur eigene Dateien: kein Inline-JavaScript, keine Inline-Styles (<code>style="…"</code>), keine Schriften oder Skripte von fremden Servern. Skripte und Schriften gehören als Dateien nach <code>assets/</code>.</p>
+</section>
+
+<section class="card-box">
+    <h2>Eine Erweiterung bauen</h2>
+<pre><code>extensions/meineerweiterung/
+  extension.json        Pflicht
+  src/Extension.php     Pflicht: meldet an, was die Erweiterung mitbringt
+  src/…                 weitere Klassen im selben Namensraum
+  templates/            Twig-Vorlagen, angesprochen als "@meineerweiterung/datei.twig"
+  lang/de.php, en.php   Texte, Schlüssel beginnen mit "meineerweiterung."
+  migrations/001_x.sql  Tabellen, Namen beginnen mit "x_meineerweiterung_"
+  assets/               CSS, JavaScript, Bilder</code></pre>
+<pre><code>{
+    "id": "meineerweiterung",
+    "name": "Meine Erweiterung",
+    "version": "1.0.0",
+    "requires": "0.15.0",
+    "api": 1,
+    "namespace": "Firma\\MeineErweiterung"
+}</code></pre>
+<pre><code>&lt;?php
+
+declare(strict_types=1);
+
+namespace Firma\MeineErweiterung;
+
+use Modulento\Core\Extension\Extension as ExtensionContract;
+use Modulento\Core\Extension\Registrar;
+use Modulento\Core\Support\Router;
+
+final class Extension implements ExtensionContract
+{
+    public function register(Registrar $registrar): void
+    {
+        $registrar->routes(function (Router $router): void {
+            $router->get('/hallo', [HalloController::class, 'index'], Router::PUBLIC);
+        });
+        $registrar->navigation('meineerweiterung.nav', '/hallo');
+    }
+}</code></pre>
+    <div class="table-wrap">
+        <table>
+            <thead><tr><th scope="col">Registrar</th><th scope="col">Wofür</th></tr></thead>
+            <tbody>
+                <tr><th scope="row"><code>routes()</code></th><td>Adressen. Jede Route nennt ihren Zugriff: <code>Router::PUBLIC</code>, angemeldet (Standard) oder ein Recht.</td></tr>
+                <tr><th scope="row"><code>permission()</code>, <code>adminMenu()</code></th><td>Ein eigenes Recht und ein Eintrag im Menü der Administration.</td></tr>
+                <tr><th scope="row"><code>navigation()</code>, <code>homeSection()</code></th><td>Eintrag im Hauptmenü der Website, Abschnitt auf der Startseite.</td></tr>
+                <tr><th scope="row"><code>listen()</code></th><td>Auf Ereignisse reagieren, z. B. Datenexport oder Löschung eines Kontos.</td></tr>
+                <tr><th scope="row"><code>task()</code></th><td>Etwas regelmäßig über den Cron ausführen.</td></tr>
+                <tr><th scope="row"><code>offerType()</code>, <code>orderFlow()</code>, <code>paymentMethod()</code></th><td>Eine Art von Angebot, ihr Bestellablauf, eine Zahlungsart.</td></tr>
+            </tbody>
+        </table>
+    </div>
+    <ul>
+        <li>Controller erben von <code>Modulento\Core\Controller\Controller</code> und nutzen <code>$this-&gt;render()</code>, <code>$this-&gt;redirect()</code>, <code>$this-&gt;trans()</code> und <code>$this-&gt;app</code>.</li>
+        <li>Formulare brauchen <code>{{ '{{ csrf_field() }}' }}</code>; ohne Token lehnt der Kern jede POST-Anfrage ab.</li>
+        <li>Datenbank: nur vorbereitete Abfragen über <code>$this-&gt;app-&gt;db</code> (PDO). Migrationen laufen beim Aktivieren und bei jedem Update.</li>
+        <li>Bilder und Dateien, die ohne Anmeldung ausgeliefert werden, unter <code>/media/&lt;id&gt;/…</code> anbieten.</li>
+        <li>Als Vorlage dient die mitgelieferte Erweiterung <code>extensions/example</code>; Blog, Auktion und Freelancer sind vollständige Beispiele in eigenen Repositories.</li>
+    </ul>
+</section>
+
+<section class="card-box">
+    <h2>Ausprobieren und veröffentlichen</h2>
+    <ol>
+        <li><strong>Lokal oder per FTP:</strong> Ordner nach <code>extensions/</code> bzw. <code>themes/</code> legen. Er erscheint unter <a href="{{ url('/admin/packages') }}">Pakete</a> bei „Vorhanden, aber kein Paket" und lässt sich dort aktivieren.</li>
+        <li><strong>Repository:</strong> Der Inhalt des Ordners ist die Wurzel eines GitHub-Repositorys, üblich sind die Namen <code>modulento-ext-&lt;id&gt;</code> und <code>modulento-theme-&lt;id&gt;</code>.</li>
+        <li><strong>Release:</strong> Version im Manifest anheben, Tag <code>v1.0.0</code> setzen. Das Release braucht zwei Dateien: ein Zip mit dem Manifest in der Wurzel und daneben dieselbe Datei mit der Endung <code>.sha256</code>. Die offiziellen Pakete enthalten dafür einen fertigen Workflow unter <code>.github/workflows/release.yml</code>.</li>
+        <li><strong>Installieren:</strong> Unter Pakete <code>besitzer/repository</code> eintragen. Erlaubte Quellen stehen als <code>PACKAGE_SOURCES</code> in der <code>.env</code>.</li>
+    </ol>
+    <p>Eine Erweiterung führt eigenen Code auf dem Server aus. Installiere nur Pakete aus Quellen, denen du vertraust.</p>
+</section>

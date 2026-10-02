@@ -2722,6 +2722,9 @@ foreach (['//evil.example', 'https://evil.example/', '/\\evil', "/a\nb"] as $els
     check('colour scheme: never back to another site (' . json_encode($elsewhere) . ')', isset($_SESSION['_flash']['success']));
 }
 $r = $get('/admin', 3);
+$r = $get('/admin/docs', 3);
+check('documentation: in the administration, in the administrator\'s language, with the examples as text', $r['status'] === 200 && str_contains($r['body'], 'Ein Theme bauen') && str_contains($r['body'], '&lt;?php')
+    && str_contains($r['body'], '{{ theme_asset(') && str_contains($r['body'], 'href="/admin/docs"') && str_contains($get('/en/admin/docs', 3)['body'], 'Building a theme') && $get('/admin/docs', 1)['status'] === 403);
 check('administration: the top bar has the same account menu', str_contains($r['body'], '<details class="account-menu">') && str_contains($r['body'], 'action="/account/appearance"') && str_contains($r['body'], 'account-menu.js'));
 check('colour scheme: it is the account\'s own', str_contains($get('/', 2)['body'], '<html lang="de">') && str_contains($get('/', null)['body'], '<html lang="de">'));
 foreach (['pink', '', ['dark'], 'DARK'] as $invalid) {

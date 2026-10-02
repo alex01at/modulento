@@ -1,0 +1,113 @@
+<section class="card-box">
+    <h2>Overview</h2>
+    <p>Modulento is a core plus packages. The core brings accounts, pages, orders, payment methods and the administration. <strong>Extensions</strong> add features (services, auctions, a blog), <strong>themes</strong> decide what the site looks like. Both are plain folders - no build step, no Composer.</p>
+    <ul>
+        <li>Extensions live in <code>extensions/&lt;id&gt;/</code>, themes in <code>themes/&lt;id&gt;/</code>.</li>
+        <li>They are installed under <a href="{{ url('/admin/packages') }}">Packages</a> from a GitHub repository, or by uploading the folder by FTP.</li>
+        <li>The full reference (every template, variable and Twig function) is the core's <code>README.md</code>.</li>
+    </ul>
+</section>
+
+<section class="card-box">
+    <h2>Building a theme</h2>
+    <p>A theme only contains what it does differently. Every file it lacks comes from the theme <code>default</code>.</p>
+<pre><code>themes/mytheme/
+  theme.json            required
+  templates/            Twig templates, same paths as in themes/default/templates
+  assets/theme.css      stylesheet, plus fonts and pictures
+  lang/de.php, en.php   own texts, keys start with "theme."</code></pre>
+<pre><code>{
+    "id": "mytheme",
+    "name": "My theme",
+    "version": "1.0.0",
+    "requires": "0.15.0"
+}</code></pre>
+    <ul>
+        <li><strong>id</strong> is the folder name: lower-case letters, digits, underscore. <strong>requires</strong> names the oldest core version the theme runs on.</li>
+        <li>The easiest start: copy only <code>assets/theme.css</code> and <code>templates/layout/base.twig</code> from <code>default</code> and change them.</li>
+        <li>Assets are included with <code>{{ '{{ theme_asset(\'theme.css\') }}' }}</code>, links with <code>{{ '{{ url(\'/path\') }}' }}</code>, texts with <code>{{ '{{ trans(\'key\') }}' }}</code>.</li>
+        <li>A theme overrides an extension's templates under <code>extensions/&lt;id&gt;/</code>, e.g. <code>themes/mytheme/extensions/blog/index.twig</code>.</li>
+        <li>Menu and home page should show what extensions bring: <code>nav_links()</code>, <code>home_sections()</code>, and <code>has_catalogue()</code> for the links to offers and providers.</li>
+    </ul>
+    <h3>Dark colour scheme</h3>
+    <p>Define colours as CSS variables and set the dark values twice - for the device and for the account's fixed choice:</p>
+<pre><code>:root { --ground: #fff; --text: #1a1a1a; }
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) { --ground: #0b1020; --text: #e8ecf5; }
+}
+:root[data-theme="dark"] { --ground: #0b1020; --text: #e8ecf5; }</code></pre>
+    <p>In the layout: <code>&lt;html lang="…" data-theme="…"&gt;</code> only when <code>color_scheme()</code> does not return <code>auto</code>.</p>
+    <h3>What does not work</h3>
+    <p>The site only allows its own files: no inline JavaScript, no inline styles (<code>style="…"</code>), no fonts or scripts from other servers. Scripts and fonts belong into <code>assets/</code> as files.</p>
+</section>
+
+<section class="card-box">
+    <h2>Building an extension</h2>
+<pre><code>extensions/myextension/
+  extension.json        required
+  src/Extension.php     required: announces what the extension brings
+  src/…                 more classes in the same namespace
+  templates/            Twig templates, addressed as "@myextension/file.twig"
+  lang/de.php, en.php   texts, keys start with "myextension."
+  migrations/001_x.sql  tables, names start with "x_myextension_"
+  assets/               CSS, JavaScript, pictures</code></pre>
+<pre><code>{
+    "id": "myextension",
+    "name": "My extension",
+    "version": "1.0.0",
+    "requires": "0.15.0",
+    "api": 1,
+    "namespace": "Company\\MyExtension"
+}</code></pre>
+<pre><code>&lt;?php
+
+declare(strict_types=1);
+
+namespace Company\MyExtension;
+
+use Modulento\Core\Extension\Extension as ExtensionContract;
+use Modulento\Core\Extension\Registrar;
+use Modulento\Core\Support\Router;
+
+final class Extension implements ExtensionContract
+{
+    public function register(Registrar $registrar): void
+    {
+        $registrar->routes(function (Router $router): void {
+            $router->get('/hello', [HelloController::class, 'index'], Router::PUBLIC);
+        });
+        $registrar->navigation('myextension.nav', '/hello');
+    }
+}</code></pre>
+    <div class="table-wrap">
+        <table>
+            <thead><tr><th scope="col">Registrar</th><th scope="col">What for</th></tr></thead>
+            <tbody>
+                <tr><th scope="row"><code>routes()</code></th><td>Addresses. Every route states its access: <code>Router::PUBLIC</code>, logged in (the default) or a permission.</td></tr>
+                <tr><th scope="row"><code>permission()</code>, <code>adminMenu()</code></th><td>A permission of its own and an entry in the administration's menu.</td></tr>
+                <tr><th scope="row"><code>navigation()</code>, <code>homeSection()</code></th><td>An entry in the site's main menu, a section on the home page.</td></tr>
+                <tr><th scope="row"><code>listen()</code></th><td>React to events, e.g. an account's data export or deletion.</td></tr>
+                <tr><th scope="row"><code>task()</code></th><td>Run something regularly through cron.</td></tr>
+                <tr><th scope="row"><code>offerType()</code>, <code>orderFlow()</code>, <code>paymentMethod()</code></th><td>A kind of offer, its order flow, a payment method.</td></tr>
+            </tbody>
+        </table>
+    </div>
+    <ul>
+        <li>Controllers extend <code>Modulento\Core\Controller\Controller</code> and use <code>$this-&gt;render()</code>, <code>$this-&gt;redirect()</code>, <code>$this-&gt;trans()</code> and <code>$this-&gt;app</code>.</li>
+        <li>Forms need <code>{{ '{{ csrf_field() }}' }}</code>; without the token the core refuses every POST request.</li>
+        <li>Database: prepared statements only, through <code>$this-&gt;app-&gt;db</code> (PDO). Migrations run when the extension is enabled and with every update.</li>
+        <li>Serve pictures and files that need no login under <code>/media/&lt;id&gt;/…</code>.</li>
+        <li>The shipped extension <code>extensions/example</code> is the template to start from; blog, auction and freelancer are complete examples in repositories of their own.</li>
+    </ul>
+</section>
+
+<section class="card-box">
+    <h2>Trying out and publishing</h2>
+    <ol>
+        <li><strong>Locally or by FTP:</strong> put the folder into <code>extensions/</code> or <code>themes/</code>. It appears under <a href="{{ url('/admin/packages') }}">Packages</a> as "Present, but not a package" and can be switched on there.</li>
+        <li><strong>Repository:</strong> the folder's content is the root of a GitHub repository; the usual names are <code>modulento-ext-&lt;id&gt;</code> and <code>modulento-theme-&lt;id&gt;</code>.</li>
+        <li><strong>Release:</strong> raise the version in the manifest and set the tag <code>v1.0.0</code>. The release needs two files: a zip with the manifest at its root and, next to it, the same name ending in <code>.sha256</code>. The official packages contain a ready-made workflow for that in <code>.github/workflows/release.yml</code>.</li>
+        <li><strong>Installing:</strong> enter <code>owner/repository</code> under Packages. Allowed sources are listed as <code>PACKAGE_SOURCES</code> in <code>.env</code>.</li>
+    </ol>
+    <p>An extension runs its own code on the server. Install only packages from sources you trust.</p>
+</section>

@@ -73,6 +73,7 @@ return [
 
     'core.permission.update_manage' => 'Updates einspielen',
     'core.admin.menu.updates' => 'Updates',
+    'core.admin.docs.title' => 'Dokumentation',
     'core.update.title' => 'Updates',
     'core.update.current_version' => 'Installierte Version',
     'core.update.version_unreleased' => 'Entwicklungsstand (keine Release-Version)',

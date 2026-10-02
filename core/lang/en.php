@@ -73,6 +73,7 @@ return [
 
     'core.permission.update_manage' => 'Install updates',
     'core.admin.menu.updates' => 'Updates',
+    'core.admin.docs.title' => 'Documentation',
     'core.update.title' => 'Updates',
     'core.update.current_version' => 'Installed version',
     'core.update.version_unreleased' => 'development state (not a release version)',
