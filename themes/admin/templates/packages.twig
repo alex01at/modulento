@@ -93,6 +93,33 @@
 </section>
 {% endif %}
 
+{% if official %}
+<section class="card-box">
+    <h2>{{ trans('core.package.official_title') }}</h2>
+    <p>{{ trans('core.package.official_hint') }}</p>
+    <div class="table-wrap">
+        <table>
+            <tbody>
+            {% for item in official %}
+                <tr>
+                    <th scope="row">{{ item.id }}</th>
+                    <td>{{ trans('core.package.kind.' ~ item.kind) }}</td>
+                    <td>{{ trans(item.key) }}<br><small>{{ item.repo }}</small></td>
+                    <td>
+                        <form method="post" action="{{ url('/admin/packages/install') }}">
+                            {{ csrf_field() }}
+                            <input type="hidden" name="repo" value="{{ item.repo }}">
+                            <button type="submit" class="btn-sm">{{ trans('core.package.install') }}</button>
+                        </form>
+                    </td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endif %}
+
 <section class="card-box">
     <h2>{{ trans('core.package.install_title') }}</h2>
     <p>{{ trans('core.package.install_hint') }}</p>

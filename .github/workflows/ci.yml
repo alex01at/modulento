@@ -15,6 +15,23 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # The tests drive the core through these two extensions, which live
+      # in repositories of their own. They come after the checkout above:
+      # that one empties the workspace, these only touch their own path.
+      - name: Checkout extension freelancer
+        uses: actions/checkout@v4
+        with:
+          repository: alex01at/modulento-ext-freelancer
+          ref: main
+          path: extensions/freelancer
+
+      - name: Checkout extension auction
+        uses: actions/checkout@v4
+        with:
+          repository: alex01at/modulento-ext-auction
+          ref: main
+          path: extensions/auction
+
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:

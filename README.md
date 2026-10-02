@@ -12,9 +12,13 @@ MariaDB through PDO, vanilla JS/CSS.
 confirmation, password reset, own data export and deletion), provider
 profiles and a catalogue of offers with approval, categories, pictures and
 search, roles and account administration, content pages and legal texts,
-several languages, themes, extensions, scheduled tasks and self-update. The
-extension `freelancer` adds services with packages as the first kind of offer,
-`auction` adds lots that are sold to the highest bidder.
+several languages, themes, extensions, scheduled tasks and self-update. Two
+extensions in repositories of their own show what the core carries:
+[`freelancer`](https://github.com/alex01at/modulento-ext-freelancer) adds
+services with packages as the first kind of offer,
+[`auction`](https://github.com/alex01at/modulento-ext-auction) adds lots that
+are sold to the highest bidder. Both are installed under
+**Administration → Packages**.
 Orders run as a state machine with history, messages, attachments and
 deadlines; finished orders can be reviewed by their buyer. Payment
 is settled between buyer and provider for now; a payment service plugs in as
@@ -59,6 +63,19 @@ php tests/run.php
 `cp .env.example .env`, `php bin/migrate.php` and
 `php bin/create-admin.php you@example.com` do the same as the setup page from
 the command line. Set `APP_ENV="dev"` while developing.
+
+The tests drive the core through the extensions `freelancer` and `auction`,
+which are not part of this repository. Clone them into `extensions/`, or
+link working copies you have elsewhere; both folders are ignored by git here:
+
+```
+git clone https://github.com/alex01at/modulento-ext-freelancer.git extensions/freelancer
+git clone https://github.com/alex01at/modulento-ext-auction.git extensions/auction
+```
+
+`php tests/run.php` stops with this hint while one of them is missing. CI
+fetches both from their `main` branch, so a change to the interface shows
+up there.
 
 ## Releases and updates
 
@@ -109,10 +126,20 @@ Installing a package runs someone else's code on the server, so:
   every repository of the owner of `UPDATE_REPO` is allowed.
 - A package keeps the repository it first came from; another repository
   cannot take over its name.
-- What the core ships (`default`, `admin`, `example`, `freelancer`,
-  `auction`) cannot be replaced by a package.
+- What the core ships (`default`, `admin`, `example`) cannot be replaced by a
+  package.
 - An extension written for another interface version is refused.
 - The previous folder is kept under `var/updates/backups/packages/`.
+
+The page lists the project's own packages that are not installed yet -
+`modulento-ext-freelancer`, `modulento-ext-auction` and
+`modulento-theme-indigo` of the owner of `UPDATE_REPO` - each with a button.
+
+Earlier versions of the core brought `freelancer` and `auction` along. A core
+update leaves these folders, their tables and their enabled state as they
+are. They then appear on the page as "Present, but not a package"; "Take
+over as package" installs the newest release of their repository in their
+place and from then on they are updated like any other package.
 
 ## Languages
 
@@ -239,7 +266,9 @@ inline `<script>`, no inline `style`, no external hosts.
 
 ## Writing an extension
 
-Copy `extensions/example/`. An extension is a folder whose name is its id:
+Copy `extensions/example/`, the one extension the core ships. An extension is
+a folder whose name is its id, in this repository or - to be installed as a
+package - in one of its own:
 
 ```
 extensions/<id>/
@@ -284,11 +313,13 @@ that implements `Modulento\Core\Catalogue\OfferType`:
   not change any more; `save()` returns the lowest price for listings
 - `detailTemplate()` / `detailData()` - its part of the public offer page
 
-`extensions/freelancer` is the reference: packages with price, delivery time
-and revisions, extras, and requirements, each with a text per language.
-`extensions/auction` is the second one, built to prove that the interface
-carries something quite different: a lot with a starting price that runs for a
-number of days from the moment its offer is published.
+[`modulento-ext-freelancer`](https://github.com/alex01at/modulento-ext-freelancer)
+is the reference: packages with price, delivery time and revisions, extras,
+and requirements, each with a text per language.
+[`modulento-ext-auction`](https://github.com/alex01at/modulento-ext-auction)
+is the second one, built to prove that the interface carries something quite
+different: a lot with a starting price that runs for a number of days from
+the moment its offer is published.
 
 ### Order flows
 
@@ -318,11 +349,11 @@ An extension makes its offers orderable by registering an
 `Orders::apply()` is the only way an order changes state. It checks state,
 actor and guard, changes the state in one conditional update (two requests at
 once cannot both succeed), writes the history, and `OrderNotifier` mails the
-other side in their language. `extensions/freelancer/src/ServiceFlow.php` is
-the reference: accept or decline, deliver, revisions, acceptance, mutual
+other side in their language. `src/ServiceFlow.php` in `modulento-ext-freelancer`
+is the reference: accept or decline, deliver, revisions, acceptance, mutual
 cancellation, expiry and automatic acceptance.
 
-`extensions/auction` shows the other way to an order. A bid is accepted by one
+`modulento-ext-auction` shows the other way to an order. A bid is accepted by one
 conditional update on the lot (of two bids at the same moment exactly one
 wins), a bid in the last two minutes extends the end, and the task
 `auction.close` turns the highest bid of each lot whose time is up into an
@@ -378,6 +409,44 @@ Rules, which also bind first-party extensions:
 4. `App::API_VERSION` is the version of this interface. An extension states
    the version it was written for in `extension.json` and is not loaded on a
    mismatch.
+
+### Interface version 1
+
+Extensions are released apart from the core, so what they build on is fixed.
+Version 1 consists of:
+
+- `Modulento\Core\Extension\Extension` with `register(Registrar)`, and
+  `extension.json` with `id`, `name`, `version`, `api`, `namespace`
+- the `Registrar` methods `routes`, `permission`, `adminMenu`, `listen`,
+  `task`, `offerType`, `orderFlow`, `paymentMethod`, and its `manifest`
+- the interfaces `Modulento\Core\Catalogue\OfferType`,
+  `Modulento\Core\Order\OrderFlow` and `Modulento\Core\Order\PaymentMethod`,
+  including the keys of the arrays they return (states, transitions,
+  deadlines)
+- the events in `Modulento\Core\Event`: `AccountRegistered`,
+  `AccountLoggedIn`, `AccountDeleted`, `AccountExport`,
+  `ProviderStatusChanged`, `OfferStatusChanged`, `OrderStateChanged`, with
+  their public properties
+- `Orders::create()`, `Orders::apply()`, `Orders::markPaid()` and
+  `Orders::PREVIOUS`
+- the router's access levels (`Router::PUBLIC`, `Router::AUTH`, a permission
+  name) and the CSRF check before every `POST` handler
+- the services on `App` named above, as far as this document describes them
+- the Twig functions and globals listed under "Themes", the template
+  namespace `@<id>/`, and the blocks and variables of the site templates an
+  extension's templates extend or are included in
+- the naming rules: tables `x_<id>_<name>`, language keys, permissions, task
+  names and offer type or flow ids starting with `<id>.`, assets below
+  `/assets/ext/<id>/`
+
+The rule: a change that can break an extension written for version 1 - a
+method removed or renamed, a parameter added without a default, a method
+added to one of these interfaces, a different meaning of an existing value -
+raises `App::API_VERSION`, and extensions for the old version are no longer
+loaded until they are released for the new one. Additions that existing
+extensions do not notice - a new service, event, Twig function, optional
+array key or optional parameter - do not. Everything not listed here is
+internal and may change with any release.
 
 ## License
 

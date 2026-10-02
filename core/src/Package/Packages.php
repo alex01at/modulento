@@ -27,7 +27,18 @@ final class Packages
     public const KINDS = ['extension', 'theme'];
 
     /** Shipped with the core: a core update would overwrite a package of the same name again. */
-    private const SHIPPED = ['extension' => ['example', 'freelancer', 'auction'], 'theme' => ['default', 'admin']];
+    private const SHIPPED = ['extension' => ['example'], 'theme' => ['default', 'admin']];
+
+    /**
+     * What the project maintains in repositories of its own, so that a
+     * fresh installation finds it without knowing the names. The owner
+     * is the one of UPDATE_REPO; "key" is a one-line description.
+     */
+    public const OFFICIAL = [
+        ['kind' => 'extension', 'id' => 'freelancer', 'name' => 'modulento-ext-freelancer', 'key' => 'core.package.official.freelancer'],
+        ['kind' => 'extension', 'id' => 'auction', 'name' => 'modulento-ext-auction', 'key' => 'core.package.official.auction'],
+        ['kind' => 'theme', 'id' => 'indigo', 'name' => 'modulento-theme-indigo', 'key' => 'core.package.official.indigo'],
+    ];
 
     /** @param string[] $allowedSources patterns like "owner/*" or "owner/name" */
     public function __construct(
@@ -159,6 +170,12 @@ final class Packages
         $delete->execute(['kind' => $kind, 'id' => $id]);
         $insert = $this->db->prepare('INSERT INTO package (kind, id, repo, version, installed_at) VALUES (:kind, :id, :repo, :version, :now)');
         $insert->execute(['kind' => $kind, 'id' => $id, 'repo' => $repo, 'version' => $version, 'now' => Clock::now()]);
+
+        if ($kind === 'extension') {
+            // Otherwise the row would keep the version the extension had
+            // when it was enabled. No row yet means never enabled.
+            $this->db->prepare('UPDATE extension SET version = :version WHERE id = :id')->execute(['version' => $version, 'id' => $id]);
+        }
 
         return ['kind' => $kind, 'id' => $id, 'version' => $version, 'updated' => $existing !== null];
     }

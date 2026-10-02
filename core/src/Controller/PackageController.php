@@ -25,13 +25,27 @@ final class PackageController extends Controller
         // or left from a time when the core brought them along. Installing
         // their repository's release takes them over.
         $known = array_map(fn (array $package) => $package['kind'] . ':' . $package['id'], $installed);
-        $owner = strstr((string) ($app->config['update']['repo'] ?? ''), '/', true) ?: 'owner';
+        $projectOwner = strstr((string) ($app->config['update']['repo'] ?? ''), '/', true) ?: '';
+        $owner = $projectOwner ?: 'owner';
+        $present = $known;
         $unmanaged = [];
         foreach (['theme' => $app->themes->siteThemes(), 'extension' => $app->extensions->discover()] as $kind => $found) {
             foreach (array_keys($found) as $id) {
+                $present[] = $kind . ':' . $id;
                 if (!Packages::isShipped($kind, $id) && !in_array($kind . ':' . $id, $known, true)) {
                     $unmanaged[] = ['kind' => $kind, 'id' => $id, 'repo' => $owner . '/modulento-' . ($kind === 'theme' ? 'theme-' : 'ext-') . $id];
                 }
+            }
+        }
+
+        // The project's own packages that are not here yet. Built from
+        // names alone: opening the page must not ask GitHub anything.
+        // Left out where installing would be refused anyway.
+        $official = [];
+        foreach (Packages::OFFICIAL as $item) {
+            $repo = $projectOwner . '/' . $item['name'];
+            if ($projectOwner !== '' && !in_array($item['kind'] . ':' . $item['id'], $present, true) && $app->packages->isAllowed($repo)) {
+                $official[] = $item + ['repo' => $repo];
             }
         }
 
@@ -41,6 +55,7 @@ final class PackageController extends Controller
                 'in_use' => $this->inUse($package['kind'], $package['id']),
             ], $installed),
             'unmanaged' => $unmanaged,
+            'official' => $official,
             'sources' => $app->packages->allowedSources(),
         ]);
     }
