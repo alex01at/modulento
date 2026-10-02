@@ -1584,6 +1584,8 @@ check('package: removed from disk and from the list', !is_dir($packageRoot . '/t
 check('package administration needs its permission', $get('/admin/packages', 1)['status'] === 403);
 $r = $get('/admin/packages', 3);
 check('package administration lists packages and the allowed sources', $r['status'] === 200 && str_contains($r['body'], 'acme/modulento-shop') && str_contains($r['body'], 'acme/*, other/exact'));
+check('package administration: every package can be updated from its row; a theme that is no package can be taken over', str_contains($r['body'], '/admin/packages/extension/shop/update')
+    && str_contains($r['body'], 'Als Paket übernehmen') && str_contains($r['body'], '/modulento-theme-sample"'));
 $post('/admin/packages/install', ['repo' => 'evil/thing'], 3);
 check('package administration refuses a source that is not allowed', str_contains($_SESSION['_flash']['error'] ?? '', 'evil/thing'));
 $pdo->exec("INSERT INTO package VALUES ('theme', 'sample', 'acme/modulento-theme-sample', '1.0.0', '2026-01-01 00:00:00')");

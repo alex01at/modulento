@@ -61,6 +61,12 @@ final class Packages
         return false;
     }
 
+    /** Whether a name belongs to what the core itself brings along. */
+    public static function isShipped(string $kind, string $id): bool
+    {
+        return in_array($id, self::SHIPPED[$kind] ?? [], true);
+    }
+
     /** @return array<int, array{kind: string, id: string, repo: string, version: string, installed_at: string}> */
     public function installed(): array
     {
