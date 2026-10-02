@@ -10,3 +10,8 @@
 .DS_Store
 .vscode/sftp.json
 /dist/
+# Clones or symlinks of the extensions' own repositories (modulento-ext-freelancer,
+# modulento-ext-auction): the tests need both. No trailing slash, so that a
+# symlink is ignored as well.
+/extensions/freelancer
+/extensions/auction

@@ -18,6 +18,18 @@ $root = dirname(__DIR__);
 
 require $root . '/vendor/autoload.php';
 
+// The checks drive the core through two extensions that live in
+// repositories of their own, so both have to be there.
+foreach (['freelancer', 'auction'] as $needed) {
+    if (!is_file($root . '/extensions/' . $needed . '/extension.json')) {
+        fwrite(STDERR, "extensions/{$needed} is missing. The tests need the extensions \"freelancer\" and \"auction\":\n"
+            . "clone or symlink the repositories alex01at/modulento-ext-freelancer and alex01at/modulento-ext-auction\n"
+            . "to extensions/freelancer and extensions/auction, e.g.\n"
+            . "  git clone https://github.com/alex01at/modulento-ext-{$needed}.git extensions/{$needed}\n");
+        exit(1);
+    }
+}
+
 $failures = 0;
 $checks = 0;
 
@@ -1575,10 +1587,26 @@ $extensionFiles = fn (int $api) => ['extension.json' => json_encode(['id' => 'sh
 check('package: an extension for another interface version is refused', $packageError(fn () => $packages->installArchive($zip, $sha, 'acme/modulento-shop', '0.1.0')) === 'core.package.error.api' && !is_dir($packageRoot . '/extensions/shop'));
 [$zip, $sha] = $makePackage($extensionFiles(Modulento\Core\App::API_VERSION));
 check('package: an extension is unpacked into extensions/<id>', $packages->installArchive($zip, $sha, 'acme/modulento-shop', '0.1.0')['kind'] === 'extension' && is_file($packageRoot . '/extensions/shop/src/Extension.php'));
-foreach (['example', 'freelancer', 'auction'] as $shipped) {
+foreach (['example'] as $shipped) {
     [$zip, $sha] = $makePackage(['extension.json' => json_encode(['id' => $shipped, 'version' => '9.0.0', 'api' => 1, 'namespace' => 'X']), 'src/Extension.php' => '<?php']);
     check("package: cannot replace the shipped extension {$shipped}", $packageError(fn () => $packages->installArchive($zip, $sha, 'acme/x', '9.0.0')) === 'core.package.error.shipped');
 }
+// An installation from the time when the core brought "freelancer" along:
+// the folder is there and enabled, but no package.
+mkdir($packageRoot . '/extensions/freelancer/src', 0777, true);
+file_put_contents($packageRoot . '/extensions/freelancer/extension.json', json_encode(['id' => 'freelancer', 'name' => 'Old', 'version' => '0.1.0', 'api' => 1, 'namespace' => 'X']));
+file_put_contents($packageRoot . '/extensions/freelancer/src/Extension.php', '<?php // old');
+$pdo->exec("UPDATE extension SET enabled = 1 WHERE id = 'freelancer'");
+[$zip, $sha] = $makePackage(['extension.json' => json_encode(['id' => 'freelancer', 'name' => 'New', 'version' => '0.2.0', 'api' => 1, 'namespace' => 'X']), 'src/Extension.php' => '<?php // new', 'migrations/002_more.sql' => 'SELECT 1;']);
+$result = $packages->installArchive($zip, $sha, 'acme/modulento-ext-freelancer', '0.2.0');
+check('package: an extension the core used to ship is accepted and takes over the existing folder', $result === ['kind' => 'extension', 'id' => 'freelancer', 'version' => '0.2.0', 'updated' => false]
+    && file_get_contents($packageRoot . '/extensions/freelancer/src/Extension.php') === '<?php // new' && is_file($packageRoot . '/extensions/freelancer/migrations/002_more.sql')
+    && $packages->find('extension', 'freelancer')['repo'] === 'acme/modulento-ext-freelancer');
+check('package: the folder that was there is kept as a backup', array_map('file_get_contents', glob($packageRoot . '/work/backups/packages/extension-freelancer-*/src/Extension.php')) === ['<?php // old']);
+check('package: a taken over extension stays enabled, with its new version', $pdo->query("SELECT enabled, version FROM extension WHERE id = 'freelancer'")->fetch() == ['enabled' => 1, 'version' => '0.2.0']
+    && (new Modulento\Core\Extension\ExtensionManager($pdo, $packageRoot . '/extensions'))->discover()['freelancer']->version === '0.2.0');
+$packages->remove('extension', 'freelancer');
+$pdo->exec("UPDATE extension SET enabled = 0, version = '0.1.0' WHERE id = 'freelancer'");
 check('package: install refuses a repository that is not allowed, before asking it anything', $packageError(fn () => $packages->install('evil/modulento-theme')) === 'core.package.error.source');
 $packages->remove('theme', 'ocean');
 check('package: removed from disk and from the list', !is_dir($packageRoot . '/themes/ocean') && $packages->find('theme', 'ocean') === null && count($packages->installed()) === 1);
@@ -1588,6 +1616,13 @@ $r = $get('/admin/packages', 3);
 check('package administration lists packages and the allowed sources', $r['status'] === 200 && str_contains($r['body'], 'acme/modulento-shop') && str_contains($r['body'], 'acme/*, other/exact'));
 check('package administration: every package can be updated from its row; a theme that is no package can be taken over', str_contains($r['body'], '/admin/packages/extension/shop/update')
     && str_contains($r['body'], 'Als Paket übernehmen') && str_contains($r['body'], '/modulento-theme-sample"'));
+check('package administration: extensions that moved out of the core can be taken over', str_contains($r['body'], '/modulento-ext-freelancer"') && str_contains($r['body'], '/modulento-ext-auction"') && !str_contains($r['body'], '/modulento-ext-example"'));
+check('package administration: no official packages without knowing whose they are', !str_contains($r['body'], 'Offizielle Pakete'));
+$r = request($pdo, ['update' => ['repo' => 'acme/modulento']] + $config, 'GET', '/admin/packages', 3);
+check('package administration offers the official packages that are not here yet', str_contains($r['body'], 'Offizielle Pakete') && str_contains($r['body'], 'name="repo" value="acme/modulento-theme-indigo"')
+    && !str_contains($r['body'], 'type="hidden" name="repo" value="acme/modulento-ext-'));
+$r = request($pdo, ['update' => ['repo' => 'elsewhere/modulento']] + $config, 'GET', '/admin/packages', 3);
+check('package administration: official packages only from an allowed source', $r['status'] === 200 && !str_contains($r['body'], 'Offizielle Pakete'));
 $post('/admin/packages/install', ['repo' => 'evil/thing'], 3);
 check('package administration refuses a source that is not allowed', str_contains($_SESSION['_flash']['error'] ?? '', 'evil/thing'));
 $pdo->exec("INSERT INTO package VALUES ('theme', 'sample', 'acme/modulento-theme-sample', '1.0.0', '2026-01-01 00:00:00')");
