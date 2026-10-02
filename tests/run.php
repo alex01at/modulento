@@ -1777,9 +1777,12 @@ $declare = function (array $fields, int|null $as = null, bool $counted = false) 
     return $post('/withdrawal/confirm', []);
 };
 
+check('withdrawal: no link where nothing can be ordered', !str_contains($get('/', null)['body'], 'href="/withdrawal"'));
+$pdo->exec("UPDATE extension SET enabled = 1 WHERE id = 'freelancer'");
 check('withdrawal: the footer of every page links to the form', str_contains($get('/', null)['body'], '<a href="/withdrawal">Vertrag widerrufen</a>')
     && str_contains($get('/login', null)['body'], '<a href="/withdrawal">Vertrag widerrufen</a>'));
 check('withdrawal: the link in another language', str_contains($get('/en', null)['body'], '<a href="/en/withdrawal">Withdraw from contract</a>'));
+$pdo->exec("UPDATE extension SET enabled = 0 WHERE id = 'freelancer'");
 $r = $get('/withdrawal', null);
 check('withdrawal: the form is public and says what it does not do', $r['status'] === 200 && str_contains($r['body'], 'name="order_number"') && str_contains($r['body'], 'name="website"')
     && str_contains($r['body'], '>Weiter</button>') && str_contains($r['body'], 'ändert sich dadurch nicht automatisch') && !str_contains($r['body'], '<select'));

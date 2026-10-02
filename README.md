@@ -336,7 +336,7 @@ Available in every template:
 | `latest_offers(limit)` | The newest public offers as cards |
 | `has_catalogue()` | Whether an extension adds a kind of offer; without one, hide the links to offers and providers |
 | `nav_links()` | Entries extensions add to the main menu, as `title`/`url`/`path` |
-| `home_sections()` | Templates extensions want included on the home page: `{% for section in home_sections() %}{% include section %}{% endfor %}` |
+| `home_sections()` | What extensions want shown on the home page: `{% for section in home_sections() %}{% include section.template with section.data %}{% endfor %}` |
 | `categories()` | The category tree with `name`, `path`, `children` and `offer_count` |
 | `top_providers(limit)` | Public providers, best rated first, as shown on `provider/show.twig` |
 | `registration_open()` | Whether new accounts can be created |
@@ -438,7 +438,7 @@ extensions/<id>/
 | `permission(name, labelKey)` | A permission that roles can be given |
 | `adminMenu(labelKey, path, permission)` | An entry in the administration menu |
 | `navigation(labelKey, path)` | An entry in the site's main menu |
-| `homeSection(template)` | A template of the extension included on the home page; it gets no variables |
+| `homeSection(template, data)` | A template of the extension included on the home page; `data` is an optional `Closure(App): array` that supplies its variables |
 | `listen(EventClass, fn ($event, App $app) => ...)` | React to a core or extension event |
 | `task(name, everyMinutes, fn (App $app) => ...)` | Scheduled work, run by `bin/cron.php` |
 | `offerType(OfferType)` | A kind of offer for the catalogue, see below |

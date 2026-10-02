@@ -13,6 +13,6 @@
 
 {# What extensions show on the home page, e.g. the latest posts of a blog. #}
 {% for section in home_sections() %}
-    {% include section %}
+    {% include section.template with section.data %}
 {% endfor %}
 {% endblock %}
