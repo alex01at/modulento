@@ -3,6 +3,7 @@
 {% block title %}{{ trans(type.label_key) }} – {{ site_name }}{% endblock %}
 
 {% block content %}
+{% include 'account/_nav.twig' %}
 <p><a href="{{ url('/account/offers') }}">{{ trans('core.offer.mine.title') }}</a></p>
 <h1>{{ offer ? trans('core.offer.edit') : trans('core.offer.mine.new', {type: trans(type.label_key)}) }}</h1>
 

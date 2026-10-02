@@ -3,6 +3,7 @@
 {% block title %}{{ trans('core.order.list.' ~ role) }} – {{ site_name }}{% endblock %}
 
 {% block content %}
+{% include 'account/_nav.twig' %}
 <h1>{{ trans('core.order.list.' ~ role) }}</h1>
 
 {% if orders is empty %}

@@ -3,6 +3,7 @@
 {% block title %}{{ trans('core.offer.mine.title') }} – {{ site_name }}{% endblock %}
 
 {% block content %}
+{% include 'account/_nav.twig' %}
 <h1>{{ trans('core.offer.mine.title') }}</h1>
 
 {% if provider_status != 'approved' %}
@@ -14,7 +15,7 @@
 {% else %}
     <p class="button-row">
         {% for type in types %}
-            <a href="{{ url('/account/offers/new') }}?type={{ type.id|url_encode }}">{{ trans('core.offer.mine.new', {type: trans(type.label_key)}) }}</a>
+            <a class="button" href="{{ url('/account/offers/new') }}?type={{ type.id|url_encode }}">{{ trans('core.offer.mine.new', {type: trans(type.label_key)}) }}</a>
         {% endfor %}
     </p>
 {% endif %}

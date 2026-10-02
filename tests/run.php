@@ -768,6 +768,8 @@ $offerForm = ['type' => 'freelancer.service', 'category_id' => $childId,
         3 => ['price' => '']],
     'extra' => [0 => ['price' => '20', 'extra_days' => '1', 'text' => ['de' => ['title' => 'Quelldatei']]], 1 => ['price' => '', 'text' => ['de' => ['title' => '']]]],
     'requirements' => ['de' => 'Firmenname und Farben']];
+check('a provider finds the own offers from every page, others are offered to become one', str_contains($get('/', 1)['body'], 'href="/account/offers"') && !str_contains($get('/', 3)['body'], 'href="/account/offers"')
+    && str_contains($get('/account', 3)['body'], 'Anbieter werden') && str_contains($get('/account/offers', 1)['body'], 'class="account-nav"'));
 $offerRow = fn (string $where = '1 = 1') => $pdo->query("SELECT * FROM offer WHERE {$where} ORDER BY id DESC")->fetch();
 
 check('offers: without a provider profile the form leads to the profile', $get('/account/offers', 3)['body'] === '' && ($_SESSION['_flash']['error'] ?? '') !== '');

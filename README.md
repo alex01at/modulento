@@ -188,6 +188,7 @@ Templates of the site theme, with the variables they receive:
 | `auth/verify.twig` | `token`; a form that posts to `/verify-email/<token>` - the address is confirmed by the button, not by opening the link |
 | `auth/forgot.twig` | - |
 | `auth/reset.twig` | `errors`, `token`, `min_length` |
+| `account/_nav.twig` | - ; the account's pages, included on top of each; `provider_status()` says whether the account has a provider profile |
 | `account/index.twig` | `locales`, `min_length`, `is_last_admin`, `provider_status` |
 | `account/provider.twig` | `provider` (stored or typed values, `texts` by language), `status`, `status_note`, `public_path`, `certified`, `errors`, `locales`, `countries`, `approval_required` |
 | `offer/index.twig` | `offers` (cards), `total`, `categories` (tree), `category`, `search`, `sort`, `sorts`, `page`, `pages` |
