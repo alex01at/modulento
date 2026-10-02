@@ -113,6 +113,7 @@ final class View
             // layout of its own shows it without knowing about it.
             if ($where === 'footer') {
                 $links[] = ['title' => $app->translator->trans('core.withdrawal.link'), 'url' => $app->url('/withdrawal'), 'role' => 'withdrawal'];
+                $links[] = ['title' => $app->translator->trans('core.report.link'), 'url' => $app->url('/report'), 'role' => 'report'];
             }
 
             return $links;

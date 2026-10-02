@@ -230,6 +230,8 @@ Templates of the site theme, with the variables they receive:
 | `withdrawal/form.twig` | `name`, `email`, `order_number`, `order_choice`, `statement`, `orders` (the logged-in buyer's own: `number`, `title`, `created_at`), `limits`, `errors`; keep the hidden `website` field and the note on what the form does |
 | `withdrawal/review.twig` | `name`, `email`, `order_number`, `statement`, `errors`; a form that posts to `/withdrawal/confirm` - keep the button's wording |
 | `withdrawal/done.twig` | `email`, `received_at` (UTC) |
+| `report/form.twig` | `url`, `category`, `explanation`, `name`, `email`, `categories`, `limits`, `errors`; keep the hidden `website` field, the statement of good faith and the note on what happens with a notice |
+| `report/done.twig` | `email`, `received_at` (UTC) |
 | `review/_rating.twig` | `rating` (`count`, `average`): stars with a text alternative |
 | `review/_list.twig` | `reviews`: `author` (empty for "a buyer"), `rating`, `body`, `locale`, `created_at`, `reply`; keep the note on where reviews come from |
 | `provider/index.twig` | `providers`, `page`, `pages` |
@@ -241,7 +243,7 @@ E-mails are theme templates too: `verify_email`, `reset_password`,
 `provider_rejected`, `provider_suspended`, `account_blocked`, `offer_published`,
 `offer_rejected`, `offer_contact`, `order_update`, `order_message`, `review_new`,
 `review_reply`, `review_hidden`, `withdrawal_receipt`, `withdrawal_provider`,
-`withdrawal_platform`. With `APP_ENV="dev"`
+`withdrawal_platform`, `report_receipt`, `report_platform`, `report_decision`. With `APP_ENV="dev"`
 nothing is sent; mails are appended to `var/log/mail.log`.
 
 Available in every template:
@@ -252,7 +254,7 @@ Available in every template:
 | `url(path)` | Address of a path in the current language - use it for every link and form target |
 | `locale()`, `locale_urls()`, `locale_name(code)` | Current language; the current page in every language (`locale`, `name`, `url`, `absolute_url`, `current`) |
 | `current_path()` | Path of the current page without its language prefix, e.g. to mark the active menu entry |
-| `page_links('header' \| 'footer' \| role)` | Published pages for a menu, as `title`/`url`/`role`; `'footer'` ends with the link to the withdrawal form (`role` is `withdrawal`) |
+| `page_links('header' \| 'footer' \| role)` | Published pages for a menu, as `title`/`url`/`role`; `'footer'` ends with the links to the withdrawal form and the report form (`role` is `withdrawal` and `report`) |
 | `latest_offers(limit)` | The newest public offers as cards |
 | `categories()` | The category tree with `name`, `path`, `children` and `offer_count` |
 | `top_providers(limit)` | Public providers, best rated first, as shown on `provider/show.twig` |
@@ -387,7 +389,26 @@ then passed on to the provider and shown among the order's messages, otherwise
 it goes to the administrators. The answer is the same either way, and no order
 changes state: whether a right of withdrawal exists is the provider's to
 decide. **Administration → Withdrawals** lists every declaration
-(`$app->withdrawals`). The wording is a starting point, not legal advice.
+(`$app->withdrawals`); one that could not be assigned to an order waits there
+until an administrator has passed it on and ticked it off. The wording is a
+starting point, not legal advice.
+
+The report form (`/report`, linked in the footer and on every offer and
+provider page) takes notices about content someone considers illegal: the
+address of the content, a category, the reasons, name and e-mail address and a
+statement of good faith. It is protected like the registration (hidden field,
+time trap, rate limits). The sender gets a confirmation of receipt, the
+administrators a mail. Under **Administration → Notices** (permission
+`core.reports.manage`) an administrator decides each notice with reasons,
+which the sender receives together with the ways to object. Acting on the
+content itself - pausing an offer, suspending a provider, hiding a review -
+happens where that content is administered. Again: a starting point, not
+legal advice.
+
+Behind a reverse proxy or CDN, list its addresses as `TRUSTED_PROXIES` in
+`.env` ("10.0.0.0/8, 2001:db8::/32"). Only then is the visitor's address taken
+from `X-Forwarded-For`; without it all visitors would share one limit for
+logins and registrations. IPv6 visitors are counted by their /64 network.
 
 A `PaymentMethod` decides how an order is paid. The core ships `core.offline`
 (buyer and provider settle it themselves; the provider confirms the receipt).

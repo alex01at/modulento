@@ -24,6 +24,7 @@ use Modulento\Core\Controller\RegistrationController;
 use Modulento\Core\Controller\ReviewController;
 use Modulento\Core\Controller\SettingsController;
 use Modulento\Core\Controller\UpdateController;
+use Modulento\Core\Controller\ReportController;
 use Modulento\Core\Controller\WithdrawalController;
 use Modulento\Core\Support\ClientIp;
 use Modulento\Core\Support\Database;
@@ -196,6 +197,12 @@ final class Kernel
         $router->post('/withdrawal/confirm', [WithdrawalController::class, 'confirm'], Router::PUBLIC);
         $router->get('/withdrawal/done', [WithdrawalController::class, 'done'], Router::PUBLIC);
 
+        // Reporting content needs no account: whoever sees something illegal
+        // has to be able to say so.
+        $router->get('/report', [ReportController::class, 'form'], Router::PUBLIC);
+        $router->post('/report', [ReportController::class, 'send'], Router::PUBLIC);
+        $router->get('/report/done', [ReportController::class, 'done'], Router::PUBLIC);
+
         $router->get('/providers', [ProviderController::class, 'index'], Router::PUBLIC);
         $router->get('/providers/{slug}', [ProviderController::class, 'show'], Router::PUBLIC);
 
@@ -222,6 +229,9 @@ final class Kernel
 
         $router->get('/admin/withdrawals', [WithdrawalController::class, 'index'], 'core.orders.manage');
         $router->post('/admin/withdrawals/{id}/handled', [WithdrawalController::class, 'handled'], 'core.orders.manage');
+
+        $router->get('/admin/reports', [ReportController::class, 'index'], 'core.reports.manage');
+        $router->post('/admin/reports/{id}/decide', [ReportController::class, 'decide'], 'core.reports.manage');
 
         $router->get('/admin/reviews', [ReviewController::class, 'index'], 'core.reviews.manage');
         $router->post('/admin/reviews/{id}/hide', [ReviewController::class, 'hide'], 'core.reviews.manage');
@@ -282,6 +292,7 @@ final class Kernel
         $app->addPermission('core.pages.manage', 'core.permission.pages_manage');
         $app->addPermission('core.orders.manage', 'core.permission.orders_manage');
         $app->addPermission('core.reviews.manage', 'core.permission.reviews_manage');
+        $app->addPermission('core.reports.manage', 'core.permission.reports_manage');
         $app->addPermission('core.offers.manage', 'core.permission.offers_manage');
         $app->addPermission('core.categories.manage', 'core.permission.categories_manage');
         $app->addPermission('core.providers.manage', 'core.permission.providers_manage');
@@ -295,6 +306,7 @@ final class Kernel
         $app->addAdminMenu('core.admin.menu.orders', '/admin/orders', 'core.orders.manage');
         $app->addAdminMenu('core.admin.menu.withdrawals', '/admin/withdrawals', 'core.orders.manage');
         $app->addAdminMenu('core.admin.menu.reviews', '/admin/reviews', 'core.reviews.manage');
+        $app->addAdminMenu('core.admin.menu.reports', '/admin/reports', 'core.reports.manage');
         $app->addAdminMenu('core.admin.menu.offers', '/admin/offers', 'core.offers.manage');
         $app->addAdminMenu('core.admin.menu.categories', '/admin/categories', 'core.categories.manage');
         $app->addAdminMenu('core.admin.menu.providers', '/admin/providers', 'core.providers.manage');

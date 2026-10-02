@@ -49,6 +49,10 @@ final class AdminController extends Controller
             $stats[] = ['id' => 'reviews', 'label_key' => 'core.admin.menu.reviews', 'path' => '/admin/reviews',
                 'total' => $app->reviews->listAll(null, 1, 1)['total'], 'pending' => null];
         }
+        if ($app->auth->can('core.reports.manage')) {
+            $stats[] = ['id' => 'reports', 'label_key' => 'core.admin.menu.reports', 'path' => '/admin/reports',
+                'total' => $app->reports->list(1, 1)['total'], 'pending' => $app->reports->openCount()];
+        }
 
         return $stats;
     }
