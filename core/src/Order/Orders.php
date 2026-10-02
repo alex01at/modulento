@@ -391,6 +391,15 @@ final class Orders
         return $stmt->fetch() !== false;
     }
 
+    /** How many unfinished orders a buyer has for one offer. */
+    public function openCount(int $buyerId, int $offerId): int
+    {
+        $stmt = $this->db->prepare('SELECT COUNT(*) FROM orders WHERE closed_at IS NULL AND buyer_id = :buyer AND offer_id = :offer');
+        $stmt->execute(['buyer' => $buyerId, 'offer' => $offerId]);
+
+        return (int) $stmt->fetchColumn();
+    }
+
     /** @return array<string, int> state => number of orders */
     public function counts(): array
     {

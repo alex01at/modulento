@@ -17,6 +17,8 @@ use Modulento\Core\Support\Session;
 final class OfferController extends Controller
 {
     private const PER_PAGE = 24;
+    private const MAX_OFFERS = 100;
+    private const MAX_OFFERS_UNAPPROVED = 3;
 
     // --- Visitors ----------------------------------------------------------
 
@@ -238,6 +240,20 @@ final class OfferController extends Controller
             return;
         }
 
+        // Offers take room and an administrator's time; a profile nobody
+        // has looked at yet gets only a few.
+        $max = $provider['status'] === 'approved' ? self::MAX_OFFERS : self::MAX_OFFERS_UNAPPROVED;
+        $problem = match (true) {
+            $offer === null && $app->offers->listAll((int) $provider['id'], null, 1, 1)['total'] >= $max => $this->trans('core.offer.error.too_many', ['max' => $max]),
+            (new RateLimiter($app->db))->hit('offer-save', (string) $provider['account_id'], 60, 3600) => $this->trans('core.error.too_many_requests'),
+            default => null,
+        };
+        if ($problem !== null) {
+            Session::flash('error', $problem);
+            $this->redirect('/account/offers');
+            return;
+        }
+
         $shared = $app->offers->validate($_POST, array_keys($app->categories->all()));
         $specific = $type->validate($_POST, $offer['id'] ?? null, $app);
         $errors = array_merge($shared['errors'], $specific['errors']);
@@ -314,7 +330,9 @@ final class OfferController extends Controller
             return;
         }
 
-        $problem = $this->app->offerImages->add($offer['id'], is_array($_FILES['image'] ?? null) ? $_FILES['image'] : []);
+        $problem = (new RateLimiter($this->app->db))->hit('offer-image', (string) $offer['account_id'], 60, 3600)
+            ? 'core.error.too_many_requests'
+            : $this->app->offerImages->add($offer['id'], is_array($_FILES['image'] ?? null) ? $_FILES['image'] : []);
         Session::flash($problem === null ? 'success' : 'error', $this->trans($problem ?? 'core.offer.image.added', [
             'max' => OfferImages::MAX_PER_OFFER,
             'megabytes' => intdiv(OfferImages::MAX_BYTES, 1024 * 1024),

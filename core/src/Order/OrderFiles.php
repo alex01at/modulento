@@ -21,6 +21,8 @@ final class OrderFiles
 {
     public const MAX_FILES = 5;
     public const MAX_BYTES = 20 * 1024 * 1024;
+    /** Everything attached to one order together. */
+    public const MAX_ORDER_BYTES = 200 * 1024 * 1024;
 
     /**
      * What a delivery or a briefing plausibly consists of. Programs and
@@ -115,6 +117,24 @@ final class OrderFiles
         }
 
         return null;
+    }
+
+    /**
+     * Whether an order has room for more files; checked with problem().
+     *
+     * @param array<int, array{name: string, tmp_name: string, error: int, size: int}> $uploads
+     * @return string|null language key of the problem
+     */
+    public function quotaProblem(int $orderId, array $uploads): ?string
+    {
+        if ($uploads === []) {
+            return null;
+        }
+
+        $stmt = $this->db->prepare('SELECT COALESCE(SUM(size), 0) FROM order_file WHERE order_id = :id');
+        $stmt->execute(['id' => $orderId]);
+
+        return (int) $stmt->fetchColumn() + array_sum(array_column($uploads, 'size')) > self::MAX_ORDER_BYTES ? 'core.order.file.error.quota' : null;
     }
 
     /**

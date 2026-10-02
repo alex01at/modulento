@@ -301,6 +301,8 @@ function request(PDO $pdo, array $config, string $method, string $path, int|fals
         }
     }
     $_SESSION['_csrf'] = 'test-token';
+    // As if the registration form had been open for a while.
+    $_SESSION['register_form_at'] ??= time() - 60;
     if ($method === 'POST') {
         $post += ['_csrf' => 'test-token'];
     }
@@ -402,6 +404,9 @@ $r = $post('/register', ['email' => 'new@example.test', 'password' => $pw, 'pass
 check('register: differing repeat is refused', $row('new@example.test') === false);
 $r = $post('/register', ['email' => 'bot@example.test', 'password' => $pw, 'password_repeat' => $pw, 'website' => 'http://spam'], null);
 check('register: filled bot trap creates nothing', $row('bot@example.test') === false && lastMail($mailLog, 'bot@example.test') === null);
+$get('/register', null);
+$r = $post('/register', ['email' => 'quick@example.test', 'password' => $pw, 'password_repeat' => $pw]);
+check('register: a form sent back the moment it was shown creates nothing', $row('quick@example.test') === false && str_contains($r['body'], 'Das ging sehr schnell'));
 
 $post('/register', ['email' => 'New@Example.test ', 'password' => $pw, 'password_repeat' => $pw], null);
 $new = $row('new@example.test');
@@ -416,12 +421,15 @@ check('login: refused while unconfirmed', $get('/account')['body'] === '' && ($_
 $post('/verify-email/resend', []);
 $resent = lastMail($mailLog, 'new@example.test');
 check('resend: new link, old one stops working', $resent['link'] !== $mail['link']);
-$get($mail['link'], null);
+$post($mail['link'], [], null);
 check('verify: replaced link is refused', $row('new@example.test')['email_verified_at'] === null);
-$get($resent['link'], null);
-check('verify: link confirms the address', $row('new@example.test')['email_verified_at'] !== null);
-$get($resent['link'], null);
-check('verify: link works once', $pdo->query('SELECT COUNT(*) FROM account_token')->fetchColumn() == 0);
+$r = $get($resent['link'], null);
+check('verify: opening the link only shows a button, so a mail scanner confirms nothing', $row('new@example.test')['email_verified_at'] === null
+    && str_contains($r['body'], 'action="' . $resent['link'] . '"') && str_contains($r['body'], 'Adresse bestätigen'));
+$post($resent['link'], [], null);
+check('verify: the button confirms the address', $row('new@example.test')['email_verified_at'] !== null);
+$post($resent['link'], [], null);
+check('verify: link works once', $pdo->query('SELECT COUNT(*) FROM account_token')->fetchColumn() == 0 && $get($resent['link'], null)['body'] === '');
 
 $post('/register', ['email' => 'new@example.test', 'password' => $pw, 'password_repeat' => $pw], null);
 check('register again: no second account, owner is told', $pdo->query("SELECT COUNT(*) FROM account WHERE email = 'new@example.test'")->fetchColumn() == 1
@@ -492,11 +500,28 @@ $pdo->exec("UPDATE account_token SET expires_at = '2020-01-01 00:00:00'");
 $post($expired['link'], ['password' => 'a fourth long password', 'password_repeat' => 'a fourth long password'], null);
 check('reset: expired link is refused', password_verify('the third long password', $row('moved@example.test')['password_hash']));
 
+$pdo->exec('DELETE FROM rate_limit_attempt');
 for ($i = 0; $i < 6; $i++) {
     $post('/login', ['email' => 'plain@example.test', 'password' => 'guess number ' . $i], null);
 }
 $post('/login', ['email' => 'plain@example.test', 'password' => 'correct horse battery'], null);
 check('login: locked after repeated wrong passwords, even with the right one', ($_SESSION['account_id'] ?? null) === null);
+$_SERVER['REMOTE_ADDR'] = '203.0.113.9';
+$post('/login', ['email' => 'plain@example.test', 'password' => 'correct horse battery'], null);
+check('login: wrong passwords typed elsewhere do not lock the owner out', ($_SESSION['account_id'] ?? null) == 1);
+$attempts = fn (string $action) => (int) $pdo->query("SELECT COUNT(*) FROM rate_limit_attempt WHERE action = '{$action}'")->fetchColumn();
+check('login: a successful login leaves no counted attempt behind', $pdo->query("SELECT COUNT(*) FROM rate_limit_attempt WHERE identifier LIKE '%203.0.113.9'")->fetchColumn() == 0 && $attempts('login-email') === 5);
+$r = $post('/login', ['email' => str_repeat('a', 300) . '@example.test', 'password' => 'x'], null);
+check('login: an overlong address is counted like any other', $r['status'] !== 500 && $attempts('login') === 6);
+unset($_SERVER['REMOTE_ADDR']);
+$pdo->exec('DELETE FROM rate_limit_attempt');
+
+$mailsTo = fn (string $to) => substr_count(is_file($mailLog) ? (string) file_get_contents($mailLog) : '', 'To: ' . $to . "\n");
+$before = $mailsTo('plain@example.test');
+for ($i = 0; $i < 5; $i++) {
+    $post('/register', ['email' => 'plain@example.test', 'password' => $pw, 'password_repeat' => $pw], null);
+}
+check('register: someone else\'s address gets at most three mails an hour', $mailsTo('plain@example.test') - $before === 3);
 $pdo->exec('DELETE FROM rate_limit_attempt');
 
 $post('/login', ['email' => 'moved@example.test', 'password' => 'the third long password'], null);
@@ -752,6 +777,13 @@ check('offer: saved as a draft with the lowest package price', $offer !== false 
 check('offer: packages, extra and requirements stored; empty rows skipped', $pdo->query('SELECT COUNT(*) FROM x_freelancer_package')->fetchColumn() == 2
     && $pdo->query('SELECT COUNT(*) FROM x_freelancer_extra')->fetchColumn() == 1 && $pdo->query('SELECT text FROM x_freelancer_requirement')->fetchColumn() === 'Firmenname und Farben');
 $offerId = (int) $offer['id'];
+$pdo->exec("UPDATE provider SET status = 'pending' WHERE account_id = 1");
+foreach (['Zwei', 'Drei', 'Vier'] as $title) {
+    $post('/account/offers/new', ['text' => ['de' => ['title' => 'Angebot ' . $title, 'summary' => '', 'description' => '']]] + $offerForm, 1);
+}
+check('offers: a profile that is not approved yet gets three, no more', $pdo->query('SELECT COUNT(*) FROM offer')->fetchColumn() == 3 && str_contains($_SESSION['_flash']['error'] ?? '', 'Höchstzahl von 3'));
+$pdo->exec("UPDATE provider SET status = 'approved' WHERE account_id = 1");
+$pdo->exec("DELETE FROM offer WHERE id <> {$offerId}");
 check('offer: a draft is not public', $get('/offers/ich-gestalte-dein-logo', null)['status'] === 404 && !str_contains($get('/offers', null)['body'], 'Ich gestalte'));
 check('offer: someone else cannot open or change it', $get('/account/offers/' . $offerId, 2)['status'] === 404 && $post('/account/offers/' . $offerId . '/delete', [], 2)['status'] === 404 && $offerRow() !== false);
 
@@ -877,6 +909,11 @@ $post($orderPath, ['package' => '3'], 2);
 check('a package that does not exist cannot be ordered', $lastOrder() === 0);
 $post($orderPath, ['package' => '2', 'extras' => ['5']], 2);
 check('an extra that does not exist cannot be ordered', $lastOrder() === 0);
+for ($i = 0; $i < 4; $i++) {
+    $r = $post($orderPath, ['package' => '1'], 2);
+}
+check('no more than three open orders of one buyer for one offer', $lastOrder() === 3 && str_contains($r['body'], 'bereits 3 offene Bestellungen'));
+$pdo->exec('DELETE FROM orders');
 
 $post($orderPath, ['package' => '2', 'extras' => ['0'], 'note' => 'Firma: Beispiel GmbH', 'total' => '1', 'price' => '1', 'unit_price' => '1'], 2);
 $orderId = $lastOrder();

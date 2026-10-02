@@ -1,0 +1,12 @@
+{% extends 'layout/base.twig' %}
+
+{% block title %}{{ trans('core.verify.title') }} – {{ site_name }}{% endblock %}
+
+{% block content %}
+<h1>{{ trans('core.verify.title') }}</h1>
+<p>{{ trans('core.verify.intro') }}</p>
+<form method="post" action="{{ url('/verify-email/' ~ token) }}" class="stack-form">
+    {{ csrf_field() }}
+    <button type="submit">{{ trans('core.verify.submit') }}</button>
+</form>
+{% endblock %}

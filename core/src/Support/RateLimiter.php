@@ -26,7 +26,7 @@ final class RateLimiter
             'SELECT COUNT(*) FROM rate_limit_attempt
              WHERE action = :action AND identifier = :identifier AND created_at > :since'
         );
-        $stmt->execute(['action' => $action, 'identifier' => $identifier, 'since' => Clock::now(-$windowSeconds)]);
+        $stmt->execute(['action' => $action, 'identifier' => self::key($identifier), 'since' => Clock::now(-$windowSeconds)]);
 
         return (int) $stmt->fetchColumn() >= $maxAttempts;
     }
@@ -36,7 +36,7 @@ final class RateLimiter
         $stmt = $this->db->prepare(
             'INSERT INTO rate_limit_attempt (action, identifier, created_at) VALUES (:action, :identifier, :now)'
         );
-        $stmt->execute(['action' => $action, 'identifier' => $identifier, 'now' => Clock::now()]);
+        $stmt->execute(['action' => $action, 'identifier' => self::key($identifier), 'now' => Clock::now()]);
     }
 
     /** Counts the attempt and says whether the limit was already reached before it. */
@@ -48,6 +48,31 @@ final class RateLimiter
         }
 
         return $limited;
+    }
+
+    /** Takes back the newest attempt: it was counted before it was known to be legitimate. */
+    public function release(string $action, string $identifier): void
+    {
+        $stmt = $this->db->prepare('SELECT MAX(id) FROM rate_limit_attempt WHERE action = :action AND identifier = :identifier');
+        $stmt->execute(['action' => $action, 'identifier' => self::key($identifier)]);
+        $id = $stmt->fetchColumn();
+        if ($id !== null && $id !== false) {
+            $delete = $this->db->prepare('DELETE FROM rate_limit_attempt WHERE id = :id');
+            $delete->execute(['id' => $id]);
+        }
+    }
+
+    /** Forgets every attempt under a key. */
+    public function forget(string $action, string $identifier): void
+    {
+        $stmt = $this->db->prepare('DELETE FROM rate_limit_attempt WHERE action = :action AND identifier = :identifier');
+        $stmt->execute(['action' => $action, 'identifier' => self::key($identifier)]);
+    }
+
+    /** Whatever someone types has to fit the column. */
+    private static function key(string $identifier): string
+    {
+        return strlen($identifier) > 190 ? 'sha256:' . hash('sha256', $identifier) : $identifier;
     }
 
     public function cleanup(): void
