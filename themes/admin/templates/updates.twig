@@ -49,4 +49,9 @@
         <button type="submit" class="btn-outline">{{ trans('core.update.migrations_run') }}</button>
     </form>
 </section>
+{% if can('core.packages.manage') %}
+<section class="card-box">
+    <p>{{ trans('core.update.packages_hint') }} <a href="{{ url('/admin/packages') }}">{{ trans('core.package.title') }}</a></p>
+</section>
+{% endif %}
 {% endblock %}

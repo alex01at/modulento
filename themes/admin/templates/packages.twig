@@ -40,12 +40,11 @@
                         </td>
                         <td>
                             <div class="button-row">
-                                {% if package.latest and package.latest != package.version %}
-                                    <form method="post" action="{{ url('/admin/packages/' ~ package.kind ~ '/' ~ package.id ~ '/update') }}">
-                                        {{ csrf_field() }}
-                                        <button type="submit" class="btn-sm">{{ trans('core.package.update', {version: package.latest}) }}</button>
-                                    </form>
-                                {% endif %}
+                                {# Always there: without a known newer version it asks the repository first. #}
+                                <form method="post" action="{{ url('/admin/packages/' ~ package.kind ~ '/' ~ package.id ~ '/update') }}">
+                                    {{ csrf_field() }}
+                                    <button type="submit" class="btn-sm">{{ package.latest and package.latest != package.version ? trans('core.package.update', {version: package.latest}) : trans('core.package.update_now') }}</button>
+                                </form>
                                 {% if not package.in_use %}
                                     <form method="post" action="{{ url('/admin/packages/' ~ package.kind ~ '/' ~ package.id ~ '/remove') }}">
                                         {{ csrf_field() }}
@@ -66,6 +65,33 @@
         </form>
     {% endif %}
 </section>
+
+{% if unmanaged %}
+<section class="card-box">
+    <h2>{{ trans('core.package.unmanaged_title') }}</h2>
+    <p>{{ trans('core.package.unmanaged_hint') }}</p>
+    <div class="table-wrap">
+        <table>
+            <tbody>
+            {% for item in unmanaged %}
+                <tr>
+                    <th scope="row">{{ item.id }}</th>
+                    <td>{{ trans('core.package.kind.' ~ item.kind) }}</td>
+                    <td>
+                        <form method="post" action="{{ url('/admin/packages/install') }}" class="button-row">
+                            {{ csrf_field() }}
+                            <label class="visually-hidden" for="adopt_{{ item.kind }}_{{ item.id }}">{{ trans('core.package.repo') }}</label>
+                            <input id="adopt_{{ item.kind }}_{{ item.id }}" name="repo" value="{{ item.repo }}" required>
+                            <button type="submit" class="btn-sm">{{ trans('core.package.adopt') }}</button>
+                        </form>
+                    </td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endif %}
 
 <section class="card-box">
     <h2>{{ trans('core.package.install_title') }}</h2>
