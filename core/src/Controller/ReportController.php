@@ -164,6 +164,15 @@ final class ReportController extends Controller
                 'decision' => $app->translator->trans('core.report.decision.' . $decision, [], $locale),
                 'note' => $note,
             ], $locale);
+
+            // Action against content is a restriction of the provider it
+            // belongs to, who is owed the reasons as well - without
+            // learning who sent the notice.
+            $provider = $decision === 'actioned' && $report['provider_id'] !== null ? $app->providers->find((int) $report['provider_id']) : null;
+            if ($provider !== null && $provider['account_status'] === 'active') {
+                $to = $app->locales->isEnabled($provider['account_locale']) ? $provider['account_locale'] : $app->locales->default();
+                $app->mailer->send($provider['account_email'], 'emails/report_provider.txt.twig', ['url' => $report['url'], 'note' => $note], $to);
+            }
             Session::flash('success', $this->trans('core.admin.reports.decided'));
         }
 
@@ -176,7 +185,7 @@ final class ReportController extends Controller
         $app = $this->app;
         $locale = $app->translator->locale();
 
-        $id = $app->reports->create($input + ['locale' => $locale, 'account_id' => $app->auth->account()['id'] ?? null], $receivedAt);
+        $id = $app->reports->create($input + ['locale' => $locale, 'account_id' => $app->auth->account()['id'] ?? null] + $this->subject($input['url']), $receivedAt);
 
         // What was typed comes last: a "{link}" in it must stay as typed.
         $data = fn (string $in) => [
@@ -195,6 +204,37 @@ final class ReportController extends Controller
             $to = $app->locales->isEnabled($admin['locale']) ? $admin['locale'] : $app->locales->default();
             $app->mailer->send($admin['email'], 'emails/report_platform.txt.twig', ['link' => $app->url('/admin/reports', $to, true)] + $data($to), $to);
         }
+    }
+
+    /**
+     * The offer or provider of this site an address leads to, if any.
+     *
+     * @return array{offer_id: ?int, provider_id: ?int}
+     */
+    private function subject(string $url): array
+    {
+        $app = $this->app;
+        $none = ['offer_id' => null, 'provider_id' => null];
+
+        $host = parse_url($url, PHP_URL_HOST);
+        $path = parse_url($url, PHP_URL_PATH);
+        if (!is_string($path) || ($host !== null && $host !== parse_url($app->config['app']['url'], PHP_URL_HOST))) {
+            return $none;
+        }
+
+        $split = $app->locales->split($path);
+        if (preg_match('#^/offers/([^/]+)/?$#', $split['path'], $match) === 1) {
+            $offer = $app->offers->findPublicBySlug($split['locale'], rawurldecode($match[1]));
+
+            return $offer !== null ? ['offer_id' => $offer['id'], 'provider_id' => $offer['provider_id']] : $none;
+        }
+        if (preg_match('#^/providers/([^/]+)/?$#', $split['path'], $match) === 1) {
+            $provider = $app->providers->findPublicBySlug(rawurldecode($match[1]));
+
+            return $provider !== null ? ['offer_id' => null, 'provider_id' => (int) $provider['id']] : $none;
+        }
+
+        return $none;
     }
 
     private function renderForm(array $input, array $errors): void

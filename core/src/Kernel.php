@@ -134,6 +134,7 @@ final class Kernel
         $router->get('/assets/admin/{path*}', [AssetController::class, 'admin'], Router::PUBLIC);
         $router->get('/assets/ext/{id}/{path*}', [AssetController::class, 'extension'], Router::PUBLIC);
         $router->get('/media/offers/{id}/{file}', [MediaController::class, 'offerImage'], Router::PUBLIC);
+        $router->get('/media/avatars/{file}', [MediaController::class, 'avatar'], Router::PUBLIC);
         $router->get('/cron/{token}', [CronController::class, 'run'], Router::PUBLIC);
 
         $router->get('/login', [AuthController::class, 'showLogin'], Router::PUBLIC);
@@ -152,6 +153,8 @@ final class Kernel
 
         $router->get('/account', [AccountController::class, 'dashboard']);
         $router->get('/account/settings', [AccountController::class, 'index']);
+        $router->post('/account/avatar', [AccountController::class, 'setAvatar']);
+        $router->post('/account/avatar/delete', [AccountController::class, 'deleteAvatar']);
         $router->post('/account/profile', [AccountController::class, 'updateProfile']);
         $router->post('/account/password', [AccountController::class, 'changePassword']);
         $router->post('/account/email', [AccountController::class, 'changeEmail']);

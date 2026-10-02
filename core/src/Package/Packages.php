@@ -47,7 +47,8 @@ final class Packages
         private string $extensionsDir,
         private string $themesDir,
         private string $workDir,
-        private array $allowedSources
+        private array $allowedSources,
+        private string $coreVersion = '0.0.0'
     ) {
     }
 
@@ -232,6 +233,13 @@ final class Packages
         // release announced.
         if (($manifest['version'] ?? null) !== $version) {
             throw new UpdateException('core.update.error.version_mismatch');
+        }
+
+        // A package may name the oldest core it runs on. A development
+        // checkout has no version and takes everything.
+        $requires = is_string($manifest['requires'] ?? null) ? $manifest['requires'] : null;
+        if ($requires !== null && $this->coreVersion !== '0.0.0' && version_compare($this->coreVersion, $requires, '<')) {
+            throw new UpdateException('core.package.error.core_version', ['needed' => $requires, 'current' => $this->coreVersion]);
         }
 
         if ($kind === 'extension') {

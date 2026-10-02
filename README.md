@@ -129,6 +129,8 @@ Installing a package runs someone else's code on the server, so:
 - What the core ships (`default`, `admin`, `example`) cannot be replaced by a
   package.
 - An extension written for another interface version is refused.
+- A package can name the oldest core it runs on with `"requires": "0.11.0"`
+  in `extension.json` or `theme.json`; an older core refuses it and says so.
 - The previous folder is kept under `var/updates/backups/packages/`.
 
 The page lists the project's own packages that are not installed yet -
@@ -216,8 +218,8 @@ Templates of the site theme, with the variables they receive:
 | `auth/forgot.twig` | - |
 | `auth/reset.twig` | `errors`, `token`, `min_length` |
 | `account/_nav.twig` | - ; the account's pages, included on top of each; `provider_status()` says whether the account has a provider profile |
-| `account/dashboard.twig` | `name`, `purchases` (`open`, `closed`, `recent`), `provider` (null or `name`, `status`, `path`, `rating`, `offers`, `offers_public`, `sales` like `purchases`, `types`); the page behind "My account" |
-| `account/index.twig` | the settings: `locales`, `min_length`, `is_last_admin`, `provider_status` |
+| `account/dashboard.twig` | `name`, `avatar`, `recent` (offer cards viewed last, from the session), `purchases` (`open`, `closed`, `recent`), `provider` (null or `name`, `status`, `path`, `rating`, `offers`, `offers_public`, `sales` like `purchases`, `types`); the page behind "My account" |
+| `account/index.twig` | the settings: `avatar` (path of the profile picture or null), `locales`, `min_length`, `is_last_admin`, `provider_status` |
 | `account/provider.twig` | `provider` (stored or typed values, `texts` by language), `status`, `status_note`, `public_path`, `certified`, `errors`, `locales`, `countries`, `approval_required` |
 | `offer/index.twig` | `offers` (cards), `total`, `categories` (tree), `category`, `search`, `sort`, `sorts`, `page`, `pages` |
 | `offer/_cards.twig` | `offers`: `title`, `summary`, `path`, `price_from`, `currency`, `thumb`, `provider_name`, `provider_path` |
@@ -400,7 +402,10 @@ statement of good faith. It is protected like the registration (hidden field,
 time trap, rate limits). The sender gets a confirmation of receipt, the
 administrators a mail. Under **Administration → Notices** (permission
 `core.reports.manage`) an administrator decides each notice with reasons,
-which the sender receives together with the ways to object. Acting on the
+which the sender receives together with the ways to object. Where the
+reported address is an offer or a provider of the site, the list links to it,
+and the provider is told about action taken - with the reasons, not with the
+sender's name. The footer link carries the address of the page it is on. Acting on the
 content itself - pausing an offer, suspending a provider, hiding a review -
 happens where that content is administered. Again: a starting point, not
 legal advice.

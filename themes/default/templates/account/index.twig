@@ -7,6 +7,26 @@
 <h1>{{ trans('core.account.title') }}</h1>
 
 <section>
+    <h2>{{ trans('core.account.avatar.title') }}</h2>
+    {% if avatar %}
+        <p><img class="avatar" src="{{ avatar }}" alt="{{ trans('core.account.avatar.title') }}" width="80" height="80"></p>
+    {% endif %}
+    <form method="post" action="{{ url('/account/avatar') }}" enctype="multipart/form-data" class="stack-form">
+        {{ csrf_field() }}
+        <label for="avatar">{{ trans('core.account.avatar.file') }}</label>
+        <input id="avatar" name="avatar" type="file" accept="image/jpeg,image/png,image/webp" required>
+        <small>{{ trans('core.account.avatar.hint') }}</small>
+        <button type="submit">{{ trans('core.account.avatar.save') }}</button>
+    </form>
+    {% if avatar %}
+        <form method="post" action="{{ url('/account/avatar/delete') }}">
+            {{ csrf_field() }}
+            <button type="submit" class="link-button">{{ trans('core.account.avatar.delete') }}</button>
+        </form>
+    {% endif %}
+</section>
+
+<section>
     <h2>{{ trans('core.account.profile.title') }}</h2>
     <form method="post" action="{{ url('/account/profile') }}" class="stack-form">
         {{ csrf_field() }}
