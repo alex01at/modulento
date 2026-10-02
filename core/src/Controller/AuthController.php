@@ -84,6 +84,12 @@ final class AuthController extends Controller
 
         $returnTo = (string) Session::get('login_return_to', '/');
         $this->app->auth->login((int) $account['id']);
+        // Whatever this browser was remembered as before, the box decides
+        // anew - also when someone else logs in on it.
+        $this->app->loginTokens->forget();
+        if (isset($_POST['remember'])) {
+            $this->app->loginTokens->issue((int) $account['id']);
+        }
         Session::remove('login_return_to');
         Session::remove('unverified_account_id');
         $this->app->events->dispatch(new AccountLoggedIn((int) $account['id']));
@@ -98,6 +104,9 @@ final class AuthController extends Controller
 
     public function logout(array $params): void
     {
+        // Before the session ends: otherwise the cookie would log this
+        // device in again with the very next request.
+        $this->app->loginTokens->forget();
         $this->app->auth->logout();
         $this->redirect('/');
     }

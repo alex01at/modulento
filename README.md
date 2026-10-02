@@ -212,14 +212,14 @@ Templates of the site theme, with the variables they receive:
 | `home.twig` | - |
 | `page.twig` | `page`: `title`, `body` (cleaned HTML, output with `raw`), `meta_description`, `locale`, `role` |
 | `error.twig` | `status`, `message_key` |
-| `auth/login.twig` | `can_resend_verification` |
+| `auth/login.twig` | `can_resend_verification`; keep the checkbox `remember` |
 | `auth/register.twig` | `errors`, `email`, `min_length`, `legal` (terms and privacy pages to accept, as `title`/`url`); keep the hidden `website` field |
 | `auth/verify.twig` | `token`; a form that posts to `/verify-email/<token>` - the address is confirmed by the button, not by opening the link |
 | `auth/forgot.twig` | - |
 | `auth/reset.twig` | `errors`, `token`, `min_length` |
 | `account/_nav.twig` | - ; the account's pages, included on top of each; `provider_status()` says whether the account has a provider profile |
 | `account/dashboard.twig` | `name`, `avatar`, `recent` (offer cards viewed last, from the session), `purchases` (`open`, `closed`, `recent`), `provider` (null or `name`, `status`, `path`, `rating`, `offers`, `offers_public`, `sales` like `purchases`, `types`); the page behind "My account" |
-| `account/index.twig` | the settings: `avatar` (path of the profile picture or null), `locales`, `min_length`, `is_last_admin`, `provider_status` |
+| `account/index.twig` | the settings: `avatar` (path of the profile picture or null), `locales`, `min_length`, `is_last_admin`, `provider_status`, `devices` (where the account stays logged in: `created_at`, `last_used_at`, `browser`, `current`), `remember_days` |
 | `account/provider.twig` | `provider` (stored or typed values, `texts` by language), `status`, `status_note`, `public_path`, `certified`, `errors`, `locales`, `countries`, `approval_required` |
 | `offer/index.twig` | `offers` (cards), `total`, `categories` (tree), `category`, `search`, `sort`, `sorts`, `page`, `pages` |
 | `offer/_cards.twig` | `offers`: `title`, `summary`, `path`, `price_from`, `currency`, `thumb`, `provider_name`, `provider_path` |
@@ -409,6 +409,21 @@ sender's name. The footer link carries the address of the page it is on. Acting 
 content itself - pausing an offer, suspending a provider, hiding a review -
 happens where that content is administered. Again: a starting point, not
 legal advice.
+
+"Stay logged in" on the login form keeps a device logged in after its browser
+was closed, for every kind of account. The cookie `remember` holds a random
+selector and a random secret (`HttpOnly`, `SameSite=Lax`, `Secure` over
+HTTPS); the table `account_login_token` holds the selector, the SHA-256 of
+the secret, a fingerprint of the password hash and a shortened browser name -
+nothing that logs anyone in. Each time a device is logged in again its secret
+is replaced; the one before stays valid for 30 seconds, for the other tabs a
+browser opens at once. A secret older than that can only come from a copied
+cookie, so it logs out every remembered device of the account. A token ends
+30 days after its last use, with logging out on that device, with "Log out
+everywhere" in the settings, and for all devices when the password is changed
+or reset, the e-mail address changes, or the account is blocked or deleted.
+Changing password or address and deleting the account ask for the password
+whichever way the device was logged in.
 
 Behind a reverse proxy or CDN, list its addresses as `TRUSTED_PROXIES` in
 `.env` ("10.0.0.0/8, 2001:db8::/32"). Only then is the visitor's address taken

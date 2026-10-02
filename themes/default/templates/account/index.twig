@@ -94,6 +94,38 @@
 </section>
 
 <section>
+    <h2>{{ trans('core.account.devices.title') }}</h2>
+    <p>{{ trans('core.account.devices.intro', {days: remember_days}) }}</p>
+    {% if devices %}
+        <table>
+            <thead>
+            <tr>
+                <th scope="col">{{ trans('core.account.devices.browser') }}</th>
+                <th scope="col">{{ trans('core.account.devices.created') }}</th>
+                <th scope="col">{{ trans('core.account.devices.last_used') }}</th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for device in devices %}
+                <tr>
+                    <td>{{ device.browser ?? trans('core.account.devices.unknown') }}{% if device.current %} <small>({{ trans('core.account.devices.current') }})</small>{% endif %}</td>
+                    <td>{{ device.created_at }} UTC</td>
+                    <td>{{ device.last_used_at }} UTC</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+        <form method="post" action="{{ url('/account/sessions/revoke') }}">
+            {{ csrf_field() }}
+            <button type="submit">{{ trans('core.account.devices.revoke') }}</button>
+        </form>
+        <p><small>{{ trans('core.account.devices.revoke_hint') }}</small></p>
+    {% else %}
+        <p>{{ trans('core.account.devices.none') }}</p>
+    {% endif %}
+</section>
+
+<section>
     <h2>{{ trans('core.account.export.title') }}</h2>
     <p>{{ trans('core.account.export.intro') }}</p>
     <p><a href="{{ url('/account/export') }}">{{ trans('core.account.export.download') }}</a></p>
