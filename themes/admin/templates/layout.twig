@@ -10,6 +10,8 @@
     <title>{% block title %}{{ trans('core.admin.title') }} – {{ site_name }}{% endblock %}</title>
     <link rel="stylesheet" href="{{ admin_asset('admin.css') }}">
     <script src="{{ admin_asset('admin.js') }}"></script>
+    {# The same script as on the site: a "show" button next to every password field. #}
+    <script src="{{ admin_asset('password-toggle.js') }}" defer data-show="{{ trans('core.password.show') }}" data-hide="{{ trans('core.password.hide') }}"></script>
     {% block head %}{% endblock %}
 </head>
 <body>

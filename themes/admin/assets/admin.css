@@ -442,3 +442,8 @@ code { padding: .1rem .35rem; border: 1px solid var(--line); border-radius: 4px;
 @media (prefers-reduced-motion: reduce) {
     * { transition: none !important; }
 }
+
+/* --- "Show password", added by password-toggle.js --- */
+.password-field { display: flex; gap: .4rem; }
+.password-field input { flex: 1 1 auto; min-width: 0; }
+.password-toggle, .stack-form .password-toggle { flex: none; margin: 0; border: 1px solid var(--line); background: var(--card); color: var(--text); font-size: .85rem; white-space: nowrap; }
