@@ -444,7 +444,7 @@ $post('/login', ['email' => 'new@example.test', 'password' => 'wrong password!']
 check('login: wrong password is refused', ($_SESSION['account_id'] ?? null) === null);
 $post('/login', ['email' => 'new@example.test', 'password' => $pw], null);
 check('login: works after confirmation', ($_SESSION['account_id'] ?? null) == $new['id']);
-$r = $get('/account');
+$r = $get('/account/settings');
 check('account page renders for the logged-in account', $r['status'] === 200 && str_contains($r['body'], 'new@example.test'));
 
 $post('/account/profile', ['display_name' => 'Neue Person', 'locale' => 'en']);
@@ -770,6 +770,11 @@ $offerForm = ['type' => 'freelancer.service', 'category_id' => $childId,
     'requirements' => ['de' => 'Firmenname und Farben']];
 check('a provider finds the own offers from every page, others are offered to become one', str_contains($get('/', 1)['body'], 'href="/account/offers"') && !str_contains($get('/', 3)['body'], 'href="/account/offers"')
     && str_contains($get('/account', 3)['body'], 'Anbieter werden') && str_contains($get('/account/offers', 1)['body'], 'class="account-nav"'));
+$r = $get('/account', 3);
+check('overview: greeting, numbers and the way to become a provider', $r['status'] === 200 && str_contains($r['body'], 'Hallo, admin!') && str_contains($r['body'], 'Offene Bestellungen') && str_contains($r['body'], 'Selbst anbieten')
+    && !str_contains($r['body'], 'Offene Aufträge'));
+$r = $get('/account', 1);
+check('overview of a provider: sales, offers and a button per kind of offer', str_contains($r['body'], 'Offene Aufträge') && str_contains($r['body'], 'Öffentliche Angebote') && str_contains($r['body'], '/account/offers/new?type=freelancer.service'));
 $offerRow = fn (string $where = '1 = 1') => $pdo->query("SELECT * FROM offer WHERE {$where} ORDER BY id DESC")->fetch();
 
 check('offers: without a provider profile the form leads to the profile', $get('/account/offers', 3)['body'] === '' && ($_SESSION['_flash']['error'] ?? '') !== '');

@@ -8,15 +8,50 @@ use Modulento\Core\Account\Accounts;
 use Modulento\Core\Account\Tokens;
 use Modulento\Core\Account\AccountRemoval;
 use Modulento\Core\Event\AccountExport;
+use Modulento\Core\Review\Reviews;
 use Modulento\Core\Support\PasswordPolicy;
 use Modulento\Core\Support\RateLimiter;
 use Modulento\Core\Support\Session;
 use PDOException;
 
-/** The logged-in account's own settings. Every route here is login-only. */
+/** The logged-in account's overview and its own settings. Every route here is login-only. */
 final class AccountController extends Controller
 {
     private const CHANGE_EMAIL_TTL_SECONDS = 86400;
+    private const RECENT = 5;
+
+    /** Where someone lands after "My account": what is going on, and the ways onward. */
+    public function dashboard(array $params): void
+    {
+        $app = $this->app;
+        $account = $app->auth->account();
+        $provider = $app->providers->findByAccount($account['id']);
+        $providerId = $provider !== null ? (int) $provider['id'] : null;
+
+        $rows = fn (string $role, int $id) => array_map(fn (array $order) => [
+            'id' => $order['id'],
+            'number' => $order['number'],
+            'title' => $order['offer_title'],
+            'state_label_key' => $app->orders->flow($order['flow'])?->states()[$order['state']]['label'] ?? 'core.order.state_unknown',
+            'total' => $order['total'],
+            'currency' => $order['currency'],
+        ], $app->orders->list($role, $id, null, 1, self::RECENT)['rows']);
+
+        $this->render('account/dashboard.twig', [
+            'name' => ($account['display_name'] ?? '') !== '' ? $account['display_name'] : strstr($account['email'], '@', true),
+            'purchases' => $app->orders->tally('buyer', $account['id']) + ['recent' => $rows('buyer', $account['id'])],
+            'provider' => $provider !== null ? [
+                'name' => $provider['name'],
+                'status' => $provider['status'],
+                'path' => $provider['status'] === 'approved' ? '/providers/' . $provider['slug'] : null,
+                'rating' => Reviews::summary($provider),
+                'offers' => $app->offers->listAll($providerId, null, 1, 1)['total'],
+                'offers_public' => $app->offers->listAll($providerId, 'published', 1, 1)['total'],
+                'sales' => $app->orders->tally('provider', $providerId) + ['recent' => $rows('provider', $providerId)],
+                'types' => array_map(fn ($type) => ['id' => $type->id(), 'label_key' => $type->labelKey()], array_values($app->offers->types())),
+            ] : null,
+        ]);
+    }
 
     public function index(array $params): void
     {
@@ -213,6 +248,6 @@ final class AccountController extends Controller
     private function back(string $type, string $messageKey, array $replacements = []): void
     {
         Session::flash($type, $this->trans($messageKey, $replacements));
-        $this->redirect('/account');
+        $this->redirect('/account/settings');
     }
 }
