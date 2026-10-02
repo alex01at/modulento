@@ -35,8 +35,8 @@ final class AuthController extends Controller
 
     public function login(array $params): void
     {
-        $email = strtolower(trim((string) ($_POST['email'] ?? '')));
-        $password = (string) ($_POST['password'] ?? '');
+        $email = strtolower(trim(is_string($_POST['email'] ?? null) ? $_POST['email'] : ''));
+        $password = is_string($_POST['password'] ?? null) ? $_POST['password'] : '';
         $ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
 
         // The tight limit counts per address and network address together:

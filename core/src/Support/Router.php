@@ -80,7 +80,7 @@ final class Router
             }
 
             if ($method === 'POST' && !$route['csrfExempt']
-                && !Csrf::verify($_POST['_csrf'] ?? $_SERVER['HTTP_X_CSRF_TOKEN'] ?? null)) {
+                && !Csrf::verify(is_string($_POST['_csrf'] ?? null) ? $_POST['_csrf'] : ($_SERVER['HTTP_X_CSRF_TOKEN'] ?? null))) {
                 $this->rejectCsrf();
                 return;
             }
@@ -168,7 +168,8 @@ final class Router
 
         $query = parse_url($referer, PHP_URL_QUERY);
 
-        return (parse_url($referer, PHP_URL_PATH) ?: '/') . ($query ? '?' . $query : '');
+        // One leading slash, never two: "//host" is another site.
+        return '/' . ltrim(str_replace('\\', '/', (string) parse_url($referer, PHP_URL_PATH)), '/') . ($query ? '?' . $query : '');
     }
 
     private function isAjax(): bool

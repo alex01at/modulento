@@ -15,7 +15,7 @@ final class AdminOrderController extends Controller
     public function index(array $params): void
     {
         $counts = $this->app->orders->counts();
-        $state = isset($counts[$_GET['state'] ?? '']) ? (string) $_GET['state'] : null;
+        $state = is_string($_GET['state'] ?? null) && isset($counts[$_GET['state']]) ? $_GET['state'] : null;
         $page = max(1, (int) ($_GET['page'] ?? 1));
         $list = $this->app->orders->list('admin', null, $state, $page, self::PER_PAGE);
 

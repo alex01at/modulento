@@ -101,7 +101,9 @@ final class Locales
     {
         $segments = explode('/', ltrim($path, '/'), 2);
         $first = $segments[0];
-        $rest = '/' . ($segments[1] ?? '');
+        // One leading slash, never two: "//host" would be read as another
+        // site by a browser that is redirected there.
+        $rest = '/' . ltrim(str_replace('\\', '/', $segments[1] ?? ''), '/');
 
         if (!$this->isEnabled($first)) {
             return ['locale' => $this->default(), 'path' => $path, 'redirect' => null];

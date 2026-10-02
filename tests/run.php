@@ -373,6 +373,11 @@ $r = request($pdo, $config, 'POST', '/save', 1, ['_csrf' => 'wrong']);
 check('POST with wrong CSRF token does not run', !$r['called']);
 $r = request($pdo, $config, 'POST', '/save', 1, ['_csrf' => 'test-token']);
 check('POST with CSRF token runs', $r['called']);
+$r = request($pdo, $config, 'POST', '/save', 1, ['_csrf' => ['x']]);
+check('POST with a token that is not text does not run and does not fail', !$r['called'] && $r['status'] !== 500);
+$r = request($pdo, $config, 'POST', '/login', null, ['email' => ['a'], 'password' => ['b']]);
+check('login with fields that are not text is just a failed login', $r['status'] !== 500 && ($_SESSION['account_id'] ?? null) === null);
+check('a page number beyond every list is an empty page, not an error', request($pdo, $config, 'GET', '/admin/accounts?page=99999999999999999999999', 3)['status'] === 200);
 $r = request($pdo, $config, 'POST', '/save', null, ['_csrf' => 'test-token']);
 check('POST by a visitor to a login-only route: 403', !$r['called'] && $r['status'] === 403);
 $r = request($pdo, $config, 'POST', '/hook', null);
@@ -552,6 +557,8 @@ check('locales: prefix alone is the home page', $locales()->split('/en')['path']
 check('locales: default language with prefix redirects to the plain address', $locales()->split('/de/login')['redirect'] === '/login');
 check('locales: an unknown or disabled code is an ordinary path', $locales()->split('/fr/login')['path'] === '/fr/login');
 check('locales: prefix()', $locales()->prefix('/login', 'en') === '/en/login' && $locales()->prefix('/', 'en') === '/en' && $locales()->prefix('/login', 'de') === '/login' && $locales()->prefix('/login', 'fr') === '/login');
+check('locales: the redirect to the plain address never leads to another site', $locales()->split('/de//evil.example/x')['redirect'] === '/evil.example/x'
+    && $locales()->split('/de///evil.example')['redirect'] === '/evil.example' && $locales()->split('/de/\\evil.example')['redirect'] === '/evil.example');
 check('locales: a word starting like a code is not a prefix', $locales()->split('/english')['path'] === '/english');
 
 $r = $get('/login', null);
