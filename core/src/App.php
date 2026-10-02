@@ -100,7 +100,7 @@ final class App
     private array $adminMenu = [];
     /** @var array<int, array{label_key: string, path: string}> */
     private array $navigation = [];
-    /** @var string[] */
+    /** @var array<int, array{template: string, data: ?\Closure}> */
     private array $homeSections = [];
     /** @var array<string, string> permission name => label key */
     private array $permissions = [];
@@ -210,16 +210,23 @@ final class App
         return $this->navigation;
     }
 
-    /** A template an extension wants shown on the home page. */
-    public function addHomeSection(string $template): void
+    /**
+     * A template an extension wants shown on the home page.
+     *
+     * @param \Closure(App): array<string, mixed>|null $data what the template gets, fetched only when the home page is shown
+     */
+    public function addHomeSection(string $template, ?\Closure $data = null): void
     {
-        $this->homeSections[] = $template;
+        $this->homeSections[] = ['template' => $template, 'data' => $data];
     }
 
-    /** @return string[] */
+    /** @return array<int, array{template: string, data: array<string, mixed>}> */
     public function homeSections(): array
     {
-        return $this->homeSections;
+        return array_map(
+            fn (array $section) => ['template' => $section['template'], 'data' => $section['data'] !== null ? ($section['data'])($this) : []],
+            $this->homeSections
+        );
     }
 
     public function addPermission(string $name, string $labelKey): void

@@ -83,12 +83,15 @@ final class Registrar
 
     /**
      * A section on the home page, e.g. the latest posts. The template is
-     * one of this extension's ("@id/home.twig"), gets no variables and
-     * fetches what it shows itself; a theme may override it like any other.
+     * one of this extension's ("@id/home.twig"); a theme may override it
+     * like any other. $data supplies its variables and runs only when the
+     * home page is shown.
+     *
+     * @param Closure(App): array<string, mixed>|null $data
      */
-    public function homeSection(string $template): void
+    public function homeSection(string $template, ?Closure $data = null): void
     {
-        $this->app->addHomeSection($template);
+        $this->app->addHomeSection($template, $data);
     }
 
     public function adminMenu(string $labelKey, string $path, string $permission): void

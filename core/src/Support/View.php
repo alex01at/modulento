@@ -112,7 +112,10 @@ final class View
             // is added here rather than in a template, so a theme with a
             // layout of its own shows it without knowing about it.
             if ($where === 'footer') {
-                $links[] = ['title' => $app->translator->trans('core.withdrawal.link'), 'url' => $app->url('/withdrawal'), 'role' => 'withdrawal'];
+                // Where nothing can be ordered there is no contract to withdraw from.
+                if ($app->offers->types() !== []) {
+                    $links[] = ['title' => $app->translator->trans('core.withdrawal.link'), 'url' => $app->url('/withdrawal'), 'role' => 'withdrawal'];
+                }
                 // The report form is told which page it was opened from, so
                 // the address of the content is already filled in. Not from
                 // the form itself or the administration.

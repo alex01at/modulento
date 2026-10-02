@@ -1,5 +1,5 @@
-{# Included on the home page, see Registrar::homeSection(). Gets no variables. #}
+{# Included on the home page, see Registrar::homeSection(). Gets "site" from the closure given there. #}
 <section>
-    <h2>{{ trans('example.home.title') }}</h2>
+    <h2>{{ trans('example.home.title') }} – {{ site }}</h2>
     <p><a href="{{ url('/example') }}">{{ trans('example.nav') }}</a></p>
 </section>
