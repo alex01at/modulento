@@ -1,0 +1,7 @@
+{# Plain text: nothing here is HTML-escaped. Blocks: subject, body. #}
+{% block subject %}{{ trans('core.mail.report_decision.subject', {reference: reference}) }}{% endblock %}
+{% block body %}
+{{ trans('core.mail.report_decision.body', {reference: reference, url: url, decision: decision, note: note}) }}
+
+{{ trans('core.mail.signature') }}
+{% endblock %}

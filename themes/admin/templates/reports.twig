@@ -1,0 +1,62 @@
+{% extends '@admin/layout.twig' %}
+
+{% block title %}{{ trans('core.admin.reports.title') }} – {{ site_name }}{% endblock %}
+
+{% block admin %}
+{% include '@admin/_page_header.twig' with {heading: trans('core.admin.reports.title')} only %}
+
+<section class="card-box">
+    <div class="card-head">
+        <p>{{ trans('core.admin.reports.intro') }}</p>
+        {% if open > 0 %}<p><span class="badge badge-pending">{{ trans('core.admin.reports.open', {count: open}) }}</span></p>{% endif %}
+    </div>
+
+    {% if reports is empty %}
+        <p class="empty">{{ trans('core.admin.reports.none') }}</p>
+    {% endif %}
+</section>
+
+{% for report in reports %}
+    <section class="card-box">
+        <h2>
+            {{ trans('core.admin.reports.reference', {reference: report.id}) }}
+            <span class="badge badge-{{ report.status == 'open' ? 'pending' : (report.status == 'actioned' ? 'ok' : 'draft') }}">{{ trans('core.report.status.' ~ report.status) }}</span>
+        </h2>
+        <dl>
+            <dt>{{ trans('core.admin.withdrawals.received') }}</dt>
+            <dd>{{ report.created_at }} UTC</dd>
+            <dt>{{ trans('core.report.field.url') }}</dt>
+            {# Shown as text: an address someone typed is not a link to follow blindly. #}
+            <dd>{{ report.url }}</dd>
+            <dt>{{ trans('core.report.field.category') }}</dt>
+            <dd>{{ trans('core.report.category.' ~ report.category) }}</dd>
+            <dt>{{ trans('core.report.field.explanation') }}</dt>
+            <dd>{{ report.explanation|nl2br }}</dd>
+            <dt>{{ trans('core.admin.reports.sender') }}</dt>
+            <dd>{{ report.name }}, <a href="mailto:{{ report.email }}">{{ report.email }}</a></dd>
+            {% if report.status != 'open' %}
+                <dt>{{ trans('core.admin.reports.decision') }}</dt>
+                <dd>{{ report.decided_at }} UTC<br>{{ report.decision_note|nl2br }}</dd>
+            {% endif %}
+        </dl>
+
+        {% if report.status == 'open' %}
+            <form method="post" action="{{ url('/admin/reports/' ~ report.id ~ '/decide') }}" class="stack-form">
+                {{ csrf_field() }}
+                <label for="decision_{{ report.id }}">{{ trans('core.admin.reports.decision') }}</label>
+                <select id="decision_{{ report.id }}" name="decision" required>
+                    {% for decision in decisions %}
+                        <option value="{{ decision }}">{{ trans('core.report.decision.' ~ decision) }}</option>
+                    {% endfor %}
+                </select>
+                <label for="note_{{ report.id }}">{{ trans('core.admin.reports.note') }}</label>
+                <textarea id="note_{{ report.id }}" name="note" rows="4" maxlength="{{ max_note }}" required></textarea>
+                <small>{{ trans('core.admin.reports.note_hint') }}</small>
+                <button type="submit">{{ trans('core.admin.reports.decide') }}</button>
+            </form>
+        {% endif %}
+    </section>
+{% endfor %}
+
+{% include '@admin/_pager.twig' with {path: '/admin/reports', page: page, pages: pages} only %}
+{% endblock %}

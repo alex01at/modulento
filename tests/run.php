@@ -249,6 +249,8 @@ $pdo->exec("CREATE TABLE review (id INTEGER PRIMARY KEY, order_id INTEGER UNIQUE
     status TEXT DEFAULT 'published', status_note TEXT, reply TEXT, replied_at TEXT, created_at TEXT)");
 $pdo->exec("CREATE TABLE withdrawal (id INTEGER PRIMARY KEY, order_id INTEGER REFERENCES orders (id) ON DELETE SET NULL, order_number TEXT, name TEXT, email TEXT, statement TEXT,
     locale TEXT, account_id INTEGER REFERENCES account (id) ON DELETE SET NULL, matched INTEGER NOT NULL DEFAULT 0, created_at TEXT)");
+$pdo->exec("CREATE TABLE report (id INTEGER PRIMARY KEY, url TEXT, category TEXT, explanation TEXT, name TEXT, email TEXT, locale TEXT,
+    account_id INTEGER REFERENCES account (id) ON DELETE SET NULL, status TEXT DEFAULT 'open', decision_note TEXT, decided_at TEXT, decided_by INTEGER, created_at TEXT)");
 $pdo->exec("ALTER TABLE withdrawal ADD COLUMN handled_at TEXT");
 $pdo->exec("ALTER TABLE withdrawal ADD COLUMN handled_by INTEGER");
 $pdo->exec("ALTER TABLE offer ADD COLUMN rating_count INTEGER NOT NULL DEFAULT 0");
@@ -335,6 +337,7 @@ function request(PDO $pdo, array $config, string $method, string $path, int|fals
     // As if the registration form had been open for a while.
     $_SESSION['register_form_at'] ??= time() - 60;
     $_SESSION['withdrawal_form_at'] ??= time() - 60;
+    $_SESSION['report_form_at'] ??= time() - 60;
     if ($method === 'POST') {
         $post += ['_csrf' => 'test-token'];
     }
@@ -946,6 +949,8 @@ $orderPath = '/offers/ich-gestalte-dein-logo/order';
 
 $r = $get('/offers/ich-gestalte-dein-logo', 2);
 check('offer page offers to order each package', str_contains($r['body'], $orderPath . '?package=1') && str_contains($r['body'], $orderPath . '?package=2'));
+check('offer and provider pages link to the report form with their own address', str_contains($r['body'], 'href="/report?url=%2Foffers%2Fich-gestalte-dein-logo"')
+    && str_contains($get('/en/providers/mueller-design', null)['body'], 'href="/en/report?url=%2Fen%2Fproviders%2Fmueller-design"'));
 check('the provider sees no order button on the own offer', !str_contains($get('/offers/ich-gestalte-dein-logo', 1)['body'], $orderPath . '?package='));
 check('ordering needs a login', $get($orderPath, null)['body'] === '');
 $r = $get($orderPath . '?package=2', 2);
@@ -1629,6 +1634,68 @@ check('withdrawal: and can be reopened', $pdo->query("SELECT handled_at FROM wit
 $pdo->exec('DELETE FROM withdrawal');
 $pdo->exec('DELETE FROM provider');
 $pdo->exec("UPDATE account SET locale = 'de' WHERE id = 1");
+$pdo->exec('DELETE FROM rate_limit_attempt');
+@unlink($mailLog);
+
+// --- Reporting illegal content --------------------------------------------------
+$reports = fn (): array => $pdo->query('SELECT * FROM report ORDER BY id')->fetchAll();
+$notice = ['url' => 'https://example.test/offers/gefaelschte-uhr', 'category' => 'intellectual_property', 'explanation' => 'Das ist eine Fälschung einer geschützten Marke. <script>x</script>',
+    'name' => 'Erika Muster', 'email' => 'Erika@Example.test', 'good_faith' => '1'];
+@unlink($mailLog);
+check('report: the footer of every page links to the form', str_contains($get('/', null)['body'], '<a href="/report">Inhalt melden</a>') && str_contains($get('/en', null)['body'], '<a href="/en/report">Report content</a>'));
+$r = $get('/report?url=' . rawurlencode('/offers/gefaelschte-uhr'), null);
+check('report: the form is public and takes the address along', $r['status'] === 200 && str_contains($r['body'], 'value="/offers/gefaelschte-uhr"') && str_contains($r['body'], 'name="good_faith"') && str_contains($r['body'], 'name="website"'));
+check('report: a query parameter that is not text is ignored', $get('/report?url[]=x', null)['status'] === 200);
+check('report: a logged-in account finds name and address filled in', str_contains($get('/report', 2)['body'], 'value="editor@example.test"'));
+$r = $post('/report', ['url' => '', 'category' => 'nonsense', 'explanation' => 'kurz', 'name' => '', 'email' => 'x'], null);
+check('report: every field is checked', $reports() === [] && str_contains($r['body'], 'Adresse der Seite an') && str_contains($r['body'], 'worum es geht') && str_contains($r['body'], 'mindestens 20')
+    && str_contains($r['body'], 'deinen Namen') && str_contains($r['body'], 'gültige E-Mail-Adresse') && str_contains($r['body'], 'nach bestem Wissen richtig'));
+$r = $post('/report', ['url' => ['x'], 'category' => ['y'], 'explanation' => ['z'], 'name' => ['n'], 'email' => ['e'], 'good_faith' => ['1']], null);
+check('report: fields that are not text count as empty', $r['status'] === 200 && $reports() === []);
+$r = $post('/report', array_diff_key($notice, ['good_faith' => 1]), null);
+check('report: the statement of good faith is required, typed values stay', $reports() === [] && str_contains($r['body'], 'gefaelschte-uhr') && str_contains($r['body'], '&lt;script&gt;'));
+$get('/report', null);
+$r = $post('/report', $notice);
+check('report: a form sent back the moment it was shown stores nothing', $reports() === [] && str_contains($r['body'], 'Das ging sehr schnell'));
+$post('/report', ['website' => 'http://spam'] + $notice, null);
+check('report: a filled bot trap gets the same answer and stores nothing', $reports() === [] && lastMail($mailLog, 'erika@example.test') === null && str_contains($get('/report/done')['body'], 'eingegangen'));
+
+$post('/report', $notice, null);
+$stored = $reports()[0] ?? [];
+check('report: stored as open with the address normalised', count($reports()) === 1 && $stored['status'] === 'open' && $stored['email'] === 'erika@example.test' && $stored['category'] === 'intellectual_property' && $stored['account_id'] === null);
+$r = $get('/report/done');
+check('report: the answer names time and address', str_contains($r['body'], $stored['created_at'] . ' UTC') && str_contains($r['body'], 'erika@example.test'));
+$mail = lastMail($mailLog, 'erika@example.test');
+check('report: the sender gets a confirmation of receipt with reference', $mail['subject'] === 'Deine Meldung ' . $stored['id'] . ' ist eingegangen' && str_contains((string) file_get_contents($mailLog), 'Thema: Urheber- oder Markenrecht'));
+check('report: the administrators are told, with the way to the list', lastMail($mailLog, 'admin@example.test')['subject'] === 'Neue Meldung ' . $stored['id'] . ' zu einem Inhalt' && lastMail($mailLog, 'admin@example.test')['link'] === '/admin/reports');
+$post('/report', ['email' => 'editor@example.test'] + $notice, 2);
+check('report: a logged-in sender is remembered for the data export', (int) $reports()[1]['account_id'] === 2 && count(json_decode($get('/account/export', 2)['body'], true)['reports'] ?? []) === 1);
+
+check('report: the list in the administration needs its permission', $get('/admin/reports', 1)['status'] === 403 && $post('/admin/reports/' . $stored['id'] . '/decide', ['decision' => 'rejected', 'note' => 'x'], 1)['status'] === 403);
+$r = $get('/admin/reports', 3);
+check('report: the administration lists open notices, text escaped', $r['status'] === 200 && str_contains($r['body'], '2 offen') && str_contains($r['body'], 'gefaelschte-uhr') && str_contains($r['body'], '&lt;script&gt;') && !str_contains($r['body'], '<script>x'));
+$post('/admin/reports/' . $stored['id'] . '/decide', ['decision' => 'actioned', 'note' => ''], 3);
+$post('/admin/reports/' . $stored['id'] . '/decide', ['decision' => 'deleted', 'note' => 'Begründung'], 3);
+check('report: a decision needs reasons and a known outcome', $reports()[0]['status'] === 'open');
+$post('/admin/reports/' . $stored['id'] . '/decide', ['decision' => 'actioned', 'note' => 'Das Angebot wurde entfernt.'], 3);
+$decided = $reports()[0];
+check('report: decided with reasons, time and administrator', $decided['status'] === 'actioned' && $decided['decision_note'] === 'Das Angebot wurde entfernt.' && $decided['decided_at'] !== null && (int) $decided['decided_by'] === 3);
+$log = (string) file_get_contents($mailLog);
+check('report: the sender is told the decision, its reasons and the ways to object', lastMail($mailLog, 'erika@example.test')['subject'] === 'Entscheidung zu deiner Meldung ' . $stored['id']
+    && str_contains($log, 'Wir haben eine Maßnahme gegen den Inhalt getroffen') && str_contains($log, 'Das Angebot wurde entfernt.') && str_contains($log, 'Streitbeilegung'));
+$mailsBefore = substr_count($log, 'To: erika@example.test');
+$post('/admin/reports/' . $stored['id'] . '/decide', ['decision' => 'rejected', 'note' => 'Doch nicht.'], 3);
+check('report: a decided notice is not decided again', $reports()[0]['status'] === 'actioned' && substr_count((string) file_get_contents($mailLog), 'To: erika@example.test') === $mailsBefore);
+
+$pdo->exec('DELETE FROM rate_limit_attempt');
+$_SERVER['REMOTE_ADDR'] = '203.0.113.77';
+$before = count($reports());
+for ($i = 0; $i < 6; $i++) {
+    $r = $post('/report', ['email' => "reporter{$i}@example.test"] + $notice, null);
+}
+unset($_SERVER['REMOTE_ADDR']);
+check('report: no more than five an hour from one address of the network', count($reports()) === $before + 5 && str_contains($r['body'], 'Zu viele'));
+$pdo->exec('DELETE FROM report');
 $pdo->exec('DELETE FROM rate_limit_attempt');
 @unlink($mailLog);
 

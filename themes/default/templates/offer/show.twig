@@ -53,4 +53,6 @@
         <p><a href="{{ url('/login') }}">{{ trans('core.offer.contact.login') }}</a></p>
     {% endif %}
 </section>
+{# Reporting has to be easy to find where the content is. #}
+<p><small><a href="{{ url('/report') }}?url={{ url(current_path())|url_encode }}" rel="nofollow">{{ trans('core.report.link_here') }}</a></small></p>
 {% endblock %}

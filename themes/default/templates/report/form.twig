@@ -1,0 +1,53 @@
+{% extends 'layout/base.twig' %}
+
+{% block title %}{{ trans('core.report.title') }} – {{ site_name }}{% endblock %}
+
+{% block content %}
+<h1>{{ trans('core.report.title') }}</h1>
+<p>{{ trans('core.report.intro') }}</p>
+{# Keep this note: it says what happens with a notice. #}
+<p><small>{{ trans('core.report.hint') }}</small></p>
+
+{% for error in errors %}
+    <p class="flash flash-error" role="alert">{{ error }}</p>
+{% endfor %}
+
+<form method="post" action="{{ url('/report') }}" class="stack-form wide">
+    {{ csrf_field() }}
+    <label for="report_url">{{ trans('core.report.field.url') }}</label>
+    <input id="report_url" name="url" type="text" value="{{ url }}" maxlength="{{ limits.url }}" required>
+    <small>{{ trans('core.report.field.url_hint') }}</small>
+
+    <label for="report_category">{{ trans('core.report.field.category') }}</label>
+    <select id="report_category" name="category" required>
+        <option value="">{{ trans('core.report.field.category_choose') }}</option>
+        {% for item in categories %}
+            <option value="{{ item }}" {{ item == category ? 'selected' }}>{{ trans('core.report.category.' ~ item) }}</option>
+        {% endfor %}
+    </select>
+
+    <label for="report_explanation">{{ trans('core.report.field.explanation') }}</label>
+    <textarea id="report_explanation" name="explanation" rows="7" minlength="{{ limits.min }}" maxlength="{{ limits.max }}" required>{{ explanation }}</textarea>
+    <small>{{ trans('core.report.field.explanation_hint') }}</small>
+
+    <label for="report_name">{{ trans('core.report.field.name') }}</label>
+    <input id="report_name" name="name" type="text" value="{{ name }}" maxlength="{{ limits.name }}" autocomplete="name" required>
+
+    <label for="report_email">{{ trans('core.report.field.email') }}</label>
+    <input id="report_email" name="email" type="email" value="{{ email }}" maxlength="255" autocomplete="email" required>
+    <small>{{ trans('core.report.field.email_hint') }}</small>
+
+    <label class="checkbox">
+        <input type="checkbox" name="good_faith" value="1" required>
+        <span>{{ trans('core.report.field.good_faith') }}</span>
+    </label>
+
+    {# Bot trap: hidden from people, must stay empty. Keep it in every theme. #}
+    <div class="visually-hidden" aria-hidden="true">
+        <label for="report_website">Website</label>
+        <input id="report_website" name="website" type="text" tabindex="-1" autocomplete="off">
+    </div>
+
+    <button type="submit">{{ trans('core.report.submit') }}</button>
+</form>
+{% endblock %}

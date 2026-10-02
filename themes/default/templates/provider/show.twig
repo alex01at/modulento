@@ -46,4 +46,6 @@
         <p><small>{{ trans('core.provider.private_notice') }}</small></p>
     {% endif %}
 </article>
+{# Reporting has to be easy to find where the content is. #}
+<p><small><a href="{{ url('/report') }}?url={{ url(current_path())|url_encode }}" rel="nofollow">{{ trans('core.report.link_here') }}</a></small></p>
 {% endblock %}
