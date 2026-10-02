@@ -1,13 +1,15 @@
 {# The pages of the logged-in account, shown on top of each of them. #}
 <nav class="account-nav" aria-label="{{ trans('core.nav.account') }}">
     <a href="{{ url('/account') }}">{{ trans('core.dashboard.title') }}</a>
-    <a href="{{ url('/account/orders') }}">{{ trans('core.order.list.buyer') }}</a>
+    {% if has_catalogue() or provider_status() %}
+        <a href="{{ url('/account/orders') }}">{{ trans('core.order.list.buyer') }}</a>
+    {% endif %}
     {% if provider_status() %}
         <a href="{{ url('/account/offers') }}">{{ trans('core.offer.mine.title') }}</a>
         <a href="{{ url('/account/sales') }}">{{ trans('core.order.list.provider') }}</a>
         <a href="{{ url('/account/provider') }}">{{ trans('core.provider.title') }}</a>
         <a href="{{ url('/account/payments') }}">{{ trans('core.payment.settings.title') }}</a>
-    {% else %}
+    {% elseif has_catalogue() %}
         <a href="{{ url('/account/provider') }}">{{ trans('core.provider.create') }}</a>
     {% endif %}
     <a href="{{ url('/account/settings') }}">{{ trans('core.account.settings') }}</a>

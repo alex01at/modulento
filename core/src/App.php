@@ -98,6 +98,10 @@ final class App
     private ?View $view = null;
     /** @var array<int, array{label_key: string, path: string, permission: string}> */
     private array $adminMenu = [];
+    /** @var array<int, array{label_key: string, path: string}> */
+    private array $navigation = [];
+    /** @var string[] */
+    private array $homeSections = [];
     /** @var array<string, string> permission name => label key */
     private array $permissions = [];
 
@@ -192,6 +196,30 @@ final class App
     public function adminMenu(): array
     {
         return $this->adminMenu;
+    }
+
+    /** An entry of the site's main menu that an extension brings along. */
+    public function addNavigation(string $labelKey, string $path): void
+    {
+        $this->navigation[] = ['label_key' => $labelKey, 'path' => $path];
+    }
+
+    /** @return array<int, array{label_key: string, path: string}> */
+    public function navigation(): array
+    {
+        return $this->navigation;
+    }
+
+    /** A template an extension wants shown on the home page. */
+    public function addHomeSection(string $template): void
+    {
+        $this->homeSections[] = $template;
+    }
+
+    /** @return string[] */
+    public function homeSections(): array
+    {
+        return $this->homeSections;
     }
 
     public function addPermission(string $name, string $labelKey): void

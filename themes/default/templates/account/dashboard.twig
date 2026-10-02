@@ -32,7 +32,9 @@
             {% endif %}
             <p class="dashboard-welcome">{{ trans('core.dashboard.welcome') }} <strong>{{ name }}</strong></p>
             <ul class="dashboard-links">
-                <li><a href="{{ url('/account/orders') }}">{{ trans('core.order.list.buyer') }}</a></li>
+                {# Without a catalogue there is nothing to order or to offer. #}
+                {% set shop = has_catalogue() or provider or purchases.open + purchases.closed > 0 %}
+                {% if shop %}<li><a href="{{ url('/account/orders') }}">{{ trans('core.order.list.buyer') }}</a></li>{% endif %}
                 {% if provider %}
                     <li><a href="{{ url('/account/offers') }}">{{ trans('core.offer.mine.title') }}</a></li>
                     <li><a href="{{ url('/account/sales') }}">{{ trans('core.order.list.provider') }}</a></li>
@@ -40,7 +42,7 @@
                     <li><a href="{{ url('/account/payments') }}">{{ trans('core.payment.settings.title') }}</a></li>
                 {% endif %}
                 <li><a href="{{ url('/account/settings') }}">{{ trans('core.account.settings') }}</a></li>
-                <li><a href="{{ url('/offers') }}">{{ trans('core.dashboard.browse') }}</a></li>
+                {% if has_catalogue() %}<li><a href="{{ url('/offers') }}">{{ trans('core.dashboard.browse') }}</a></li>{% endif %}
             </ul>
         </section>
 
@@ -54,7 +56,7 @@
                     <a class="button" href="{{ url('/account/offers/new') }}?type={{ type.id|url_encode }}">{{ trans('core.offer.mine.new', {type: trans(type.label_key)}) }}</a>
                 {% endfor %}
             </section>
-        {% else %}
+        {% elseif has_catalogue() %}
             <section class="dashboard-card">
                 <h2>{{ trans('core.dashboard.sell.title') }}</h2>
                 <p>{{ trans('core.dashboard.sell.text') }}</p>
@@ -66,6 +68,7 @@
     <div class="dashboard-main">
         <h1>{{ trans('core.dashboard.greeting', {name: name}) }}</h1>
 
+        {% if shop %}
         <ul class="dashboard-tiles">
             <li><span>{{ trans('core.dashboard.tile.open_purchases') }}</span><strong>{{ purchases.open }}</strong></li>
             <li><span>{{ trans('core.dashboard.tile.closed_purchases') }}</span><strong>{{ purchases.closed }}</strong></li>
@@ -77,6 +80,7 @@
                 </li>
             {% endif %}
         </ul>
+        {% endif %}
 
         {% if provider %}
             <section>
@@ -88,6 +92,7 @@
             </section>
         {% endif %}
 
+        {% if shop %}
         <section>
             <div class="dashboard-heading">
                 <h2>{{ trans('core.dashboard.recent_purchases') }}</h2>
@@ -95,6 +100,7 @@
             </div>
             {{ _self.orders(purchases.recent, 'core.dashboard.no_purchases') }}
         </section>
+        {% endif %}
 
         {% if recent %}
             <section>

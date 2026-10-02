@@ -24,8 +24,14 @@
         {% for link in page_links('header') %}
             <a href="{{ link.url }}">{{ link.title }}</a>
         {% endfor %}
-        <a href="{{ url('/offers') }}">{{ trans('core.nav.offers') }}</a>
-        <a href="{{ url('/providers') }}">{{ trans('core.nav.providers') }}</a>
+        {# Only where an extension adds a kind of offer is there a catalogue. #}
+        {% if has_catalogue() %}
+            <a href="{{ url('/offers') }}">{{ trans('core.nav.offers') }}</a>
+            <a href="{{ url('/providers') }}">{{ trans('core.nav.providers') }}</a>
+        {% endif %}
+        {% for link in nav_links() %}
+            <a href="{{ link.url }}">{{ link.title }}</a>
+        {% endfor %}
         {% if can('core.admin.access') %}
             <a href="{{ url('/admin') }}">{{ trans('core.nav.admin') }}</a>
         {% endif %}

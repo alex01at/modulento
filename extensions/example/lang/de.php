@@ -11,4 +11,6 @@ return [
     'example.logins.account' => 'Konto-Nr.',
     'example.logins.time' => 'Zeitpunkt (UTC)',
     'example.logins.none' => 'Seit dem Aktivieren hat sich noch niemand angemeldet.',
+    'example.nav' => 'Beispiel',
+    'example.home.title' => 'Aus der Beispiel-Erweiterung',
 ];

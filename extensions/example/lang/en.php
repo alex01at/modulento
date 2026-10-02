@@ -11,4 +11,6 @@ return [
     'example.logins.account' => 'Account no.',
     'example.logins.time' => 'Time (UTC)',
     'example.logins.none' => 'Nobody has logged in since this extension was enabled.',
+    'example.nav' => 'Example',
+    'example.home.title' => 'From the example extension',
 ];

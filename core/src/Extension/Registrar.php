@@ -75,6 +75,22 @@ final class Registrar
         $this->app->orders->registerPaymentMethod($method);
     }
 
+    /** An entry in the site's main menu, e.g. "Blog". The path is one of this extension's public routes. */
+    public function navigation(string $labelKey, string $path): void
+    {
+        $this->app->addNavigation($labelKey, $path);
+    }
+
+    /**
+     * A section on the home page, e.g. the latest posts. The template is
+     * one of this extension's ("@id/home.twig"), gets no variables and
+     * fetches what it shows itself; a theme may override it like any other.
+     */
+    public function homeSection(string $template): void
+    {
+        $this->app->addHomeSection($template);
+    }
+
     public function adminMenu(string $labelKey, string $path, string $permission): void
     {
         $this->app->addAdminMenu($labelKey, $path, $permission);
