@@ -6,6 +6,7 @@ namespace Modulento\Core\Controller;
 
 use Modulento\Core\Account\Accounts;
 use Modulento\Core\Account\Avatars;
+use Modulento\Core\Account\LoginTokens;
 use Modulento\Core\Catalogue\OfferView;
 use Modulento\Core\Account\Tokens;
 use Modulento\Core\Account\AccountRemoval;
@@ -21,6 +22,7 @@ final class AccountController extends Controller
 {
     private const CHANGE_EMAIL_TTL_SECONDS = 86400;
     private const RECENT = 5;
+    private const DEVICE_NAME_LENGTH = 80;
 
     /** Where someone lands after "My account": what is going on, and the ways onward. */
     public function dashboard(array $params): void
@@ -101,7 +103,25 @@ final class AccountController extends Controller
             'min_length' => PasswordPolicy::MIN_LENGTH,
             'is_last_admin' => $this->app->accounts->isLastAdmin($this->accountId()),
             'provider_status' => $this->app->providers->findByAccount($this->accountId())['status'] ?? null,
+            'devices' => array_map(fn (array $device) => [
+                'created_at' => $device['created_at'],
+                'last_used_at' => $device['last_used_at'],
+                'browser' => $device['user_agent'] !== null ? mb_strimwidth($device['user_agent'], 0, self::DEVICE_NAME_LENGTH, '…') : null,
+                'current' => $device['current'],
+            ], $this->app->loginTokens->devices($this->accountId())),
+            'remember_days' => intdiv(LoginTokens::TTL_SECONDS, 86400),
         ]);
+    }
+
+    /**
+     * "Log out everywhere": no device is remembered any more, this one
+     * included. Asks for no password - it only takes access away.
+     */
+    public function revokeSessions(array $params): void
+    {
+        $this->app->loginTokens->revokeAll($this->accountId());
+        $this->app->loginTokens->forget();
+        $this->back('success', 'core.account.devices.revoked');
     }
 
     public function updateProfile(array $params): void
@@ -142,6 +162,7 @@ final class AccountController extends Controller
         $this->app->accounts->setPassword($this->accountId(), $password);
         $this->app->tokens->revoke($this->accountId(), Tokens::RESET_PASSWORD);
         $this->app->auth->refreshStamp();
+        $this->app->loginTokens->renew($this->accountId());
         // If it was not the owner, this mail is how they find out.
         $this->app->mailer->send($account['email'], 'emails/password_changed.txt.twig', [
             'reset_link' => $this->app->url('/forgot-password', absolute: true),
@@ -200,6 +221,8 @@ final class AccountController extends Controller
             return;
         }
 
+        // Whoever was remembered under the old address logs in again.
+        $this->app->loginTokens->renew($this->accountId());
         $this->back('success', 'core.account.email.saved');
     }
 
@@ -234,6 +257,12 @@ final class AccountController extends Controller
         if ($withdrawals !== []) {
             $export->add('withdrawals', $withdrawals);
         }
+        $devices = $this->app->loginTokens->devices($this->accountId());
+        if ($devices !== []) {
+            $export->add('remembered_devices', array_map(fn (array $device) => array_intersect_key($device, array_flip(
+                ['created_at', 'last_used_at', 'expires_at', 'user_agent']
+            )), $devices));
+        }
         $reports = $this->app->reports->byAccount($this->accountId());
         if ($reports !== []) {
             $export->add('reports', $reports);
@@ -267,6 +296,8 @@ final class AccountController extends Controller
         }
 
         AccountRemoval::run($this->app, $accountId, $email);
+        // The tokens went with the account; the cookie is still in the browser.
+        $this->app->loginTokens->forget();
         $this->app->auth->logout();
         $this->redirect('/');
     }

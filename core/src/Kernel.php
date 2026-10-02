@@ -26,9 +26,11 @@ use Modulento\Core\Controller\SettingsController;
 use Modulento\Core\Controller\UpdateController;
 use Modulento\Core\Controller\ReportController;
 use Modulento\Core\Controller\WithdrawalController;
+use Modulento\Core\Event\AccountLoggedIn;
 use Modulento\Core\Support\ClientIp;
 use Modulento\Core\Support\Database;
 use Modulento\Core\Support\RateLimiter;
+use Modulento\Core\Support\RememberCookie;
 use Modulento\Core\Support\Router;
 use Modulento\Core\Support\Session;
 
@@ -116,6 +118,17 @@ final class Kernel
             Session::start();
         }
 
+        // "Stay logged in": the session is gone (the browser was closed),
+        // the cookie is still there. Only here, where a session exists to
+        // log in to - never for the asset, cron and media requests above.
+        if (RememberCookie::present() && !$app->auth->check()) {
+            $accountId = $app->loginTokens->resume();
+            if ($accountId !== null) {
+                $app->auth->login($accountId);
+                $app->events->dispatch(new AccountLoggedIn($accountId));
+            }
+        }
+
         $route = $app->locales->split($path);
         $app->path = $route['path'];
         $app->translator->setLocale($route['locale']);
@@ -157,6 +170,7 @@ final class Kernel
         $router->post('/account/avatar/delete', [AccountController::class, 'deleteAvatar']);
         $router->post('/account/profile', [AccountController::class, 'updateProfile']);
         $router->post('/account/password', [AccountController::class, 'changePassword']);
+        $router->post('/account/sessions/revoke', [AccountController::class, 'revokeSessions']);
         $router->post('/account/email', [AccountController::class, 'changeEmail']);
         $router->get('/account/confirm-email/{token}', [AccountController::class, 'confirmEmail']);
         $router->get('/account/export', [AccountController::class, 'export']);
@@ -328,10 +342,11 @@ final class Kernel
         );
         // Deadlines of orders: what happens when nobody acts in time.
         $app->scheduler->register('core.order-deadlines', 5, fn (App $app) => $app->orders->runDeadlines($app));
-        // Expired mail links, and registrations whose address was never
-        // confirmed within a week.
+        // Expired mail links and "stay logged in" tokens, and registrations
+        // whose address was never confirmed within a week.
         $app->scheduler->register('core.account-cleanup', 60, function (App $app): void {
             $app->tokens->purgeExpired();
+            $app->loginTokens->purgeExpired();
             $app->accounts->deleteUnverifiedOlderThan(7 * 86400);
         });
     }

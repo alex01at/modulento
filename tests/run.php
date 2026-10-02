@@ -220,6 +220,8 @@ $pdo->exec("CREATE TABLE page_translation (page_id INTEGER REFERENCES page (id) 
     meta_description TEXT, body TEXT, PRIMARY KEY (page_id, locale), UNIQUE (locale, slug))");
 $pdo->exec("CREATE TABLE account_token (id INTEGER PRIMARY KEY, account_id INTEGER REFERENCES account (id) ON DELETE CASCADE,
     purpose TEXT, token_hash TEXT UNIQUE, payload TEXT, expires_at TEXT, created_at TEXT)");
+$pdo->exec("CREATE TABLE account_login_token (id INTEGER PRIMARY KEY, account_id INTEGER REFERENCES account (id) ON DELETE CASCADE,
+    selector TEXT UNIQUE, token_hash TEXT, previous_hash TEXT, rotated_at TEXT, auth_stamp TEXT, user_agent TEXT, created_at TEXT, last_used_at TEXT, expires_at TEXT)");
 $pdo->exec("CREATE TABLE rate_limit_attempt (id INTEGER PRIMARY KEY, action TEXT, identifier TEXT, created_at TEXT)");
 $pdo->exec("CREATE TABLE x_example_login (id INTEGER PRIMARY KEY, account_id INTEGER REFERENCES account (id) ON DELETE CASCADE, logged_in_at TEXT)");
 $pdo->exec("CREATE TABLE category (id INTEGER PRIMARY KEY, parent_id INTEGER REFERENCES category (id), position INTEGER, created_at TEXT)");
@@ -585,6 +587,222 @@ $pdo->exec("UPDATE account SET created_at = '2020-01-01 00:00:00' WHERE email = 
 check('cleanup: only old unconfirmed registrations are removed', $accounts->deleteUnverifiedOlderThan(7 * 86400) === 1
     && $row('fresh@example.test') !== false && $row('admin@example.test') !== false);
 $pdo->exec("DELETE FROM account WHERE email = 'fresh@example.test'");
+
+// --- Stay logged in --------------------------------------------------------
+$pdo->exec('DELETE FROM rate_limit_attempt');
+unset($_COOKIE['remember'], $_SERVER['HTTPS'], $_SERVER['HTTP_USER_AGENT']);
+$stayPw = 'a password to stay with';
+$accounts->create('stay@example.test', $stayPw, 'de', verified: true);
+$stayId = (int) $row('stay@example.test')['id'];
+$tokenCount = fn () => (int) $pdo->query('SELECT COUNT(*) FROM account_login_token')->fetchColumn();
+$tokenRow = fn (string $cookie) => $pdo->query('SELECT * FROM account_login_token WHERE selector = ' . $pdo->quote(explode(':', $cookie)[0]))->fetch();
+$secretOf = fn (string $cookie) => explode(':', $cookie)[1];
+$stays = fn () => (int) ($_SESSION['account_id'] ?? 0) === $stayId;
+// A browser without cookies logs in; what it holds afterwards.
+$device = function (bool $remember = true, string $email = 'stay@example.test', ?string $password = null) use ($post, &$stayPw): ?string {
+    unset($_COOKIE['remember']);
+    $post('/login', ['email' => $email, 'password' => $password ?? $stayPw] + ($remember ? ['remember' => '1'] : []), null);
+
+    return $_COOKIE['remember'] ?? null;
+};
+// A browser that was closed and opened again: the session is gone, the cookie is not.
+$reopen = function (?string $cookie, string $path = '/account') use ($get): array {
+    unset($_COOKIE['remember']);
+    if ($cookie !== null) {
+        $_COOKIE['remember'] = $cookie;
+    }
+
+    return $get($path, null);
+};
+$sent = fn () => Modulento\Core\Support\RememberCookie::lastSent();
+
+check('stay logged in: the login form offers the box', str_contains($get('/login', null)['body'], 'name="remember"'));
+check('stay logged in: without the box no token and no cookie', $device(false) === null && $stays() && $tokenCount() === 0);
+$reopen(null);
+check('stay logged in: without the cookie a closed browser is logged out', !$stays());
+
+$_SERVER['HTTP_USER_AGENT'] = "<script>alert(1)</script>\x07 " . str_repeat('x', 400);
+$first = $device();
+$stored = $tokenRow((string) $first);
+check('stay logged in: the box creates a token and a cookie "selector:secret"', $stays() && $tokenCount() === 1
+    && preg_match('/\A[a-f0-9]{24}:[a-f0-9]{64}\z/', (string) $first) === 1 && (int) $stored['account_id'] === $stayId);
+check('stay logged in: only the hash of the secret is stored', $stored['token_hash'] === hash('sha256', $secretOf($first))
+    && !str_contains(implode('|', array_map('strval', $stored)), $secretOf($first)));
+check('stay logged in: the cookie is HttpOnly, SameSite=Lax, for the whole site and lasts as long as the token', $sent()['value'] === $first
+    && $sent()['options']['httponly'] === true && $sent()['options']['samesite'] === 'Lax' && $sent()['options']['path'] === '/'
+    && $sent()['options']['secure'] === false && abs($sent()['options']['expires'] - time() - 30 * 86400) < 5
+    && abs(strtotime($stored['expires_at'] . ' UTC') - time() - 30 * 86400) < 5);
+check('stay logged in: the browser name is shortened and cleaned', mb_strlen($stored['user_agent']) === 255 && !str_contains($stored['user_agent'], "\x07"));
+$r = $get('/account/settings');
+check('stay logged in: the settings list the device, its name escaped and cut', str_contains($r['body'], '&lt;script&gt;alert(1)') && !str_contains($r['body'], '<script>alert(1)')
+    && !str_contains($r['body'], str_repeat('x', 100)) && str_contains($r['body'], 'dieses Gerät') && str_contains($r['body'], '/account/sessions/revoke'));
+check('stay logged in: a request with a session leaves the token alone', $_COOKIE['remember'] === $first && $tokenRow($first)['token_hash'] === $stored['token_hash']);
+unset($_SERVER['HTTP_USER_AGENT']);
+
+$reopen($first, '/assets/theme/nothing.css');
+check('stay logged in: an asset request neither logs in nor rotates', !$stays() && $tokenRow($first)['token_hash'] === $stored['token_hash'] && $_COOKIE['remember'] === $first);
+
+$r = $reopen($first);
+$second = $_COOKIE['remember'] ?? '';
+check('stay logged in: a closed browser is logged in again from the cookie', $stays() && $r['status'] === 200 && $r['body'] !== ''
+    && $_SESSION['auth_stamp'] === Modulento\Core\Support\Auth::stamp($row('stay@example.test')['password_hash']));
+check('stay logged in: the secret is replaced, the token stays the same one', $second !== $first && explode(':', $second)[0] === explode(':', $first)[0]
+    && $tokenCount() === 1 && $tokenRow($second)['token_hash'] === hash('sha256', $secretOf($second)) && $sent()['value'] === $second);
+
+$reopen($first);
+check('stay logged in: the secret from before still works for a moment, for a second tab', $stays() && $tokenCount() === 1);
+check('stay logged in: ... without rotating again', $tokenRow($second)['token_hash'] === hash('sha256', $secretOf($second)) && $_COOKIE['remember'] === $first);
+$reopen($second);
+$third = $_COOKIE['remember'];
+check('stay logged in: the current secret keeps working after that', $stays() && $third !== $second);
+
+$other = $device();
+check('stay logged in: a second device has a token of its own', $tokenCount() === 2 && explode(':', $other)[0] !== explode(':', $third)[0]);
+$pdo->exec("UPDATE account_login_token SET rotated_at = '2020-01-01 00:00:00' WHERE rotated_at IS NOT NULL");
+$reopen($second);
+check('stay logged in: a replaced secret after that moment logs nobody in and ends every token of the account', !$stays() && $tokenCount() === 0
+    && !isset($_COOKIE['remember']) && $sent()['value'] === '' && $sent()['options']['expires'] < time());
+$reopen($third);
+check('stay logged in: ... the device holding the current secret included', !$stays());
+
+$one = $device();
+$device();
+$accounts->create('bystander@example.test', $stayPw, 'de', verified: true);
+$bystander = $device(true, 'bystander@example.test');
+$reopen(explode(':', $one)[0] . ':' . str_repeat('0', 64));
+check('stay logged in: a known selector with a wrong secret ends the tokens of that account only', !$stays() && $tokenCount() === 1 && $tokenRow($bystander) !== false);
+$pdo->exec("DELETE FROM account WHERE email = 'bystander@example.test'");
+check('stay logged in: tokens go with their account', $tokenCount() === 0);
+
+foreach ([['x' => 'y'], 'nonsense', '', ':', str_repeat('a', 5000), str_repeat('a', 24) . ':' . str_repeat('b', 64), "abc:def\n", ['a' => ['b' => ['c']]]] as $i => $junk) {
+    $keep = $device();
+    $_COOKIE['remember'] = $junk;
+    $r = $get('/open', null);
+    check("stay logged in: a cookie with nonsense ({$i}) is no error, logs nobody in and is dropped", $r['called'] && $r['status'] === 200 && !$stays()
+        && !isset($_COOKIE['remember']) && $tokenRow($keep) !== false);
+    $pdo->exec('DELETE FROM account_login_token');
+}
+
+$cookie = $device();
+$pdo->exec("UPDATE account_login_token SET expires_at = '2020-01-01 00:00:00'");
+check('stay logged in: an expired token is not listed', !str_contains($get('/account/settings', $stayId)['body'], '/account/sessions/revoke'));
+$reopen($cookie);
+check('stay logged in: an expired token logs nobody in and is removed with its cookie', !$stays() && $tokenCount() === 0 && !isset($_COOKIE['remember']));
+$device();
+$valid = $device();
+$pdo->exec("UPDATE account_login_token SET expires_at = '2020-01-01 00:00:00' WHERE selector <> " . $pdo->quote(explode(':', $valid)[0]));
+(new Modulento\Core\Account\LoginTokens($pdo))->purgeExpired();
+check('stay logged in: the cleanup removes expired tokens only', $tokenCount() === 1 && $tokenRow($valid) !== false);
+
+$pdo->exec("UPDATE account SET status = 'blocked' WHERE id = {$stayId}");
+$reopen($valid);
+check('stay logged in: a blocked account is not logged in again', !$stays() && $tokenCount() === 0 && !isset($_COOKIE['remember']));
+$pdo->exec("UPDATE account SET status = 'active', email_verified_at = NULL WHERE id = {$stayId}");
+$pdo->exec("INSERT INTO account_login_token (account_id, selector, token_hash, auth_stamp, created_at, last_used_at, expires_at) VALUES ({$stayId}, '" . str_repeat('c', 24) . "', '"
+    . hash('sha256', str_repeat('d', 64)) . "', '" . Modulento\Core\Support\Auth::stamp($row('stay@example.test')['password_hash']) . "', '2026-01-01 00:00:00', '2026-01-01 00:00:00', '2099-01-01 00:00:00')");
+$reopen(str_repeat('c', 24) . ':' . str_repeat('d', 64));
+check('stay logged in: nor an account whose address is not confirmed', !$stays() && $tokenCount() === 0);
+$pdo->exec("UPDATE account SET email_verified_at = '2026-01-01 00:00:00' WHERE id = {$stayId}");
+$device();
+unset($_COOKIE['remember']);
+$post('/admin/accounts/' . $stayId . '/block', ['note' => 'Testsperre'], 3);
+check('stay logged in: blocking an account removes its tokens', $row('stay@example.test')['status'] === 'blocked' && $tokenCount() === 0);
+$pdo->exec("UPDATE account SET status = 'active', status_note = NULL WHERE id = {$stayId}");
+
+$away = $device();
+$here = $device();
+$post('/account/password', ['current_password' => 'wrong', 'password' => 'a password to stay with 2', 'password_repeat' => 'a password to stay with 2']);
+check('stay logged in: a remembered device still needs the current password to change it', password_verify($stayPw, $row('stay@example.test')['password_hash']) && $tokenCount() === 2);
+$post('/account/password', ['current_password' => $stayPw, 'password' => 'a password to stay with 2', 'password_repeat' => 'a password to stay with 2']);
+$stayPw = 'a password to stay with 2';
+$renewed = $_COOKIE['remember'] ?? '';
+check('stay logged in: a password change ends every token, the device that made it gets a new one', $tokenCount() === 1 && $tokenRow($here) === false
+    && $tokenRow($away) === false && $renewed !== $here && $tokenRow($renewed) !== false);
+$reopen($away);
+check('stay logged in: ... so another device is logged out', !$stays() && !isset($_COOKIE['remember']) && $tokenCount() === 1);
+$reopen($renewed);
+check('stay logged in: ... and this one stays', $stays());
+$pdo->exec('UPDATE account SET password_hash = ' . $pdo->quote(password_hash('changed behind its back', PASSWORD_BCRYPT, ['cost' => 4])) . " WHERE id = {$stayId}");
+$reopen($_COOKIE['remember']);
+check('stay logged in: a token from before a password change is worth nothing by itself', !$stays() && $tokenCount() === 0);
+$pdo->exec('UPDATE account SET password_hash = ' . $pdo->quote(password_hash($stayPw, PASSWORD_BCRYPT, ['cost' => 4])) . " WHERE id = {$stayId}");
+
+$cookie = $device();
+$post('/forgot-password', ['email' => 'stay@example.test'], null);
+$post(lastMail($mailLog, 'stay@example.test')['link'], ['password' => 'a password to stay with 3', 'password_repeat' => 'a password to stay with 3'], null);
+$stayPw = 'a password to stay with 3';
+check('stay logged in: a password reset ends every token', password_verify($stayPw, $row('stay@example.test')['password_hash']) && $tokenCount() === 0);
+$reopen($cookie);
+check('stay logged in: ... and the cookie no longer logs in', !$stays());
+$pdo->exec('DELETE FROM rate_limit_attempt');
+
+$away = $device();
+$here = $device();
+$post('/account/email', ['email' => 'stayed@example.test', 'current_password' => $stayPw]);
+$get(lastMail($mailLog, 'stayed@example.test')['link']);
+check('stay logged in: a changed address ends every token, the device that confirmed it gets a new one', $row('stayed@example.test') !== false
+    && $tokenCount() === 1 && $tokenRow($away) === false && $tokenRow($here) === false && $tokenRow($_COOKIE['remember']) !== false);
+$pdo->exec("UPDATE account SET email = 'stay@example.test' WHERE id = {$stayId}");
+$pdo->exec('DELETE FROM account_login_token');
+$pdo->exec('DELETE FROM rate_limit_attempt');
+
+$away = $device();
+$here = $device();
+$post('/logout', []);
+check('stay logged in: logging out ends this device\'s token and cookie only', !$stays() && !isset($_COOKIE['remember']) && $sent()['value'] === ''
+    && $tokenCount() === 1 && $tokenRow($here) === false && $tokenRow($away) !== false);
+$reopen($here);
+check('stay logged in: ... which stays logged out', !$stays() && $tokenRow($away) !== false);
+$reopen($away);
+$away = $_COOKIE['remember'];
+check('stay logged in: ... while the other device is still remembered', $stays());
+
+$here = $device();
+$export = json_decode($get('/account/export')['body'], true);
+check('export: the remembered devices, without selector and hash', count($export['remembered_devices'] ?? []) === 2
+    && array_keys($export['remembered_devices'][0]) === ['created_at', 'last_used_at', 'expires_at', 'user_agent']);
+$post('/account/sessions/revoke', ['_csrf' => 'wrong']);
+check('log out everywhere: not without the CSRF token', $tokenCount() === 2);
+unset($_COOKIE['remember']);
+$post('/account/sessions/revoke', [], null);
+check('log out everywhere: not for a visitor', $tokenCount() === 2);
+$_COOKIE['remember'] = $here;
+$r = $post('/account/sessions/revoke', [], $stayId);
+check('log out everywhere: every token of the account and this device\'s cookie are gone', $tokenCount() === 0 && !isset($_COOKIE['remember'])
+    && str_contains($_SESSION['_flash']['success'] ?? '', 'kein Gerät'));
+$reopen($away);
+check('log out everywhere: no device is logged in again', !$stays());
+
+$_SERVER['HTTPS'] = 'on';
+$here = $device();
+check('stay logged in: over HTTPS the cookie is Secure', $sent()['value'] === $here && $sent()['options']['secure'] === true);
+unset($_SERVER['HTTPS']);
+check('stay logged in: logging in without the box forgets the device', $device(false) === null && $tokenCount() === 1);
+$_COOKIE['remember'] = $here;
+$post('/login', ['email' => 'stay@example.test', 'password' => $stayPw], null);
+check('stay logged in: ... also when its cookie is still there', $stays() && $tokenCount() === 0 && !isset($_COOKIE['remember']));
+
+$device(true, 'stay@example.test', 'not the password');
+check('stay logged in: a wrong password creates no token', !$stays() && $tokenCount() === 0 && !isset($_COOKIE['remember']));
+for ($i = 0; $i < 5; $i++) {
+    $device(true, 'stay@example.test', 'guess number ' . $i);
+}
+check('stay logged in: the login limits hold with the box ticked', $device() === null && !$stays() && $tokenCount() === 0);
+$pdo->exec('DELETE FROM rate_limit_attempt');
+
+$adminCookie = $device(true, 'admin@example.test', 'correct horse battery');
+$r = $reopen($adminCookie, '/admin');
+check('stay logged in: an administrator is remembered like everyone else', ($_SESSION['account_id'] ?? null) == 3 && $r['status'] === 200 && $r['body'] !== '');
+$post('/logout', []);
+check('stay logged in: ... and logs out like everyone else', $tokenCount() === 0);
+
+$device();
+$post('/account/delete', ['current_password' => 'wrong']);
+check('stay logged in: a remembered device still needs the password to delete the account', $row('stay@example.test') !== false);
+$post('/account/delete', ['current_password' => $stayPw]);
+check('stay logged in: deleting the account removes its tokens and the cookie', $row('stay@example.test') === false && $tokenCount() === 0 && !isset($_COOKIE['remember']));
+$pdo->exec('DELETE FROM rate_limit_attempt');
+unset($_COOKIE['remember']);
 
 // --- Languages in the address ---------------------------------------------
 $locales = fn () => new Modulento\Core\Support\Locales(new Modulento\Core\Support\Settings($pdo), $root . '/core/lang');

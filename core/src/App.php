@@ -6,6 +6,7 @@ namespace Modulento\Core;
 
 use Modulento\Core\Account\Accounts;
 use Modulento\Core\Account\Avatars;
+use Modulento\Core\Account\LoginTokens;
 use Modulento\Core\Account\Roles;
 use Modulento\Core\Account\Tokens;
 use Modulento\Core\Catalogue\Categories;
@@ -56,6 +57,7 @@ final class App
     public readonly ThemeManager $themes;
     public readonly Accounts $accounts;
     public readonly Tokens $tokens;
+    public readonly LoginTokens $loginTokens;
     public readonly Mailer $mailer;
     public readonly Locales $locales;
     public readonly Pages $pages;
@@ -128,6 +130,7 @@ final class App
         $this->avatars = new Avatars($db, ($config['app']['uploads'] ?? $config['app']['root'] . '/var/uploads') . '/avatars');
         $this->accounts = new Accounts($db);
         $this->tokens = new Tokens($db);
+        $this->loginTokens = new LoginTokens($db);
         $this->mailer = new Mailer($this);
         $this->router = new Router($this);
     }
