@@ -30,7 +30,7 @@ return [
     'auction.detail.current' => 'Current bid',
     'auction.detail.bid' => '{count} bid',
     'auction.detail.bids' => '{count} bids',
-    'auction.detail.left' => '{days} d {hours} h {minutes} min left',
+    'auction.detail.left' => '{days} d {hours} h {minutes} min {seconds} s left',
     'auction.detail.ends' => 'Ends on {date} UTC',
     'auction.detail.ended' => 'Ended on {date} UTC',
     'auction.detail.pending' => 'The auction has not started yet.',

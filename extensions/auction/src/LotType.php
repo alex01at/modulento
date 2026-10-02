@@ -131,7 +131,9 @@ final class LotType implements OfferType
             'bid_count' => $lot['bid_count'],
             'duration_days' => $lot['duration_days'],
             'ends_at' => $lot['ends_at'],
-            'left' => ['days' => intdiv($left, 86400), 'hours' => intdiv($left % 86400, 3600), 'minutes' => intdiv($left % 3600, 60)],
+            'left' => ['days' => intdiv($left, 86400), 'hours' => intdiv($left % 86400, 3600), 'minutes' => intdiv($left % 3600, 60), 'seconds' => $left % 60],
+            'ends_at_iso' => $lot['ends_at'] !== null ? str_replace(' ', 'T', $lot['ends_at']) . 'Z' : null,
+            'now_iso' => gmdate('Y-m-d\\TH:i:s\\Z'),
             'bids' => array_map(fn (array $bid) => [
                 'bidder' => $bid['bidder'], 'amount' => $bid['amount'], 'created_at' => $bid['created_at'], 'own' => $bid['account_id'] === $viewer,
             ], $bids),

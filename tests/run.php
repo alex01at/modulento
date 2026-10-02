@@ -1234,7 +1234,8 @@ check('auction: publication starts the clock', $lot()['status'] === 'open' && $l
 
 $r = $get('/offers/alte-kamera', 2);
 check('auction: the offer page shows price, time left and the bid form with a binding button', $r['status'] === 200 && str_contains($r['body'], 'Startpreis') && str_contains($r['body'], '10,00 €')
-    && str_contains($r['body'], 'action="/auction/' . $lotId . '/bid"') && str_contains($r['body'], 'Verbindlich bieten') && str_contains($r['body'], 'name="accept_terms"') && preg_match('/Noch [23] T\. \d+ Std\./', $r['body']) === 1);
+    && str_contains($r['body'], 'action="/auction/' . $lotId . '/bid"') && str_contains($r['body'], 'Verbindlich bieten') && str_contains($r['body'], 'name="accept_terms"') && preg_match('/>Noch [23] T\. \d+ Std\. \d+ Min\. \d+ Sek\.</', $r['body']) === 1
+    && preg_match('#data-auction-ends="\d{4}-\d\d-\d\dT[\d:]{8}Z"#', $r['body']) === 1 && str_contains($r['body'], '/assets/ext/auction/countdown.js'));
 check('auction: a visitor is sent to the login, the provider cannot bid', str_contains($get('/offers/alte-kamera', null)['body'], 'Melde dich an, um mitzubieten')
     && !str_contains($get('/offers/alte-kamera', 1)['body'], '/bid"') && $bid('10', null)['status'] === 403);
 $ordersBefore = $lastOrder();
