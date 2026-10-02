@@ -1135,6 +1135,180 @@ $pdo->exec('DELETE FROM category');
 $pdo->exec("UPDATE extension SET enabled = 0 WHERE id = 'freelancer'");
 $pdo->exec("DELETE FROM setting WHERE name IN ('core.currency', 'core.offer_approval')");
 
+// --- Auctions: an extension whose orders come from bids, not the order form ------
+$pdo->exec("CREATE TABLE x_auction_lot (offer_id INTEGER PRIMARY KEY REFERENCES offer (id) ON DELETE CASCADE, start_price INTEGER, step INTEGER, duration_days INTEGER,
+    status TEXT DEFAULT 'pending', next_min INTEGER, current_price INTEGER, bid_count INTEGER NOT NULL DEFAULT 0, ends_at TEXT, closed_at TEXT, order_id INTEGER REFERENCES orders (id) ON DELETE SET NULL)");
+$pdo->exec("CREATE TABLE x_auction_bid (id INTEGER PRIMARY KEY, offer_id INTEGER REFERENCES x_auction_lot (offer_id) ON DELETE CASCADE, account_id INTEGER REFERENCES account (id) ON DELETE CASCADE,
+    amount INTEGER, terms_accepted INTEGER, created_at TEXT)");
+$pdo->exec("INSERT INTO extension VALUES ('auction', '0.1.0', 1)");
+$pdo->exec("UPDATE provider SET status = 'approved' WHERE account_id IN (1, 2)");
+$pdo->exec("DELETE FROM rate_limit_attempt");
+$insertAccount->execute([7, 'bidder@example.test', $testHash, 'active']);
+$post('/admin/pages/new', ['status' => 'published', 'role' => 'terms', 'text' => ['de' => $text('AGB')]], 3);
+$lot = fn () => $pdo->query('SELECT * FROM x_auction_lot ORDER BY offer_id DESC')->fetch();
+$lotForm = ['type' => 'auction.lot', 'text' => ['de' => ['title' => 'Alte Kamera', 'summary' => 'Analog', 'description' => 'Funktioniert'], 'en' => ['title' => '', 'summary' => '', 'description' => '']],
+    'start_price' => '10', 'step' => '', 'duration_days' => '3'];
+// What bin/cron.php does every minute.
+$closeAuctions = function () use ($pdo, $config): int {
+    $_SESSION = [];
+    $app = new Modulento\Core\App($config, $pdo);
+    $app->translator->load($config['app']['root'] . '/core/lang', 'core');
+    Modulento\Core\Kernel::registerCore($app);
+    $app->extensions->loadEnabled($app);
+    Modulento\Core\Kernel::registerLast($app);
+    Modulento\Core\Kernel::loadThemeTexts($app);
+    Modulento\Core\Kernel::prepareRequest($app, '/', startSession: false);
+
+    return (new Modulento\Auction\Auctions($pdo))->closeDue($app);
+};
+
+$r = $get('/account/offers/new?type=auction.lot', 1);
+check('auction: the offer form shows the lot\'s fields', $r['status'] === 200 && str_contains($r['body'], 'name="start_price"') && str_contains($r['body'], 'name="duration_days"'));
+$r = $post('/account/offers/new', ['start_price' => '0,50', 'duration_days' => '4'] + $lotForm, 1);
+check('auction: starting price and duration are checked', $lot() === false && str_contains($r['body'], 'Startpreis zwischen') && str_contains($r['body'], 'Laufzeit'));
+$post('/account/offers/new', $lotForm, 1);
+$lotId = (int) ($lot()['offer_id'] ?? 0);
+check('auction: a new lot waits, with the starting price as the offer\'s price', $lotId > 0 && $lot()['status'] === 'pending' && $lot()['ends_at'] === null && (int) $lot()['next_min'] === 1000
+    && (int) $lot()['step'] === 100 && (int) $offerRow("id = {$lotId}")['price_from'] === 1000);
+$bid = function (string $amount, ?int $as, array $more = ['accept_terms' => '1']) use (&$lotId, $post): array {
+    return $post('/auction/' . $lotId . '/bid', ['amount' => $amount] + $more, $as);
+};
+check('auction: no bids before the offer is public', $bid('10', 2)['status'] === 404 && (int) $lot()['bid_count'] === 0);
+
+$post('/account/offers/' . $lotId . '/submit', [], 1);
+check('auction: the clock does not run while the offer waits for review', $offerRow("id = {$lotId}")['status'] === 'pending' && $lot()['status'] === 'pending');
+$post('/admin/offers/' . $lotId . '/decide', ['decision' => 'approve'], 3);
+check('auction: publication starts the clock', $lot()['status'] === 'open' && $lot()['ends_at'] > gmdate('Y-m-d H:i:s', time() + 3 * 86400 - 60) && $lot()['ends_at'] <= gmdate('Y-m-d H:i:s', time() + 3 * 86400));
+
+$r = $get('/offers/alte-kamera', 2);
+check('auction: the offer page shows price, time left and the bid form with a binding button', $r['status'] === 200 && str_contains($r['body'], 'Startpreis') && str_contains($r['body'], '10,00 €')
+    && str_contains($r['body'], 'action="/auction/' . $lotId . '/bid"') && str_contains($r['body'], 'Verbindlich bieten') && str_contains($r['body'], 'name="accept_terms"') && preg_match('/Noch [23] T\. \d+ Std\./', $r['body']) === 1);
+check('auction: a visitor is sent to the login, the provider cannot bid', str_contains($get('/offers/alte-kamera', null)['body'], 'Melde dich an, um mitzubieten')
+    && !str_contains($get('/offers/alte-kamera', 1)['body'], '/bid"') && $bid('10', null)['status'] === 403);
+$ordersBefore = $lastOrder();
+check('auction: a lot cannot be ordered through the order form', $get('/offers/alte-kamera/order', 2)['status'] === 404 && $post('/offers/alte-kamera/order', [], 2)['status'] === 404 && $lastOrder() === $ordersBefore);
+
+$bid('10', 1);
+check('auction: nobody bids on the own lot', (int) $lot()['bid_count'] === 0);
+$bid('9,99', 2);
+check('auction: a bid below the starting price is refused, with the minimum named', (int) $lot()['bid_count'] === 0 && str_contains($_SESSION['_flash']['error'] ?? '', '10,00 €'));
+$bid('zehn', 2);
+$bid(' ', 2);
+check('auction: a bid has to be an amount', (int) $lot()['bid_count'] === 0);
+$bid('10', 2, []);
+check('auction: published terms have to be accepted with the bid', (int) $lot()['bid_count'] === 0);
+$bid('1000000', 2);
+check('auction: no bid beyond the platform\'s limit', (int) $lot()['bid_count'] === 0);
+
+$bid('10', 2);
+check('auction: the first bid at the starting price counts', (int) $lot()['bid_count'] === 1 && (int) $lot()['current_price'] === 1000 && (int) $lot()['next_min'] === 1100
+    && (int) $offerRow("id = {$lotId}")['price_from'] === 1000 && str_contains($_SESSION['_flash']['success'] ?? '', '10,00 €'));
+$bid('15', 2);
+check('auction: the highest bidder cannot outbid themselves', (int) $lot()['bid_count'] === 1);
+check('auction: the highest bidder is told so instead of seeing the form', str_contains($get('/offers/alte-kamera', 2)['body'], 'Du bist Höchstbietender') && !str_contains($get('/offers/alte-kamera', 2)['body'], '/bid"'));
+$bid('10,50', 7);
+check('auction: the next bid has to exceed the highest by the step', (int) $lot()['bid_count'] === 1 && str_contains($_SESSION['_flash']['error'] ?? '', '11,00 €'));
+$bid('12,50', 7, ['accept_terms' => '1', 'next_min' => '1', 'account_id' => '2']);
+check('auction: a higher bid leads, the catalogue price follows', (int) $lot()['bid_count'] === 2 && (int) $lot()['current_price'] === 1250 && (int) $lot()['next_min'] === 1350
+    && (int) $offerRow("id = {$lotId}")['price_from'] === 1250 && $pdo->query('SELECT account_id FROM x_auction_bid ORDER BY id DESC')->fetchColumn() == 7);
+$mail = lastMail($mailLog, 'editor@example.test');
+check('auction: the outbid bidder gets a mail with the way back', $mail['subject'] === 'Du wurdest überboten: Alte Kamera' && $mail['link'] === '/offers/alte-kamera');
+$r = $get('/offers/alte-kamera', 2);
+check('auction: the history shows amounts but no names', str_contains($r['body'], 'Aktuelles Gebot') && str_contains($r['body'], '12,50 €') && str_contains($r['body'], 'Bieter 2') && str_contains($r['body'], '2 Gebote')
+    && !str_contains($r['body'], 'bidder@example.test') && str_contains($r['body'], 'value="13,50"'));
+
+// Two requests that both saw 13,50 as the minimum: only one UPDATE finds it still true.
+$auctions = new Modulento\Auction\Auctions($pdo);
+$stale = $auctions->lot($lotId);
+check('auction: a bid is decided by the row as it is, not as it was read', $auctions->bid($lotId, 2, 1400, true) === null && $auctions->bid($lotId, 3, 1400, true) === 'auction.error.too_low'
+    && (int) $lot()['bid_count'] === 3 && $stale['next_min'] === 1350);
+$pdo->exec("UPDATE offer SET price_from = 1400 WHERE id = {$lotId}");
+
+$post('/account/offers/' . $lotId, ['start_price' => '1', 'step' => '50', 'duration_days' => '14'] + $lotForm, 1);
+check('auction: a running lot keeps its terms when the offer is edited', (int) $lot()['start_price'] === 1000 && (int) $lot()['step'] === 100 && (int) $lot()['duration_days'] === 3 && $lot()['status'] === 'open'
+    && (int) $lot()['bid_count'] === 3 && (int) $offerRow("id = {$lotId}")['price_from'] === 1400);
+check('auction: the form says why', str_contains($get('/account/offers/' . $lotId, 1)['body'], 'lassen sich jetzt nicht mehr ändern') && !str_contains($get('/account/offers/' . $lotId, 1)['body'], 'name="start_price"'));
+
+// A bid in the last minutes keeps the lot open for an answer.
+$pdo->exec("UPDATE x_auction_lot SET ends_at = '" . gmdate('Y-m-d H:i:s', time() + 30) . "'");
+$bid('16', 7);
+check('auction: a late bid extends the end', (int) $lot()['current_price'] === 1600 && $lot()['ends_at'] > gmdate('Y-m-d H:i:s', time() + 100));
+check('auction: nothing closes before its time', $closeAuctions() === 0 && $lot()['status'] === 'open');
+
+$pdo->exec("UPDATE x_auction_lot SET ends_at = '" . gmdate('Y-m-d H:i:s', time() - 5) . "'");
+$bid('20', 2);
+check('auction: no bid after the end, even before the lot is closed', (int) $lot()['bid_count'] === 4 && str_contains($get('/offers/alte-kamera', 2)['body'], 'wird ausgewertet'));
+$ordersBefore = $lastOrder();
+check('auction: the due lot is closed once', $closeAuctions() === 1 && $closeAuctions() === 0 && $lot()['status'] === 'sold' && $lot()['closed_at'] !== null);
+$saleId = $lastOrder();
+$sale = $orderRow($saleId);
+check('auction: the highest bid becomes an order at its amount', $saleId > $ordersBefore && (int) $lot()['order_id'] === $saleId && (int) $sale['buyer_id'] === 7 && (int) $sale['total'] === 1600
+    && $sale['flow'] === 'auction.sale' && $sale['state'] === 'sold' && $sale['offer_title'] === 'Alte Kamera' && $sale['terms_accepted_at'] !== null && $sale['payment_method'] === 'core.offline'
+    && $pdo->query("SELECT label || ':' || quantity || ':' || unit_price FROM order_item WHERE order_id = {$saleId}")->fetchColumn() === 'Alte Kamera:1:1600');
+check('auction: buyer and provider are both told about the sale', lastMail($mailLog, 'bidder@example.test')['subject'] === 'Bestellung ' . sprintf('%06d', $saleId) . ': Zuschlag erteilt'
+    && lastMail($mailLog, 'plain@example.test')['subject'] === 'Bestellung ' . sprintf('%06d', $saleId) . ': Zuschlag erteilt');
+check('auction: the ended lot leaves the catalogue', $offerRow("id = {$lotId}")['status'] === 'paused' && $get('/offers/alte-kamera', null)['status'] === 404);
+$post('/account/offers/' . $lotId . '/resume', [], 1);
+$post('/account/offers/' . $lotId, ['start_price' => '1'] + $lotForm, 1);
+check('auction: a sold lot does not run again', $lot()['status'] === 'sold' && (int) $lot()['start_price'] === 1000 && str_contains($get('/offers/alte-kamera', 2)['body'], 'Beendet – verkauft')
+    && !str_contains($get('/offers/alte-kamera', 2)['body'], '/bid"') && $bid('30', 2)['status'] !== 404 && (int) $lot()['bid_count'] === 4);
+
+$r = $get('/orders/' . $saleId, 7);
+check('auction: the order page tells the sale\'s story', $r['status'] === 200 && str_contains($r['body'], 'Zuschlag nach 4 Geboten') && str_contains($r['body'], 'Zuschlag erteilt') && str_contains($r['body'], '16,00 €')
+    && !str_contains($r['body'], 'Als übergeben oder versandt markieren') && $get('/orders/' . $saleId, 2)['status'] === 404);
+$act($saleId, 'confirm', 7);
+$act($saleId, 'hand_over', 7);
+check('auction: the buyer cannot confirm or hand over ahead of the provider', $orderRow($saleId)['state'] === 'sold');
+$act($saleId, 'hand_over', 1, 'Paket ist unterwegs');
+check('auction: handover starts the time to confirm', $orderRow($saleId)['state'] === 'handed_over' && $orderRow($saleId)['due_transition'] === 'auto_complete' && $orderRow($saleId)['due_at'] > gmdate('Y-m-d H:i:s', time() + 13 * 86400));
+$act($saleId, 'request_cancel', 7, 'Nicht angekommen');
+$act($saleId, 'agree_cancel', 7);
+check('auction: a cancellation needs the other side', $orderRow($saleId)['state'] === 'cancel_requested');
+$act($saleId, 'refuse_cancel', 1, 'Sendungsnummer folgt');
+$act($saleId, 'confirm', 7);
+check('auction: back where it was, then completed and open for a review', $orderRow($saleId)['state'] === 'completed' && $orderRow($saleId)['closed_at'] !== null && str_contains($get('/orders/' . $saleId, 7)['body'], 'name="rating"'));
+
+// A second lot: no bids, set up again, then a leading bidder who disappears.
+$post('/account/offers/new', ['text' => ['de' => ['title' => 'Stativ', 'summary' => '', 'description' => '']], 'start_price' => '5', 'step' => '0,50', 'duration_days' => '1'] + $lotForm, 1);
+$lotId = (int) $lot()['offer_id'];
+$post('/account/offers/' . $lotId . '/submit', [], 1);
+$post('/admin/offers/' . $lotId . '/decide', ['decision' => 'approve'], 3);
+$pdo->exec("UPDATE x_auction_lot SET ends_at = '" . gmdate('Y-m-d H:i:s', time() - 5) . "' WHERE offer_id = {$lotId}");
+$ordersBefore = $lastOrder();
+check('auction: a lot without bids ends unsold, without an order', $closeAuctions() === 1 && $lot()['status'] === 'unsold' && $lastOrder() === $ordersBefore && $offerRow("id = {$lotId}")['status'] === 'paused'
+    && lastMail($mailLog, 'plain@example.test')['subject'] === 'Auktion ohne Gebot beendet: Stativ' && lastMail($mailLog, 'plain@example.test')['link'] === '/account/offers/' . $lotId);
+check('auction: the form offers to run it again', str_contains($get('/account/offers/' . $lotId, 1)['body'], 'ohne Verkauf zu Ende gegangen') && str_contains($get('/account/offers/' . $lotId, 1)['body'], 'name="start_price"'));
+$post('/account/offers/' . $lotId, ['text' => ['de' => ['title' => 'Stativ', 'summary' => '', 'description' => '']], 'start_price' => '4', 'step' => '0,50', 'duration_days' => '1'] + $lotForm, 1);
+check('auction: saving sets the lot up again, it waits while the offer is paused', $lot()['status'] === 'pending' && (int) $lot()['start_price'] === 400 && $lot()['ends_at'] === null && $lot()['closed_at'] === null);
+$post('/account/offers/' . $lotId . '/resume', [], 1);
+check('auction: publishing again starts a new run', $lot()['status'] === 'open' && $lot()['ends_at'] > gmdate('Y-m-d H:i:s'));
+
+$bid('4', 2);
+$bid('4,50', 7);
+check('auction: the step the provider chose applies', (int) $lot()['current_price'] === 450 && (int) $lot()['next_min'] === 500);
+$export = json_decode($get('/account/export', 7)['body'], true);
+check('auction: an account\'s bids are part of its data', array_column($export['auction']['bids'] ?? [], 'amount') === [1250, 1600, 450]);
+$pdo->exec("UPDATE account SET status = 'blocked' WHERE id = 7");
+check('auction: a blocked account does not lead', ($auctions->highBid($lotId)['account_id'] ?? null) === 2);
+$pdo->exec("UPDATE account SET status = 'active' WHERE id = 7");
+$post('/account/delete', ['current_password' => 'correct horse battery'], 2);
+check('auction: an account with a running bid can be deleted; the lot follows its remaining bids', $row('editor@example.test') === false && (int) $lot()['bid_count'] === 1 && (int) $lot()['current_price'] === 450);
+$pdo->exec("UPDATE provider SET status = 'suspended' WHERE account_id = 1");
+$pdo->exec("UPDATE x_auction_lot SET ends_at = '" . gmdate('Y-m-d H:i:s', time() - 5) . "' WHERE offer_id = {$lotId}");
+$ordersBefore = $lastOrder();
+check('auction: a lot of a suspended provider is cancelled, not sold', $closeAuctions() === 1 && $lot()['status'] === 'cancelled' && $lastOrder() === $ordersBefore);
+$pdo->exec("UPDATE provider SET status = 'approved' WHERE account_id = 1");
+$post('/account/offers/' . $lotId . '/delete', [], 1);
+check('auction: deleting the offer removes lot and bids', $pdo->query("SELECT COUNT(*) FROM x_auction_lot WHERE offer_id = {$lotId}")->fetchColumn() == 0 && $pdo->query("SELECT COUNT(*) FROM x_auction_bid WHERE offer_id = {$lotId}")->fetchColumn() == 0);
+
+$pdo->exec('DELETE FROM offer');
+$pdo->exec('DELETE FROM account WHERE id = 7');
+$insertAccount->execute([2, 'editor@example.test', $testHash, 'active']);
+$pdo->exec("INSERT INTO account_role VALUES (2, 1)");
+$pdo->exec("UPDATE extension SET enabled = 0 WHERE id = 'auction'");
+$pdo->exec('DELETE FROM page');
+$pdo->exec("DELETE FROM rate_limit_attempt");
+
 // --- Accounts and roles in the administration --------------------------------
 check('account administration needs its permission', $get('/admin/accounts', 2)['status'] === 403);
 $r = $get('/admin/accounts?q=plain', 3);
@@ -1224,33 +1398,35 @@ foreach ($sources as $file) {
     }
 }
 foreach (glob($root . '/{core/src,extensions/*/src}/{,*/}*.php', GLOB_BRACE) as $file) {
-    preg_match_all("/(?:trans\\(|flash\\('[a-z]+', \\\$this->trans\\(|'key' => |back\\([^,]+, '[a-z]+', |Key\\) => |return |\\\$errors\\[\\] = |UpdateException\\(|result\\([a-z]+, '[a-z_]+', )'((?:core|example|freelancer)\\.[a-z0-9_.]+[a-z0-9])'/", (string) file_get_contents($file), $found);
+    preg_match_all("/(?:trans\\(|flash\\('[a-z]+', \\\$this->trans\\(|'key' => |back\\([^,]+, '[a-z]+', |Key\\) => |return |\\\$errors\\[\\] = |UpdateException\\(|result\\([a-z]+, '[a-z_]+', )'((?:core|example|freelancer|auction)\\.[a-z0-9_.]+[a-z0-9])'/", (string) file_get_contents($file), $found);
     foreach ($found[1] as $key) {
         // Offer type ids look like keys but are not.
-        if (!isset($knownKeys[$key]) && !in_array($key, ['freelancer.service', 'core.offline'], true)) {
+        if (!isset($knownKeys[$key]) && !in_array($key, ['freelancer.service', 'auction.lot', 'auction.sale', 'core.offline'], true)) {
             $missingKeys[] = $key . ' in ' . basename($file);
         }
     }
 }
 // The wording of every transition, as button and as history entry.
 $flowApp = new Modulento\Core\App($config, $pdo);
-$pdo->exec("UPDATE extension SET enabled = 1 WHERE id = 'freelancer'");
+$pdo->exec("UPDATE extension SET enabled = 1 WHERE id IN ('freelancer', 'auction')");
 $flowApp->extensions->loadEnabled($flowApp);
-$pdo->exec("UPDATE extension SET enabled = 0 WHERE id = 'freelancer'");
-$serviceFlow = $flowApp->orders->flow('freelancer.service');
-foreach ($serviceFlow->transitions() as $transitionName => $definition) {
-    foreach (['label', 'done'] as $kind) {
-        if (!isset($knownKeys[$definition[$kind] ?? ''])) {
-            $missingKeys[] = "{$kind} of {$transitionName}";
+$pdo->exec("UPDATE extension SET enabled = 0 WHERE id IN ('freelancer', 'auction')");
+foreach (['freelancer.service', 'auction.sale'] as $flowId) {
+    $flow = $flowApp->orders->flow($flowId);
+    foreach ($flow->transitions() as $transitionName => $definition) {
+        foreach (['label', 'done'] as $kind) {
+            if (!isset($knownKeys[$definition[$kind] ?? ''])) {
+                $missingKeys[] = "{$kind} of {$flowId} {$transitionName}";
+            }
+        }
+        if (!isset($flow->states()[$definition['to']]) && $definition['to'] !== Modulento\Core\Order\Orders::PREVIOUS) {
+            $missingKeys[] = "target state of {$flowId} {$transitionName}";
         }
     }
-    if (!isset($serviceFlow->states()[$definition['to']]) && $definition['to'] !== Modulento\Core\Order\Orders::PREVIOUS) {
-        $missingKeys[] = "target state of {$transitionName}";
-    }
-}
-foreach ($serviceFlow->states() as $stateName => $definition) {
-    if (!isset($knownKeys[$definition['label']])) {
-        $missingKeys[] = "label of state {$stateName}";
+    foreach ($flow->states() as $stateName => $definition) {
+        if (!isset($knownKeys[$definition['label']]) || !isset($knownKeys[$definition['entered'] ?? $definition['label']])) {
+            $missingKeys[] = "label of state {$flowId} {$stateName}";
+        }
     }
 }
 check('every language key used exists: ' . implode(', ', array_unique($missingKeys)), $missingKeys === []);
@@ -1346,7 +1522,7 @@ $extensionFiles = fn (int $api) => ['extension.json' => json_encode(['id' => 'sh
 check('package: an extension for another interface version is refused', $packageError(fn () => $packages->installArchive($zip, $sha, 'acme/modulento-shop', '0.1.0')) === 'core.package.error.api' && !is_dir($packageRoot . '/extensions/shop'));
 [$zip, $sha] = $makePackage($extensionFiles(Modulento\Core\App::API_VERSION));
 check('package: an extension is unpacked into extensions/<id>', $packages->installArchive($zip, $sha, 'acme/modulento-shop', '0.1.0')['kind'] === 'extension' && is_file($packageRoot . '/extensions/shop/src/Extension.php'));
-foreach (['example', 'freelancer'] as $shipped) {
+foreach (['example', 'freelancer', 'auction'] as $shipped) {
     [$zip, $sha] = $makePackage(['extension.json' => json_encode(['id' => $shipped, 'version' => '9.0.0', 'api' => 1, 'namespace' => 'X']), 'src/Extension.php' => '<?php']);
     check("package: cannot replace the shipped extension {$shipped}", $packageError(fn () => $packages->installArchive($zip, $sha, 'acme/x', '9.0.0')) === 'core.package.error.shipped');
 }

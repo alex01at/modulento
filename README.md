@@ -13,7 +13,8 @@ confirmation, password reset, own data export and deletion), provider
 profiles and a catalogue of offers with approval, categories, pictures and
 search, roles and account administration, content pages and legal texts,
 several languages, themes, extensions, scheduled tasks and self-update. The
-extension `freelancer` adds services with packages as the first kind of offer.
+extension `freelancer` adds services with packages as the first kind of offer,
+`auction` adds lots that are sold to the highest bidder.
 Orders run as a state machine with history, messages, attachments and
 deadlines; finished orders can be reviewed by their buyer. Payment
 is settled between buyer and provider for now; a payment service plugs in as
@@ -108,8 +109,8 @@ Installing a package runs someone else's code on the server, so:
   every repository of the owner of `UPDATE_REPO` is allowed.
 - A package keeps the repository it first came from; another repository
   cannot take over its name.
-- What the core ships (`default`, `admin`, `example`, `freelancer`) cannot be
-  replaced by a package.
+- What the core ships (`default`, `admin`, `example`, `freelancer`,
+  `auction`) cannot be replaced by a package.
 - An extension written for another interface version is refused.
 - The previous folder is kept under `var/updates/backups/packages/`.
 
@@ -275,12 +276,16 @@ that implements `Modulento\Core\Catalogue\OfferType`:
 
 - `formTemplate()` / `formData()` - its fields inside the core's offer form
 - `validate()` / `save()` - checking and storing them in the extension's own
-  tables, which reference `offer (id)` with `ON DELETE CASCADE`; `save()`
-  returns the lowest price for listings
+  tables, which reference `offer (id)` with `ON DELETE CASCADE`; `validate()`
+  receives the offer's id (null for a new one), so a type can keep what must
+  not change any more; `save()` returns the lowest price for listings
 - `detailTemplate()` / `detailData()` - its part of the public offer page
 
 `extensions/freelancer` is the reference: packages with price, delivery time
 and revisions, extras, and requirements, each with a text per language.
+`extensions/auction` is the second one, built to prove that the interface
+carries something quite different: a lot with a starting price that runs for a
+number of days from the moment its offer is published.
 
 ### Order flows
 
@@ -301,6 +306,11 @@ An extension makes its offers orderable by registering an
 - `build()` - turns the buyer's choices into items and a total, **reading
   prices from the stored offer, never from the request**
 - form and detail templates with their data
+- `checkout()` - false if buyers do not order through the order form because
+  the extension creates the orders itself with `Orders::create()`; the form's
+  methods are then never called. The initial state may name with `'entered'`
+  how history and e-mails call the order's creation ("Sold" instead of
+  "Ordered")
 
 `Orders::apply()` is the only way an order changes state. It checks state,
 actor and guard, changes the state in one conditional update (two requests at
@@ -308,6 +318,14 @@ once cannot both succeed), writes the history, and `OrderNotifier` mails the
 other side in their language. `extensions/freelancer/src/ServiceFlow.php` is
 the reference: accept or decline, deliver, revisions, acceptance, mutual
 cancellation, expiry and automatic acceptance.
+
+`extensions/auction` shows the other way to an order. A bid is accepted by one
+conditional update on the lot (of two bids at the same moment exactly one
+wins), a bid in the last two minutes extends the end, and the task
+`auction.close` turns the highest bid of each lot whose time is up into an
+order - `SaleFlow` then covers handover, confirmation and cancellation. It
+listens to `OfferStatusChanged` to start the clock, and to `AccountExport` and
+`AccountDeleted` for the bids of an account.
 
 Attachments (`$app->orderFiles`) are stored in `var/uploads/orders/` under
 random names without extension, limited to a list of file types, and handed

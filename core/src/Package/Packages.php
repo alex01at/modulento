@@ -27,7 +27,7 @@ final class Packages
     public const KINDS = ['extension', 'theme'];
 
     /** Shipped with the core: a core update would overwrite a package of the same name again. */
-    private const SHIPPED = ['extension' => ['example', 'freelancer'], 'theme' => ['default', 'admin']];
+    private const SHIPPED = ['extension' => ['example', 'freelancer', 'auction'], 'theme' => ['default', 'admin']];
 
     /** @param string[] $allowedSources patterns like "owner/*" or "owner/name" */
     public function __construct(

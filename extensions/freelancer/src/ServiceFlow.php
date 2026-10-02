@@ -38,6 +38,11 @@ final class ServiceFlow implements OrderFlow
         return $this->type->id();
     }
 
+    public function checkout(): bool
+    {
+        return true;
+    }
+
     public function initialState(): string
     {
         return 'placed';

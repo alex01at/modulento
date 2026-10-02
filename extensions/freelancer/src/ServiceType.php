@@ -90,7 +90,7 @@ final class ServiceType implements OfferType
         ];
     }
 
-    public function validate(array $input, App $app): array
+    public function validate(array $input, ?int $offerId, App $app): array
     {
         $errors = [];
         $locales = $app->locales->enabled();

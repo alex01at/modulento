@@ -115,8 +115,9 @@ final class OfferController extends Controller
                 'provider_path' => '/providers/' . $offer['provider_slug'],
                 'category' => $category !== null ? $app->categories->view($category, $locale) : null,
                 'is_own' => $account !== null && $account['id'] === $offer['account_id'],
-                // Whether an extension registered a way to order this type.
-                'orderable' => $app->orders->flowForOfferType($offer['type']) !== null,
+                // Whether an extension registered a way to order this type
+                // through the order form.
+                'orderable' => $app->orders->flowForOfferType($offer['type'])?->checkout() ?? false,
                 'rating' => Reviews::summary($offer),
             ],
             'type_template' => $type->detailTemplate(),
@@ -238,7 +239,7 @@ final class OfferController extends Controller
         }
 
         $shared = $app->offers->validate($_POST, array_keys($app->categories->all()));
-        $specific = $type->validate($_POST, $app);
+        $specific = $type->validate($_POST, $offer['id'] ?? null, $app);
         $errors = array_merge($shared['errors'], $specific['errors']);
 
         if ($errors !== []) {

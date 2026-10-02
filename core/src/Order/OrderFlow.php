@@ -23,14 +23,24 @@ interface OrderFlow
     /** The offer type (OfferType::id()) whose offers are ordered through this flow. */
     public function offerType(): string;
 
+    /**
+     * Whether buyers order through the order form. False for a flow whose
+     * extension creates the orders itself with Orders::create() - an
+     * auction at the hammer; the form's methods are then never called.
+     */
+    public function checkout(): bool;
+
     /** The state a new order starts in. */
     public function initialState(): string;
 
     /**
-     * @return array<string, array{label: string, final?: bool, reviewable?: bool}>
+     * @return array<string, array{label: string, final?: bool, reviewable?: bool, entered?: string}>
      *         state => language key of its name, whether the order ends
      *         there, and whether the buyer may review an order that ended
-     *         there (it was carried out, not declined or cancelled)
+     *         there (it was carried out, not declined or cancelled). On the
+     *         initial state, "entered" is the language key of how the
+     *         history and e-mails call the order's creation, if "ordered"
+     *         does not fit
      */
     public function states(): array;
 
