@@ -37,6 +37,7 @@ final class Packages
     public const OFFICIAL = [
         ['kind' => 'extension', 'id' => 'freelancer', 'name' => 'modulento-ext-freelancer', 'key' => 'core.package.official.freelancer'],
         ['kind' => 'extension', 'id' => 'auction', 'name' => 'modulento-ext-auction', 'key' => 'core.package.official.auction'],
+        ['kind' => 'extension', 'id' => 'blog', 'name' => 'modulento-ext-blog', 'key' => 'core.package.official.blog'],
         ['kind' => 'theme', 'id' => 'indigo', 'name' => 'modulento-theme-indigo', 'key' => 'core.package.official.indigo'],
     ];
 

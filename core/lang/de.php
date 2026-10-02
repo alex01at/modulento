@@ -846,6 +846,7 @@ return [
     'core.package.official_hint' => 'Erweiterungen und Themes aus den eigenen Repositorys des Projekts, die hier noch nicht vorhanden sind.',
     'core.package.official.freelancer' => 'Dienstleistungen mit Paketen, Extras und Bestellablauf.',
     'core.package.official.auction' => 'Auktionen: Angebote, die an den Höchstbietenden gehen.',
+    'core.package.official.blog' => 'Blog: Beiträge mit Kategorien, Titelbild und Feed – macht aus einer Installation ohne Marktplatz ein Blog-Portal',
     'core.package.official.indigo' => 'Ein zweites Website-Theme.',
     'core.package.remove' => 'Entfernen',
     'core.package.install_title' => 'Paket installieren',
