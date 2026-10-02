@@ -24,7 +24,10 @@
                         <tr><th scope="row">{{ item.label }}</th><td>{{ money(item.quantity * item.unit_price, order.currency) }}</td></tr>
                     {% endfor %}
                     <tr><th scope="row">{{ trans('core.order.total') }}</th><td><strong>{{ money(order.total, order.currency) }}</strong></td></tr>
-                    <tr><th scope="row">{{ trans('core.order.payment') }}</th><td>{{ order.payment_method }} – {{ trans('core.order.payment_state.' ~ order.payment_state) }}</td></tr>
+                    <tr><th scope="row">{{ trans('core.order.payment') }}</th><td>{{ payment_label_key ? trans(payment_label_key) : order.payment_method }} – {{ trans('core.order.payment_state.' ~ order.payment_state) }}{% if order.paid_at %} <small>({{ trans('core.payment.paid_at', {date: order.paid_at}) }})</small>{% endif %}</td></tr>
+                    {% for attempt in payments %}
+                        <tr><th scope="row">{{ attempt.label_key ? trans(attempt.label_key) : attempt.method }}</th><td>{{ trans('core.payment.attempt.' ~ attempt.status) }} · <code>{{ attempt.reference }}</code> · {{ money(attempt.amount, attempt.currency) }} <small>({{ attempt.at }} UTC)</small></td></tr>
+                    {% endfor %}
                     <tr><th scope="row">{{ trans('core.admin.providers.created') }}</th><td>{{ order.created_at }} UTC</td></tr>
                 </table>
             </div>

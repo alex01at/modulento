@@ -44,6 +44,8 @@ final class AdminOrderController extends Controller
                 'state_label_key' => $this->stateLabel($order),
                 'event_labels' => array_map(fn (array $event) => $app->orders->eventLabel($order, $event['transition']), $order['events']),
             ],
+            'payment_label_key' => ($app->orders->paymentMethods()[$order['payment_method']] ?? null)?->labelKey(),
+            'payments' => OrderController::attempts($app, $order['id']),
             'files' => $app->orderFiles->ofOrder($order['id']),
             'actions' => $app->orders->available($order, 'admin', $app),
             'flow_template' => $flow?->orderDetailTemplate(),

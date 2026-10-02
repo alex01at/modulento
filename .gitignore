@@ -5,6 +5,8 @@
 !/var/log/.gitkeep
 /var/uploads/
 /var/updates/
+# The key API keys of payment services are encrypted with; never leaves the server.
+/var/secret.key
 /VERSION
 .env
 .DS_Store

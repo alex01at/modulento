@@ -6,6 +6,7 @@ namespace Modulento\Core\Order;
 
 use Modulento\Core\App;
 use Modulento\Core\Event\OrderStateChanged;
+use Modulento\Core\Support\Money;
 
 /**
  * Tells the people an order concerns what happened to it, each by e-mail
@@ -63,6 +64,27 @@ final class OrderNotifier
                 'message' => $body,
                 'link' => $app->url('/orders/' . $order['id'], $recipient['locale'], true),
             ], $recipient['locale']);
+        }
+    }
+
+    /**
+     * A payment service reported the order as paid. Both sides are told:
+     * neither of them did it by hand, and the provider may be waiting for
+     * it before starting.
+     */
+    public static function paid(App $app, array $order): void
+    {
+        $labelKey = ($app->orders->paymentMethods()[$order['payment_method']] ?? null)?->labelKey();
+
+        foreach (self::recipients($app, $order) as $recipient) {
+            $locale = $recipient['locale'];
+            $app->mailer->send($recipient['email'], 'emails/order_paid.txt.twig', [
+                'number' => $order['number'],
+                'title' => $order['offer_title'],
+                'amount' => Money::format($order['total'], $order['currency'], $locale),
+                'method' => $labelKey !== null ? $app->translator->trans($labelKey, [], $locale) : $order['payment_method'],
+                'link' => $app->url('/orders/' . $order['id'], $locale, true),
+            ], $locale);
         }
     }
 

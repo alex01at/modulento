@@ -1,0 +1,76 @@
+{% extends '@admin/layout.twig' %}
+
+{% block title %}{{ trans('core.admin.payments.title') }} – {{ site_name }}{% endblock %}
+
+{% block admin %}
+{% include '@admin/_page_header.twig' with {heading: trans('core.admin.payments.title')} only %}
+
+<form method="post" action="{{ url('/admin/payments') }}" autocomplete="off">
+    {{ csrf_field() }}
+
+    <fieldset class="card-box">
+        <legend>{{ trans('core.admin.payments.allowed') }}</legend>
+        <p><small>{{ trans('core.admin.payments.allowed_hint') }}</small></p>
+        {% if not encryption %}
+            <p class="flash flash-error">{{ trans('core.admin.payments.no_encryption') }}</p>
+        {% endif %}
+        <div class="check-list">
+            {% for method in methods %}
+                <label class="checkbox">
+                    <input type="checkbox" name="methods[]" value="{{ method.id }}" {{ method.enabled ? 'checked' }} {{ method.needs_encryption and not encryption ? 'disabled' }}>
+                    <span>{{ trans(method.label_key) }} <small>({{ method.id }})</small></span>
+                </label>
+            {% endfor %}
+        </div>
+    </fieldset>
+
+    <section class="card-box">
+        <div class="card-head">
+            <h2>{{ trans('core.admin.payments.stripe.title') }}</h2>
+            <div class="status-line">
+                {% if stripe.secret_key_hint and stripe.webhook_secret_hint %}
+                    <span class="badge badge-ok">{{ trans('core.admin.payments.stripe.complete') }}</span>
+                {% elseif stripe.secret_key_hint %}
+                    <span class="badge badge-pending">{{ trans('core.admin.payments.stripe.no_webhook') }}</span>
+                {% else %}
+                    <span class="badge badge-disabled">{{ trans('core.admin.payments.stripe.incomplete') }}</span>
+                {% endif %}
+            </div>
+        </div>
+        <p>{{ trans('core.admin.payments.stripe.intro') }}</p>
+
+        <div class="field-grid">
+            <div class="field">
+                <label for="stripe_secret_key">{{ trans('core.admin.payments.stripe.secret_key') }}</label>
+                <input id="stripe_secret_key" name="stripe_secret_key" type="password" value="" maxlength="255" autocomplete="off" {{ not encryption ? 'disabled' }}>
+                <small>{{ stripe.secret_key_hint ? trans('core.admin.payments.key_set', {end: stripe.secret_key_hint}) : trans('core.admin.payments.key_missing') }}</small>
+            </div>
+            <div class="field">
+                <label for="stripe_webhook_secret">{{ trans('core.admin.payments.stripe.webhook_secret') }}</label>
+                <input id="stripe_webhook_secret" name="stripe_webhook_secret" type="password" value="" maxlength="255" autocomplete="off" {{ not encryption ? 'disabled' }}>
+                <small>{{ stripe.webhook_secret_hint ? trans('core.admin.payments.key_set', {end: stripe.webhook_secret_hint}) : trans('core.admin.payments.key_missing') }}</small>
+            </div>
+        </div>
+
+        <p>
+            {{ trans('core.admin.payments.stripe.webhook_url') }}<br>
+            <code>{{ stripe.webhook_url }}</code><br>
+            <small>{{ trans('core.admin.payments.stripe.webhook_hint') }}</small>
+        </p>
+
+        {% if stripe.secret_key_hint or stripe.webhook_secret_hint %}
+            <label class="checkbox">
+                <input type="checkbox" name="stripe_remove" value="1">
+                <span>{{ trans('core.admin.payments.stripe.remove') }}</span>
+            </label>
+        {% endif %}
+    </section>
+
+    <section class="card-box">
+        <p><small>{{ trans('core.admin.payments.note') }}</small></p>
+        <div class="button-row">
+            <button type="submit">{{ trans('core.account.save') }}</button>
+        </div>
+    </section>
+</form>
+{% endblock %}

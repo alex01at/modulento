@@ -253,6 +253,9 @@ $pdo->exec("CREATE TABLE withdrawal (id INTEGER PRIMARY KEY, order_id INTEGER RE
     locale TEXT, account_id INTEGER REFERENCES account (id) ON DELETE SET NULL, matched INTEGER NOT NULL DEFAULT 0, created_at TEXT)");
 $pdo->exec("CREATE TABLE report (id INTEGER PRIMARY KEY, url TEXT, category TEXT, explanation TEXT, name TEXT, email TEXT, locale TEXT,
     account_id INTEGER REFERENCES account (id) ON DELETE SET NULL, status TEXT DEFAULT 'open', decision_note TEXT, decided_at TEXT, decided_by INTEGER, created_at TEXT)");
+$pdo->exec("CREATE TABLE provider_payment (provider_id INTEGER REFERENCES provider (id) ON DELETE CASCADE, method TEXT, data TEXT, status TEXT, updated_at TEXT, PRIMARY KEY (provider_id, method))");
+$pdo->exec("CREATE TABLE order_payment (id INTEGER PRIMARY KEY, order_id INTEGER REFERENCES orders (id) ON DELETE CASCADE, method TEXT, provider_reference TEXT, status TEXT,
+    amount INTEGER, currency TEXT, created_at TEXT, updated_at TEXT, UNIQUE (method, provider_reference))");
 $pdo->exec("ALTER TABLE report ADD COLUMN offer_id INTEGER");
 $pdo->exec("ALTER TABLE report ADD COLUMN provider_id INTEGER");
 $pdo->exec("CREATE TABLE account_avatar (account_id INTEGER PRIMARY KEY REFERENCES account (id) ON DELETE CASCADE, name TEXT, extension TEXT, created_at TEXT)");
@@ -1967,6 +1970,655 @@ unset($_SERVER['REMOTE_ADDR']);
 check('report: no more than five an hour from one address of the network', count($reports()) === $before + 5 && str_contains($r['body'], 'Zu viele'));
 $pdo->exec('DELETE FROM report');
 $pdo->exec('DELETE FROM rate_limit_attempt');
+@unlink($mailLog);
+
+// --- Payments: transfer, PayPal and Stripe, always straight to the provider -----------
+// No check here reaches the network: the payment services are replaced by
+// something that records what would have been sent and answers from a script.
+$http = new class implements Modulento\Core\Support\HttpClient {
+    /** @var array<int, array{method: string, url: string, headers: array<string, string>, body: ?string}> */
+    public array $requests = [];
+    /** @var array<int, array{status: int, body: string}> */
+    private array $answers = [];
+
+    public function request(string $method, string $url, array $headers = [], ?string $body = null): array
+    {
+        $this->requests[] = ['method' => $method, 'url' => $url, 'headers' => $headers, 'body' => $body];
+
+        // Nothing scripted: as if the service did not answer in time.
+        return array_shift($this->answers) ?? ['status' => 0, 'body' => ''];
+    }
+
+    public function answer(int $status, array|string $body): void
+    {
+        $this->answers[] = ['status' => $status, 'body' => is_array($body) ? (string) json_encode($body) : $body];
+    }
+
+    public function reset(): void
+    {
+        $this->requests = [];
+        $this->answers = [];
+    }
+};
+$payLog = sys_get_temp_dir() . '/modulento-test-paylog-' . bin2hex(random_bytes(4)) . '.log';
+ini_set('error_log', $payLog);
+$keyPath = sys_get_temp_dir() . '/modulento-test-key-' . bin2hex(random_bytes(4)) . '/secret.key';
+$payConfig = $config;
+$payConfig['app']['secret_key'] = $keyPath;
+$payConfig['payment'] = ['http' => $http];
+$pPost = fn (string $path, array $fields, ?int $as) => request($pdo, $payConfig, 'POST', $path, $as, $fields);
+$pGet = fn (string $path, ?int $as) => request($pdo, $payConfig, 'GET', $path, $as);
+$flash = fn (string $type = 'error') => (string) ($_SESSION['_flash'][$type] ?? '');
+$payApp = function () use ($pdo, $payConfig): Modulento\Core\App {
+    $_SESSION = [];
+    $app = new Modulento\Core\App($payConfig, $pdo);
+    $app->translator->load($payConfig['app']['root'] . '/core/lang', 'core');
+    Modulento\Core\Kernel::registerCore($app);
+    $app->extensions->loadEnabled($app);
+    Modulento\Core\Kernel::registerLast($app);
+    Modulento\Core\Kernel::loadThemeTexts($app);
+    Modulento\Core\Kernel::prepareRequest($app, '/', startSession: false);
+
+    return $app;
+};
+$stripeKey = 'sk_test_SECRETKEY1234abcd';
+$webhookSecret = 'whsec_testSigningSecret5678';
+$paypalSecret = 'paypal-secret-XYZ-987';
+
+// Encryption: the key is a file, never the database.
+$secrets = new Modulento\Core\Support\Secrets($keyPath);
+check('secrets: nothing is decrypted and no key is made by reading alone', $secrets->decrypt('v1:' . base64_encode(str_repeat('x', 60))) === null && !is_file($keyPath));
+$sealed = $secrets->encrypt($stripeKey);
+check('secrets: the key file appears on first need, 32 bytes, readable by its owner only', is_file($keyPath) && filesize($keyPath) === 32 && (fileperms($keyPath) & 0777) === 0600);
+check('secrets: what is stored does not contain the secret and differs every time', !str_contains($sealed, $stripeKey) && !str_contains((string) base64_decode(substr($sealed, 3)), $stripeKey)
+    && $sealed !== $secrets->encrypt($stripeKey) && str_starts_with($sealed, 'v1:'));
+check('secrets: round trip, also with a fresh object reading the same key file', $secrets->decrypt($sealed) === $stripeKey && (new Modulento\Core\Support\Secrets($keyPath))->decrypt($sealed) === $stripeKey);
+$tampered = substr($sealed, 0, -6) . (substr($sealed, -6, 1) === 'A' ? 'B' : 'A') . substr($sealed, -5);
+check('secrets: a changed value, a plain value and another installation\'s key open nothing', $secrets->decrypt($tampered) === null && $secrets->decrypt($stripeKey) === null && $secrets->decrypt('') === null
+    && (new Modulento\Core\Support\Secrets(dirname($keyPath) . '/other.key'))->decrypt($sealed) === null && !is_file(dirname($keyPath) . '/other.key'));
+
+// Bank details.
+$bank = Modulento\Core\Payment\BankAccount::class;
+check('iban: valid ones pass, written with or without spaces and in any case', $bank::isIban($bank::normalize('DE89 3704 0044 0532 0130 00')) && $bank::isIban($bank::normalize('at61 1904 3002 3457 3201'))
+    && $bank::isIban('GB82WEST12345698765432') && $bank::normalize(" de89\t3704 ") === 'DE893704');
+check('iban: a wrong check sum, a swapped digit and nonsense are refused', !$bank::isIban('DE89370400440532013001') && !$bank::isIban('DE89370400440532010300') && !$bank::isIban('DE00370400440532013000')
+    && !$bank::isIban('DE89') && !$bank::isIban('') && !$bank::isIban('1234567890123456') && !$bank::isIban('DE89 3704 0044 0532 0130 00'));
+check('bic: eight or eleven characters', $bank::isBic('COBADEFF') && $bank::isBic('COBADEFFXXX') && !$bank::isBic('COBADEF') && !$bank::isBic('COBADEFFXX') && !$bank::isBic('1OBADEFF'));
+check('iban: shown in groups of four', $bank::formatIban('DE89370400440532013000') === 'DE89 3704 0044 0532 0130 00');
+
+// Amounts for PayPal are decimal strings, made and read without floats.
+$paypalClass = Modulento\Core\Payment\PaypalGateway::class;
+check('paypal amounts: minor units to decimal and back', $paypalClass::decimal(11900) === '119.00' && $paypalClass::decimal(5) === '0.05' && $paypalClass::decimal(100050) === '1000.50'
+    && $paypalClass::minorUnits('119.00') === 11900 && $paypalClass::minorUnits('0.05') === 5 && $paypalClass::minorUnits('119.0') === null && $paypalClass::minorUnits('119,00') === null
+    && $paypalClass::minorUnits('119') === null && $paypalClass::minorUnits('-1.00') === null);
+
+// Stripe's webhook signature.
+$stripeClass = Modulento\Core\Payment\StripeGateway::class;
+$sign = fn (string $payload, string $secret, ?int $at = null) => 't=' . ($at ??= time()) . ',v1=' . hash_hmac('sha256', $at . '.' . $payload, $secret);
+$event = fn (string $session, int $amount, string $currency = 'eur', string $status = 'paid', string $type = 'checkout.session.completed') => (string) json_encode([
+    'id' => 'evt_1', 'type' => $type, 'account' => 'acct_1TEST',
+    'data' => ['object' => ['id' => $session, 'object' => 'checkout.session', 'payment_status' => $status, 'amount_total' => $amount, 'currency' => $currency]],
+]);
+$body = $event('cs_test_X', 11900);
+check('webhook signature: a correct one is accepted and yields the event', ($stripeClass::verifyWebhook($body, $sign($body, $webhookSecret), $webhookSecret)['type'] ?? null) === 'checkout.session.completed');
+check('webhook signature: one of several v1 values may fit', $stripeClass::verifyWebhook($body, 't=' . time() . ',v1=' . str_repeat('0', 64) . ',v1=' . hash_hmac('sha256', time() . '.' . $body, $webhookSecret), $webhookSecret) !== null);
+check('webhook signature: another secret, a changed body, a missing or malformed header are refused', $stripeClass::verifyWebhook($body, $sign($body, 'whsec_other'), $webhookSecret) === null
+    && $stripeClass::verifyWebhook($body . ' ', $sign($body, $webhookSecret), $webhookSecret) === null && $stripeClass::verifyWebhook($body, '', $webhookSecret) === null
+    && $stripeClass::verifyWebhook($body, 'v1=' . hash_hmac('sha256', '.' . $body, $webhookSecret), $webhookSecret) === null && $stripeClass::verifyWebhook($body, 't=abc,v1=abc', $webhookSecret) === null
+    && $stripeClass::verifyWebhook($body, $sign($body, ''), '') === null);
+check('webhook signature: older or newer than five minutes is refused', $stripeClass::verifyWebhook($body, $sign($body, $webhookSecret, time() - 301), $webhookSecret) === null
+    && $stripeClass::verifyWebhook($body, $sign($body, $webhookSecret, time() + 301), $webhookSecret) === null && $stripeClass::verifyWebhook($body, $sign($body, $webhookSecret, time() - 290), $webhookSecret) !== null);
+
+// What is sent to Stripe, and how its answers are read.
+$refused = function (callable $call): ?string {
+    try {
+        $call();
+    } catch (Modulento\Core\Payment\PaymentException $e) {
+        return $e->messageKey . '|' . $e->getMessage();
+    }
+
+    return null;
+};
+$stripe = new Modulento\Core\Payment\StripeGateway($http, $stripeKey);
+$http->answer(200, ['id' => 'cs_test_1', 'url' => 'https://checkout.stripe.com/c/pay/cs_test_1']);
+$session = $stripe->createCheckoutSession('acct_1TEST', 11900, 'EUR', 'Logo – 000012', 12, 'https://example.test/ok', 'https://example.test/back');
+$sent = $http->requests[0];
+parse_str((string) $sent['body'], $fields);
+check('stripe checkout: a direct charge on the connected account, authorised with the platform key', $session === ['id' => 'cs_test_1', 'url' => 'https://checkout.stripe.com/c/pay/cs_test_1']
+    && $sent['method'] === 'POST' && $sent['url'] === 'https://api.stripe.com/v1/checkout/sessions' && $sent['headers']['Stripe-Account'] === 'acct_1TEST'
+    && $sent['headers']['Authorization'] === 'Bearer ' . $stripeKey && $sent['headers']['Content-Type'] === 'application/x-www-form-urlencoded');
+check('stripe checkout: one position in minor units, the order as reference, no fee for the platform', $fields['mode'] === 'payment' && count($fields['line_items']) === 1
+    && $fields['line_items'][0]['price_data'] === ['currency' => 'eur', 'unit_amount' => '11900', 'product_data' => ['name' => 'Logo – 000012']] && $fields['line_items'][0]['quantity'] === '1'
+    && $fields['client_reference_id'] === '12' && $fields['metadata'] === ['order_id' => '12'] && $fields['success_url'] === 'https://example.test/ok' && $fields['cancel_url'] === 'https://example.test/back'
+    && !str_contains((string) $sent['body'], 'application_fee') && !str_contains((string) $sent['body'], 'transfer_data'));
+$http->reset();
+$http->answer(200, ['id' => 'acct_1NEW', 'charges_enabled' => false]);
+$http->answer(200, ['url' => 'https://connect.stripe.com/setup/s/abc']);
+$http->answer(200, ['id' => 'acct_1NEW', 'charges_enabled' => true]);
+$http->answer(200, ['id' => 'cs_test_1', 'payment_status' => 'paid', 'amount_total' => 11900, 'currency' => 'eur']);
+$created = $stripe->createAccount();
+$link = $stripe->accountLink('acct_1NEW', 'https://example.test/again', 'https://example.test/done');
+parse_str((string) $http->requests[1]['body'], $fields);
+check('stripe connect: a standard account, an onboarding link, and whether it can take payments', $created === 'acct_1NEW' && $http->requests[0]['url'] === 'https://api.stripe.com/v1/accounts' && $http->requests[0]['body'] === 'type=standard'
+    && !isset($http->requests[0]['headers']['Stripe-Account']) && $link === 'https://connect.stripe.com/setup/s/abc' && $http->requests[1]['url'] === 'https://api.stripe.com/v1/account_links'
+    && $fields === ['account' => 'acct_1NEW', 'refresh_url' => 'https://example.test/again', 'return_url' => 'https://example.test/done', 'type' => 'account_onboarding']
+    && $stripe->chargesEnabled('acct_1NEW') === true && $http->requests[2]['method'] === 'GET' && $http->requests[2]['url'] === 'https://api.stripe.com/v1/accounts/acct_1NEW' && $http->requests[2]['body'] === null);
+check('stripe session: read on the connected account, amount in minor units, currency in capitals', $stripe->checkoutSession('acct_1NEW', 'cs_test_1') === ['id' => 'cs_test_1', 'paid' => true, 'amount' => 11900, 'currency' => 'EUR']
+    && $http->requests[3]['url'] === 'https://api.stripe.com/v1/checkout/sessions/cs_test_1' && $http->requests[3]['headers']['Stripe-Account'] === 'acct_1NEW');
+$http->reset();
+$http->answer(401, ['error' => ['type' => 'invalid_request_error', 'message' => 'Invalid API Key provided: ' . $stripeKey]]);
+$http->answer(400, ['error' => ['type' => 'invalid_request_error', 'code' => 'amount_too_small', 'message' => 'Amount must be at least 50 cents for acct_1TEST']]);
+$http->answer(200, '<html>not json</html>');
+$http->answer(200, ['id' => 'cs_test_1']);
+$wrongKey = $refused(fn () => $stripe->createAccount());
+$tooSmall = $refused(fn () => $stripe->createCheckoutSession('acct_1TEST', 1, 'EUR', 'x', 1, 'https://example.test/a', 'https://example.test/b'));
+check('stripe errors: a refused key and a refused request are told apart; the log gets status and code, not the service\'s words', str_starts_with((string) $wrongKey, 'core.payment.error.credentials|')
+    && !str_contains((string) $wrongKey, $stripeKey) && !str_contains((string) $wrongKey, 'Invalid API Key') && str_starts_with((string) $tooSmall, 'core.payment.error.refused|')
+    && str_contains((string) $tooSmall, 'HTTP 400') && str_contains((string) $tooSmall, 'amount_too_small') && !str_contains((string) $tooSmall, 'acct_1TEST'));
+check('stripe errors: an answer that is not JSON or lacks what is needed is no success', str_starts_with((string) $refused(fn () => $stripe->chargesEnabled('acct_1TEST')), 'core.payment.error.refused|')
+    && str_starts_with((string) $refused(fn () => $stripe->createCheckoutSession('acct_1TEST', 100, 'EUR', 'x', 1, 'https://example.test/a', 'https://example.test/b')), 'core.payment.error.unexpected|'));
+$http->reset();
+check('stripe errors: no answer in time is "not reachable"; ids that are no ids are never sent', str_starts_with((string) $refused(fn () => $stripe->createAccount()), 'core.payment.error.unreachable|')
+    && $refused(fn () => $stripe->checkoutSession('acct_1TEST', '../v1/accounts')) !== null && $refused(fn () => $stripe->chargesEnabled('acct_1/../x')) !== null && count($http->requests) === 1);
+
+// What is sent to PayPal.
+$http->reset();
+$paypalOrder = ['id' => '5O190127TN364715T', 'status' => 'PAYER_ACTION_REQUIRED', 'links' => [
+    ['href' => 'https://api-m.sandbox.paypal.com/v2/checkout/orders/5O190127TN364715T', 'rel' => 'self', 'method' => 'GET'],
+    ['href' => 'https://www.sandbox.paypal.com/checkoutnow?token=5O190127TN364715T', 'rel' => 'payer-action', 'method' => 'GET'],
+]];
+$captured = fn (string $value, string $currency = 'EUR', string $captureStatus = 'COMPLETED', ?string $customId = null) => ['id' => '5O190127TN364715T', 'status' => 'COMPLETED', 'purchase_units' => [[
+    'reference_id' => 'default', 'payments' => ['captures' => [['id' => '3C679366HH908993F', 'status' => $captureStatus, 'amount' => ['currency_code' => $currency, 'value' => $value]] + ($customId !== null ? ['custom_id' => $customId] : [])]],
+]]];
+$paypal = new Modulento\Core\Payment\PaypalGateway($http, 'AClientId123', $paypalSecret, true);
+$http->answer(200, ['access_token' => 'A21.token', 'token_type' => 'Bearer', 'expires_in' => 32400]);
+$http->answer(201, $paypalOrder);
+$http->answer(201, $captured('119.00'));
+$made = $paypal->createOrder(11900, 'eur', '12', 'Logo – 000012', 'https://example.test/ok', 'https://example.test/back', 'request-1');
+$sentJson = json_decode((string) $http->requests[1]['body'], true);
+check('paypal token: client credentials with basic auth, against the sandbox in test mode', $http->requests[0]['method'] === 'POST' && $http->requests[0]['url'] === 'https://api-m.sandbox.paypal.com/v1/oauth2/token'
+    && $http->requests[0]['headers']['Authorization'] === 'Basic ' . base64_encode('AClientId123:' . $paypalSecret) && $http->requests[0]['body'] === 'grant_type=client_credentials');
+check('paypal order: capture intent, the amount as a decimal string, the order as custom id, own return addresses', $made === ['id' => '5O190127TN364715T', 'url' => 'https://www.sandbox.paypal.com/checkoutnow?token=5O190127TN364715T']
+    && $http->requests[1]['url'] === 'https://api-m.sandbox.paypal.com/v2/checkout/orders' && $http->requests[1]['headers']['Authorization'] === 'Bearer A21.token'
+    && $http->requests[1]['headers']['Content-Type'] === 'application/json' && $http->requests[1]['headers']['PayPal-Request-Id'] === 'request-1'
+    && $sentJson['intent'] === 'CAPTURE' && count($sentJson['purchase_units']) === 1 && $sentJson['purchase_units'][0]['amount'] === ['currency_code' => 'EUR', 'value' => '119.00']
+    && $sentJson['purchase_units'][0]['custom_id'] === '12' && $sentJson['payment_source']['paypal']['experience_context']['return_url'] === 'https://example.test/ok'
+    && $sentJson['payment_source']['paypal']['experience_context']['cancel_url'] === 'https://example.test/back');
+check('paypal capture: one token for several calls, the completed capture\'s amount in minor units', $paypal->capture('5O190127TN364715T') === ['status' => 'COMPLETED', 'paid' => true, 'amount' => 11900, 'currency' => 'EUR', 'custom_id' => null]
+    && count($http->requests) === 3 && $http->requests[2]['method'] === 'POST' && $http->requests[2]['url'] === 'https://api-m.sandbox.paypal.com/v2/checkout/orders/5O190127TN364715T/capture');
+check('paypal: a capture PayPal holds back, or an order merely approved, is not a payment', $paypalClass::summary($captured('119.00', 'EUR', 'PENDING'))['paid'] === false
+    && $paypalClass::summary(['status' => 'APPROVED'] + $captured('119.00'))['paid'] === false && $paypalClass::summary([])['paid'] === false && $paypalClass::summary($captured('119.00', 'EUR', 'COMPLETED', '12'))['custom_id'] === '12');
+$http->reset();
+$live = new Modulento\Core\Payment\PaypalGateway($http, 'AClientId123', $paypalSecret, false);
+$http->answer(401, ['error' => 'invalid_client', 'error_description' => 'Client Authentication failed']);
+$denied = $refused(fn () => $live->verify());
+check('paypal errors: refused credentials, live address without test mode, nothing secret in the log line', str_starts_with((string) $denied, 'core.payment.error.credentials|') && !str_contains((string) $denied, $paypalSecret)
+    && $http->requests[0]['url'] === 'https://api-m.paypal.com/v1/oauth2/token');
+$http->reset();
+$http->answer(200, ['access_token' => 'A21.token']);
+$http->answer(422, ['name' => 'UNPROCESSABLE_ENTITY', 'message' => 'The requested action could not be performed', 'details' => [['issue' => 'ORDER_NOT_APPROVED']]]);
+$notApproved = $refused(fn () => $live->capture('5O190127TN364715T'));
+check('paypal errors: a refused request, no answer in time, an id that is none', str_starts_with((string) $notApproved, 'core.payment.error.refused|') && str_contains((string) $notApproved, 'HTTP 422')
+    && str_starts_with((string) $refused(fn () => $live->order('5O190127TN364715T')), 'core.payment.error.unreachable|') && $refused(fn () => $live->order('../../v1/oauth2/token')) !== null && count($http->requests) === 3
+    && str_starts_with((string) $refused(fn () => (new Modulento\Core\Payment\PaypalGateway($http, 'a', 'b', false))->verify()), 'core.payment.error.unreachable|'));
+
+// The operator: which ways to pay are allowed, and the platform's Stripe keys.
+$http->reset();
+$enabledSetting = fn (string $id) => $pdo->query("SELECT value FROM setting WHERE name = 'core.payment.enabled.{$id}'")->fetchColumn();
+$allMethods = ['core.offline', 'core.transfer', 'core.paypal', 'core.stripe'];
+check('payment settings: need their permission', $pGet('/admin/payments', 1)['status'] === 403 && $pPost('/admin/payments', ['methods' => $allMethods], 1)['status'] === 403 && $enabledSetting('core.transfer') === false);
+$r = $pGet('/admin/payments', 3);
+check('payment settings: every method is listed; only "settle it yourselves" is on at first', $r['status'] === 200 && preg_match('/value="core\.offline" checked/', $r['body']) === 1
+    && preg_match('/value="core\.(transfer|paypal|stripe)" checked/', $r['body']) === 0 && substr_count($r['body'], 'name="methods[]"') === 4
+    && str_contains($r['body'], 'https://example.test/webhooks/stripe') && str_contains($r['body'], 'href="/admin/payments"'));
+$pPost('/admin/payments', ['methods' => []], 3);
+check('payment settings: at least one method stays allowed', str_contains($flash(), 'Mindestens eine') && $enabledSetting('core.offline') === false && $payApp()->payments->isEnabled('core.offline'));
+$pPost('/admin/payments', ['methods' => $allMethods, 'stripe_secret_key' => 'pk_test_PUBLISHABLE1234'], 3);
+check('payment settings: a publishable key is not taken for the secret one, and nothing is saved', str_contains($flash(), 'sk_') && $enabledSetting('core.transfer') === false && !$payApp()->payments->stripeConfigured());
+$pPost('/admin/payments', ['methods' => $allMethods, 'stripe_secret_key' => $stripeKey, 'stripe_webhook_secret' => 'secret-without-prefix'], 3);
+check('payment settings: a webhook secret must look like one', str_contains($flash(), 'whsec_') && !$payApp()->payments->stripeConfigured());
+$pPost('/admin/payments', ['methods' => $allMethods, 'stripe_secret_key' => ' ' . $stripeKey . ' ', 'stripe_webhook_secret' => $webhookSecret], 3);
+$storedKey = (string) $pdo->query("SELECT value FROM setting WHERE name = 'core.payment.stripe.secret_key'")->fetchColumn();
+check('payment settings: methods switched on, keys stored encrypted', $enabledSetting('core.transfer') === '1' && $enabledSetting('core.stripe') === '1' && $payApp()->payments->stripeConfigured()
+    && str_starts_with($storedKey, 'v1:') && !str_contains($storedKey, $stripeKey) && $pdo->query("SELECT COUNT(*) FROM setting WHERE value LIKE '%SECRETKEY%' OR value LIKE '%SigningSecret%'")->fetchColumn() == 0);
+$r = $pGet('/admin/payments', 3);
+check('payment settings: a stored key is never shown again, only its last characters', !str_contains($r['body'], $stripeKey) && !str_contains($r['body'], $webhookSecret) && !str_contains($r['body'], 'SECRETKEY')
+    && str_contains($r['body'], '…abcd') && str_contains($r['body'], '…5678') && str_contains($r['body'], 'Angaben vollständig') && preg_match('/name="stripe_secret_key" type="password" value=""/', $r['body']) === 1);
+$pPost('/admin/payments', ['methods' => $allMethods, 'stripe_secret_key' => '', 'stripe_webhook_secret' => ''], 3);
+check('payment settings: an empty field leaves the stored key as it is', $payApp()->payments->stripeHints() === ['secret_key' => 'abcd', 'webhook_secret' => '5678']);
+check('payment settings: another installation\'s key file opens nothing', !(new Modulento\Core\App(['app' => ['secret_key' => dirname($keyPath) . '/other.key'] + $payConfig['app']] + $payConfig, $pdo))->payments->stripeConfigured());
+
+// A provider sets up what buyers are offered.
+$pdo->exec("UPDATE extension SET enabled = 1 WHERE id = 'freelancer'");
+$pPost('/account/provider', $business, 1);
+$pdo->exec("UPDATE provider SET status = 'approved' WHERE account_id = 1");
+$payProvider = (int) $provider(1)['id'];
+$pPost('/account/offers/new', $offerForm, 1);
+$pdo->exec("UPDATE offer SET status = 'published', published_at = '2026-01-01 00:00:00'");
+$payOffer = (int) $pdo->query('SELECT MAX(id) FROM offer')->fetchColumn();
+$setup = fn (string $method) => $pdo->query("SELECT * FROM provider_payment WHERE provider_id = {$payProvider} AND method = " . $pdo->quote($method))->fetch();
+$validBank = ['holder' => 'Müller Design GmbH', 'iban' => 'de89 3704 0044 0532 0130 00', 'bic' => 'cobadeffxxx', 'bank' => 'Commerzbank'];
+
+check('payment setup: needs a provider profile', $pGet('/account/payments', 3)['body'] === '' && $pPost('/account/payments/transfer', $validBank, 3)['body'] === '' && $pdo->query('SELECT COUNT(*) FROM provider_payment')->fetchColumn() == 0
+    && $pGet('/account/payments', null)['body'] === '');
+$r = $pGet('/account/payments', 1);
+check('payment setup: a section per allowed method, linked from the account\'s menu, with the note on refunds', $r['status'] === 200 && str_contains($r['body'], 'Banküberweisung') && str_contains($r['body'], 'name="client_id"')
+    && str_contains($r['body'], 'Mit Stripe verbinden') && str_contains($r['body'], 'Rückerstattungen') && str_contains($r['body'], 'Nicht eingerichtet') && substr_count($r['body'], 'href="/account/payments"') >= 1
+    && str_contains($pGet('/account', 1)['body'], 'href="/account/payments"'));
+$r = $pGet($orderPath . '?package=2', 2);
+check('order form: a method the provider has not set up is not offered', $r['status'] === 200 && str_contains($r['body'], 'value="core.offline" checked') && !str_contains($r['body'], 'value="core.transfer"')
+    && !str_contains($r['body'], 'value="core.paypal"') && !str_contains($r['body'], 'value="core.stripe"'));
+
+$r = $pPost('/account/payments/transfer', ['iban' => 'DE89 3704 0044 0532 0130 01'] + $validBank, 1);
+check('bank details: an IBAN with a typing error is refused and stays in the form to be corrected', $setup('core.transfer') === false && str_contains($r['body'], 'IBAN ist nicht gültig') && str_contains($r['body'], 'value="DE89 3704 0044 0532 0130 01"'));
+$r = $pPost('/account/payments/transfer', ['holder' => '', 'bic' => 'XX'] + $validBank, 1);
+check('bank details: holder and a well-formed BIC are required', $setup('core.transfer') === false && str_contains($r['body'], 'Kontoinhaber an') && str_contains($r['body'], 'BIC ist nicht gültig'));
+$pPost('/account/payments/transfer', $validBank, 1);
+check('bank details: stored normalised, and from then on offered', json_decode((string) $setup('core.transfer')['data'], true) === ['holder' => 'Müller Design GmbH', 'iban' => 'DE89370400440532013000', 'bic' => 'COBADEFFXXX', 'bank' => 'Commerzbank']
+    && $setup('core.transfer')['status'] === 'ready' && str_contains($pGet('/account/payments', 1)['body'], 'value="DE89 3704 0044 0532 0130 00"') && str_contains($pGet($orderPath, 2)['body'], 'value="core.transfer"'));
+check('bank details are not public', !str_contains($pGet('/providers/mueller-design', null)['body'], '0532') && !str_contains($pGet('/offers/ich-gestalte-dein-logo', 2)['body'], '0532') && !str_contains($pGet($orderPath, 2)['body'], '0532'));
+
+// PayPal: the provider's own app; offered once PayPal accepted the credentials.
+$http->reset();
+$http->answer(401, ['error' => 'invalid_client']);
+$pPost('/account/payments/paypal', ['client_id' => 'AClientId123', 'secret' => $paypalSecret, 'sandbox' => '1'], 1);
+check('paypal setup: credentials PayPal refuses are kept but not offered, and the provider is told why', $setup('core.paypal')['status'] === 'unverified' && str_contains($flash(), 'Zugangsdaten abgelehnt')
+    && !str_contains($pGet($orderPath, 2)['body'], 'value="core.paypal"') && $http->requests[0]['url'] === 'https://api-m.sandbox.paypal.com/v1/oauth2/token');
+check('paypal setup: the secret is stored encrypted', !str_contains((string) $setup('core.paypal')['data'], $paypalSecret) && str_contains((string) $setup('core.paypal')['data'], '"secret":"v1:')
+    && json_decode((string) $setup('core.paypal')['data'], true)['client_id'] === 'AClientId123');
+$r = $pGet('/account/payments', 1);
+check('paypal setup: the secret never comes back to the browser', !str_contains($r['body'], $paypalSecret) && !str_contains($r['body'], 'v1:') && str_contains($r['body'], 'value="AClientId123"') && str_contains($r['body'], 'Ein Secret ist gespeichert')
+    && str_contains($r['body'], 'noch nicht bestätigt'));
+$http->reset();
+$pPost('/account/payments/paypal/check', [], 1);
+check('paypal setup: PayPal not answering is said so, without a server error', str_contains($flash(), 'nicht erreichbar') && $setup('core.paypal')['status'] === 'unverified');
+$http->reset();
+$http->answer(200, ['access_token' => 'A21.token']);
+$pPost('/account/payments/paypal/check', [], 1);
+check('paypal setup: "check connection" asks for a token with the stored secret; success makes it available', $setup('core.paypal')['status'] === 'ready' && $flash('success') !== ''
+    && $http->requests[0]['headers']['Authorization'] === 'Basic ' . base64_encode('AClientId123:' . $paypalSecret) && str_contains($pGet($orderPath, 2)['body'], 'value="core.paypal"'));
+$http->reset();
+$http->answer(200, ['access_token' => 'A21.token']);
+$pPost('/account/payments/paypal', ['client_id' => 'AClientId456', 'secret' => ''], 1);
+check('paypal setup: an empty secret field keeps the stored one; without test mode the live address is asked', $setup('core.paypal')['status'] === 'ready' && $http->requests[0]['url'] === 'https://api-m.paypal.com/v1/oauth2/token'
+    && $http->requests[0]['headers']['Authorization'] === 'Basic ' . base64_encode('AClientId456:' . $paypalSecret));
+$pPost('/account/payments/paypal', ['client_id' => '', 'secret' => 'x y'], 1);
+check('paypal setup: incomplete input changes nothing', json_decode((string) $setup('core.paypal')['data'], true)['client_id'] === 'AClientId456' && $flash() !== '');
+$pdo->exec('DELETE FROM rate_limit_attempt');
+for ($i = 0; $i < 11; $i++) {
+    $http->answer(200, ['access_token' => 'A21.token']);
+    $pPost('/account/payments/paypal/check', [], 1);
+}
+check('paypal setup: checking the connection is rate limited', str_contains($flash(), 'Zu viele'));
+$pdo->exec('DELETE FROM rate_limit_attempt');
+$http->reset();
+$http->answer(200, ['access_token' => 'A21.token']);
+$pPost('/account/payments/paypal', ['client_id' => 'AClientId123', 'secret' => $paypalSecret, 'sandbox' => '1'], 1);
+
+// Stripe: a connected account of the provider's own.
+$http->reset();
+check('stripe setup: following the "link expired" address creates nothing', $pGet('/account/payments/stripe/refresh', 1)['body'] === '' && $http->requests === [] && $setup('core.stripe') === false);
+$http->answer(200, ['id' => 'acct_1TEST', 'type' => 'standard', 'charges_enabled' => false]);
+$http->answer(200, ['object' => 'account_link', 'url' => 'https://connect.stripe.com/setup/s/acct_1TEST/abc']);
+$pPost('/account/payments/stripe/connect', [], 1);
+parse_str((string) $http->requests[1]['body'], $fields);
+check('stripe setup: "connect" creates a standard account with the platform key and asks for an onboarding link back to this site', json_decode((string) $setup('core.stripe')['data'], true) === ['account' => 'acct_1TEST']
+    && $setup('core.stripe')['status'] === 'pending' && $http->requests[0]['body'] === 'type=standard' && $http->requests[0]['headers']['Authorization'] === 'Bearer ' . $stripeKey
+    && $fields === ['account' => 'acct_1TEST', 'refresh_url' => 'https://example.test/account/payments/stripe/refresh', 'return_url' => 'https://example.test/account/payments/stripe/return', 'type' => 'account_onboarding']
+    && $flash() === '');
+$http->reset();
+$http->answer(200, ['id' => 'acct_1TEST', 'charges_enabled' => false, 'details_submitted' => false]);
+$pGet('/account/payments/stripe/return', 1);
+check('stripe setup: back from Stripe with an unfinished account - shown as incomplete, not offered', $setup('core.stripe')['status'] === 'pending' && str_contains($flash(), 'Einrichtung unvollständig')
+    && $http->requests[0]['url'] === 'https://api.stripe.com/v1/accounts/acct_1TEST' && str_contains($pGet('/account/payments', 1)['body'], 'Einrichtung bei Stripe fortsetzen')
+    && !str_contains($pGet($orderPath, 2)['body'], 'value="core.stripe"'));
+$http->reset();
+$http->answer(200, ['url' => 'https://connect.stripe.com/setup/s/acct_1TEST/def']);
+$pPost('/account/payments/stripe/connect', [], 1);
+check('stripe setup: continuing uses the account already stored', count($http->requests) === 1 && $http->requests[0]['url'] === 'https://api.stripe.com/v1/account_links' && json_decode((string) $setup('core.stripe')['data'], true) === ['account' => 'acct_1TEST']);
+$http->reset();
+$http->answer(200, ['url' => 'https://evil.example/setup']);
+$pPost('/account/payments/stripe/connect', [], 1);
+check('stripe setup: a link that does not lead to Stripe is not followed', str_contains($flash(), 'schiefgegangen'));
+$http->reset();
+$http->answer(200, ['id' => 'acct_1TEST', 'charges_enabled' => true]);
+$pPost('/account/payments/stripe/status', [], 1);
+$r = $pGet('/account/payments', 1);
+check('stripe setup: once Stripe takes payments for the account it is ready and offered', $setup('core.stripe')['status'] === 'ready' && str_contains($r['body'], 'acct_1TEST') && !str_contains($r['body'], '/account/payments/stripe/connect')
+    && str_contains($pGet($orderPath, 2)['body'], 'value="core.stripe"'));
+$http->reset();
+$http->answer(401, ['error' => ['type' => 'invalid_request_error', 'message' => 'Invalid API Key provided: ' . $stripeKey]]);
+$r = $pPost('/account/payments/stripe/status', [], 1);
+check('stripe setup: a platform key Stripe refuses gives a message, not a server error, and nothing of the answer is shown', $r['status'] !== 500 && str_contains($flash(), 'Zugangsdaten abgelehnt') && !str_contains($flash(), 'Invalid API Key')
+    && $setup('core.stripe')['status'] === 'ready');
+$http->reset();
+$r = $pPost('/account/payments/stripe/status', [], 1);
+check('stripe setup: Stripe not answering gives a message, not a server error', $r['status'] !== 500 && str_contains($flash(), 'nicht erreichbar') && $setup('core.stripe')['status'] === 'ready');
+
+// The order form offers what is allowed and set up - and the server checks it again.
+// Orders left by the checks above stay untouched.
+$ordersBefore = $lastOrder();
+$r = $pGet($orderPath . '?package=2', 2);
+check('order form: all four are offered and none is chosen for the buyer', substr_count($r['body'], 'name="payment_method"') === 4 && preg_match('/name="payment_method" value="[^"]+" checked/', $r['body']) === 0);
+$pPost('/admin/payments', ['methods' => ['core.transfer']], 3);
+$r = $pGet($orderPath . '?package=2', 2);
+check('order form: a single method is preselected; what the operator switched off is gone', substr_count($r['body'], 'name="payment_method"') === 1 && str_contains($r['body'], 'value="core.transfer" checked'));
+$pPost($orderPath, ['package' => '2', 'payment_method' => 'core.stripe'], 2);
+check('a method the operator does not allow is refused, whatever the form sends', $lastOrder() === $ordersBefore);
+$pPost('/admin/payments', ['methods' => $allMethods], 3);
+$pPost('/account/payments/paypal/delete', [], 1);
+$r = $pPost($orderPath, ['package' => '2', 'payment_method' => 'core.paypal'], 2);
+check('a method this provider has not set up is refused, whatever the form sends', $lastOrder() === $ordersBefore && $setup('core.paypal') === false && str_contains($r['body'], 'Bitte wähle eine Zahlungsart'));
+$pPost($orderPath, ['package' => '2', 'payment_method' => 'core.nope'], 2);
+$pPost($orderPath, ['package' => '2', 'payment_method' => ['core.offline']], 2);
+check('a method that does not exist is refused', $lastOrder() === $ordersBefore);
+$http->reset();
+$http->answer(200, ['access_token' => 'A21.token']);
+$pPost('/account/payments/paypal', ['client_id' => 'AClientId123', 'secret' => $paypalSecret, 'sandbox' => '1'], 1);
+$http->reset();
+
+// Bank transfer: the buyer reads the bank details on the order page, the provider confirms.
+$pPost($orderPath, ['package' => '2', 'extras' => ['0'], 'payment_method' => 'core.transfer'], 2);
+$transferOrder = $lastOrder();
+$number = fn (int $id) => sprintf('%06d', $id);
+check('transfer: the order is placed with it, unpaid, without any call to a service', $transferOrder > $ordersBefore && $orderRow($transferOrder)['payment_method'] === 'core.transfer' && $orderRow($transferOrder)['payment_state'] === 'unpaid'
+    && $http->requests === [] && $pdo->query('SELECT COUNT(*) FROM order_payment')->fetchColumn() == 0);
+$r = $pGet('/orders/' . $transferOrder, 2);
+check('transfer: the buyer sees holder, IBAN, amount and the order number as payment reference', str_contains($r['body'], 'DE89 3704 0044 0532 0130 00') && str_contains($r['body'], 'COBADEFFXXX') && str_contains($r['body'], 'Müller Design GmbH')
+    && str_contains($r['body'], 'Verwendungszweck') && str_contains($r['body'], '<td>Bestellung ' . $number($transferOrder) . '</td>') && !str_contains($r['body'], 'Jetzt bezahlen') && !str_contains($r['body'], 'Zahlung als erhalten markieren'));
+$pPost('/orders/' . $transferOrder . '/paid', [], 2);
+check('transfer: the buyer cannot confirm the own payment', $orderRow($transferOrder)['payment_state'] === 'unpaid');
+check('transfer: the provider confirms the receipt as before', str_contains($pGet('/orders/' . $transferOrder, 1)['body'], 'Zahlung als erhalten markieren') && $pPost('/orders/' . $transferOrder . '/paid', [], 1)
+    && $orderRow($transferOrder)['payment_state'] === 'paid');
+$r = $pGet('/orders/' . $transferOrder, 2);
+check('transfer: once paid the page says when, and the bank details are gone', str_contains($r['body'], 'bezahlt am ' . $orderRow($transferOrder)['paid_at']) && !str_contains($r['body'], '0532') && !str_contains($r['body'], 'Zahlungsart übernehmen'));
+$pdo->exec("DELETE FROM orders WHERE id > {$ordersBefore}");
+@unlink($mailLog);
+
+// Stripe: ordering leads to Checkout on the provider's account; the return confirms it.
+$paymentsOf = fn (int $orderId) => $pdo->query("SELECT * FROM order_payment WHERE order_id = {$orderId} ORDER BY id")->fetchAll();
+$paidMails = fn () => substr_count((string) @file_get_contents($mailLog), 'Zahlung eingegangen');
+$stripeSession = fn (string $id, string $status = 'unpaid', int $amount = 11900, string $currency = 'eur') => ['id' => $id, 'object' => 'checkout.session', 'payment_status' => $status, 'amount_total' => $amount, 'currency' => $currency];
+$http->answer(200, ['id' => 'cs_test_A1', 'url' => 'https://checkout.stripe.com/c/pay/cs_test_A1']);
+$pPost($orderPath, ['package' => '2', 'extras' => ['0'], 'payment_method' => 'core.stripe'], 2);
+$stripeOrder = $lastOrder();
+$started = $paymentsOf($stripeOrder);
+parse_str((string) ($http->requests[0]['body'] ?? ''), $fields);
+check('stripe order: the session id is stored with the order, with amount and currency', count($started) === 1 && $started[0]['provider_reference'] === 'cs_test_A1' && $started[0]['status'] === 'pending'
+    && (int) $started[0]['amount'] === 11900 && $started[0]['currency'] === 'EUR' && $started[0]['method'] === 'core.stripe' && $orderRow($stripeOrder)['payment_state'] === 'unpaid');
+check('stripe order: charged on the provider\'s account, in cents, named after offer and order, returning to this order', count($http->requests) === 1 && $http->requests[0]['headers']['Stripe-Account'] === 'acct_1TEST'
+    && $http->requests[0]['headers']['Authorization'] === 'Bearer ' . $stripeKey && $fields['line_items'][0]['price_data']['unit_amount'] === '11900' && $fields['line_items'][0]['price_data']['currency'] === 'eur'
+    && $fields['line_items'][0]['price_data']['product_data']['name'] === 'Ich gestalte dein Logo – ' . $number($stripeOrder) && $fields['client_reference_id'] === (string) $stripeOrder
+    && $fields['metadata']['order_id'] === (string) $stripeOrder && $fields['success_url'] === 'https://example.test/orders/' . $stripeOrder . '/payments/' . $started[0]['id'] . '/return'
+    && $fields['cancel_url'] === 'https://example.test/orders/' . $stripeOrder && !str_contains((string) $http->requests[0]['body'], 'application_fee'));
+check('stripe order: buyer gets "pay now"; provider and administration see method, state and the session id', str_contains($pGet('/orders/' . $stripeOrder, 2)['body'], 'Jetzt bezahlen (119,00 €)')
+    && !str_contains($pGet('/orders/' . $stripeOrder, 2)['body'], 'cs_test_A1') && str_contains($pGet('/orders/' . $stripeOrder, 1)['body'], '<code>cs_test_A1</code>')
+    && !str_contains($pGet('/orders/' . $stripeOrder, 1)['body'], 'Jetzt bezahlen') && !str_contains($pGet('/orders/' . $stripeOrder, 1)['body'], 'Zahlung als erhalten markieren')
+    && str_contains($pGet('/admin/orders/' . $stripeOrder, 3)['body'], '<code>cs_test_A1</code>') && str_contains($pGet('/admin/orders/' . $stripeOrder, 3)['body'], 'Karte und weitere (Stripe)'));
+$returnPath = '/orders/' . $stripeOrder . '/payments/' . $started[0]['id'] . '/return';
+$http->reset();
+check('return: only the buyer of the order - not the provider, not someone else, not a visitor - and Stripe is not even asked', $pGet($returnPath, 3)['status'] === 404 && $pGet($returnPath, 1)['status'] === 404 && $pGet($returnPath, null)['body'] === ''
+    && $http->requests === [] && $orderRow($stripeOrder)['payment_state'] === 'unpaid');
+$http->answer(200, $stripeSession('cs_test_A1'));
+$pGet($returnPath . '?session_id=cs_test_EVIL', 2);
+check('return: the session asked about is the stored one, whatever the address says; unpaid stays unpaid', $http->requests[0]['method'] === 'GET' && $http->requests[0]['url'] === 'https://api.stripe.com/v1/checkout/sessions/cs_test_A1'
+    && $http->requests[0]['headers']['Stripe-Account'] === 'acct_1TEST' && $orderRow($stripeOrder)['payment_state'] === 'unpaid' && str_contains($flash(), 'nicht abgeschlossen'));
+$http->answer(200, $stripeSession('cs_test_A1', 'paid', 100));
+$pGet($returnPath, 2);
+$http->answer(200, $stripeSession('cs_test_A1', 'paid', 11900, 'usd'));
+$pGet($returnPath, 2);
+$http->answer(200, $stripeSession('cs_test_OTHER', 'paid'));
+$pGet($returnPath, 2);
+check('return: another amount, another currency or another session is not a payment of this order', $orderRow($stripeOrder)['payment_state'] === 'unpaid' && $paymentsOf($stripeOrder)[0]['status'] === 'pending' && $paidMails() === 0);
+$http->reset();
+$r = $pGet($returnPath, 2);
+check('return: Stripe not answering leaves the order unpaid, with a message and no server error', $r['status'] !== 500 && str_contains($flash(), 'nicht erreichbar') && $orderRow($stripeOrder)['payment_state'] === 'unpaid');
+$http->answer(200, $stripeSession('cs_test_A1', 'paid'));
+$pGet($returnPath, 2);
+check('return: paid with the order\'s amount and currency marks the order as paid', $orderRow($stripeOrder)['payment_state'] === 'paid' && $orderRow($stripeOrder)['paid_at'] !== null && $paymentsOf($stripeOrder)[0]['status'] === 'paid'
+    && $flash('success') !== '');
+check('paid by a service: buyer and provider are both told by mail', $paidMails() === 2 && lastMail($mailLog, 'editor@example.test')['subject'] === 'Bestellung ' . $number($stripeOrder) . ': Zahlung eingegangen'
+    && lastMail($mailLog, 'plain@example.test')['subject'] === 'Bestellung ' . $number($stripeOrder) . ': Zahlung eingegangen' && lastMail($mailLog, 'plain@example.test')['link'] === '/orders/' . $stripeOrder
+    && str_contains((string) file_get_contents($mailLog), '119,00 € über Karte und weitere (Stripe)'));
+$r = $pGet('/orders/' . $stripeOrder, 2);
+check('paid by a service: the order page says so, with the time, and offers no further payment', str_contains($r['body'], 'bezahlt am ' . $orderRow($stripeOrder)['paid_at']) && !str_contains($r['body'], 'Jetzt bezahlen') && !str_contains($r['body'], 'Zahlungsart übernehmen'));
+$http->reset();
+$paidAt = $orderRow($stripeOrder)['paid_at'];
+$pGet($returnPath, 2);
+$again = $payApp();
+$body = $event('cs_test_A1', 11900);
+check('idempotent: the return opened again and the webhook arriving afterwards change nothing and mail nobody', $http->requests === [] && $again->payments->handleStripeWebhook($again, $body, $sign($body, $webhookSecret)) === 200
+    && $paidMails() === 2 && $orderRow($stripeOrder)['paid_at'] === $paidAt && count($paymentsOf($stripeOrder)) === 1);
+$pPost('/orders/' . $stripeOrder . '/pay', [], 2);
+$pPost('/orders/' . $stripeOrder . '/payment-method', ['payment_method' => 'core.transfer'], 2);
+check('a paid order is neither paid again nor moved to another method', $http->requests === [] && $orderRow($stripeOrder)['payment_method'] === 'core.stripe' && count($paymentsOf($stripeOrder)) === 1);
+$pdo->exec("DELETE FROM orders WHERE id > {$ordersBefore}");
+@unlink($mailLog);
+
+// The webhook: Stripe reports the payment itself, signed.
+$http->reset();
+$http->answer(200, ['id' => 'cs_test_B2', 'url' => 'https://checkout.stripe.com/c/pay/cs_test_B2']);
+$pPost($orderPath, ['package' => '2', 'extras' => ['0'], 'payment_method' => 'core.stripe'], 2);
+$hookOrder = $lastOrder();
+$hook = function (string $body, string $signature) use ($payApp): int {
+    $app = $payApp();
+
+    return $app->payments->handleStripeWebhook($app, $body, $signature);
+};
+$body = $event('cs_test_B2', 11900);
+check('webhook: without a valid signature the answer is 400 and nothing happens', $hook($body, '') === 400 && $hook($body, 't=' . time() . ',v1=' . str_repeat('ab', 32)) === 400 && $hook($body, $sign($body, 'whsec_someone_else')) === 400
+    && $hook($body, $sign($body, $webhookSecret, time() - 600)) === 400 && $hook($event('cs_test_B2', 1), $sign($body, $webhookSecret)) === 400 && $orderRow($hookOrder)['payment_state'] === 'unpaid');
+$r = request($pdo, $payConfig, 'POST', '/webhooks/stripe', null, ['_csrf' => '']);
+check('webhook: the address is public and needs no CSRF token, but an unsigned call gets 400', $r['status'] === 400 && $r['body'] === 'invalid signature' && $orderRow($hookOrder)['payment_state'] === 'unpaid');
+$wrongAmount = $event('cs_test_B2', 100);
+$wrongCurrency = $event('cs_test_B2', 11900, 'usd');
+$notPaid = $event('cs_test_B2', 11900, 'eur', 'unpaid');
+$unknown = $event('cs_test_NOBODY', 11900);
+$otherType = $event('cs_test_B2', 11900, 'eur', 'paid', 'payment_intent.succeeded');
+check('webhook: signed, but another amount, another currency, not paid, an unknown session or another event - accepted and ignored', $hook($wrongAmount, $sign($wrongAmount, $webhookSecret)) === 200
+    && $hook($wrongCurrency, $sign($wrongCurrency, $webhookSecret)) === 200 && $hook($notPaid, $sign($notPaid, $webhookSecret)) === 200 && $hook($unknown, $sign($unknown, $webhookSecret)) === 200
+    && $hook($otherType, $sign($otherType, $webhookSecret)) === 200 && $hook('not json', $sign('not json', $webhookSecret)) === 400
+    && $orderRow($hookOrder)['payment_state'] === 'unpaid' && $paymentsOf($hookOrder)[0]['status'] === 'pending' && $paidMails() === 0);
+check('webhook: a signed "completed" with the order\'s amount marks the order found by the stored session id as paid', $hook($body, $sign($body, $webhookSecret)) === 200 && $orderRow($hookOrder)['payment_state'] === 'paid'
+    && $paymentsOf($hookOrder)[0]['status'] === 'paid' && $paidMails() === 2 && $http->requests !== [] && count($http->requests) === 1);
+$paidAt = $orderRow($hookOrder)['paid_at'];
+check('webhook: delivered twice it acts once', $hook($body, $sign($body, $webhookSecret)) === 200 && $hook($body, $sign($body, $webhookSecret)) === 200 && $paidMails() === 2 && $orderRow($hookOrder)['paid_at'] === $paidAt);
+$pdo->exec("DELETE FROM orders WHERE id > {$ordersBefore}");
+@unlink($mailLog);
+
+// Nobody redeems someone else's payment, and "pay now" starts over safely.
+$http->reset();
+$http->answer(200, ['id' => 'cs_test_C3', 'url' => 'https://checkout.stripe.com/c/pay/cs_test_C3']);
+$pPost($orderPath, ['package' => '2', 'extras' => ['0'], 'payment_method' => 'core.stripe'], 2);
+$orderOfTwo = $lastOrder();
+$http->answer(200, ['id' => 'cs_test_D4', 'url' => 'https://checkout.stripe.com/c/pay/cs_test_D4']);
+$pPost($orderPath, ['package' => '1', 'payment_method' => 'core.stripe'], 3);
+$orderOfThree = $lastOrder();
+$paymentOfTwo = (int) $paymentsOf($orderOfTwo)[0]['id'];
+$paymentOfThree = (int) $paymentsOf($orderOfThree)[0]['id'];
+$http->reset();
+check('a payment of another order cannot be redeemed for one\'s own, nor one\'s own for another order', $orderOfThree > $orderOfTwo && $pGet('/orders/' . $orderOfThree . '/payments/' . $paymentOfTwo . '/return', 3)['status'] === 404
+    && $pGet('/orders/' . $orderOfTwo . '/payments/' . $paymentOfThree . '/return', 3)['status'] === 404 && $pGet('/orders/' . $orderOfTwo . '/payments/' . $paymentOfTwo . '/return', 3)['status'] === 404
+    && $pGet('/orders/' . $orderOfThree . '/payments/999999/return', 3)['status'] === 404 && $http->requests === [] && $orderRow($orderOfTwo)['payment_state'] === 'unpaid' && $orderRow($orderOfThree)['payment_state'] === 'unpaid');
+check('"pay now" and changing the method are the buyer\'s alone', $pPost('/orders/' . $orderOfTwo . '/pay', [], 3)['status'] === 404 && $pPost('/orders/' . $orderOfTwo . '/pay', [], 1)['status'] === 404
+    && $pPost('/orders/' . $orderOfTwo . '/payment-method', ['payment_method' => 'core.transfer'], 1)['status'] === 404 && $pPost('/orders/' . $orderOfTwo . '/pay', ['_csrf' => 'wrong'], 2)['body'] === ''
+    && $http->requests === [] && $orderRow($orderOfTwo)['payment_method'] === 'core.stripe' && count($paymentsOf($orderOfTwo)) === 1);
+$http->answer(200, $stripeSession('cs_test_C3'));
+$http->answer(200, ['id' => 'cs_test_E5', 'url' => 'https://checkout.stripe.com/c/pay/cs_test_E5']);
+$pPost('/orders/' . $orderOfTwo . '/pay', [], 2);
+check('"pay now": after a payment broken off a new session is started, the open one having been checked first', count($http->requests) === 2 && $http->requests[0]['url'] === 'https://api.stripe.com/v1/checkout/sessions/cs_test_C3'
+    && $http->requests[1]['method'] === 'POST' && count($paymentsOf($orderOfTwo)) === 2 && $paymentsOf($orderOfTwo)[1]['provider_reference'] === 'cs_test_E5' && $paymentsOf($orderOfTwo)[1]['status'] === 'pending');
+$http->reset();
+$http->answer(200, $stripeSession('cs_test_E5'));
+$http->answer(200, ['id' => 'cs_test_F6', 'url' => 'https://evil.example/c/pay/cs_test_F6']);
+$r = $pPost('/orders/' . $orderOfTwo . '/pay', [], 2);
+check('"pay now": an address that is not Stripe\'s is not followed and its session not kept', $r['status'] !== 500 && str_contains($flash(), 'schiefgegangen') && $paymentsOf($orderOfTwo)[2]['status'] === 'failed' && $paymentsOf($orderOfTwo)[2]['provider_reference'] === null);
+$http->reset();
+$http->answer(200, $stripeSession('cs_test_E5', 'paid'));
+$pPost('/orders/' . $orderOfTwo . '/pay', [], 2);
+check('"pay now": a payment that went through without the buyer coming back is recorded instead of being asked for twice', count($http->requests) === 1 && $orderRow($orderOfTwo)['payment_state'] === 'paid'
+    && $paymentsOf($orderOfTwo)[1]['status'] === 'paid' && count($paymentsOf($orderOfTwo)) === 3 && $paidMails() === 2);
+$http->reset();
+$r = $pPost('/orders/' . $orderOfThree . '/pay', [], 3);
+check('"pay now": Stripe not answering - a message, no server error, the order stays as it is', $r['status'] !== 500 && str_contains($flash(), 'nicht erreichbar') && $orderRow($orderOfThree)['payment_state'] === 'unpaid');
+for ($i = 0; $i < 21; $i++) {
+    $pPost('/orders/' . $orderOfThree . '/pay', [], 3);
+}
+check('"pay now" is rate limited per account', str_contains($flash(), 'Zu viele'));
+$pdo->exec('DELETE FROM rate_limit_attempt');
+$pdo->exec("DELETE FROM orders WHERE id > {$ordersBefore}");
+@unlink($mailLog);
+
+// The service fails while ordering: the order stands and can be paid later or differently.
+$http->reset();
+$r = $pPost($orderPath, ['package' => '2', 'extras' => ['0'], 'payment_method' => 'core.stripe'], 2);
+$failedOrder = $lastOrder();
+check('ordering while Stripe does not answer: the order exists, unpaid, and the buyer reads why on its page', $r['status'] !== 500 && $failedOrder > $ordersBefore && $orderRow($failedOrder)['payment_state'] === 'unpaid'
+    && str_contains($flash(), 'nicht erreichbar') && $paymentsOf($failedOrder)[0]['status'] === 'failed' && str_contains($pGet('/orders/' . $failedOrder, 2)['body'], 'Jetzt bezahlen'));
+$http->answer(400, ['error' => ['type' => 'invalid_request_error', 'code' => 'account_invalid', 'message' => 'The provided key ' . $stripeKey . ' does not have access to account acct_1TEST']]);
+$r = $pPost('/orders/' . $failedOrder . '/pay', [], 2);
+check('a refusal by the service is told in own words; nothing of its answer reaches the page', $r['status'] !== 500 && str_contains($flash(), 'Anfrage abgelehnt') && !str_contains($flash(), 'acct_') && !str_contains($flash(), 'sk_test'));
+$r = $pGet('/orders/' . $failedOrder, 2);
+check('changing the method: the other available ones are offered while unpaid', str_contains($r['body'], 'Andere Zahlungsart wählen') && str_contains($r['body'], 'value="core.transfer"') && str_contains($r['body'], 'value="core.paypal"')
+    && str_contains($r['body'], 'value="core.offline"') && !str_contains($r['body'], 'value="core.stripe"'));
+$pPost('/orders/' . $failedOrder . '/payment-method', ['payment_method' => 'core.nope'], 2);
+check('changing the method: only to one that exists', $orderRow($failedOrder)['payment_method'] === 'core.stripe' && $flash() !== '');
+$pPost('/orders/' . $failedOrder . '/payment-method', ['payment_method' => 'core.transfer'], 2);
+$r = $pGet('/orders/' . $failedOrder, 2);
+check('changing the method: to bank transfer, and the bank details appear', $orderRow($failedOrder)['payment_method'] === 'core.transfer' && str_contains($r['body'], 'DE89 3704 0044 0532 0130 00') && !str_contains($r['body'], 'Jetzt bezahlen')
+    && str_contains($r['body'], 'value="core.stripe"'));
+$pPost('/account/payments/transfer/delete', [], 1);
+check('a provider removes the bank details: gone from the order page, the buyer is asked to choose again', $setup('core.transfer') === false && !str_contains($pGet('/orders/' . $failedOrder, 2)['body'], '0532')
+    && str_contains($pGet('/orders/' . $failedOrder, 2)['body'], 'noch keine Zahlungsart gewählt') && !str_contains($pGet($orderPath, 2)['body'], 'value="core.transfer"'));
+$pPost('/account/payments/transfer', $validBank, 1);
+$pdo->exec("DELETE FROM orders WHERE id > {$ordersBefore}");
+
+// PayPal: the order is created at PayPal, approved there, captured on return.
+$http->reset();
+$http->answer(200, ['access_token' => 'A21.token']);
+$http->answer(201, $paypalOrder);
+$pPost($orderPath, ['package' => '2', 'extras' => ['0'], 'payment_method' => 'core.paypal'], 2);
+$paypalOrderId = $lastOrder();
+$started = $paymentsOf($paypalOrderId);
+$sentJson = json_decode((string) ($http->requests[1]['body'] ?? ''), true);
+check('paypal order: created with the provider\'s credentials, the PayPal order id stored with the order', count($started) === 1 && $started[0]['provider_reference'] === '5O190127TN364715T' && $started[0]['status'] === 'pending'
+    && $http->requests[0]['headers']['Authorization'] === 'Basic ' . base64_encode('AClientId123:' . $paypalSecret) && $http->requests[1]['url'] === 'https://api-m.sandbox.paypal.com/v2/checkout/orders'
+    && $sentJson['purchase_units'][0]['amount'] === ['currency_code' => 'EUR', 'value' => '119.00'] && $sentJson['purchase_units'][0]['custom_id'] === (string) $paypalOrderId
+    && $sentJson['payment_source']['paypal']['experience_context']['return_url'] === 'https://example.test/orders/' . $paypalOrderId . '/payments/' . $started[0]['id'] . '/return'
+    && $sentJson['payment_source']['paypal']['experience_context']['cancel_url'] === 'https://example.test/orders/' . $paypalOrderId && strlen($http->requests[1]['headers']['PayPal-Request-Id']) === 32);
+$returnPath = '/orders/' . $paypalOrderId . '/payments/' . $started[0]['id'] . '/return';
+$http->reset();
+$http->answer(200, ['access_token' => 'A21.token']);
+$http->answer(200, $paypalOrder);
+$pGet($returnPath . '?token=5O190127TN364715T&PayerID=ABC', 2);
+check('paypal return: an order the buyer did not approve is not captured', count($http->requests) === 2 && $http->requests[1]['method'] === 'GET' && $orderRow($paypalOrderId)['payment_state'] === 'unpaid' && str_contains($flash(), 'nicht abgeschlossen'));
+foreach ([$captured('1.00'), $captured('119.00', 'USD'), $captured('119.00', 'EUR', 'PENDING'), $captured('119.00', 'EUR', 'COMPLETED', '999999'), ['status' => 'COMPLETED']] as $answer) {
+    $http->reset();
+    $http->answer(200, ['access_token' => 'A21.token']);
+    $http->answer(200, ['status' => 'APPROVED'] + $paypalOrder);
+    $http->answer(201, $answer);
+    $pGet($returnPath, 2);
+}
+check('paypal return: another amount or currency, a capture held back, another order\'s capture, or no capture at all is not a payment', $orderRow($paypalOrderId)['payment_state'] === 'unpaid' && $paymentsOf($paypalOrderId)[0]['status'] === 'pending'
+    && count($http->requests) === 3 && $paidMails() === 0);
+$http->reset();
+$http->answer(200, ['access_token' => 'A21.token']);
+$http->answer(200, ['status' => 'APPROVED'] + $paypalOrder);
+$http->answer(201, $captured('119.00', 'EUR', 'COMPLETED', (string) $paypalOrderId));
+$pGet($returnPath . '?token=SOMEONEELSESORDER&PayerID=ABC', 2);
+check('paypal return: the order captured is the stored one, whatever the address says', $http->requests[1]['url'] === 'https://api-m.sandbox.paypal.com/v2/checkout/orders/5O190127TN364715T'
+    && $http->requests[2]['method'] === 'POST' && $http->requests[2]['url'] === 'https://api-m.sandbox.paypal.com/v2/checkout/orders/5O190127TN364715T/capture'
+    && !str_contains(implode(' ', array_column($http->requests, 'url')), 'SOMEONEELSESORDER') && $http->requests[2]['headers']['Authorization'] === 'Bearer A21.token');
+check('paypal return: completed with the order\'s amount and currency marks it as paid, both sides are mailed', $orderRow($paypalOrderId)['payment_state'] === 'paid' && $paymentsOf($paypalOrderId)[0]['status'] === 'paid' && $paidMails() === 2
+    && str_contains((string) file_get_contents($mailLog), '119,00 € über PayPal') && str_contains($pGet('/orders/' . $paypalOrderId, 1)['body'], '<code>5O190127TN364715T</code>'));
+$http->reset();
+$pGet($returnPath, 2);
+check('paypal return: opened again it captures nothing and mails nobody', $http->requests === [] && $paidMails() === 2);
+$pdo->exec("DELETE FROM orders WHERE id > {$ordersBefore}");
+@unlink($mailLog);
+$http->reset();
+$http->answer(200, ['access_token' => 'A21.token']);
+$http->answer(422, ['name' => 'UNPROCESSABLE_ENTITY', 'details' => [['issue' => 'CURRENCY_NOT_SUPPORTED']]]);
+$r = $pPost($orderPath, ['package' => '2', 'payment_method' => 'core.paypal'], 2);
+check('ordering while PayPal refuses: the order stands, unpaid, with a message', $r['status'] !== 500 && $lastOrder() > $ordersBefore && $orderRow($lastOrder())['payment_state'] === 'unpaid' && str_contains($flash(), 'Anfrage abgelehnt')
+    && $paymentsOf($lastOrder())[0]['status'] === 'failed');
+$http->reset();
+$http->answer(200, ['access_token' => 'A21.token']);
+$http->answer(201, ['id' => '7XY', 'links' => [['rel' => 'payer-action', 'href' => 'https://www.paypal.com.evil.example/checkoutnow?token=7XY']]]);
+$pPost('/orders/' . $lastOrder() . '/pay', [], 2);
+check('paypal: an approval address that is not PayPal\'s is not followed', str_contains($flash(), 'schiefgegangen') && $paymentsOf($lastOrder())[1]['status'] === 'failed');
+$pdo->exec("DELETE FROM orders WHERE id > {$ordersBefore}");
+
+// An order an extension created itself (an auction's sale) starts with
+// "core.offline" - also where the operator has switched that off.
+$pPost('/admin/payments', ['methods' => ['core.transfer', 'core.paypal', 'core.stripe']], 3);
+$extApp = $payApp();
+$soldId = $extApp->orders->create(['id' => 2, 'email' => 'editor@example.test', 'display_name' => null], $extApp->offers->find($payOffer), 'Alte Kamera', $extApp->orders->flow('freelancer.service'),
+    [['label' => 'Alte Kamera', 'quantity' => 1, 'unit_price' => 1600]], [], 'core.offline', 'de', null, false);
+$r = $pGet('/orders/' . $soldId, 2);
+check('an order created with a method that is switched off: the buyer is asked to choose among the available ones', $orderRow($soldId)['payment_method'] === 'core.offline' && str_contains($r['body'], 'noch keine Zahlungsart gewählt')
+    && str_contains($r['body'], 'value="core.transfer"') && str_contains($r['body'], 'value="core.stripe"') && !str_contains($r['body'], 'value="core.offline"') && !str_contains($r['body'], 'Direkt mit dem Anbieter')
+    && !str_contains($r['body'], 'Jetzt bezahlen'));
+$http->reset();
+$pPost('/orders/' . $soldId . '/pay', [], 2);
+$pPost('/orders/' . $soldId . '/payment-method', ['payment_method' => 'core.offline'], 2);
+check('such an order: nothing is paid before a method is chosen, and the switched-off one cannot be chosen', $http->requests === [] && $orderRow($soldId)['payment_method'] === 'core.offline' && $flash() !== '');
+$pPost('/orders/' . $soldId . '/payment-method', ['payment_method' => 'core.stripe'], 2);
+$http->answer(200, ['id' => 'cs_test_G7', 'url' => 'https://checkout.stripe.com/c/pay/cs_test_G7']);
+$pPost('/orders/' . $soldId . '/pay', [], 2);
+parse_str((string) ($http->requests[0]['body'] ?? ''), $fields);
+check('such an order: once a method is chosen it is paid like any other', $orderRow($soldId)['payment_method'] === 'core.stripe' && $paymentsOf($soldId)[0]['provider_reference'] === 'cs_test_G7'
+    && ($fields['line_items'][0]['price_data']['unit_amount'] ?? null) === '1600');
+// Paid through a window that was still open after the buyer chose something else.
+$pPost('/orders/' . $soldId . '/payment-method', ['payment_method' => 'core.transfer'], 2);
+$body = $event('cs_test_G7', 1600);
+check('a payment arriving for a method the buyer has left meanwhile still counts, and the order shows how it was paid', $orderRow($soldId)['payment_method'] === 'core.transfer' && $hook($body, $sign($body, $webhookSecret)) === 200
+    && $orderRow($soldId)['payment_state'] === 'paid' && $orderRow($soldId)['payment_method'] === 'core.stripe');
+check('the provider still confirms by hand where the buyer chose nothing, also with that method switched off', (function () use ($pdo, $extApp, $payOffer, $pPost, $orderRow): bool {
+    $id = $extApp->orders->create(['id' => 2, 'email' => 'editor@example.test', 'display_name' => null], $extApp->offers->find($payOffer), 'Alte Kamera', $extApp->orders->flow('freelancer.service'),
+        [['label' => 'Alte Kamera', 'quantity' => 1, 'unit_price' => 1600]], [], 'core.offline', 'de', null, false);
+    $pPost('/orders/' . $id . '/paid', [], 1);
+
+    return $orderRow($id)['payment_state'] === 'paid';
+})());
+$before = $lastOrder();
+$r = $pPost($orderPath, ['package' => '2'], 2);
+check('with "settle it yourselves" switched off the order form does not offer it, and with several methods none is assumed', !str_contains($pGet($orderPath, 2)['body'], 'value="core.offline"') && $lastOrder() === $before
+    && str_contains($r['body'], 'Bitte wähle eine Zahlungsart'));
+$pdo->exec("DELETE FROM orders WHERE id > {$ordersBefore}");
+
+// Nothing secret in any page, in the data export or in the log.
+$pages = $pGet('/admin/payments', 3)['body'] . $pGet('/account/payments', 1)['body'] . $pGet($orderPath, 2)['body'] . $pGet('/admin/providers/' . $payProvider, 3)['body'];
+$export = $pGet('/account/export', 1)['body'];
+check('keys appear in no page', strlen($pages) > 5000 && !str_contains($pages, $stripeKey) && !str_contains($pages, $webhookSecret) && !str_contains($pages, $paypalSecret) && !str_contains($pages, 'v1:'));
+check('data export: bank details and account ids, but no key and no encrypted key', str_contains($export, 'DE89370400440532013000') && str_contains($export, 'acct_1TEST') && str_contains($export, 'AClientId123')
+    && !str_contains($export, $paypalSecret) && !str_contains($export, 'v1:') && !str_contains($export, '"secret"') && !str_contains($export, $stripeKey));
+$logged = (string) @file_get_contents($payLog);
+check('the log says what failed, without keys or the services\' own words', str_contains($logged, 'HTTP 0') && str_contains($logged, 'HTTP 400') && !str_contains($logged, $stripeKey) && !str_contains($logged, $paypalSecret)
+    && !str_contains($logged, $webhookSecret) && !str_contains($logged, 'Invalid API Key') && !str_contains($logged, 'A21.token') && !str_contains($logged, 'acct_1TEST'));
+
+// A provider who has set up nothing, on a site without "settle it yourselves".
+foreach (['transfer', 'paypal', 'stripe'] as $slug) {
+    $pPost('/account/payments/' . $slug . '/delete', [], 1);
+}
+$r = $pGet($orderPath . '?package=2', 2);
+$pPost($orderPath, ['package' => '2'], 2);
+check('no method available: the order form says so and no order is placed', $pdo->query('SELECT COUNT(*) FROM provider_payment')->fetchColumn() == 0 && str_contains($r['body'], 'noch keine Zahlungsart eingerichtet')
+    && $lastOrder() === $ordersBefore && !str_contains($pGet('/account/payments', 1)['body'], 'acct_1TEST'));
+$pPost('/account/payments/transfer', $validBank, 1);
+$pPost('/admin/payments', ['methods' => ['core.offline'], 'stripe_remove' => '1'], 3);
+check('the operator removes the Stripe keys and switches the new methods off again', !$payApp()->payments->stripeConfigured() && !$payApp()->payments->isEnabled('core.transfer') && $payApp()->payments->isEnabled('core.offline')
+    && $pPost('/account/payments/transfer', $validBank, 1)['body'] === '' && !str_contains($pGet('/account/payments', 1)['body'], 'name="iban"'));
+$pdo->exec('DELETE FROM provider');
+check('deleting a provider removes what it set up', $pdo->query('SELECT COUNT(*) FROM provider_payment')->fetchColumn() == 0);
+$pdo->exec('DELETE FROM offer');
+$pdo->exec("DELETE FROM setting WHERE name LIKE 'core.payment.%'");
+$pdo->exec("UPDATE extension SET enabled = 0 WHERE id = 'freelancer'");
+$pdo->exec('DELETE FROM rate_limit_attempt');
+ini_restore('error_log');
+@unlink($payLog);
+@unlink($keyPath);
+@rmdir(dirname($keyPath));
 @unlink($mailLog);
 
 // --- Language keys -----------------------------------------------------------
