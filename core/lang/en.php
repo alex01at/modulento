@@ -846,6 +846,7 @@ return [
     'core.package.official_hint' => 'Extensions and themes from the project\'s own repositories that are not here yet.',
     'core.package.official.freelancer' => 'Services with packages, extras and an order flow.',
     'core.package.official.auction' => 'Auctions: lots that go to the highest bidder.',
+    'core.package.official.blog' => 'Blog: posts with categories, cover picture and feed - turns an installation without a marketplace into a blog portal',
     'core.package.official.indigo' => 'A second site theme.',
     'core.package.remove' => 'Remove',
     'core.package.install_title' => 'Install a package',
