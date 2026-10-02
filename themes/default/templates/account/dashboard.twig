@@ -1,0 +1,106 @@
+{% extends 'layout/base.twig' %}
+
+{% block title %}{{ trans('core.dashboard.title') }} – {{ site_name }}{% endblock %}
+
+{% macro orders(rows, empty_key) %}
+    {% if rows is empty %}
+        <p>{{ trans(empty_key) }}</p>
+    {% else %}
+        <table>
+            <tbody>
+            {% for order in rows %}
+                <tr>
+                    <th scope="row"><a href="{{ url('/orders/' ~ order.id) }}">{{ order.number }}</a></th>
+                    <td>{{ order.title }}</td>
+                    <td>{{ trans(order.state_label_key) }}</td>
+                    <td>{{ money(order.total, order.currency) }}</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    {% endif %}
+{% endmacro %}
+
+{% block content %}
+<div class="dashboard">
+    <aside class="dashboard-side">
+        <section class="dashboard-card">
+            <span class="avatar" aria-hidden="true">{{ name|first|upper }}</span>
+            <p class="dashboard-welcome">{{ trans('core.dashboard.welcome') }} <strong>{{ name }}</strong></p>
+            <ul class="dashboard-links">
+                <li><a href="{{ url('/account/orders') }}">{{ trans('core.order.list.buyer') }}</a></li>
+                {% if provider %}
+                    <li><a href="{{ url('/account/offers') }}">{{ trans('core.offer.mine.title') }}</a></li>
+                    <li><a href="{{ url('/account/sales') }}">{{ trans('core.order.list.provider') }}</a></li>
+                    <li><a href="{{ url('/account/provider') }}">{{ trans('core.provider.title') }}</a></li>
+                {% endif %}
+                <li><a href="{{ url('/account/settings') }}">{{ trans('core.account.settings') }}</a></li>
+                <li><a href="{{ url('/offers') }}">{{ trans('core.dashboard.browse') }}</a></li>
+            </ul>
+        </section>
+
+        {% if provider %}
+            <section class="dashboard-card">
+                <h2>{{ provider.name }}</h2>
+                <p>{{ trans('core.provider.status.' ~ provider.status) }}</p>
+                {% include 'review/_rating.twig' with {rating: provider.rating} only %}
+                {% if provider.path %}<p><a href="{{ url(provider.path) }}">{{ trans('core.dashboard.public_profile') }}</a></p>{% endif %}
+                {% for type in provider.types %}
+                    <a class="button" href="{{ url('/account/offers/new') }}?type={{ type.id|url_encode }}">{{ trans('core.offer.mine.new', {type: trans(type.label_key)}) }}</a>
+                {% endfor %}
+            </section>
+        {% else %}
+            <section class="dashboard-card">
+                <h2>{{ trans('core.dashboard.sell.title') }}</h2>
+                <p>{{ trans('core.dashboard.sell.text') }}</p>
+                <a class="button" href="{{ url('/account/provider') }}">{{ trans('core.provider.create') }}</a>
+            </section>
+        {% endif %}
+    </aside>
+
+    <div class="dashboard-main">
+        <h1>{{ trans('core.dashboard.greeting', {name: name}) }}</h1>
+
+        <ul class="dashboard-tiles">
+            <li><span>{{ trans('core.dashboard.tile.open_purchases') }}</span><strong>{{ purchases.open }}</strong></li>
+            <li><span>{{ trans('core.dashboard.tile.closed_purchases') }}</span><strong>{{ purchases.closed }}</strong></li>
+            {% if provider %}
+                <li><span>{{ trans('core.dashboard.tile.open_sales') }}</span><strong>{{ provider.sales.open }}</strong></li>
+                <li>
+                    <span>{{ trans('core.dashboard.tile.offers') }}</span><strong>{{ provider.offers_public }}</strong>
+                    <small>{{ trans('core.dashboard.tile.offers_of', {total: provider.offers}) }}</small>
+                </li>
+            {% endif %}
+        </ul>
+
+        {% if provider %}
+            <section>
+                <div class="dashboard-heading">
+                    <h2>{{ trans('core.dashboard.recent_sales') }}</h2>
+                    <a href="{{ url('/account/sales') }}">{{ trans('core.dashboard.all') }}</a>
+                </div>
+                {{ _self.orders(provider.sales.recent, 'core.dashboard.no_sales') }}
+            </section>
+        {% endif %}
+
+        <section>
+            <div class="dashboard-heading">
+                <h2>{{ trans('core.dashboard.recent_purchases') }}</h2>
+                <a href="{{ url('/account/orders') }}">{{ trans('core.dashboard.all') }}</a>
+            </div>
+            {{ _self.orders(purchases.recent, 'core.dashboard.no_purchases') }}
+        </section>
+
+        {% set latest = latest_offers(3) %}
+        {% if latest %}
+            <section>
+                <div class="dashboard-heading">
+                    <h2>{{ trans('core.dashboard.latest') }}</h2>
+                    <a href="{{ url('/offers') }}">{{ trans('core.dashboard.all') }}</a>
+                </div>
+                {% include 'offer/_cards.twig' with {offers: latest} %}
+            </section>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

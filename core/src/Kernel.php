@@ -142,7 +142,8 @@ final class Kernel
         $router->get('/reset-password/{token}', [RegistrationController::class, 'showReset'], Router::PUBLIC);
         $router->post('/reset-password/{token}', [RegistrationController::class, 'reset'], Router::PUBLIC);
 
-        $router->get('/account', [AccountController::class, 'index']);
+        $router->get('/account', [AccountController::class, 'dashboard']);
+        $router->get('/account/settings', [AccountController::class, 'index']);
         $router->post('/account/profile', [AccountController::class, 'updateProfile']);
         $router->post('/account/password', [AccountController::class, 'changePassword']);
         $router->post('/account/email', [AccountController::class, 'changeEmail']);

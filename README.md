@@ -189,7 +189,8 @@ Templates of the site theme, with the variables they receive:
 | `auth/forgot.twig` | - |
 | `auth/reset.twig` | `errors`, `token`, `min_length` |
 | `account/_nav.twig` | - ; the account's pages, included on top of each; `provider_status()` says whether the account has a provider profile |
-| `account/index.twig` | `locales`, `min_length`, `is_last_admin`, `provider_status` |
+| `account/dashboard.twig` | `name`, `purchases` (`open`, `closed`, `recent`), `provider` (null or `name`, `status`, `path`, `rating`, `offers`, `offers_public`, `sales` like `purchases`, `types`); the page behind "My account" |
+| `account/index.twig` | the settings: `locales`, `min_length`, `is_last_admin`, `provider_status` |
 | `account/provider.twig` | `provider` (stored or typed values, `texts` by language), `status`, `status_note`, `public_path`, `certified`, `errors`, `locales`, `countries`, `approval_required` |
 | `offer/index.twig` | `offers` (cards), `total`, `categories` (tree), `category`, `search`, `sort`, `sorts`, `page`, `pages` |
 | `offer/_cards.twig` | `offers`: `title`, `summary`, `path`, `price_from`, `currency`, `thumb`, `provider_name`, `provider_path` |

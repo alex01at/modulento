@@ -391,6 +391,23 @@ final class Orders
         return $stmt->fetch() !== false;
     }
 
+    /**
+     * How many orders an account has on one side, for an overview.
+     *
+     * @param string $role "buyer" (by account id) or "provider" (by provider id)
+     * @return array{open: int, closed: int}
+     */
+    public function tally(string $role, int $id): array
+    {
+        $column = $role === 'provider' ? 'provider_id' : 'buyer_id';
+        $open = $this->db->prepare("SELECT COUNT(*) FROM orders WHERE {$column} = :id AND closed_at IS NULL");
+        $open->execute(['id' => $id]);
+        $closed = $this->db->prepare("SELECT COUNT(*) FROM orders WHERE {$column} = :id AND closed_at IS NOT NULL");
+        $closed->execute(['id' => $id]);
+
+        return ['open' => (int) $open->fetchColumn(), 'closed' => (int) $closed->fetchColumn()];
+    }
+
     /** How many unfinished orders a buyer has for one offer. */
     public function openCount(int $buyerId, int $offerId): int
     {
