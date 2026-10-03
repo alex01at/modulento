@@ -6,7 +6,25 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{% block title %}{{ site_name }}{% endblock %}</title>
+    {# Captured once, so the page's own title (or lack of one) is reused for og:title without computing it twice. #}
+    {% set page_title %}{% block title %}{{ site_name }}{% endblock %}{% endset %}
+    <title>{{ page_title }}</title>
+    {# Likewise for the description: a page sets it by overriding this block, e.g. {% block meta_description %}{{ offer.summary }}{% endblock %}. #}
+    {% set page_description %}{% block meta_description %}{{ meta_description() }}{% endblock %}{% endset %}
+    {% if page_description %}<meta name="description" content="{{ page_description }}">{% endif %}
+    <meta property="og:site_name" content="{{ site_name }}">
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="{{ page_title }}">
+    {% if page_description %}<meta property="og:description" content="{{ page_description }}">{% endif %}
+    <meta property="og:url" content="{{ url(current_path(), null, true) }}">
+    {# A page overrides this with its own picture, e.g. an offer's first image; the path it gives is made absolute the same way. #}
+    {% set page_image %}{% block meta_image %}{{ site_logo('light') }}{% endblock %}{% endset %}
+    {% if page_image %}
+        <meta property="og:image" content="{{ site_url }}{{ page_image }}">
+        <meta name="twitter:card" content="summary">
+        <meta name="twitter:image" content="{{ site_url }}{{ page_image }}">
+    {% endif %}
+    {% if site_favicon() %}<link rel="icon" href="{{ site_favicon() }}">{% endif %}
     {% for language in locale_urls() %}
         <link rel="alternate" hreflang="{{ language.locale }}" href="{{ language.absolute_url }}">
     {% endfor %}
@@ -19,7 +37,17 @@
 </head>
 <body>
 <header class="site-header">
-    <a class="site-name" href="{{ url('/') }}">{{ site_name }}</a>
+    <a class="site-name" href="{{ url('/') }}">
+        {% set logoLight = site_logo('light') %}
+        {% if logoLight %}
+            {# The dark variant, where there is one, is swapped in by CSS - see theme.css. #}
+            <img class="site-logo site-logo-light" src="{{ logoLight }}" alt="{{ site_name }}">
+            {% set logoDark = site_logo('dark') %}
+            {% if logoDark != logoLight %}<img class="site-logo site-logo-dark" src="{{ logoDark }}" alt="{{ site_name }}">{% endif %}
+        {% else %}
+            {{ site_name }}
+        {% endif %}
+    </a>
     <nav aria-label="{{ trans('core.nav.main') }}">
         {% for link in page_links('header') %}
             <a href="{{ link.url }}">{{ link.title }}</a>

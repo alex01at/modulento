@@ -27,6 +27,11 @@
                     <option value="closed" {{ settings.registration == 'closed' ? 'selected' }}>{{ trans('core.admin.settings.registration_closed') }}</option>
                 </select>
             </div>
+            <div class="field field-wide">
+                <label for="meta_description">{{ trans('core.admin.settings.meta_description') }}</label>
+                <textarea id="meta_description" name="meta_description" rows="3" maxlength="300">{{ settings.meta_description }}</textarea>
+                <small>{{ trans('core.admin.settings.meta_description_hint') }}</small>
+            </div>
         </div>
     </section>
 

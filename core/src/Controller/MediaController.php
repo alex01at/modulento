@@ -12,7 +12,7 @@ namespace Modulento\Core\Controller;
  */
 final class MediaController extends Controller
 {
-    private const TYPES = ['webp' => 'image/webp', 'jpg' => 'image/jpeg'];
+    private const TYPES = ['webp' => 'image/webp', 'jpg' => 'image/jpeg', 'png' => 'image/png'];
 
     public function offerImage(array $params): void
     {
@@ -22,6 +22,11 @@ final class MediaController extends Controller
     public function avatar(array $params): void
     {
         $this->send($this->app->avatars->path($params['file']));
+    }
+
+    public function branding(array $params): void
+    {
+        $this->send($this->app->branding->path($params['file']));
     }
 
     private function send(?string $file): void

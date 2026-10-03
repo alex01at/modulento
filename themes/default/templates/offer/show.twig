@@ -2,9 +2,8 @@
 
 {% block title %}{{ offer.title }} – {{ site_name }}{% endblock %}
 
-{% block head %}
-    {% if offer.summary %}<meta name="description" content="{{ offer.summary }}">{% endif %}
-{% endblock %}
+{% block meta_description %}{{ offer.summary }}{% endblock %}
+{% block meta_image %}{{ offer.images[0].large ?? site_logo('light') }}{% endblock %}
 
 {% block content %}
 <article>

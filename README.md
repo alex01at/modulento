@@ -345,11 +345,14 @@ Available in every template:
 | `provider_status()` | Status of the logged-in account's provider profile, or null without one |
 | `account_avatar()` | Path of the logged-in account's profile picture, or null without one (or without an account) |
 | `color_scheme()` | `auto`, `light` or `dark`: what the logged-in account has chosen; `auto` for visitors |
+| `site_logo('light' \| 'dark')` | Path of the site's own logo (Administration → Themes), or null without one; `'dark'` falls back to the light logo if no separate dark one was uploaded |
+| `site_favicon()` | Path of the site's own favicon, or null for the browser's default |
+| `meta_description()` | The default description (Administration → Settings), for pages that have none of their own |
 | `theme_asset(path)`, `admin_asset(path)`, `ext_asset(id, path)` | URL of a file in an `assets/` folder, with cache busting |
 | `csrf_field()`, `csrf_token()` | Required in every `POST` form or AJAX call |
 | `can(permission)` | Whether the logged-in account has a permission |
 | `money(cents, currency)` | Formatted amount |
-| `account`, `site_name`, `flashes`, `admin_menu` | Globals |
+| `account`, `site_name`, `site_url`, `flashes`, `admin_menu` | Globals - `site_url` is the bare address of the site, for the rare absolute link to something that is not a page |
 
 Assets are served from the theme folder itself (`/assets/theme/...`), so a
 theme works by upload alone - no symlink, no copy step, no build. The content
@@ -415,6 +418,42 @@ field's `autocomplete` stays, and it is sent as a password field. Both
 scripts come from `default` unless the theme brings files of the same name.
 The setup page loads its own copy from `core/install/`, which has to stay
 identical.
+
+**The logo, favicon and meta tags.** `site_logo()` and `site_favicon()`
+answer null until an administrator uploads one (Administration → Themes →
+Branding); every theme should fall back to `site_name` where there is no
+logo, and skip the `<link rel="icon">` where there is no favicon. The default
+theme's header shows the light logo by itself and the dark one as well,
+switched by the same CSS the colour scheme already uses:
+
+```twig
+<img class="site-logo site-logo-light" src="{{ logoLight }}" alt="{{ site_name }}">
+<img class="site-logo site-logo-dark" src="{{ logoDark }}" alt="{{ site_name }}">
+```
+
+```css
+.site-logo-dark { display: none; }
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) .site-logo-light { display: none; }
+    :root:not([data-theme="light"]) .site-logo-dark { display: block; }
+}
+:root[data-theme="dark"] .site-logo-light { display: none; }
+:root[data-theme="dark"] .site-logo-dark { display: block; }
+```
+
+The layout also carries the description, Open Graph and Twitter tags every
+page needs, built once and reused so a page sets both the plain description
+and `og:description` by overriding a single block:
+
+```twig
+{% set page_description %}{% block meta_description %}{{ meta_description() }}{% endblock %}{% endset %}
+{% if page_description %}<meta name="description" content="{{ page_description }}">{% endif %}
+```
+
+A page overrides `meta_description` (`offer/show.twig` uses the offer's
+summary) and, for `og:image`, `meta_image` (the offer's first picture,
+falling back to `site_logo('light')`); both default to the site-wide values
+when a page does not set them.
 
 ## Writing an extension
 
