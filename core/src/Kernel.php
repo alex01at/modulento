@@ -363,31 +363,31 @@ final class Kernel
         $app->addPermission('core.update.manage', 'core.permission.update_manage');
         $app->addPermission('core.packages.manage', 'core.permission.packages_manage');
 
-        $app->addAdminMenu('core.admin.menu.settings', '/admin/settings', 'core.settings.manage');
-        $app->addAdminMenu('core.admin.menu.payments', '/admin/payments', 'core.settings.manage');
-        $app->addAdminMenu('core.admin.menu.pages', '/admin/pages', 'core.pages.manage');
-        $app->addAdminMenu('core.admin.menu.orders', '/admin/orders', 'core.orders.manage');
+        $app->addAdminMenu('core.admin.menu.settings', '/admin/settings', 'core.settings.manage', 'system');
+        $app->addAdminMenu('core.admin.menu.payments', '/admin/payments', 'core.settings.manage', 'marketplace');
+        $app->addAdminMenu('core.admin.menu.pages', '/admin/pages', 'core.pages.manage', 'content');
+        $app->addAdminMenu('core.admin.menu.orders', '/admin/orders', 'core.orders.manage', 'marketplace');
         if ($app->modules->enabled('withdrawal')) {
-            $app->addAdminMenu('core.admin.menu.withdrawals', '/admin/withdrawals', 'core.orders.manage');
+            $app->addAdminMenu('core.admin.menu.withdrawals', '/admin/withdrawals', 'core.orders.manage', 'marketplace');
         }
         if ($app->modules->enabled('reviews')) {
-            $app->addAdminMenu('core.admin.menu.reviews', '/admin/reviews', 'core.reviews.manage');
+            $app->addAdminMenu('core.admin.menu.reviews', '/admin/reviews', 'core.reviews.manage', 'moderation');
         }
         if ($app->modules->enabled('reports')) {
-            $app->addAdminMenu('core.admin.menu.reports', '/admin/reports', 'core.reports.manage');
+            $app->addAdminMenu('core.admin.menu.reports', '/admin/reports', 'core.reports.manage', 'moderation');
         }
-        $app->addAdminMenu('core.admin.menu.offers', '/admin/offers', 'core.offers.manage');
-        $app->addAdminMenu('core.admin.menu.categories', '/admin/categories', 'core.categories.manage');
-        $app->addAdminMenu('core.admin.menu.providers', '/admin/providers', 'core.providers.manage');
-        $app->addAdminMenu('core.admin.menu.accounts', '/admin/accounts', 'core.accounts.manage');
-        $app->addAdminMenu('core.admin.menu.roles', '/admin/roles', 'core.roles.manage');
-        $app->addAdminMenu('core.admin.menu.extensions', '/admin/extensions', 'core.extensions.manage');
-        $app->addAdminMenu('core.admin.menu.modules', '/admin/modules', 'core.settings.manage');
-        $app->addAdminMenu('core.admin.menu.themes', '/admin/themes', 'core.themes.manage');
-        $app->addAdminMenu('core.admin.menu.packages', '/admin/packages', 'core.packages.manage');
-        $app->addAdminMenu('core.admin.menu.tasks', '/admin/tasks', 'core.tasks.view');
-        $app->addAdminMenu('core.admin.menu.updates', '/admin/updates', 'core.update.manage');
-        $app->addAdminMenu('core.admin.docs.title', '/admin/docs', 'core.admin.access');
+        $app->addAdminMenu('core.admin.menu.offers', '/admin/offers', 'core.offers.manage', 'marketplace');
+        $app->addAdminMenu('core.admin.menu.categories', '/admin/categories', 'core.categories.manage', 'marketplace');
+        $app->addAdminMenu('core.admin.menu.providers', '/admin/providers', 'core.providers.manage', 'marketplace');
+        $app->addAdminMenu('core.admin.menu.accounts', '/admin/accounts', 'core.accounts.manage', 'people');
+        $app->addAdminMenu('core.admin.menu.roles', '/admin/roles', 'core.roles.manage', 'people');
+        $app->addAdminMenu('core.admin.menu.extensions', '/admin/extensions', 'core.extensions.manage', 'system');
+        $app->addAdminMenu('core.admin.menu.modules', '/admin/modules', 'core.settings.manage', 'system');
+        $app->addAdminMenu('core.admin.menu.themes', '/admin/themes', 'core.themes.manage', 'system');
+        $app->addAdminMenu('core.admin.menu.packages', '/admin/packages', 'core.packages.manage', 'system');
+        $app->addAdminMenu('core.admin.menu.tasks', '/admin/tasks', 'core.tasks.view', 'system');
+        $app->addAdminMenu('core.admin.menu.updates', '/admin/updates', 'core.update.manage', 'system');
+        $app->addAdminMenu('core.admin.docs.title', '/admin/docs', 'core.admin.access', 'system');
 
         $app->scheduler->register(
             'core.rate-limit-cleanup',

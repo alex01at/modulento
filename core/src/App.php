@@ -190,12 +190,21 @@ final class App
         return $this->view ??= new View($this);
     }
 
-    public function addAdminMenu(string $labelKey, string $path, string $permission): void
+    /**
+     * The sections of the administration's menu, in this order. An entry
+     * names its section; one without a known section goes to "more".
+     */
+    public const ADMIN_GROUPS = ['content', 'marketplace', 'moderation', 'people', 'more', 'system'];
+
+    public function addAdminMenu(string $labelKey, string $path, string $permission, string $group = 'more'): void
     {
-        $this->adminMenu[] = ['label_key' => $labelKey, 'path' => $path, 'permission' => $permission];
+        $this->adminMenu[] = [
+            'label_key' => $labelKey, 'path' => $path, 'permission' => $permission,
+            'group' => in_array($group, self::ADMIN_GROUPS, true) ? $group : 'more',
+        ];
     }
 
-    /** @return array<int, array{label_key: string, path: string, permission: string}> */
+    /** @return array<int, array{label_key: string, path: string, permission: string, group: string}> */
     public function adminMenu(): array
     {
         return $this->adminMenu;

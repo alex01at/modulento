@@ -334,6 +334,7 @@ Available in every template:
 | `current_path()` | Path of the current page without its language prefix, e.g. to mark the active menu entry |
 | `page_links('header' \| 'footer' \| role)` | Published pages for a menu, as `title`/`url`/`role`; `'footer'` ends with the links to the withdrawal form and the report form (`role` is `withdrawal` and `report`) |
 | `latest_offers(limit)` | The newest public offers as cards |
+| `editor()` | The editor's wording as JSON: `<textarea … data-editor="{{ editor() }}">` turns an HTML field of the administration into a simple editor (`themes/admin/assets/editor.js`); without JavaScript it stays a text field, and the server cleans the HTML either way |
 | `module(id)` | Whether an optional function of the core is on: `reviews`, `contact`, `withdrawal`, `reports`, `avatars`, `remember_login` - a theme hides what belongs to a module that is off |
 | `has_catalogue()` | Whether an extension adds a kind of offer; without one, hide the links to offers and providers |
 | `nav_links()` | Entries extensions add to the main menu, as `title`/`url`/`path` |
@@ -437,7 +438,7 @@ extensions/<id>/
 |---|---|
 | `routes(fn (Router $r) => ...)` | Routes. Each states its access: `Router::PUBLIC`, `Router::AUTH` (default) or a permission name |
 | `permission(name, labelKey)` | A permission that roles can be given |
-| `adminMenu(labelKey, path, permission)` | An entry in the administration menu |
+| `adminMenu(labelKey, path, permission, group)` | An entry in the administration menu, in one of its sections: `content`, `marketplace`, `moderation`, `people`, `system`, or `more` (the default) |
 | `navigation(labelKey, path)` | An entry in the site's main menu |
 | `homeSection(template, data)` | A template of the extension included on the home page; `data` is an optional `Closure(App): array` that supplies its variables |
 | `listen(EventClass, fn ($event, App $app) => ...)` | React to a core or extension event |
