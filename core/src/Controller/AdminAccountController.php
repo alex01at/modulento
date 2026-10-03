@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modulento\Core\Controller;
 
+use Modulento\Core\App;
 use Modulento\Core\Account\Tokens;
 use Modulento\Core\Account\AccountRemoval;
 use Modulento\Core\Support\Session;
@@ -199,12 +200,31 @@ final class AdminAccountController extends Controller
         $this->render('@admin/roles.twig', ['roles' => array_values($this->app->roles->all())]);
     }
 
+    /**
+     * Starting points for a new role: name key and the permissions it gets,
+     * as far as they exist here (a module or extension may be missing).
+     */
+    private const PRESETS = [
+        'editor' => ['core.admin.access', 'core.pages.manage', 'core.categories.manage', 'blog.posts.manage'],
+        'moderator' => ['core.admin.access', 'core.reviews.manage', 'core.reports.manage', 'core.offers.manage', 'core.providers.manage'],
+        'support' => ['core.admin.access', 'core.orders.manage', 'core.accounts.manage'],
+    ];
+
     public function editRole(array $params): void
     {
         $role = isset($params['id']) ? $this->app->roles->find((int) $params['id']) : null;
         if (isset($params['id']) && ($role === null || $role['name'] === 'admin')) {
             $this->redirect('/admin/roles');
             return;
+        }
+
+        $preset = is_string($_GET['preset'] ?? null) ? $_GET['preset'] : '';
+        if ($role === null && isset(self::PRESETS[$preset])) {
+            $role = [
+                'id' => null,
+                'name' => $this->trans('core.admin.roles.preset.' . $preset),
+                'permissions' => array_values(array_intersect(self::PRESETS[$preset], array_keys($this->app->permissions()))),
+            ];
         }
 
         $this->renderRole($role, null);
@@ -238,10 +258,30 @@ final class AdminAccountController extends Controller
 
     private function renderRole(?array $role, ?string $error): void
     {
+        $app = $this->app;
+
+        // A permission belongs to the section of the menu entry it opens;
+        // "open the administration" comes first, the rest goes to "more".
+        $groupOf = [];
+        foreach ($app->adminMenu() as $item) {
+            $groupOf[$item['permission']] ??= $item['group'];
+        }
+        $groups = [];
+        foreach (['general', ...App::ADMIN_GROUPS] as $group) {
+            $groups[$group] = ['id' => $group, 'label_key' => $group === 'general' ? 'core.admin.roles.general' : 'core.admin.group.' . $group, 'permissions' => []];
+        }
+        foreach ($app->permissions() as $name => $labelKey) {
+            $group = $name === 'core.admin.access' ? 'general' : ($groupOf[$name] ?? 'more');
+            // An explanation is optional: "<label key>.hint" where it exists.
+            $hint = $this->trans($labelKey . '.hint');
+            $groups[$group]['permissions'][] = ['name' => $name, 'label_key' => $labelKey, 'hint' => $hint !== $labelKey . '.hint' ? $hint : null];
+        }
+
         $this->render('@admin/role_edit.twig', [
             'role' => $role,
             'error' => $error,
-            'permissions' => $this->app->permissions(),
+            'groups' => array_values(array_filter($groups, fn (array $group) => $group['permissions'] !== [])),
+            'presets' => $role === null || $role['id'] === null ? array_keys(self::PRESETS) : [],
         ]);
     }
 }

@@ -2766,6 +2766,13 @@ $r = $get('/admin/pages/new', 3);
 preg_match('#data-editor="([^"]*)"#', $r['body'], $editor);
 check('editor: the page text gets the editor, its wording in the administrator\'s language', ($editor[1] ?? '') !== '' && (json_decode(html_entity_decode($editor[1]), true)['bold'] ?? null) === 'Fett'
     && str_contains($r['body'], 'editor.js') && file_exists($root . '/themes/admin/assets/editor.js'));
+$r = $get('/admin/roles/new', 3);
+check('roles: permissions come grouped like the menu, with an explanation', preg_match('#<legend>Allgemein</legend>.*?value="core.admin.access".*?<legend>Inhalte</legend>.*?value="core.pages.manage".*?<legend>Personen</legend>.*?value="core.roles.manage"#s', $r['body']) === 1
+    && str_contains($r['body'], 'Ohne dieses Recht sieht die Rolle die Administration gar nicht'));
+$r = $get('/admin/roles/new?preset=support', 3);
+check('roles: a template fills in name and permissions', str_contains($r['body'], 'value="Kundendienst"') && preg_match('#value="core.orders.manage" checked#', $r['body']) === 1
+    && preg_match('#value="core.accounts.manage" checked#', $r['body']) === 1 && preg_match('#value="core.pages.manage" checked#', $r['body']) === 0);
+check('roles: an unknown template is an empty form', !str_contains($get('/admin/roles/new?preset=x', 3)['body'], ' checked') && $get('/admin/roles/new?preset[]=x', 3)['status'] === 200);
 check('administration: the top bar has the same account menu', str_contains($r['body'], '<details class="account-menu">') && str_contains($r['body'], 'action="/account/appearance"') && str_contains($r['body'], 'account-menu.js'));
 check('colour scheme: it is the account\'s own', str_contains($get('/', 2)['body'], '<html lang="de">') && str_contains($get('/', null)['body'], '<html lang="de">'));
 foreach (['pink', '', ['dark'], 'DARK'] as $invalid) {
