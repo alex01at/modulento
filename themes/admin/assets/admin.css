@@ -485,3 +485,7 @@ code { padding: .1rem .35rem; border: 1px solid var(--line); border-radius: 4px;
 .editor textarea { display: none; }
 .editor.editor-source .editor-area { display: none; }
 .editor.editor-source textarea { display: block; width: 100%; min-height: 16rem; border: 0; border-radius: 0 0 6px 6px; font-family: ui-monospace, monospace; font-size: .85rem; }
+
+/* --- Branding previews (Administration → Themes) --- */
+.branding-preview { display: flex; align-items: center; min-height: 3.5rem; margin: .5rem 0; padding: .5rem; border: 1px dashed var(--line); border-radius: 6px; background: repeating-conic-gradient(var(--bg) 0% 25%, var(--card) 0% 50%) 0 0 / 1.2rem 1.2rem; }
+.branding-preview img { max-height: 3rem; max-width: 12rem; object-fit: contain; }

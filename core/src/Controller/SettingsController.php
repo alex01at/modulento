@@ -21,6 +21,7 @@ final class SettingsController extends Controller
                 'provider_approval' => $app->providers->approvalRequired() ? 'required' : 'off',
                 'offer_approval' => $app->offers->approvalRequired() ? 'required' : 'off',
                 'currency' => $app->offers->currency(),
+                'meta_description' => $app->settings->get('core.meta_description'),
             ],
             'available_locales' => $app->locales->available(),
             'enabled_locales' => $app->locales->enabled(),
@@ -47,6 +48,9 @@ final class SettingsController extends Controller
         $app->settings->set('core.site_name', $siteName);
         $app->settings->set('core.mail_from', $mailFrom);
         $app->settings->set('core.registration', ($_POST['registration'] ?? '') === 'closed' ? 'closed' : 'open');
+        // Shown on pages that have no description of their own (an offer's
+        // summary, a blog post's), and used for og:description.
+        $app->settings->set('core.meta_description', mb_substr(trim((string) ($_POST['meta_description'] ?? '')), 0, 300));
         $app->locales->save($default, $enabled);
 
         $approvalRequired = ($_POST['provider_approval'] ?? '') !== 'off';

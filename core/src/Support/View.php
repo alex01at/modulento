@@ -66,6 +66,9 @@ final class View
         $this->twig->addGlobal('flashes', Session::pullFlashes());
         $this->twig->addGlobal('account', $auth->account());
         $this->twig->addGlobal('site_name', $app->siteName());
+        // The bare address of the site, for the rare tag that needs an
+        // absolute URL to something that is not a page (an image).
+        $this->twig->addGlobal('site_url', rtrim($app->config['app']['url'], '/'));
         $menu = array_values(array_filter($app->adminMenu(), fn (array $item) => $auth->can($item['permission'])));
         $this->twig->addGlobal('admin_menu', $menu);
         // The same entries by section, in the order of App::ADMIN_GROUPS;
@@ -182,6 +185,18 @@ final class View
 
             return $account !== null && $app->modules->enabled('avatars') ? $app->avatars->url($account['id']) : null;
         }));
+        // The site's own logo (Administration → Themes), or null without
+        // one: "light" for a light background, "dark" for a dark one. A
+        // layout that has no dark variant uploaded falls back to "light".
+        $this->twig->addFunction(new TwigFunction('site_logo', function (string $variant) use ($app): ?string {
+            return $app->branding->url('logo_' . ($variant === 'dark' ? 'dark' : 'light')) ?? ($variant === 'dark' ? $app->branding->url('logo_light') : null);
+        }));
+        // The site's own favicon, or null for the browser's default.
+        $this->twig->addFunction(new TwigFunction('site_favicon', fn () => $app->branding->url('favicon')));
+        // The default description for pages that have none of their own
+        // (Administration → Settings), used for <meta name="description">
+        // and og:description.
+        $this->twig->addFunction(new TwigFunction('meta_description', fn () => $app->settings->get('core.meta_description')));
         // "auto", "light" or "dark": what the logged-in account has chosen.
         // A layout writes a fixed choice as data-theme on <html>; "auto"
         // (every visitor) leaves the decision to the device.

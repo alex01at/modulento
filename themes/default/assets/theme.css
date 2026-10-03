@@ -88,7 +88,15 @@ a { color: var(--accent); }
 }
 
 .site-header nav { display: flex; flex-wrap: wrap; align-items: center; gap: 1rem; }
-.site-name { font-weight: 700; text-decoration: none; color: var(--text); }
+.site-name { display: flex; align-items: center; font-weight: 700; text-decoration: none; color: var(--text); }
+.site-logo { display: block; height: 2rem; width: auto; max-width: 12rem; object-fit: contain; }
+.site-logo-dark { display: none; }
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) .site-logo-light { display: none; }
+    :root:not([data-theme="light"]) .site-logo-dark { display: block; }
+}
+:root[data-theme="dark"] .site-logo-light { display: none; }
+:root[data-theme="dark"] .site-logo-dark { display: block; }
 
 main { flex: 1 0 auto; width: 100%; max-width: 64rem; margin: 0 auto; padding: 1.5rem 1rem 3rem; }
 .account-nav { display: flex; flex-wrap: wrap; gap: .5rem; margin-bottom: 1.5rem; padding-bottom: 1rem; border-bottom: 1px solid var(--line); }

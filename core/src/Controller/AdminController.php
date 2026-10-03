@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modulento\Core\Controller;
 
 use Modulento\Core\App;
+use Modulento\Core\Support\Branding;
 use Modulento\Core\Support\Modules;
 use Modulento\Core\Support\Session;
 use PDO;
@@ -157,6 +158,12 @@ final class AdminController extends Controller
         $this->render('@admin/themes.twig', [
             'themes' => array_values($this->app->themes->siteThemes()),
             'active' => $this->app->themes->active(),
+            // Each kind's own file, without site_logo()'s fallback to the
+            // light logo: here it matters whether one was uploaded for it.
+            'branding' => array_combine(Branding::KINDS, array_map(
+                fn (string $kind) => $this->app->branding->url($kind),
+                Branding::KINDS
+            )),
         ]);
     }
 
@@ -164,6 +171,33 @@ final class AdminController extends Controller
     {
         if ($this->app->themes->activate($params['id'])) {
             Session::flash('success', $this->trans('core.admin.themes.activated', ['id' => $params['id']]));
+        }
+
+        $this->redirect('/admin/themes');
+    }
+
+    /** A logo or favicon of the site's own, in place of the default look. */
+    public function saveBranding(array $params): void
+    {
+        $kind = (string) $params['kind'];
+        if (!in_array($kind, Branding::KINDS, true)) {
+            $this->redirect('/admin/themes');
+            return;
+        }
+
+        $problem = $this->app->branding->set($kind, is_array($_FILES['file'] ?? null) ? $_FILES['file'] : []);
+        Session::flash($problem === null ? 'success' : 'error', $this->trans($problem ?? 'core.admin.branding.saved', [
+            'megabytes' => intdiv(Branding::MAX_BYTES, 1024 * 1024),
+        ]));
+        $this->redirect('/admin/themes');
+    }
+
+    public function deleteBranding(array $params): void
+    {
+        $kind = (string) $params['kind'];
+        if (in_array($kind, Branding::KINDS, true)) {
+            $this->app->branding->delete($kind);
+            Session::flash('success', $this->trans('core.admin.branding.deleted'));
         }
 
         $this->redirect('/admin/themes');

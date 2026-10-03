@@ -235,6 +235,7 @@ final class Kernel
         $router->post('/admin/modules', [AdminController::class, 'saveModules'], 'core.settings.manage');
         if ($modules->enabled('avatars')) {
             $router->get('/media/avatars/{file}', [MediaController::class, 'avatar'], Router::PUBLIC);
+        $router->get('/media/branding/{file}', [MediaController::class, 'branding'], Router::PUBLIC);
             $router->post('/account/avatar', [AccountController::class, 'setAvatar']);
             $router->post('/account/avatar/delete', [AccountController::class, 'deleteAvatar']);
         }
@@ -328,6 +329,8 @@ final class Kernel
 
         $router->get('/admin/themes', [AdminController::class, 'themes'], 'core.themes.manage');
         $router->post('/admin/themes/{id}/activate', [AdminController::class, 'activateTheme'], 'core.themes.manage');
+        $router->post('/admin/branding/{kind}', [AdminController::class, 'saveBranding'], 'core.themes.manage');
+        $router->post('/admin/branding/{kind}/delete', [AdminController::class, 'deleteBranding'], 'core.themes.manage');
 
         $router->get('/admin/packages', [PackageController::class, 'index'], 'core.packages.manage');
         $router->post('/admin/packages/install', [PackageController::class, 'install'], 'core.packages.manage');

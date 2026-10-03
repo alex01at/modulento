@@ -46,4 +46,41 @@
         </table>
     </div>
 </section>
+
+<section class="card-box">
+    <div class="card-head">
+        <h2>{{ trans('core.admin.branding.title') }}</h2>
+        <p>{{ trans('core.admin.branding.intro') }}</p>
+    </div>
+
+    <div class="field-grid">
+        {% for kind in ['logo_light', 'logo_dark', 'favicon'] %}
+            {% set current = kind == 'logo_light' ? site_logo('light') : (kind == 'logo_dark' ? site_logo('dark') : site_favicon()) %}
+            {# site_logo('dark') falls back to the light logo once one exists, so compare against the kind's own file to show the right state here. #}
+            {% set own = branding[kind] %}
+            <div class="field">
+                <label for="branding_{{ kind }}">{{ trans('core.admin.branding.' ~ kind) }}</label>
+                <p class="branding-preview">
+                    {% if own %}
+                        <img src="{{ current }}" alt="">
+                    {% else %}
+                        <span class="muted">{{ trans('core.admin.branding.none') }}</span>
+                    {% endif %}
+                </p>
+                <form method="post" action="{{ url('/admin/branding/' ~ kind) }}" enctype="multipart/form-data" class="button-row">
+                    {{ csrf_field() }}
+                    <input id="branding_{{ kind }}" name="file" type="file" accept="image/jpeg,image/png,image/webp" required>
+                    <button type="submit" class="btn-sm">{{ trans('core.admin.branding.upload') }}</button>
+                </form>
+                {% if own %}
+                    <form method="post" action="{{ url('/admin/branding/' ~ kind ~ '/delete') }}">
+                        {{ csrf_field() }}
+                        <button type="submit" class="link-button">{{ trans('core.admin.branding.remove') }}</button>
+                    </form>
+                {% endif %}
+                <small>{{ trans('core.admin.branding.' ~ kind ~ '_hint') }}</small>
+            </div>
+        {% endfor %}
+    </div>
+</section>
 {% endblock %}

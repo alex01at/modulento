@@ -6,6 +6,7 @@ namespace Modulento\Core;
 
 use Modulento\Core\Account\Accounts;
 use Modulento\Core\Account\Avatars;
+use Modulento\Core\Support\Branding;
 use Modulento\Core\Account\LoginTokens;
 use Modulento\Core\Account\Preferences;
 use Modulento\Core\Account\Roles;
@@ -80,6 +81,7 @@ final class App
     public readonly Reports $reports;
     public readonly Modules $modules;
     public readonly Avatars $avatars;
+    public readonly Branding $branding;
     public readonly Preferences $preferences;
     public readonly Reviews $reviews;
     public readonly Packages $packages;
@@ -155,6 +157,7 @@ final class App
             is_file($root . '/VERSION') ? (trim((string) file_get_contents($root . '/VERSION')) ?: '0.0.0') : '0.0.0'
         );
         $this->avatars = new Avatars($db, ($config['app']['uploads'] ?? $config['app']['root'] . '/var/uploads') . '/avatars');
+        $this->branding = new Branding($this->settings, ($config['app']['uploads'] ?? $config['app']['root'] . '/var/uploads') . '/branding');
         $this->preferences = new Preferences($db);
         $this->accounts = new Accounts($db);
         $this->tokens = new Tokens($db);

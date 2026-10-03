@@ -1114,6 +1114,65 @@ $_FILES = [];
 $post('/account/avatar/delete', [], 2);
 check('avatar: removing deletes row and file', $pdo->query('SELECT COUNT(*) FROM account_avatar')->fetchColumn() == 0 && count(glob($config['app']['uploads'] . '/avatars/*')) === 0 && !str_contains($get('/account', 2)['body'], '/media/avatars/'));
 
+// --- Branding: a logo and favicon of the site's own, and the default meta description ---
+$brand = function (string $kind, $image, int $as = 3) use ($post) {
+    $_FILES = ['file' => ['tmp_name' => $image, 'error' => UPLOAD_ERR_OK, 'size' => $image ? filesize($image) : 0, 'name' => 'x.png', 'type' => 'image/png']];
+    $result = $post('/admin/branding/' . $kind, [], $as);
+    $_FILES = [];
+
+    return $result;
+};
+check('branding: before any upload, the header shows the name and no icon is linked', preg_match('#<a class="site-name" href="/">\\s*Testseite\\s*</a>#', $get('/')['body']) === 1
+    && !str_contains($get('/')['body'], 'rel="icon"') && !str_contains($get('/')['body'], 'class="site-logo'));
+check('branding: needs the themes permission', $brand('logo_light', $makeImage(200, 80), 1)['status'] === 403 && $pdo->query("SELECT COUNT(*) FROM setting WHERE name = 'core.logo_light'")->fetchColumn() == 0);
+check('branding: an unknown kind changes nothing', $pdo->query("SELECT COUNT(*) FROM setting WHERE name LIKE 'core.evil%'")->fetchColumn() == 0);
+$brand('evil', $makeImage(10, 10));
+check('branding: a kind outside the known three is rejected', $pdo->query("SELECT COUNT(*) FROM setting WHERE name = 'core.evil'")->fetchColumn() == 0);
+$fakeLogo = tempnam(sys_get_temp_dir(), 'img');
+file_put_contents($fakeLogo, '<?php echo "not a picture";');
+$brand('logo_light', $fakeLogo);
+check('branding: a file that is no picture is refused', $pdo->query("SELECT value FROM setting WHERE name = 'core.logo_light'")->fetchColumn() === false);
+
+$brand('logo_light', $makeImage(200, 80));
+$logoLight = $pdo->query("SELECT value FROM setting WHERE name = 'core.logo_light'")->fetchColumn();
+check('branding: the light logo is stored under a random name, re-encoded', $logoLight !== false && preg_match('/^[a-f0-9]{32}\.(webp|png)$/', $logoLight) === 1
+    && is_file($config['app']['uploads'] . '/branding/' . $logoLight));
+$r = $get('/');
+check('branding: the header shows it, with the site name as alt text, and og:image follows', str_contains($r['body'], '<img class="site-logo site-logo-light" src="/media/branding/' . $logoLight . '" alt="Testseite">')
+    && !str_contains($r['body'], 'site-logo-dark')
+    && str_contains($r['body'], '<meta property="og:image" content="https://example.test/media/branding/' . $logoLight . '">')
+    && str_contains($r['body'], '<meta name="twitter:image" content="https://example.test/media/branding/' . $logoLight . '">'));
+
+$brand('logo_dark', $makeImage(220, 90));
+$logoDark = $pdo->query("SELECT value FROM setting WHERE name = 'core.logo_dark'")->fetchColumn();
+check('branding: a distinct dark logo is shown alongside the light one', $logoDark !== false && $logoDark !== $logoLight
+    && str_contains($get('/')['body'], 'class="site-logo site-logo-dark" src="/media/branding/' . $logoDark . '"'));
+$brand('logo_dark/delete', null);
+check('branding: removing the dark logo falls back to the light one, shown only once', $pdo->query("SELECT value FROM setting WHERE name = 'core.logo_dark'")->fetchColumn() === ''
+    && !str_contains($get('/')['body'], 'site-logo-dark'));
+
+$brand('favicon', $makeImage(300, 300));
+$favicon = $pdo->query("SELECT value FROM setting WHERE name = 'core.favicon'")->fetchColumn();
+check('branding: the favicon is linked on site and administration pages', $favicon !== false
+    && str_contains($get('/')['body'], '<link rel="icon" href="/media/branding/' . $favicon . '">')
+    && str_contains($get('/admin', 3)['body'], '<link rel="icon" href="/media/branding/' . $favicon . '">'));
+$app = new Modulento\Core\App($config, $pdo);
+check('branding: only files the upload created are served', $app->branding->path($favicon) !== null && $app->branding->path('../../../.env') === null && $app->branding->path(substr($favicon, 0, -3) . 'php') === null);
+$brand('favicon/delete', null);
+check('branding: removing it leaves no icon link', !str_contains($get('/')['body'], 'rel="icon"') && $pdo->query("SELECT value FROM setting WHERE name = 'core.favicon'")->fetchColumn() === '');
+$brand('logo_light/delete', null);
+check('branding: without a logo the header falls back to the name again', !str_contains($get('/')['body'], 'class="site-logo'));
+
+check('branding: the default description is empty, so no tag appears', !str_contains($get('/')['body'], 'name="description"') && !str_contains($get('/')['body'], 'property="og:description"'));
+$post('/admin/settings', $settings + ['meta_description' => str_repeat('ü', 310)], 3);
+check('branding: the default description is kept to 300 characters', mb_strlen($pdo->query("SELECT value FROM setting WHERE name = 'core.meta_description'")->fetchColumn()) === 300);
+$post('/admin/settings', $settings + ['meta_description' => 'Ein Marktplatz für alles Mögliche.'], 3);
+$r = $get('/');
+check('branding: the default description appears on a page without its own, also as og:description', str_contains($r['body'], '<meta name="description" content="Ein Marktplatz für alles Mögliche.">')
+    && str_contains($r['body'], '<meta property="og:description" content="Ein Marktplatz für alles Mögliche.">')
+    && str_contains($r['body'], '<meta property="og:site_name" content="Testseite">') && str_contains($r['body'], '<meta property="og:type" content="website">')
+    && str_contains($r['body'], '<meta property="og:url" content="https://example.test/">'));
+
 $_FILES = ['image' => ['tmp_name' => $makeImage(10, 10), 'error' => UPLOAD_ERR_OK]];
 $post('/account/offers/' . $offerId . '/images', [], 2);
 $_FILES = [];
