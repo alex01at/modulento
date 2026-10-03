@@ -66,10 +66,18 @@ final class View
         $this->twig->addGlobal('flashes', Session::pullFlashes());
         $this->twig->addGlobal('account', $auth->account());
         $this->twig->addGlobal('site_name', $app->siteName());
-        $this->twig->addGlobal('admin_menu', array_values(array_filter(
-            $app->adminMenu(),
-            fn (array $item) => $auth->can($item['permission'])
-        )));
+        $menu = array_values(array_filter($app->adminMenu(), fn (array $item) => $auth->can($item['permission'])));
+        $this->twig->addGlobal('admin_menu', $menu);
+        // The same entries by section, in the order of App::ADMIN_GROUPS;
+        // a section the account sees nothing of is left out.
+        $groups = [];
+        foreach (App::ADMIN_GROUPS as $group) {
+            $items = array_values(array_filter($menu, fn (array $item) => $item['group'] === $group));
+            if ($items !== []) {
+                $groups[] = ['id' => $group, 'label_key' => 'core.admin.group.' . $group, 'items' => $items];
+            }
+        }
+        $this->twig->addGlobal('admin_menu_groups', $groups);
 
         $this->twig->addFunction(new TwigFunction(
             'trans',
@@ -184,6 +192,12 @@ final class View
         // Whether any extension adds a kind of offer. Without one there is
         // no catalogue to link to, and the site is pages, accounts and
         // whatever else the extensions bring.
+        // The wording of the text editor (editor.js), as a JSON object for
+        // the data-editor attribute of an HTML text field.
+        $this->twig->addFunction(new TwigFunction('editor', fn () => json_encode(array_combine(
+            ['toolbar', 'area', 'p', 'h2', 'h3', 'bold', 'italic', 'ul', 'ol', 'quote', 'link', 'unlink', 'html', 'link_prompt'],
+            array_map(fn (string $key) => $translator->trans('core.editor.' . $key), ['toolbar', 'area', 'p', 'h2', 'h3', 'bold', 'italic', 'ul', 'ol', 'quote', 'link', 'unlink', 'html', 'link_prompt'])
+        ), JSON_UNESCAPED_UNICODE)));
         // Whether an optional function of the core is switched on (Administration → Modules).
         $this->twig->addFunction(new TwigFunction('module', fn (string $id) => $app->modules->enabled($id)));
         $this->twig->addFunction(new TwigFunction('has_catalogue', fn () => $app->offers->types() !== []));

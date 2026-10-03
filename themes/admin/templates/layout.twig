@@ -10,6 +10,7 @@
     <title>{% block title %}{{ trans('core.admin.title') }} – {{ site_name }}{% endblock %}</title>
     <link rel="stylesheet" href="{{ admin_asset('admin.css') }}">
     <script src="{{ admin_asset('admin.js') }}"></script>
+    <script src="{{ admin_asset('editor.js') }}" defer></script>
     <script src="{{ theme_asset('account-menu.js') }}" defer></script>
     {# The same script as on the site: a "show" button next to every password field. #}
     <script src="{{ admin_asset('password-toggle.js') }}" defer data-show="{{ trans('core.password.show') }}" data-hide="{{ trans('core.password.hide') }}"></script>
@@ -32,8 +33,13 @@
     <nav class="admin-menu" aria-label="{{ trans('core.nav.admin') }}">
         {% set here = current_path() %}
         <a href="{{ url('/admin') }}" {{ here == '/admin' ? 'aria-current="page"' }}>{{ icons.menu('/admin') }}<span>{{ trans('core.admin.dashboard.title') }}</span></a>
-        {% for item in admin_menu %}
-            <a href="{{ url(item.path) }}" {{ here == item.path or here starts with (item.path ~ '/') ? 'aria-current="page"' }}>{{ icons.menu(item.path) }}<span>{{ trans(item.label_key) }}</span></a>
+        {% for group in admin_menu_groups %}
+            <p class="admin-menu-group" id="menu-group-{{ group.id }}">{{ trans(group.label_key) }}</p>
+            <div role="group" aria-labelledby="menu-group-{{ group.id }}">
+                {% for item in group.items %}
+                    <a href="{{ url(item.path) }}" {{ here == item.path or here starts with (item.path ~ '/') ? 'aria-current="page"' }}>{{ icons.menu(item.path) }}<span>{{ trans(item.label_key) }}</span></a>
+                {% endfor %}
+            </div>
         {% endfor %}
     </nav>
 </aside>

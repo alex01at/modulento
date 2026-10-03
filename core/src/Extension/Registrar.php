@@ -94,9 +94,14 @@ final class Registrar
         $this->app->addHomeSection($template, $data);
     }
 
-    public function adminMenu(string $labelKey, string $path, string $permission): void
+    /**
+     * @param string $group the section of the menu: "content", "marketplace",
+     *        "moderation", "people", "system"; anything else, or nothing,
+     *        puts the entry under "more"
+     */
+    public function adminMenu(string $labelKey, string $path, string $permission, string $group = 'more'): void
     {
-        $this->app->addAdminMenu($labelKey, $path, $permission);
+        $this->app->addAdminMenu($labelKey, $path, $permission, $group);
     }
 
     private function prefixed(string $name, string $kind): string
