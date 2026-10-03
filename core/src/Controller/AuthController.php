@@ -87,7 +87,7 @@ final class AuthController extends Controller
         // Whatever this browser was remembered as before, the box decides
         // anew - also when someone else logs in on it.
         $this->app->loginTokens->forget();
-        if (isset($_POST['remember'])) {
+        if (isset($_POST['remember']) && $this->app->modules->enabled('remember_login')) {
             $this->app->loginTokens->issue((int) $account['id']);
         }
         Session::remove('login_return_to');

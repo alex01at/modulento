@@ -47,5 +47,7 @@
     {% endif %}
 </article>
 {# Reporting has to be easy to find where the content is. #}
+{% if module('reports') %}
 <p><small><a href="{{ url('/report') }}?url={{ url(current_path(), null, true)|url_encode }}" rel="nofollow">{{ trans('core.report.link_here') }}</a></small></p>
+{% endif %}
 {% endblock %}

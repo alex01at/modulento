@@ -124,7 +124,7 @@ final class Kernel
         // "Stay logged in": the session is gone (the browser was closed),
         // the cookie is still there. Only here, where a session exists to
         // log in to - never for the asset, cron and media requests above.
-        if (RememberCookie::present() && !$app->auth->check()) {
+        if ($app->modules->enabled('remember_login') && RememberCookie::present() && !$app->auth->check()) {
             $accountId = $app->loginTokens->resume();
             if ($accountId !== null) {
                 $app->auth->login($accountId);
@@ -150,7 +150,6 @@ final class Kernel
         $router->get('/assets/admin/{path*}', [AssetController::class, 'admin'], Router::PUBLIC);
         $router->get('/assets/ext/{id}/{path*}', [AssetController::class, 'extension'], Router::PUBLIC);
         $router->get('/media/offers/{id}/{file}', [MediaController::class, 'offerImage'], Router::PUBLIC);
-        $router->get('/media/avatars/{file}', [MediaController::class, 'avatar'], Router::PUBLIC);
         $router->get('/cron/{token}', [CronController::class, 'run'], Router::PUBLIC);
 
         $router->get('/login', [AuthController::class, 'showLogin'], Router::PUBLIC);
@@ -169,12 +168,9 @@ final class Kernel
 
         $router->get('/account', [AccountController::class, 'dashboard']);
         $router->get('/account/settings', [AccountController::class, 'index']);
-        $router->post('/account/avatar', [AccountController::class, 'setAvatar']);
-        $router->post('/account/avatar/delete', [AccountController::class, 'deleteAvatar']);
         $router->post('/account/profile', [AccountController::class, 'updateProfile']);
         $router->post('/account/appearance', [AccountController::class, 'updateAppearance']);
         $router->post('/account/password', [AccountController::class, 'changePassword']);
-        $router->post('/account/sessions/revoke', [AccountController::class, 'revokeSessions']);
         $router->post('/account/email', [AccountController::class, 'changeEmail']);
         $router->get('/account/confirm-email/{token}', [AccountController::class, 'confirmEmail']);
         $router->get('/account/export', [AccountController::class, 'export']);
@@ -207,7 +203,6 @@ final class Kernel
 
         $router->get('/offers', [OfferController::class, 'index'], Router::PUBLIC);
         $router->get('/offers/{slug}', [OfferController::class, 'show'], Router::PUBLIC);
-        $router->post('/offers/{slug}/contact', [OfferController::class, 'contact']);
         $router->get('/offers/{slug}/order', [OrderController::class, 'form']);
         $router->post('/offers/{slug}/order', [OrderController::class, 'place']);
 
@@ -224,28 +219,57 @@ final class Kernel
         // The signature of the request is what authenticates it.
         $router->post('/webhooks/stripe', [PaymentController::class, 'stripeWebhook'], Router::PUBLIC, csrfExempt: true);
         $router->get('/orders/{id}/files/{file}', [OrderController::class, 'download']);
-        $router->post('/orders/{id}/review', [ReviewController::class, 'create']);
-        $router->post('/orders/{id}/review/reply', [ReviewController::class, 'reply']);
         $router->get('/categories/{slug}', [OfferController::class, 'category'], Router::PUBLIC);
 
-        // The withdrawal form is public on purpose: it has to be reachable
-        // for the whole withdrawal period, also by someone who cannot log in.
-        $router->get('/withdrawal', [WithdrawalController::class, 'form'], Router::PUBLIC);
-        $router->post('/withdrawal', [WithdrawalController::class, 'review'], Router::PUBLIC);
-        $router->post('/withdrawal/confirm', [WithdrawalController::class, 'confirm'], Router::PUBLIC);
-        $router->get('/withdrawal/done', [WithdrawalController::class, 'done'], Router::PUBLIC);
-
-        // Reporting content needs no account: whoever sees something illegal
-        // has to be able to say so.
-        $router->get('/report', [ReportController::class, 'form'], Router::PUBLIC);
-        $router->post('/report', [ReportController::class, 'send'], Router::PUBLIC);
-        $router->get('/report/done', [ReportController::class, 'done'], Router::PUBLIC);
 
         $router->get('/providers', [ProviderController::class, 'index'], Router::PUBLIC);
         $router->get('/providers/{slug}', [ProviderController::class, 'show'], Router::PUBLIC);
 
         $router->get('/admin', [AdminController::class, 'index'], 'core.admin.access');
         $router->get('/admin/docs', [AdminController::class, 'docs'], 'core.admin.access');
+
+        // Optional functions (Administration → Modules). A module that is
+        // switched off has no routes and no menu entries; its data stays.
+        $modules = $app->modules;
+        $router->get('/admin/modules', [AdminController::class, 'modules'], 'core.settings.manage');
+        $router->post('/admin/modules', [AdminController::class, 'saveModules'], 'core.settings.manage');
+        if ($modules->enabled('avatars')) {
+            $router->get('/media/avatars/{file}', [MediaController::class, 'avatar'], Router::PUBLIC);
+            $router->post('/account/avatar', [AccountController::class, 'setAvatar']);
+            $router->post('/account/avatar/delete', [AccountController::class, 'deleteAvatar']);
+        }
+        if ($modules->enabled('remember_login')) {
+            $router->post('/account/sessions/revoke', [AccountController::class, 'revokeSessions']);
+        }
+        if ($modules->enabled('contact')) {
+            $router->post('/offers/{slug}/contact', [OfferController::class, 'contact']);
+        }
+        if ($modules->enabled('reviews')) {
+            $router->post('/orders/{id}/review', [ReviewController::class, 'create']);
+            $router->post('/orders/{id}/review/reply', [ReviewController::class, 'reply']);
+            $router->get('/admin/reviews', [ReviewController::class, 'index'], 'core.reviews.manage');
+            $router->post('/admin/reviews/{id}/hide', [ReviewController::class, 'hide'], 'core.reviews.manage');
+            $router->post('/admin/reviews/{id}/show', [ReviewController::class, 'show'], 'core.reviews.manage');
+        }
+        if ($modules->enabled('withdrawal')) {
+            // The withdrawal form is public on purpose: it has to be reachable
+            // for the whole withdrawal period, also by someone who cannot log in.
+            $router->get('/withdrawal', [WithdrawalController::class, 'form'], Router::PUBLIC);
+            $router->post('/withdrawal', [WithdrawalController::class, 'review'], Router::PUBLIC);
+            $router->post('/withdrawal/confirm', [WithdrawalController::class, 'confirm'], Router::PUBLIC);
+            $router->get('/withdrawal/done', [WithdrawalController::class, 'done'], Router::PUBLIC);
+            $router->get('/admin/withdrawals', [WithdrawalController::class, 'index'], 'core.orders.manage');
+            $router->post('/admin/withdrawals/{id}/handled', [WithdrawalController::class, 'handled'], 'core.orders.manage');
+        }
+        if ($modules->enabled('reports')) {
+            // Reporting content needs no account: whoever sees something
+            // illegal has to be able to say so.
+            $router->get('/report', [ReportController::class, 'form'], Router::PUBLIC);
+            $router->post('/report', [ReportController::class, 'send'], Router::PUBLIC);
+            $router->get('/report/done', [ReportController::class, 'done'], Router::PUBLIC);
+            $router->get('/admin/reports', [ReportController::class, 'index'], 'core.reports.manage');
+            $router->post('/admin/reports/{id}/decide', [ReportController::class, 'decide'], 'core.reports.manage');
+        }
         $router->get('/admin/extensions', [AdminController::class, 'extensions'], 'core.extensions.manage');
         $router->post('/admin/extensions/{id}/enable', [AdminController::class, 'enableExtension'], 'core.extensions.manage');
         $router->post('/admin/extensions/{id}/disable', [AdminController::class, 'disableExtension'], 'core.extensions.manage');
@@ -268,15 +292,8 @@ final class Kernel
         $router->post('/admin/orders/{id}/transition', [AdminOrderController::class, 'transition'], 'core.orders.manage');
         $router->get('/admin/orders/{id}/files/{file}', [AdminOrderController::class, 'download'], 'core.orders.manage');
 
-        $router->get('/admin/withdrawals', [WithdrawalController::class, 'index'], 'core.orders.manage');
-        $router->post('/admin/withdrawals/{id}/handled', [WithdrawalController::class, 'handled'], 'core.orders.manage');
 
-        $router->get('/admin/reports', [ReportController::class, 'index'], 'core.reports.manage');
-        $router->post('/admin/reports/{id}/decide', [ReportController::class, 'decide'], 'core.reports.manage');
 
-        $router->get('/admin/reviews', [ReviewController::class, 'index'], 'core.reviews.manage');
-        $router->post('/admin/reviews/{id}/hide', [ReviewController::class, 'hide'], 'core.reviews.manage');
-        $router->post('/admin/reviews/{id}/show', [ReviewController::class, 'show'], 'core.reviews.manage');
 
         $router->get('/admin/offers', [AdminCatalogueController::class, 'offers'], 'core.offers.manage');
         $router->get('/admin/offers/{id}', [AdminCatalogueController::class, 'offer'], 'core.offers.manage');
@@ -332,8 +349,12 @@ final class Kernel
         $app->addPermission('core.settings.manage', 'core.permission.settings_manage');
         $app->addPermission('core.pages.manage', 'core.permission.pages_manage');
         $app->addPermission('core.orders.manage', 'core.permission.orders_manage');
-        $app->addPermission('core.reviews.manage', 'core.permission.reviews_manage');
-        $app->addPermission('core.reports.manage', 'core.permission.reports_manage');
+        if ($app->modules->enabled('reviews')) {
+            $app->addPermission('core.reviews.manage', 'core.permission.reviews_manage');
+        }
+        if ($app->modules->enabled('reports')) {
+            $app->addPermission('core.reports.manage', 'core.permission.reports_manage');
+        }
         $app->addPermission('core.offers.manage', 'core.permission.offers_manage');
         $app->addPermission('core.categories.manage', 'core.permission.categories_manage');
         $app->addPermission('core.providers.manage', 'core.permission.providers_manage');
@@ -346,15 +367,22 @@ final class Kernel
         $app->addAdminMenu('core.admin.menu.payments', '/admin/payments', 'core.settings.manage');
         $app->addAdminMenu('core.admin.menu.pages', '/admin/pages', 'core.pages.manage');
         $app->addAdminMenu('core.admin.menu.orders', '/admin/orders', 'core.orders.manage');
-        $app->addAdminMenu('core.admin.menu.withdrawals', '/admin/withdrawals', 'core.orders.manage');
-        $app->addAdminMenu('core.admin.menu.reviews', '/admin/reviews', 'core.reviews.manage');
-        $app->addAdminMenu('core.admin.menu.reports', '/admin/reports', 'core.reports.manage');
+        if ($app->modules->enabled('withdrawal')) {
+            $app->addAdminMenu('core.admin.menu.withdrawals', '/admin/withdrawals', 'core.orders.manage');
+        }
+        if ($app->modules->enabled('reviews')) {
+            $app->addAdminMenu('core.admin.menu.reviews', '/admin/reviews', 'core.reviews.manage');
+        }
+        if ($app->modules->enabled('reports')) {
+            $app->addAdminMenu('core.admin.menu.reports', '/admin/reports', 'core.reports.manage');
+        }
         $app->addAdminMenu('core.admin.menu.offers', '/admin/offers', 'core.offers.manage');
         $app->addAdminMenu('core.admin.menu.categories', '/admin/categories', 'core.categories.manage');
         $app->addAdminMenu('core.admin.menu.providers', '/admin/providers', 'core.providers.manage');
         $app->addAdminMenu('core.admin.menu.accounts', '/admin/accounts', 'core.accounts.manage');
         $app->addAdminMenu('core.admin.menu.roles', '/admin/roles', 'core.roles.manage');
         $app->addAdminMenu('core.admin.menu.extensions', '/admin/extensions', 'core.extensions.manage');
+        $app->addAdminMenu('core.admin.menu.modules', '/admin/modules', 'core.settings.manage');
         $app->addAdminMenu('core.admin.menu.themes', '/admin/themes', 'core.themes.manage');
         $app->addAdminMenu('core.admin.menu.packages', '/admin/packages', 'core.packages.manage');
         $app->addAdminMenu('core.admin.menu.tasks', '/admin/tasks', 'core.tasks.view');

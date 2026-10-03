@@ -12,10 +12,12 @@
     <label for="password">{{ trans('core.login.password') }}</label>
     <input id="password" name="password" type="password" autocomplete="current-password" required>
 
+    {% if module('remember_login') %}
     <label class="checkbox">
         <input type="checkbox" name="remember" value="1">
         <span>{{ trans('core.login.remember') }}</span>
     </label>
+    {% endif %}
 
     <button type="submit">{{ trans('core.login.submit') }}</button>
 </form>

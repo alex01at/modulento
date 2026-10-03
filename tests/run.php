@@ -2629,6 +2629,32 @@ ini_restore('error_log');
 @rmdir(dirname($keyPath));
 @unlink($mailLog);
 
+// --- Modules: optional functions of the core ------------------------------------
+check('modules: the page needs the settings permission', $get('/admin/modules', 1)['status'] === 403 && $post('/admin/modules', ['modules' => []], 2)['status'] === 403);
+$r = $get('/admin/modules', 3);
+check('modules: everything is on until switched off', $r['status'] === 200 && substr_count($r['body'], 'name="modules[]"') === 6 && substr_count($r['body'], ' checked') === 6);
+$post('/admin/modules', ['modules' => ['contact', 'avatars', 'nonsense', ['x']]], 3);
+check('modules: switched off is stored, unknown names are ignored', $pdo->query("SELECT value FROM setting WHERE name = 'core.modules_disabled'")->fetchColumn() === 'reviews,withdrawal,reports,remember_login');
+$pdo->exec("UPDATE extension SET enabled = 1 WHERE id = 'freelancer'");
+$home = $get('/', null)['body'];
+check('modules: without withdrawal and reports their footer links are gone', !str_contains($home, 'href="/withdrawal"') && !str_contains($home, '/report'));
+check('modules: their pages are gone', $get('/withdrawal', null)['status'] === 404 && $get('/report', null)['status'] === 404 && $get('/admin/reviews', 3)['status'] === 404
+    && $get('/admin/withdrawals', 3)['status'] === 404 && $get('/admin/reports', 3)['status'] === 404 && $post('/orders/1/review', ['rating' => '5'], 2)['status'] === 404);
+$r = $get('/admin', 3);
+check('modules: and so are their menu entries and permissions', !str_contains($r['body'], 'href="/admin/reviews"') && !str_contains($r['body'], 'href="/admin/reports"') && !str_contains($r['body'], 'href="/admin/withdrawals"')
+    && !str_contains($get('/admin/roles/new', 3)['body'], 'core.reviews.manage'));
+check('modules: no "stay logged in" without the module', !str_contains($get('/login', null)['body'], 'name="remember"') && !str_contains($get('/account/settings', 1)['body'], '/account/sessions/revoke'));
+$post('/login', ['email' => 'plain@example.test', 'password' => 'correct horse battery', 'remember' => '1'], null);
+check('modules: and a ticked box from an old form remembers nothing', $pdo->query('SELECT COUNT(*) FROM account_login_token')->fetchColumn() == 0);
+check('modules: what is still on works', str_contains($get('/account/settings', 1)['body'], 'action="/account/avatar"'));
+$post('/admin/modules', ['modules' => []], 3);
+check('modules: everything can be off at once', $get('/account/settings', 1)['status'] === 200 && !str_contains($get('/account/settings', 1)['body'], 'action="/account/avatar"') && $post('/account/avatar', [], 1)['status'] === 404);
+$post('/admin/modules', ['modules' => array_keys(Modulento\Core\Support\Modules::ALL)], 3);
+check('modules: switched on again, everything is back', str_contains($get('/', null)['body'], 'href="/withdrawal"') && $get('/report', null)['status'] === 200 && str_contains($get('/login', null)['body'], 'name="remember"'));
+$pdo->exec("UPDATE extension SET enabled = 0 WHERE id = 'freelancer'");
+$pdo->exec("DELETE FROM setting WHERE name = 'core.modules_disabled'");
+$pdo->exec('DELETE FROM rate_limit_attempt');
+
 // --- Language keys -----------------------------------------------------------
 // Every key written out in a template or in PHP must exist, or a visitor
 // would read the raw key.
