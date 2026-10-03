@@ -12,6 +12,17 @@
     <p class="flash flash-error" role="alert">{{ error }}</p>
 {% endif %}
 
+{% if presets %}
+    <section class="card-box">
+        <p>{{ trans('core.admin.roles.presets_intro') }}</p>
+        <div class="button-row">
+            {% for preset in presets %}
+                <a class="btn btn-outline btn-sm" href="{{ url('/admin/roles/new') }}?preset={{ preset }}">{{ trans('core.admin.roles.preset.' ~ preset) }}</a>
+            {% endfor %}
+        </div>
+    </section>
+{% endif %}
+
 <form method="post" action="{{ url(role and role.id ? '/admin/roles/' ~ role.id : '/admin/roles/new') }}">
     {{ csrf_field() }}
     <div class="card-box stack-form">
@@ -21,21 +32,28 @@
         </div>
     </div>
 
-    <fieldset class="card-box">
-        <legend>{{ trans('core.admin.roles.permissions') }}</legend>
-        <div class="check-list">
-            {% for name, label_key in permissions %}
-                <label class="checkbox">
-                    <input type="checkbox" name="permissions[]" value="{{ name }}" {{ role and name in role.permissions ? 'checked' }}>
-                    <span>{{ trans(label_key) }} <small>({{ name }})</small></span>
-                </label>
-            {% endfor %}
-        </div>
+    {# Grouped like the menu: what a permission opens is where it is listed. #}
+    {% for group in groups %}
+        <fieldset class="card-box">
+            <legend>{{ trans(group.label_key) }}</legend>
+            <div class="check-list">
+                {% for permission in group.permissions %}
+                    <label class="checkbox">
+                        <input type="checkbox" name="permissions[]" value="{{ permission.name }}" {{ role and permission.name in role.permissions ? 'checked' }}>
+                        <span>
+                            <strong>{{ trans(permission.label_key) }}</strong>
+                            {% if permission.hint %}<br><small>{{ permission.hint }}</small>{% endif %}
+                            <br><small class="muted">{{ permission.name }}</small>
+                        </span>
+                    </label>
+                {% endfor %}
+            </div>
+        </fieldset>
+    {% endfor %}
 
-        <div class="button-row">
-            <button type="submit">{{ trans('core.account.save') }}</button>
-        </div>
-    </fieldset>
+    <div class="card-box button-row">
+        <button type="submit">{{ trans('core.account.save') }}</button>
+    </div>
 </form>
 
 {% if role and role.id %}
