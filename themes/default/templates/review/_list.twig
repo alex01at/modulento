@@ -1,5 +1,5 @@
 {# Published reviews. Receives "reviews". #}
-{% if reviews %}
+{% if reviews and module('reviews') %}
     <section class="reviews">
         <h2>{{ trans('core.review.title') }}</h2>
         {# Where the reviews come from - the platform has to say so. #}

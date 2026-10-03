@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modulento\Core\Controller;
 
 use Modulento\Core\App;
+use Modulento\Core\Support\Modules;
 use Modulento\Core\Support\Session;
 use PDO;
 use Throwable;
@@ -14,6 +15,23 @@ final class AdminController extends Controller
     public function index(array $params): void
     {
         $this->render('@admin/index.twig', ['stats' => $this->stats()]);
+    }
+
+    public function modules(array $params): void
+    {
+        $this->render('@admin/modules.twig', ['modules' => array_map(
+            fn (string $id, string $key) => ['id' => $id, 'key' => $key, 'enabled' => $this->app->modules->enabled($id)],
+            array_keys(Modules::ALL),
+            Modules::ALL
+        )]);
+    }
+
+    public function saveModules(array $params): void
+    {
+        $chosen = is_array($_POST['modules'] ?? null) ? array_filter($_POST['modules'], 'is_string') : [];
+        $this->app->modules->save(array_values(array_intersect(array_keys(Modules::ALL), $chosen)));
+        Session::flash('success', $this->trans('core.admin.modules.saved'));
+        $this->redirect('/admin/modules');
     }
 
     /** How themes and extensions are built, for whoever administers the site. */
@@ -51,11 +69,11 @@ final class AdminController extends Controller
             $stats[] = ['id' => 'accounts', 'label_key' => 'core.admin.menu.accounts', 'path' => '/admin/accounts',
                 'total' => $app->accounts->list('', 1, 1)['total'], 'pending' => null];
         }
-        if ($app->auth->can('core.reviews.manage')) {
+        if ($app->modules->enabled('reviews') && $app->auth->can('core.reviews.manage')) {
             $stats[] = ['id' => 'reviews', 'label_key' => 'core.admin.menu.reviews', 'path' => '/admin/reviews',
                 'total' => $app->reviews->listAll(null, 1, 1)['total'], 'pending' => null];
         }
-        if ($app->auth->can('core.reports.manage')) {
+        if ($app->modules->enabled('reports') && $app->auth->can('core.reports.manage')) {
             $stats[] = ['id' => 'reports', 'label_key' => 'core.admin.menu.reports', 'path' => '/admin/reports',
                 'total' => $app->reports->list(1, 1)['total'], 'pending' => $app->reports->openCount()];
         }

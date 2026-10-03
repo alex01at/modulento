@@ -6,6 +6,7 @@
 {% include 'account/_nav.twig' %}
 <h1>{{ trans('core.account.title') }}</h1>
 
+{% if module('avatars') %}
 <section>
     <h2>{{ trans('core.account.avatar.title') }}</h2>
     {% if avatar %}
@@ -25,6 +26,7 @@
         </form>
     {% endif %}
 </section>
+{% endif %}
 
 <section>
     <h2>{{ trans('core.account.profile.title') }}</h2>
@@ -93,6 +95,7 @@
     </form>
 </section>
 
+{% if module('remember_login') %}
 <section>
     <h2>{{ trans('core.account.devices.title') }}</h2>
     <p>{{ trans('core.account.devices.intro', {days: remember_days}) }}</p>
@@ -124,6 +127,7 @@
         <p>{{ trans('core.account.devices.none') }}</p>
     {% endif %}
 </section>
+{% endif %}
 
 <section>
     <h2>{{ trans('core.account.export.title') }}</h2>

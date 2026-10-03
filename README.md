@@ -334,6 +334,7 @@ Available in every template:
 | `current_path()` | Path of the current page without its language prefix, e.g. to mark the active menu entry |
 | `page_links('header' \| 'footer' \| role)` | Published pages for a menu, as `title`/`url`/`role`; `'footer'` ends with the links to the withdrawal form and the report form (`role` is `withdrawal` and `report`) |
 | `latest_offers(limit)` | The newest public offers as cards |
+| `module(id)` | Whether an optional function of the core is on: `reviews`, `contact`, `withdrawal`, `reports`, `avatars`, `remember_login` - a theme hides what belongs to a module that is off |
 | `has_catalogue()` | Whether an extension adds a kind of offer; without one, hide the links to offers and providers |
 | `nav_links()` | Entries extensions add to the main menu, as `title`/`url`/`path` |
 | `home_sections()` | What extensions want shown on the home page: `{% for section in home_sections() %}{% include section.template with section.data %}{% endfor %}` |
@@ -568,6 +569,14 @@ everywhere" in the settings, and for all devices when the password is changed
 or reset, the e-mail address changes, or the account is blocked or deleted.
 Changing password or address and deleting the account ask for the password
 whichever way the device was logged in.
+
+**Administration → Modules** switches optional functions of the core on and
+off: reviews, the contact form on offers, the withdrawal form, reporting
+content, profile pictures and "stay logged in". A module that is off has no
+routes, menu entries or links; its data stays and is back when it is switched
+on again (`$app->modules->enabled('reviews')`, in templates `module('reviews')`).
+The withdrawal and the report form are legal duties in many cases - switch
+them off only where they do not apply.
 
 Behind a reverse proxy or CDN, list its addresses as `TRUSTED_PROXIES` in
 `.env` ("10.0.0.0/8, 2001:db8::/32"). Only then is the visitor's address taken

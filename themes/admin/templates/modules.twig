@@ -1,0 +1,23 @@
+{% extends '@admin/layout.twig' %}
+
+{% block title %}{{ trans('core.admin.modules.title') }} – {{ site_name }}{% endblock %}
+
+{% block admin %}
+{% include '@admin/_page_header.twig' with {heading: trans('core.admin.modules.title')} only %}
+
+<section class="card-box">
+    <div class="card-head">
+        <p>{{ trans('core.admin.modules.intro') }}</p>
+    </div>
+    <form method="post" action="{{ url('/admin/modules') }}" class="stack-form">
+        {{ csrf_field() }}
+        {% for module in modules %}
+            <label class="checkbox">
+                <input type="checkbox" name="modules[]" value="{{ module.id }}" {{ module.enabled ? 'checked' }}>
+                <span><strong>{{ trans(module.key ~ '.name') }}</strong><br><small>{{ trans(module.key ~ '.description') }}</small></span>
+            </label>
+        {% endfor %}
+        <button type="submit">{{ trans('core.admin.modules.save') }}</button>
+    </form>
+</section>
+{% endblock %}

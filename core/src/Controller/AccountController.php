@@ -44,7 +44,7 @@ final class AccountController extends Controller
 
         $this->render('account/dashboard.twig', [
             'name' => ($account['display_name'] ?? '') !== '' ? $account['display_name'] : strstr($account['email'], '@', true),
-            'avatar' => $app->avatars->url($account['id']),
+            'avatar' => $app->modules->enabled('avatars') ? $app->avatars->url($account['id']) : null,
             'recent' => $this->recentlyViewed(),
             'purchases' => $app->orders->tally('buyer', $account['id']) + ['recent' => $rows('buyer', $account['id'])],
             'provider' => $provider !== null ? [
@@ -99,7 +99,7 @@ final class AccountController extends Controller
     public function index(array $params): void
     {
         $this->render('account/index.twig', [
-            'avatar' => $this->app->avatars->url($this->accountId()),
+            'avatar' => $this->app->modules->enabled('avatars') ? $this->app->avatars->url($this->accountId()) : null,
             'locales' => $this->app->locales->enabled(),
             'color_schemes' => Preferences::COLOR_SCHEMES,
             'min_length' => PasswordPolicy::MIN_LENGTH,

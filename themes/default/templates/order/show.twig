@@ -34,7 +34,7 @@
     </section>
 {% endif %}
 
-{% if can_review %}
+{% if can_review and module('reviews') %}
     <section>
         <h2>{{ trans('core.review.write') }}</h2>
         <form method="post" action="{{ url('/orders/' ~ order.id ~ '/review') }}" class="stack-form wide">
@@ -54,7 +54,7 @@
             <button type="submit">{{ trans('core.review.submit') }}</button>
         </form>
     </section>
-{% elseif review %}
+{% elseif review and module('reviews') %}
     <section>
         <h2>{{ trans('core.review.one') }}</h2>
         {% if review.status == 'hidden' %}
@@ -104,7 +104,7 @@
         {% if counterpart.path %}<a href="{{ url(counterpart.path) }}">{{ counterpart.name }}</a>{% else %}{{ counterpart.name }}{% endif %}
         {% if counterpart.email %}· <a href="mailto:{{ counterpart.email }}">{{ counterpart.email }}</a>{% endif %}
     </p>
-    {% if role == 'buyer' %}
+    {% if role == 'buyer' and module('withdrawal') %}
         {# Keep this link in every theme: the withdrawal form has to be easy to find. #}
         <p><small><a href="{{ url('/withdrawal') }}?order={{ order.number }}">{{ trans('core.withdrawal.link') }}</a></small></p>
     {% endif %}

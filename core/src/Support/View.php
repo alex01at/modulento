@@ -113,7 +113,7 @@ final class View
             // layout of its own shows it without knowing about it.
             if ($where === 'footer') {
                 // Where nothing can be ordered there is no contract to withdraw from.
-                if ($app->offers->types() !== []) {
+                if ($app->offers->types() !== [] && $app->modules->enabled('withdrawal')) {
                     $links[] = ['title' => $app->translator->trans('core.withdrawal.link'), 'url' => $app->url('/withdrawal'), 'role' => 'withdrawal'];
                 }
                 // The report form is told which page it was opened from, so
@@ -122,7 +122,9 @@ final class View
                 $here = preg_match('#^/(report|admin|account|orders|login|register)(/|$)#', $app->path) === 1 || $app->path === '/'
                     ? ''
                     : '?url=' . rawurlencode($app->url($app->path, null, true));
-                $links[] = ['title' => $app->translator->trans('core.report.link'), 'url' => $app->url('/report') . $here, 'role' => 'report'];
+                if ($app->modules->enabled('reports')) {
+                    $links[] = ['title' => $app->translator->trans('core.report.link'), 'url' => $app->url('/report') . $here, 'role' => 'report'];
+                }
             }
 
             return $links;
@@ -170,7 +172,7 @@ final class View
         $this->twig->addFunction(new TwigFunction('account_avatar', function () use ($app, $auth): ?string {
             $account = $auth->account();
 
-            return $account !== null ? $app->avatars->url($account['id']) : null;
+            return $account !== null && $app->modules->enabled('avatars') ? $app->avatars->url($account['id']) : null;
         }));
         // "auto", "light" or "dark": what the logged-in account has chosen.
         // A layout writes a fixed choice as data-theme on <html>; "auto"
@@ -182,6 +184,8 @@ final class View
         // Whether any extension adds a kind of offer. Without one there is
         // no catalogue to link to, and the site is pages, accounts and
         // whatever else the extensions bring.
+        // Whether an optional function of the core is switched on (Administration → Modules).
+        $this->twig->addFunction(new TwigFunction('module', fn (string $id) => $app->modules->enabled($id)));
         $this->twig->addFunction(new TwigFunction('has_catalogue', fn () => $app->offers->types() !== []));
         // Entries extensions add to the main menu, as title/url.
         $this->twig->addFunction(new TwigFunction('nav_links', fn () => array_map(

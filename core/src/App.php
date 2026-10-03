@@ -26,6 +26,7 @@ use Modulento\Core\Payment\StripePayment;
 use Modulento\Core\Payment\TransferPayment;
 use Modulento\Core\Provider\Providers;
 use Modulento\Core\Review\Reviews;
+use Modulento\Core\Support\Modules;
 use Modulento\Core\Support\Auth;
 use Modulento\Core\Support\CurlHttpClient;
 use Modulento\Core\Support\Events;
@@ -77,6 +78,7 @@ final class App
     public readonly OrderFiles $orderFiles;
     public readonly Withdrawals $withdrawals;
     public readonly Reports $reports;
+    public readonly Modules $modules;
     public readonly Avatars $avatars;
     public readonly Preferences $preferences;
     public readonly Reviews $reviews;
@@ -137,6 +139,7 @@ final class App
         $this->orders->registerPaymentMethod(new StripePayment());
         $this->withdrawals = new Withdrawals($db);
         $this->reports = new Reports($db);
+        $this->modules = new Modules($this->settings);
         $this->reviews = new Reviews($db);
         $this->orderFiles = new OrderFiles($db, ($config['app']['uploads'] ?? $config['app']['root'] . '/var/uploads') . '/orders');
         $this->offerImages = new OfferImages($db, ($config['app']['uploads'] ?? $config['app']['root'] . '/var/uploads') . '/offers');
