@@ -19,6 +19,9 @@
         ['html', null]
     ];
 
+    // The editors on this page by the id of their textarea.
+    var editors = {};
+
     function setUp(textarea) {
         var labels;
         try {
@@ -100,6 +103,24 @@
         area.addEventListener('input', sync);
         textarea.form && textarea.form.addEventListener('submit', sync);
 
+        // A picture from the media library, at the cursor of the editable area.
+        editors[textarea.id] = function (url, alt) {
+            var image = document.createElement('img');
+            image.setAttribute('src', url);
+            image.setAttribute('alt', alt || '');
+            var holder = document.createElement('div');
+            holder.appendChild(image);
+            if (source) {
+                textarea.value += holder.innerHTML;
+                return;
+            }
+            area.focus();
+            if (!document.execCommand('insertHTML', false, holder.innerHTML)) {
+                area.insertAdjacentHTML('beforeend', holder.innerHTML);
+            }
+            sync();
+        };
+
         document.execCommand('defaultParagraphSeparator', false, 'p');
         textarea.parentNode.insertBefore(wrap, textarea);
         wrap.appendChild(bar);
@@ -108,4 +129,13 @@
     }
 
     document.querySelectorAll('textarea[data-editor]').forEach(setUp);
+
+    document.addEventListener('click', function (event) {
+        var button = event.target.closest ? event.target.closest('[data-media-insert]') : null;
+        var insert = button && editors[button.getAttribute('data-media-insert')];
+        if (insert) {
+            event.preventDefault();
+            insert(button.getAttribute('data-media-url'), button.getAttribute('data-media-alt'));
+        }
+    });
 }());

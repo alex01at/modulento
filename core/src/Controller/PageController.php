@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modulento\Core\Controller;
 
 use Modulento\Core\Content\Pages;
+use Modulento\Core\Media\Library;
 use Modulento\Core\Support\Session;
 
 final class PageController extends Controller
@@ -112,6 +113,11 @@ final class PageController extends Controller
             'errors' => $errors,
             'locales' => $this->app->locales->enabled(),
             'roles' => Pages::ROLES,
+            // The pictures a text can show, for the picker next to each text field.
+            'media' => $this->app->auth->can('core.media.manage')
+                ? array_map(fn (array $row) => ['url' => Library::url($row['file']), 'title' => $row['title'], 'width' => $row['width'], 'height' => $row['height']],
+                    $this->app->media->list(1, 60)['rows'])
+                : [],
         ]);
     }
 }

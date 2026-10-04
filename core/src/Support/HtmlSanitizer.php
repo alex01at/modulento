@@ -24,6 +24,8 @@ final class HtmlSanitizer
         'ul' => [], 'ol' => [], 'li' => [],
         'blockquote' => [], 'pre' => [], 'code' => [],
         'a' => ['href', 'title'],
+        // Only pictures of the media library, see cleanImage().
+        'img' => ['src', 'alt', 'width', 'height'],
         'table' => [], 'thead' => [], 'tbody' => [], 'tr' => [], 'th' => ['scope', 'colspan', 'rowspan'], 'td' => ['colspan', 'rowspan'],
     ];
     /** Removed together with everything inside them. */
@@ -72,6 +74,11 @@ final class HtmlSanitizer
 
             $name = strtolower($child->nodeName);
 
+            if ($name === 'img' && !self::isLibraryImage($child)) {
+                $node->removeChild($child);
+                continue;
+            }
+
             if (in_array($name, self::DROP_WITH_CONTENT, true)) {
                 $node->removeChild($child);
                 continue;
@@ -98,6 +105,12 @@ final class HtmlSanitizer
                 self::cleanLink($child);
             }
         }
+    }
+
+    /** A picture of the media library: the random name it was given, and nothing else. */
+    private static function isLibraryImage(DOMElement $image): bool
+    {
+        return preg_match('#^/media/library/[a-f0-9]{32}\.(webp|png)$#', $image->getAttribute('src')) === 1;
     }
 
     private static function cleanLink(DOMElement $link): void

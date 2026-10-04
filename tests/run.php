@@ -259,6 +259,7 @@ $pdo->exec("CREATE TABLE order_payment (id INTEGER PRIMARY KEY, order_id INTEGER
 $pdo->exec("ALTER TABLE report ADD COLUMN offer_id INTEGER");
 $pdo->exec("ALTER TABLE report ADD COLUMN provider_id INTEGER");
 $pdo->exec("CREATE TABLE account_avatar (account_id INTEGER PRIMARY KEY REFERENCES account (id) ON DELETE CASCADE, name TEXT, extension TEXT, created_at TEXT)");
+$pdo->exec("CREATE TABLE offer_message (id INTEGER PRIMARY KEY, offer_id INTEGER REFERENCES offer (id) ON DELETE CASCADE, asker_id INTEGER REFERENCES account (id) ON DELETE CASCADE, author_id INTEGER REFERENCES account (id) ON DELETE SET NULL, body TEXT, created_at TEXT)");
 $pdo->exec("CREATE TABLE media (id INTEGER PRIMARY KEY, file TEXT UNIQUE, title TEXT, width INTEGER, height INTEGER, bytes INTEGER, created_at TEXT)");
 $pdo->exec("CREATE TABLE account_preference (account_id INTEGER REFERENCES account (id) ON DELETE CASCADE, name TEXT, value TEXT, PRIMARY KEY (account_id, name))");
 $pdo->exec("ALTER TABLE withdrawal ADD COLUMN handled_at TEXT");
@@ -1219,6 +1220,47 @@ $post('/offers/ich-gestalte-dein-logo/contact', ['message' => 'Hallo, ich hätte
 $mails = (string) file_get_contents($mailLog);
 check('contact: the provider gets the message with the sender as reply address', lastMail($mailLog, 'plain@example.test')['subject'] === 'Anfrage zu deinem Angebot „Ich gestalte dein Logo“'
     && str_contains($mails, "Reply-To: editor@example.test") && str_contains($mails, 'Logo für mein Café'));
+
+// Word filter and conversations about an offer. Account 1 provides "Ich gestalte dein Logo",
+// account 2 asks about it.
+check('badwords: listed words are found, in any case, with stretched letters and stars, but not inside short words', Modulento\Core\Support\BadWords::find('Das ist SCHEIßE') === 'scheisse'
+    && Modulento\Core\Support\BadWords::find('du f*ck') === 'fuck' && Modulento\Core\Support\BadWords::find('fuuuuck off') === 'fuck'
+    && Modulento\Core\Support\BadWords::find('Arschlochkerl') === 'arsch' && Modulento\Core\Support\BadWords::find('Das Classic-Auto ist schön, danke.') === null
+    && Modulento\Core\Support\BadWords::find('class assist glass') === null);
+$count = fn () => (int) $pdo->query('SELECT COUNT(*) FROM offer_message')->fetchColumn();
+$before = $count();
+$post('/offers/ich-gestalte-dein-logo/contact', ['message' => 'Du bist ein verdammter Arschloch, das ist klar.'], 2);
+check('badwords: a refused message is not kept and says why', $count() === $before && str_contains($_SESSION['_flash']['error'] ?? '', 'beleidigende'));
+$post('/offers/ich-gestalte-dein-logo/contact', ['message' => 'Dazu hätte ich gern eine Visitenkarte im gleichen Stil.'], 2);
+check('contact: the message is kept in the thread as well as sent by e-mail', $count() === $before + 1
+    && lastMail($mailLog, 'plain@example.test')['subject'] === 'Anfrage zu deinem Angebot „Ich gestalte dein Logo“');
+$rr = $get('/offers/ich-gestalte-dein-logo', 2);
+check('conversations: the visitor sees their own thread', str_contains($rr['body'], 'Dazu hätte ich gern eine Visitenkarte') && str_contains($rr['body'], 'Du'));
+$rr = $get('/offers/ich-gestalte-dein-logo', 1);
+check('conversations: the provider sees every thread with its visitor and a reply form', str_contains($rr['body'], 'Gespräch mit') && str_contains($rr['body'], 'Dazu hätte ich gern eine Visitenkarte')
+    && str_contains($rr['body'], 'action="/offers/ich-gestalte-dein-logo/contact/2"'));
+check('conversations: a visitor without a login sees no thread', !str_contains($get('/offers/ich-gestalte-dein-logo', null)['body'], 'Dazu hätte ich gern eine Visitenkarte'));
+$before = $count();
+$post('/offers/ich-gestalte-dein-logo/contact/2', ['message' => 'Ich antworte mir selbst, das geht nicht.'], 2);
+check('reply: the visitor cannot answer, nothing is kept', $count() === $before);
+$post('/offers/ich-gestalte-dein-logo/contact/99', ['message' => 'Antwort an niemanden.'], 1);
+check('reply: a visitor without a thread gets no reply', $count() === $before);
+$post('/offers/ich-gestalte-dein-logo/contact/2', ['message' => 'So ein Idiot-Anbieter, du Hurensohn.'], 1);
+check('reply: the word filter applies to answers too', $count() === $before);
+$post('/offers/ich-gestalte-dein-logo/contact/2', ['message' => 'Gern, ich schicke dir Entwürfe für die Karte.'], 1);
+check('reply: the provider\'s answer is kept and the visitor gets an e-mail', $count() === $before + 1
+    && $pdo->query('SELECT COUNT(*) FROM offer_message WHERE author_id = 1 AND asker_id = 2')->fetchColumn() >= 1
+    && lastMail($mailLog, 'editor@example.test')['subject'] === 'Antwort zu deinem Angebot „Ich gestalte dein Logo“');
+
+// Pictures of the media library: only those, in pages.
+$library = '/media/library/' . str_repeat('a', 32) . '.webp';
+$clean = Modulento\Core\Support\HtmlSanitizer::clean('<p><img src="' . $library . '" alt="Logo"><img src="https://evil.example/x.png"><img src="/media/library/../x.png"><img src="/assets/x.png"></p>');
+check('pictures: the sanitizer keeps library pictures with their text and removes every other picture', str_contains($clean, '<img src="' . $library . '" alt="Logo">')
+    && substr_count($clean, '<img') === 1);
+$pdo->exec("INSERT INTO media (file, title, width, height, bytes, created_at) VALUES ('" . str_repeat('b', 32) . ".png', 'Logo', 40, 30, 100, '2026-10-04 10:00:00')");
+check('pictures: the page editor offers the library pictures for the text', str_contains($get('/admin/pages/new', 3)['body'], 'data-media-insert="body_de"')
+    && str_contains($get('/admin/pages/new', 3)['body'], 'data-media-url="/media/library/' . str_repeat('b', 32) . '.png"') && !str_contains($get('/admin/pages/new', 2)['body'], 'data-media-insert'));
+$pdo->exec("DELETE FROM media");
 
 $post('/account/offers/' . $offerId . '/pause', [], 1);
 check('offer: paused by the provider is not public', $offerRow()['status'] === 'paused' && $get('/offers/ich-gestalte-dein-logo', null)['status'] === 404);

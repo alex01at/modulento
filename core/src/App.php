@@ -13,6 +13,7 @@ use Modulento\Core\Account\Roles;
 use Modulento\Core\Account\Tokens;
 use Modulento\Core\Catalogue\Categories;
 use Modulento\Core\Catalogue\OfferImages;
+use Modulento\Core\Catalogue\OfferMessages;
 use Modulento\Core\Catalogue\Offers;
 use Modulento\Core\Content\Pages;
 use Modulento\Core\Extension\ExtensionManager;
@@ -84,6 +85,7 @@ final class App
     public readonly Avatars $avatars;
     public readonly Branding $branding;
     public readonly Library $media;
+    public readonly OfferMessages $offerMessages;
     public readonly Preferences $preferences;
     public readonly Reviews $reviews;
     public readonly Packages $packages;
@@ -160,6 +162,7 @@ final class App
         );
         $this->avatars = new Avatars($db, ($config['app']['uploads'] ?? $config['app']['root'] . '/var/uploads') . '/avatars');
         $this->branding = new Branding($this->settings, ($config['app']['uploads'] ?? $config['app']['root'] . '/var/uploads') . '/branding');
+        $this->offerMessages = new OfferMessages($db);
         $this->media = new Library($db, ($config['app']['uploads'] ?? $config['app']['root'] . '/var/uploads') . '/media');
         $this->preferences = new Preferences($db);
         $this->accounts = new Accounts($db);

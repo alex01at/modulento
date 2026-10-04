@@ -1,0 +1,11 @@
+{# One thread of messages about an offer, oldest first. Receives "messages":
+   body, created_at, label (already translated: who wrote it) and mine. #}
+<ol class="thread-messages">
+    {% for message in messages %}
+        <li class="{{ message.mine ? 'is-mine' }}">
+            <strong>{{ message.label }}</strong>
+            <small>{{ message.created_at }} UTC</small>
+            <p>{{ message.body|nl2br }}</p>
+        </li>
+    {% endfor %}
+</ol>
