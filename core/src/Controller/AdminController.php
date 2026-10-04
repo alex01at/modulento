@@ -35,6 +35,30 @@ final class AdminController extends Controller
         $this->redirect('/admin/modules');
     }
 
+    /**
+     * One section of the menu as tiles: where the top-level entries of the
+     * header layout lead. A section the account sees nothing of does not
+     * exist for it.
+     */
+    public function section(array $params): void
+    {
+        $items = array_values(array_filter(
+            $this->app->adminMenu(),
+            fn (array $item) => $item['group'] === $params['id'] && $this->app->auth->can($item['permission'])
+        ));
+
+        if ($items === []) {
+            http_response_code(404);
+            $this->render('error.twig', ['status' => 404, 'message_key' => 'core.error.not_found']);
+            return;
+        }
+
+        $this->render('@admin/section.twig', [
+            'group' => ['id' => $params['id'], 'label_key' => 'core.admin.group.' . $params['id']],
+            'items' => $items,
+        ]);
+    }
+
     /** How themes and extensions are built, for whoever administers the site. */
     public function docs(array $params): void
     {

@@ -1,0 +1,15 @@
+{# The tools at the right of either frame's top bar: other languages, the site,
+   and the account's menu (picture, settings, colour scheme, log out). #}
+{% import '@admin/_icons.twig' as icons %}
+<nav class="topbar-nav" aria-label="{{ trans('core.nav.home') }}">
+    {% for language in locale_urls() %}
+        {% if not language.current %}
+            <a class="topbar-link" href="{{ language.url }}" hreflang="{{ language.locale }}" lang="{{ language.locale }}">{{ icons.icon('globe') }}<span>{{ language.name }}</span></a>
+        {% endif %}
+    {% endfor %}
+    <a class="topbar-link" href="{{ url('/') }}" target="_blank" rel="noopener">{{ icons.icon('external') }}<span class="topbar-label">{{ trans('core.nav.to_site') }}</span></a>
+    {# The same menu as on the site: picture, settings, colour scheme, log out. #}
+    {% if account %}
+        {% include 'layout/_account_menu.twig' %}
+    {% endif %}
+</nav>

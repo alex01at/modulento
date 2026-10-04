@@ -17,6 +17,9 @@ final class Preferences
     public const COLOR_SCHEME = 'color_scheme';
     /** "auto" follows the device and is the default. */
     public const COLOR_SCHEMES = ['auto', 'light', 'dark'];
+    public const ADMIN_LAYOUT = 'admin_layout';
+    /** "sidebar" is the default; "header" puts the menu in a bar on top, with a mega menu per section. */
+    public const ADMIN_LAYOUTS = ['sidebar', 'header'];
 
     public function __construct(private PDO $db)
     {
@@ -80,5 +83,13 @@ final class Preferences
         $value = $accountId !== null ? $this->get($accountId, self::COLOR_SCHEME) : null;
 
         return in_array($value, self::COLOR_SCHEMES, true) ? $value : 'auto';
+    }
+
+    /** "sidebar" or "header"; an account without a choice gets "sidebar". Only administrators are asked, see View. */
+    public function adminLayout(?int $accountId): string
+    {
+        $value = $accountId !== null ? $this->get($accountId, self::ADMIN_LAYOUT) : null;
+
+        return in_array($value, self::ADMIN_LAYOUTS, true) ? $value : 'sidebar';
     }
 }

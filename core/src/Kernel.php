@@ -170,6 +170,7 @@ final class Kernel
         $router->get('/account/settings', [AccountController::class, 'index']);
         $router->post('/account/profile', [AccountController::class, 'updateProfile']);
         $router->post('/account/appearance', [AccountController::class, 'updateAppearance']);
+        $router->post('/account/admin-layout', [AccountController::class, 'updateAdminLayout'], 'core.admin.access');
         $router->post('/account/password', [AccountController::class, 'changePassword']);
         $router->post('/account/email', [AccountController::class, 'changeEmail']);
         $router->get('/account/confirm-email/{token}', [AccountController::class, 'confirmEmail']);
@@ -227,6 +228,7 @@ final class Kernel
 
         $router->get('/admin', [AdminController::class, 'index'], 'core.admin.access');
         $router->get('/admin/docs', [AdminController::class, 'docs'], 'core.admin.access');
+        $router->get('/admin/section/{id}', [AdminController::class, 'section'], 'core.admin.access');
 
         // Optional functions (Administration → Modules). A module that is
         // switched off has no routes and no menu entries; its data stays.

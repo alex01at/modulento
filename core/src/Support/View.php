@@ -204,6 +204,15 @@ final class View
             'color_scheme',
             fn (): string => $app->preferences->colorScheme($auth->account()['id'] ?? null)
         ));
+        // "sidebar" or "header": the frame of the administration that the
+        // logged-in administrator chose under Profile settings. Anyone
+        // without access to the administration always gets the sidebar.
+        $this->twig->addFunction(new TwigFunction(
+            'admin_layout',
+            fn (): string => $auth->can('core.admin.access')
+                ? $app->preferences->adminLayout($auth->account()['id'] ?? null)
+                : 'sidebar'
+        ));
         // Whether any extension adds a kind of offer. Without one there is
         // no catalogue to link to, and the site is pages, accounts and
         // whatever else the extensions bring.

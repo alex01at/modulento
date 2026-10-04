@@ -46,6 +46,27 @@
     </form>
 </section>
 
+{% if is_admin %}
+<section>
+    <h2>{{ trans('core.account.admin_layout.title') }}</h2>
+    <p>{{ trans('core.account.admin_layout.intro') }}</p>
+    <form method="post" action="{{ url('/account/admin-layout') }}" class="stack-form">
+        {{ csrf_field() }}
+        <fieldset>
+            <legend>{{ trans('core.account.admin_layout.choose') }}</legend>
+            {% for layout in admin_layouts %}
+                <label>
+                    <input type="radio" name="admin_layout" value="{{ layout }}" {{ layout == admin_layout ? 'checked' }}>
+                    {{ trans('core.account.admin_layout.' ~ layout) }}
+                </label>
+                <small>{{ trans('core.account.admin_layout.' ~ layout ~ '_hint') }}</small>
+            {% endfor %}
+        </fieldset>
+        <button type="submit">{{ trans('core.account.admin_layout.save') }}</button>
+    </form>
+</section>
+{% endif %}
+
 <section>
     <h2>{{ trans('core.order.list.buyer') }}</h2>
     <p><a href="{{ url('/account/orders') }}">{{ trans('core.order.list.buyer') }}</a></p>

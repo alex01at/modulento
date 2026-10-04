@@ -1,0 +1,56 @@
+{% extends '@admin/layout_base.twig' %}
+{% import '@admin/_icons.twig' as icons %}
+
+{# Header frame: the sections of the menu in a bar on top. Hovering a section
+   (wide screens) or pressing its arrow opens its mega menu, the section's own
+   link shows its entries as tiles in the content area. Narrow screens fold
+   the bar's menu into the menu button, and each section into a list. #}
+{% block frame %}
+<header class="header" data-header>
+    <div class="header-bar">
+        <a class="brand" href="{{ url('/admin') }}">
+            <span class="brand-mark">{{ icons.icon('brand') }}</span>
+            <span class="brand-name">{{ site_name }}</span>
+        </a>
+        <nav id="header-nav" class="header-nav" aria-label="{{ trans('core.nav.admin') }}">
+            {% set here = current_path() %}
+            <ul class="header-menu">
+                <li>
+                    <a class="mega-link" href="{{ url('/admin') }}" {{ here == '/admin' ? 'aria-current="page"' }}>{{ trans('core.admin.dashboard.title') }}</a>
+                </li>
+                {% for group in admin_menu_groups %}
+                    {% set open = here == '/admin/section/' ~ group.id or group.items|filter(item => here == item.path or here starts with (item.path ~ '/'))|length > 0 %}
+                    <li class="mega" data-mega>
+                        <div class="mega-top">
+                            <a class="mega-link" href="{{ url('/admin/section/' ~ group.id) }}" {{ open ? 'aria-current="page"' }}>{{ trans(group.label_key) }}</a>
+                            <button type="button" class="mega-toggle" data-mega-toggle aria-expanded="false" aria-controls="mega-{{ group.id }}">
+                                {{ icons.icon('chevron') }}
+                                <span class="visually-hidden">{{ trans('core.admin.layout.submenu', {label: trans(group.label_key)}) }}</span>
+                            </button>
+                        </div>
+                        <div class="mega-panel" id="mega-{{ group.id }}">
+                            <ul class="mega-items">
+                                {% for item in group.items %}
+                                    <li><a href="{{ url(item.path) }}" {{ here == item.path or here starts with (item.path ~ '/') ? 'aria-current="page"' }}>{{ icons.menu(item.path) }}<span>{{ trans(item.label_key) }}</span></a></li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                    </li>
+                {% endfor %}
+            </ul>
+        </nav>
+        {% include '@admin/_tools.twig' %}
+        <button type="button" class="menu-toggle" data-menu-toggle aria-controls="header-nav" aria-expanded="false">
+            {{ icons.icon('menu') }}
+            <span class="visually-hidden">{{ trans('core.admin.layout.menu_toggle') }}</span>
+        </button>
+    </div>
+</header>
+
+<main id="content" class="admin-content" tabindex="-1">
+    {% for type, message in flashes %}
+        <p class="flash flash-{{ type }}" role="status">{{ message }}</p>
+    {% endfor %}
+    {% block admin %}{% endblock %}
+</main>
+{% endblock %}
