@@ -27,6 +27,19 @@ abstract class Controller
         header('Location: ' . $this->app->url($path, $locale));
     }
 
+    /**
+     * The tab of a page with tabs: the one named in the query or the form,
+     * the first one when none (or an unknown one) is named.
+     *
+     * @param list<string> $tabs
+     */
+    protected function tab(array $tabs): string
+    {
+        $tab = $_POST['tab'] ?? $_GET['tab'] ?? null;
+
+        return is_string($tab) && in_array($tab, $tabs, true) ? $tab : $tabs[0];
+    }
+
     protected function trans(string $key, array $replacements = []): string
     {
         return $this->app->translator->trans($key, $replacements);

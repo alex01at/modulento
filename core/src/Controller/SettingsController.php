@@ -9,11 +9,16 @@ use Modulento\Core\Support\Session;
 /** Site-wide settings an administrator changes in the browser instead of in .env. */
 final class SettingsController extends Controller
 {
+    /** The tabs of this page; every one is in the same form, so saving keeps all of them. */
+    public const TABS = ['general', 'catalogue', 'languages'];
+
     public function index(array $params): void
     {
         $app = $this->app;
 
         $this->render('@admin/settings.twig', [
+            'tab' => $this->tab(self::TABS),
+            'tabs' => self::TABS,
             'settings' => [
                 'site_name' => $app->siteName(),
                 'mail_from' => $app->settings->get('core.mail_from', $app->config['mail']['from']),
@@ -41,7 +46,7 @@ final class SettingsController extends Controller
             || filter_var($mailFrom, FILTER_VALIDATE_EMAIL) === false
             || !in_array($default, $app->locales->available(), true)) {
             Session::flash('error', $this->trans('core.admin.settings.invalid'));
-            $this->redirect('/admin/settings');
+            $this->redirect('/admin/settings?tab=' . $this->tab(self::TABS));
             return;
         }
 
@@ -82,6 +87,6 @@ final class SettingsController extends Controller
         $app->translator->setLocale($locale);
 
         Session::flash('success', $this->trans('core.admin.settings.saved'));
-        $this->redirect('/admin/settings');
+        $this->redirect('/admin/settings?tab=' . $this->tab(self::TABS));
     }
 }

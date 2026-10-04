@@ -29,6 +29,11 @@ final class MediaController extends Controller
         $this->send($this->app->branding->path($params['file']));
     }
 
+    public function library(array $params): void
+    {
+        $this->send($this->app->media->path($params['file']));
+    }
+
     private function send(?string $file): void
     {
         if ($file === null) {

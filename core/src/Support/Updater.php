@@ -66,7 +66,13 @@ final class Updater
     /** VERSION only exists inside a release package, stamped from the tag. */
     public function currentVersion(): string
     {
-        $path = $this->root . '/VERSION';
+        return self::installedVersion($this->root);
+    }
+
+    /** The version of the installation in $root, without an updater. */
+    public static function installedVersion(string $root): string
+    {
+        $path = $root . '/VERSION';
         if (!is_file($path)) {
             return '0.0.0';
         }

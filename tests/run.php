@@ -259,6 +259,7 @@ $pdo->exec("CREATE TABLE order_payment (id INTEGER PRIMARY KEY, order_id INTEGER
 $pdo->exec("ALTER TABLE report ADD COLUMN offer_id INTEGER");
 $pdo->exec("ALTER TABLE report ADD COLUMN provider_id INTEGER");
 $pdo->exec("CREATE TABLE account_avatar (account_id INTEGER PRIMARY KEY REFERENCES account (id) ON DELETE CASCADE, name TEXT, extension TEXT, created_at TEXT)");
+$pdo->exec("CREATE TABLE media (id INTEGER PRIMARY KEY, file TEXT UNIQUE, title TEXT, width INTEGER, height INTEGER, bytes INTEGER, created_at TEXT)");
 $pdo->exec("CREATE TABLE account_preference (account_id INTEGER REFERENCES account (id) ON DELETE CASCADE, name TEXT, value TEXT, PRIMARY KEY (account_id, name))");
 $pdo->exec("ALTER TABLE withdrawal ADD COLUMN handled_at TEXT");
 $pdo->exec("ALTER TABLE withdrawal ADD COLUMN handled_by INTEGER");
@@ -2879,6 +2880,74 @@ check('admin layout: the tiles need the administration permission', $get('/admin
 $post('/account/admin-layout', ['admin_layout' => 'sidebar'], 3);
 check('admin layout: back to the sidebar removes the choice', $pdo->query("SELECT COUNT(*) FROM account_preference WHERE name = 'admin_layout'")->fetchColumn() == 0
     && str_contains($get('/admin', 3)['body'], '<body class="layout-sidebar">'));
+
+// Media library: pictures for the site, under "Content" in the administration.
+check('media: the library needs its permission', $get('/admin/media', 1)['status'] === 403 && $post('/admin/media', [], 1)['status'] === 403);
+check('media: the library is in the content section, and the editor role may use it', str_contains($get('/admin/section/content', 3)['body'], 'href="/admin/media"')
+    && str_contains($get('/admin/roles/new?preset=editor', 3)['body'], 'value="core.media.manage" checked'));
+$png = tempnam(sys_get_temp_dir(), 'media');
+$picture = imagecreatetruecolor(40, 30);
+imagefill($picture, 0, 0, imagecolorallocate($picture, 30, 120, 200));
+imagepng($picture, $png);
+$_FILES = ['file' => ['tmp_name' => $png, 'error' => UPLOAD_ERR_OK, 'size' => filesize($png), 'name' => 'x.php', 'type' => 'image/png']];
+$post('/admin/media', ['title' => '  Testbild  '], 3);
+$_FILES = [];
+unlink($png);
+$media = $pdo->query('SELECT * FROM media')->fetch();
+check('media: an upload is stored under a random name, with its size and a trimmed title', $media !== false && $media['title'] === 'Testbild'
+    && (int) $media['width'] === 40 && (int) $media['height'] === 30 && preg_match('/^[a-f0-9]{32}\.(webp|png)$/', $media['file']) === 1
+    && is_file($config['app']['uploads'] . '/media/' . $media['file']) && str_contains($_SESSION['_flash']['success'] ?? '', 'hochgeladen'));
+check('media: the picture is served to visitors under its address, other names are not', $get('/media/library/' . $media['file'], null)['status'] === 200
+    && $get('/media/library/' . str_repeat('a', 32) . '.png', null)['status'] === 404 && $get('/media/library/x.php', null)['status'] === 404);
+$text = tempnam(sys_get_temp_dir(), 'media');
+file_put_contents($text, 'Das ist kein Bild, auch wenn es so heißt.');
+$_FILES = ['file' => ['tmp_name' => $text, 'error' => UPLOAD_ERR_OK, 'size' => filesize($text), 'name' => 'bild.png', 'type' => 'image/png']];
+$post('/admin/media', [], 3);
+$_FILES = [];
+unlink($text);
+check('media: only pictures are accepted, whatever the file is called', str_contains($_SESSION['_flash']['error'] ?? '', 'JPEG') && $pdo->query('SELECT COUNT(*) FROM media')->fetchColumn() == 1);
+$r = $get('/admin/media', 3);
+check('media: the page lists each picture with its address and a way to remove it', $r['status'] === 200 && str_contains($r['body'], 'value="/media/library/' . $media['file'] . '"')
+    && str_contains($r['body'], 'Testbild') && str_contains($r['body'], '/admin/media/' . $media['id'] . '/delete'));
+$post('/admin/media/' . $media['id'] . '/delete', [], 3);
+check('media: removing a picture removes its file too', $pdo->query('SELECT COUNT(*) FROM media')->fetchColumn() == 0 && !is_file($config['app']['uploads'] . '/media/' . $media['file']));
+
+// Dashboard: the update card shows what the last check found; the check itself only runs on the Updates page.
+$updateConfig = ['update' => ['repo' => 'acme/modulento']] + $config;
+$app = new Modulento\Core\App($config, $pdo);
+$app->settings->set('core.update_check', json_encode(['version' => '99.0.0', 'checked_at' => '2026-10-04 10:00']));
+$rr = request($pdo, $updateConfig, 'GET', '/admin', 3);
+check('dashboard: an available update is shown next to the installed version', str_contains($rr['body'], 'Version 99.0.0 verfügbar') && str_contains($rr['body'], '<span class="stat-value">0.0.0</span>'));
+$app->settings->set('core.update_check', json_encode(['version' => '0.0.0', 'checked_at' => '2026-10-04 10:00']));
+check('dashboard: an up-to-date check says so with its date', str_contains(request($pdo, $updateConfig, 'GET', '/admin', 3)['body'], 'Aktuell · geprüft am 2026-10-04 10:00 UTC'));
+$app->settings->set('core.update_check', '');
+check('dashboard: before any check it says so, and without a repository there is no card', str_contains(request($pdo, $updateConfig, 'GET', '/admin', 3)['body'], 'Noch nicht auf Updates geprüft')
+    && !str_contains(request($pdo, $config, 'GET', '/admin', 3)['body'], 'stat-label" href="/admin/updates"'));
+
+// Settings in tabs: one page, every tab in the same form.
+$rr = $get('/account/settings', 3);
+check('settings tabs: the profile is shown first, the other tabs are only hidden', preg_match('/id="tab-profile"\s*>/', $rr['body']) === 1 && preg_match('/id="tab-security" hidden>/', $rr['body']) === 1);
+check('settings tabs: a named tab is shown, an unknown one falls back to the first', preg_match('/id="tab-security"\s*>/', $get('/account/settings?tab=security', 3)['body']) === 1
+    && preg_match('/id="tab-profile"\s*>/', $get('/account/settings?tab=nonsense', 3)['body']) === 1);
+// The tab a form returns to: the one it was sent from, else the one in the address, else the first.
+$tabOf = function (array $post, array $get, array $tabs): string {
+    $_POST = $post;
+    $_GET = $get;
+    $controller = new Modulento\Core\Controller\SettingsController(new Modulento\Core\App($GLOBALS['config'], $GLOBALS['pdo']));
+    $method = new ReflectionMethod($controller, 'tab');
+
+    return $method->invoke($controller, $tabs);
+};
+$tabs = ['profile', 'security', 'orders', 'data'];
+check('settings tabs: the form\'s tab wins, then the address\'s, unknown names fall back to the first', $tabOf(['tab' => 'security'], ['tab' => 'data'], $tabs) === 'security'
+    && $tabOf([], ['tab' => 'data'], $tabs) === 'data' && $tabOf(['tab' => 'x'], ['tab' => ['data']], $tabs) === 'profile' && $tabOf([], [], $tabs) === 'profile');
+$_POST = [];
+$_GET = [];
+$rr = $get('/admin/settings?tab=languages', 3);
+check('settings tabs: the administration settings are in tabs, all of them in one form', preg_match('/id="languages"\s*>/', $rr['body']) === 1 && preg_match('/id="general" hidden>/', $rr['body']) === 1
+    && str_contains($rr['body'], 'name="site_name"') && str_contains($rr['body'], 'name="tab" value="languages"'));
+$rr = $post('/admin/settings', ['site_name' => 'Testseite', 'mail_from' => 'noreply@example.test', 'registration' => 'open', 'default_locale' => 'de', 'locales' => ['de', 'en'], 'tab' => 'languages'], 3);
+check('settings tabs: saving keeps the administration settings of every tab', $pdo->query("SELECT COUNT(*) FROM setting WHERE name = 'core.site_name' AND value = 'Testseite'")->fetchColumn() == 1 && $rr['status'] === 302);
 
 $app = new Modulento\Core\App($config, $pdo);
 $app->preferences->set(4, 'color_scheme', 'dark');

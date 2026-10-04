@@ -6,9 +6,26 @@
 {% block admin %}
 {% include '@admin/_page_header.twig' with {heading: trans('core.admin.dashboard.title')} only %}
 
-{% if stats %}
+{% if stats or update %}
     <p>{{ trans('core.admin.dashboard.intro') }}</p>
     <ul class="stats">
+        {% if update %}
+            {# The installed version, and what the last check found. #}
+            <li class="card-box stat-card{{ update.available ? ' is-pending' }}">
+                <span class="stat-value">{{ update.current }}</span>
+                <a class="stat-label" href="{{ url('/admin/updates') }}">{{ trans('core.admin.dashboard.updates') }}</a>
+                <span class="stat-icon">{{ icons.menu('/admin/updates') }}</span>
+                <span class="stat-note">
+                    {% if update.available %}
+                        <a class="badge badge-pending" href="{{ url('/admin/updates') }}">{{ trans('core.admin.dashboard.update_available', {version: update.available}) }}</a>
+                    {% elseif update.checked_at %}
+                        {{ trans('core.admin.dashboard.update_current', {date: update.checked_at}) }}
+                    {% else %}
+                        {{ trans('core.admin.dashboard.update_unchecked') }}
+                    {% endif %}
+                </span>
+            </li>
+        {% endif %}
         {% for stat in stats %}
             {% set waiting = stat.pending is not null and stat.pending > 0 %}
             <li class="card-box stat-card{{ waiting ? ' is-pending' }}">
