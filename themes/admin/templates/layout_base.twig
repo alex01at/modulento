@@ -1,0 +1,26 @@
+{# What every frame of the administration shares: the document head and the
+   account's colour scheme. A frame fills the "frame" block. #}
+<!DOCTYPE html>
+{# The account's own choice of colour scheme; without one the device decides. #}
+{% set scheme = color_scheme() %}
+<html lang="{{ locale() }}"{% if scheme != 'auto' %} data-theme="{{ scheme }}"{% endif %}>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="robots" content="noindex">
+    <title>{% block title %}{{ trans('core.admin.title') }} – {{ site_name }}{% endblock %}</title>
+    {% if site_favicon() %}<link rel="icon" href="{{ site_favicon() }}">{% endif %}
+    <link rel="stylesheet" href="{{ admin_asset('admin.css') }}">
+    <script src="{{ admin_asset('admin.js') }}"></script>
+    <script src="{{ admin_asset('editor.js') }}" defer></script>
+    <script src="{{ theme_asset('account-menu.js') }}" defer></script>
+    {# The same script as on the site: a "show" button next to every password field. #}
+    <script src="{{ admin_asset('password-toggle.js') }}" defer data-show="{{ trans('core.password.show') }}" data-hide="{{ trans('core.password.hide') }}"></script>
+    <script src="{{ admin_asset('header-menu.js') }}" defer></script>
+    {% block head %}{% endblock %}
+</head>
+<body class="layout-{{ admin_layout() }}">
+<a class="skip-link" href="#content">{{ trans('core.admin.layout.skip') }}</a>
+{% block frame %}{% endblock %}
+</body>
+</html>

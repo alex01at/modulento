@@ -102,6 +102,9 @@ final class AccountController extends Controller
             'avatar' => $this->app->modules->enabled('avatars') ? $this->app->avatars->url($this->accountId()) : null,
             'locales' => $this->app->locales->enabled(),
             'color_schemes' => Preferences::COLOR_SCHEMES,
+            'is_admin' => $this->app->auth->can('core.admin.access'),
+            'admin_layout' => $this->app->preferences->adminLayout($this->accountId()),
+            'admin_layouts' => Preferences::ADMIN_LAYOUTS,
             'min_length' => PasswordPolicy::MIN_LENGTH,
             'is_last_admin' => $this->app->accounts->isLastAdmin($this->accountId()),
             'provider_status' => $this->app->providers->findByAccount($this->accountId())['status'] ?? null,
@@ -163,6 +166,21 @@ final class AccountController extends Controller
             return;
         }
         $this->back('success', 'core.account.appearance.saved');
+    }
+
+    /** The frame of the administration. The route itself only admits administrators. */
+    public function updateAdminLayout(array $params): void
+    {
+        $layout = $_POST['admin_layout'] ?? null;
+
+        if (!is_string($layout) || !in_array($layout, Preferences::ADMIN_LAYOUTS, true)) {
+            $this->back('error', 'core.account.admin_layout.invalid');
+            return;
+        }
+
+        // "sidebar" is the default and needs no row.
+        $this->app->preferences->set($this->accountId(), Preferences::ADMIN_LAYOUT, $layout !== 'sidebar' ? $layout : null);
+        $this->back('success', 'core.account.admin_layout.saved');
     }
 
     public function changePassword(array $params): void

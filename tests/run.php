@@ -2852,6 +2852,34 @@ $post('/account/appearance', ['color_scheme' => 'auto'], 3);
 $post('/account/appearance', ['color_scheme' => 'auto'], 1);
 check('colour scheme: "automatic" needs no row and writes no attribute', $pdo->query('SELECT COUNT(*) FROM account_preference')->fetchColumn() == 0
     && str_contains($get('/account/settings', 1)['body'], '<html lang="de">') && str_contains($get('/admin', 3)['body'], '<html lang="de">'));
+// Administration layout: the sidebar by default, or a header bar with a mega menu,
+// chosen in the profile settings by administrators only.
+check('admin layout: the sidebar is the default', str_contains($get('/admin', 3)['body'], '<body class="layout-sidebar">') && str_contains($get('/admin', 3)['body'], 'id="sidebar"'));
+check('admin layout: only an administrator sees the choice in the profile settings', str_contains($get('/account/settings', 3)['body'], 'name="admin_layout" value="header"')
+    && !str_contains($get('/account/settings', 1)['body'], 'name="admin_layout"'));
+check('admin layout: a visitor and an account without access cannot set it', $post('/account/admin-layout', ['admin_layout' => 'header'], null)['status'] === 403
+    && $post('/account/admin-layout', ['admin_layout' => 'header'], 1)['status'] === 403 && $pdo->query("SELECT COUNT(*) FROM account_preference WHERE name = 'admin_layout'")->fetchColumn() == 0);
+$post('/account/admin-layout', ['admin_layout' => 'grid'], 3);
+check('admin layout: an unknown layout is refused', str_contains($_SESSION['_flash']['error'] ?? '', 'Aufbauten') && $pdo->query("SELECT COUNT(*) FROM account_preference WHERE name = 'admin_layout'")->fetchColumn() == 0);
+$post('/account/admin-layout', ['admin_layout' => 'header'], 3);
+$r = $get('/admin', 3);
+check('admin layout: the header bar with its mega menus replaces the sidebar', str_contains($r['body'], '<body class="layout-header">') && str_contains($r['body'], 'data-header')
+    && str_contains($r['body'], 'class="mega-toggle"') && str_contains($r['body'], 'href="/admin/section/content"') && !str_contains($r['body'], 'id="sidebar"'));
+check('admin layout: the header bar is the same on every administration page', str_contains($get('/admin/settings', 3)['body'], '<body class="layout-header">') && str_contains($get('/admin/roles', 3)['body'], 'data-header'));
+$r = $get('/admin/section/content', 3);
+check('admin layout: a section shows its entries as tiles in the content area', $r['status'] === 200 && str_contains($r['body'], 'class="tiles"')
+    && str_contains($r['body'], 'class="tile" href="/admin/pages"') && str_contains($r['body'], '<h1>Inhalte</h1>'));
+// Account 2 gets a limited administrator role for these two checks: the
+// administration, and the pages - but no accounts, roles or settings.
+$pdo->exec("INSERT INTO role_permission VALUES (1, 'core.admin.access'), (1, 'core.pages.manage')");
+check('admin layout: a section without entries for the account does not exist', $get('/admin/section/people', 2)['status'] === 404 && $get('/admin/section/nope', 3)['status'] === 404);
+check('admin layout: a section shows only what the account may open', substr_count($get('/admin/section/system', 2)['body'], 'class="tile" href=') === 1 && str_contains($get('/admin/section/system', 2)['body'], 'href="/admin/docs"'));
+$pdo->exec("DELETE FROM role_permission WHERE role_id = 1 AND permission IN ('core.admin.access', 'core.pages.manage')");
+check('admin layout: the tiles need the administration permission', $get('/admin/section/content', 1)['status'] === 403);
+$post('/account/admin-layout', ['admin_layout' => 'sidebar'], 3);
+check('admin layout: back to the sidebar removes the choice', $pdo->query("SELECT COUNT(*) FROM account_preference WHERE name = 'admin_layout'")->fetchColumn() == 0
+    && str_contains($get('/admin', 3)['body'], '<body class="layout-sidebar">'));
+
 $app = new Modulento\Core\App($config, $pdo);
 $app->preferences->set(4, 'color_scheme', 'dark');
 $app->preferences->set(4, 'color_scheme', 'sepia');
@@ -2888,7 +2916,7 @@ foreach ([...glob($root . '/themes/*/templates/{,*/,*/*/}*.twig', GLOB_BRACE), .
     }
 }
 check('show password: every template with a password field uses a layout that loads the script: ' . implode(', ', $unscripted), $unscripted === []
-    && str_contains((string) file_get_contents($root . '/themes/admin/templates/layout.twig'), 'password-toggle.js')
+    && str_contains((string) file_get_contents($root . '/themes/admin/templates/layout_base.twig'), 'password-toggle.js')
     && file_get_contents($root . '/themes/admin/assets/password-toggle.js') === file_get_contents($root . '/themes/default/assets/password-toggle.js'));
 check('show password: the setup page loads its own copy of the same script', file_get_contents($root . '/core/install/password-toggle.js') === file_get_contents($root . '/themes/default/assets/password-toggle.js')
     && str_contains((string) file_get_contents($root . '/core/install/install.twig'), '<script src="/password-toggle.js" defer data-show="{{ password_show }}" data-hide="{{ password_hide }}"></script>'));

@@ -1,0 +1,20 @@
+{% extends '@admin/layout.twig' %}
+{% import '@admin/_icons.twig' as icons %}
+
+{% block title %}{{ trans(group.label_key) }} – {{ trans('core.admin.title') }} – {{ site_name }}{% endblock %}
+
+{# One section of the menu as tiles, the content of the header layout's top-level entries. #}
+{% block admin %}
+{% include '@admin/_page_header.twig' with {heading: trans(group.label_key)} only %}
+
+<ul class="tiles">
+    {% for item in items %}
+        <li>
+            <a class="tile" href="{{ url(item.path) }}">
+                <span class="tile-icon">{{ icons.menu(item.path) }}</span>
+                <span class="tile-label">{{ trans(item.label_key) }}</span>
+            </a>
+        </li>
+    {% endfor %}
+</ul>
+{% endblock %}

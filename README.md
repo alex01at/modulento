@@ -262,7 +262,12 @@ chosen under **Administration → Themes**.
 - `default` is the complete site theme. Another site theme only contains what
   it changes; every template or asset it leaves out comes from `default`.
 - `admin` renders the administration and is separate on purpose: a broken
-  site theme cannot lock anyone out.
+  site theme cannot lock anyone out. It has two frames, the sidebar
+  (`layout_sidebar.twig`) and the header with its mega menu
+  (`layout_header.twig`), both on `layout_base.twig`; `layout.twig` picks one
+  for the administrator's choice (`admin_layout()`), so pages keep extending
+  `@admin/layout.twig`. A section's entries are shown as tiles by
+  `@admin/section.twig`.
 - A theme overrides an extension's templates by placing files in
   `themes/<theme>/extensions/<extension id>/`.
 - A theme can bring texts of its own (a slogan, the steps on its home page) in
@@ -345,6 +350,7 @@ Available in every template:
 | `provider_status()` | Status of the logged-in account's provider profile, or null without one |
 | `account_avatar()` | Path of the logged-in account's profile picture, or null without one (or without an account) |
 | `color_scheme()` | `auto`, `light` or `dark`: what the logged-in account has chosen; `auto` for visitors |
+| `admin_layout()` | `sidebar` or `header`: the frame of the administration that an administrator chose under Profile settings; `sidebar` for everyone else. Used by `themes/admin` only |
 | `site_logo('light' \| 'dark')` | Path of the site's own logo (Administration → Themes), or null without one; `'dark'` falls back to the light logo if no separate dark one was uploaded |
 | `site_favicon()` | Path of the site's own favicon, or null for the browser's default |
 | `meta_description()` | The default description (Administration → Settings), for pages that have none of their own |

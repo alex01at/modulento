@@ -1,0 +1,47 @@
+{% extends '@admin/layout_base.twig' %}
+{% import '@admin/_icons.twig' as icons %}
+
+{% block frame %}
+<aside class="sidebar" id="sidebar">
+    <div class="sidebar-head">
+        <a class="brand" href="{{ url('/admin') }}">
+            <span class="brand-mark">{{ icons.icon('brand') }}</span>
+            <span class="brand-name">{{ site_name }}</span>
+        </a>
+        <button type="button" class="sidebar-close" data-sidebar-close>
+            {{ icons.icon('close') }}
+            <span class="visually-hidden">{{ trans('core.admin.layout.menu_close') }}</span>
+        </button>
+    </div>
+    <nav class="admin-menu" aria-label="{{ trans('core.nav.admin') }}">
+        {% set here = current_path() %}
+        <a href="{{ url('/admin') }}" {{ here == '/admin' ? 'aria-current="page"' }}>{{ icons.menu('/admin') }}<span>{{ trans('core.admin.dashboard.title') }}</span></a>
+        {% for group in admin_menu_groups %}
+            <p class="admin-menu-group" id="menu-group-{{ group.id }}">{{ trans(group.label_key) }}</p>
+            <div role="group" aria-labelledby="menu-group-{{ group.id }}">
+                {% for item in group.items %}
+                    <a href="{{ url(item.path) }}" {{ here == item.path or here starts with (item.path ~ '/') ? 'aria-current="page"' }}>{{ icons.menu(item.path) }}<span>{{ trans(item.label_key) }}</span></a>
+                {% endfor %}
+            </div>
+        {% endfor %}
+    </nav>
+</aside>
+<div class="sidebar-backdrop" data-sidebar-close></div>
+
+<div class="page">
+    <header class="topbar">
+        <button type="button" class="menu-toggle" data-sidebar-toggle aria-controls="sidebar" aria-expanded="false">
+            {{ icons.icon('menu') }}
+            <span class="visually-hidden">{{ trans('core.admin.layout.menu_toggle') }}</span>
+        </button>
+        {% include '@admin/_tools.twig' %}
+    </header>
+
+    <main id="content" class="admin-content" tabindex="-1">
+        {% for type, message in flashes %}
+            <p class="flash flash-{{ type }}" role="status">{{ message }}</p>
+        {% endfor %}
+        {% block admin %}{% endblock %}
+    </main>
+</div>
+{% endblock %}
