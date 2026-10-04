@@ -30,6 +30,11 @@ final class UpdateController extends Controller
     {
         try {
             $meta = $this->updater()->checkForUpdate();
+            // The dashboard shows this result without asking the release server again.
+            $this->app->settings->set('core.update_check', json_encode([
+                'version' => $meta['version'] ?? '',
+                'checked_at' => gmdate('Y-m-d H:i'),
+            ], JSON_THROW_ON_ERROR));
             if ($meta === null) {
                 Session::flash('success', $this->trans('core.update.up_to_date'));
             } else {

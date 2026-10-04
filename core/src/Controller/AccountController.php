@@ -24,6 +24,8 @@ final class AccountController extends Controller
     private const CHANGE_EMAIL_TTL_SECONDS = 86400;
     private const RECENT = 5;
     private const DEVICE_NAME_LENGTH = 80;
+    /** The tabs of the settings page; the first one is shown when none is named. */
+    private const TABS = ['profile', 'security', 'orders', 'data'];
 
     /** Where someone lands after "Dashboard": what is going on, and the ways onward. */
     public function dashboard(array $params): void
@@ -99,6 +101,7 @@ final class AccountController extends Controller
     public function index(array $params): void
     {
         $this->render('account/index.twig', [
+            'tab' => $this->tab(self::TABS),
             'avatar' => $this->app->modules->enabled('avatars') ? $this->app->avatars->url($this->accountId()) : null,
             'locales' => $this->app->locales->enabled(),
             'color_schemes' => Preferences::COLOR_SCHEMES,
@@ -380,6 +383,7 @@ final class AccountController extends Controller
     private function back(string $type, string $messageKey, array $replacements = []): void
     {
         Session::flash($type, $this->trans($messageKey, $replacements));
-        $this->redirect('/account/settings');
+        // Back to the tab the form was sent from.
+        $this->redirect('/account/settings?tab=' . $this->tab(self::TABS));
     }
 }

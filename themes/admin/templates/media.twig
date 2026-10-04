@@ -1,0 +1,58 @@
+{% extends '@admin/layout.twig' %}
+
+{% block title %}{{ trans('core.admin.menu.media') }} – {{ site_name }}{% endblock %}
+
+{% block admin %}
+{% include '@admin/_page_header.twig' with {heading: trans('core.admin.menu.media')} only %}
+
+<section class="card-box">
+    <h2>{{ trans('core.media.upload.title') }}</h2>
+    <p>{{ trans('core.media.upload.intro') }}</p>
+    <form method="post" action="{{ url('/admin/media') }}" enctype="multipart/form-data" class="stack-form">
+        {{ csrf_field() }}
+        <div class="field-grid">
+            <div class="field">
+                <label for="media_file">{{ trans('core.media.upload.file') }}</label>
+                <input id="media_file" name="file" type="file" accept="{{ accepted }}" required>
+                <small>{{ trans('core.media.upload.hint') }}</small>
+            </div>
+            <div class="field">
+                <label for="media_title">{{ trans('core.media.upload.name') }}</label>
+                <input id="media_title" name="title" maxlength="200">
+                <small>{{ trans('core.media.upload.name_hint') }}</small>
+            </div>
+        </div>
+        <div class="button-row">
+            <button type="submit">{{ trans('core.media.upload.submit') }}</button>
+        </div>
+    </form>
+</section>
+
+<section class="card-box">
+    <h2>{{ trans('core.media.list.title') }}</h2>
+    {% if items %}
+        <ul class="media-grid">
+            {% for item in items %}
+                <li class="media-item">
+                    <img src="{{ item.url }}" alt="{{ item.title }}" width="{{ item.width }}" height="{{ item.height }}" loading="lazy">
+                    <div class="media-meta">
+                        <strong>{{ item.title ?: trans('core.media.list.untitled') }}</strong>
+                        <small>{{ item.width }} × {{ item.height }} px, {{ item.kilobytes }} KB</small>
+                    </div>
+                    <label class="media-url">
+                        <span class="visually-hidden">{{ trans('core.media.list.address') }}</span>
+                        <input type="text" value="{{ item.url }}" readonly>
+                    </label>
+                    <form method="post" action="{{ url('/admin/media/' ~ item.id ~ '/delete') }}">
+                        {{ csrf_field() }}
+                        <button type="submit" class="danger btn-sm">{{ trans('core.media.list.delete') }}</button>
+                    </form>
+                </li>
+            {% endfor %}
+        </ul>
+        {% include '@admin/_pager.twig' with {path: '/admin/media', page: page, pages: pages} only %}
+    {% else %}
+        <p class="empty">{{ trans('core.media.list.empty') }}</p>
+    {% endif %}
+</section>
+{% endblock %}

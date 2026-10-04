@@ -624,6 +624,17 @@ on again (`$app->modules->enabled('reviews')`, in templates `module('reviews')`)
 The withdrawal and the report form are legal duties in many cases - switch
 them off only where they do not apply.
 
+**Administration → Media library** keeps the pictures for the site: JPEG, PNG
+or WebP up to 8 MB, saved again on upload (metadata is removed, pictures larger
+than 2400 pixels are scaled down). Each picture has a fixed address
+`/media/library/<name>` to put on a page. Who may use it is the permission
+"Manage the media library" (`core.media.manage`), listed with the roles.
+
+The administration's dashboard shows the installed version and what the last
+update check found; that check asks the release server and only runs on the
+Updates page. The settings pages of accounts and administration are split
+into tabs: every tab sits in the same form, so saving keeps all of them.
+
 Behind a reverse proxy or CDN, list its addresses as `TRUSTED_PROXIES` in
 `.env` ("10.0.0.0/8, 2001:db8::/32"). Only then is the visitor's address taken
 from `X-Forwarded-For`; without it all visitors would share one limit for

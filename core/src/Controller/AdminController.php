@@ -8,6 +8,7 @@ use Modulento\Core\App;
 use Modulento\Core\Support\Branding;
 use Modulento\Core\Support\Modules;
 use Modulento\Core\Support\Session;
+use Modulento\Core\Support\Updater;
 use PDO;
 use Throwable;
 
@@ -15,7 +16,33 @@ final class AdminController extends Controller
 {
     public function index(array $params): void
     {
-        $this->render('@admin/index.twig', ['stats' => $this->stats()]);
+        $this->render('@admin/index.twig', ['stats' => $this->stats(), 'update' => $this->updateStatus()]);
+    }
+
+    /**
+     * The installed version and what the last update check found. The check
+     * itself asks the release server, so it only runs on the Updates page.
+     * Null without the permission or without an update repository.
+     *
+     * @return array{current: string, available: ?string, checked_at: ?string}|null
+     */
+    private function updateStatus(): ?array
+    {
+        $config = $this->app->config;
+        if (!$this->app->auth->can('core.update.manage') || ($config['update']['repo'] ?? '') === '') {
+            return null;
+        }
+
+        $check = json_decode($this->app->settings->get('core.update_check'), true);
+        $check = is_array($check) ? $check : [];
+        $current = Updater::installedVersion($config['app']['root']);
+        $found = (string) ($check['version'] ?? '');
+
+        return [
+            'current' => $current,
+            'available' => $found !== '' && version_compare($found, $current, '>') ? $found : null,
+            'checked_at' => $check['checked_at'] ?? null,
+        ];
     }
 
     public function modules(array $params): void
@@ -89,6 +116,10 @@ final class AdminController extends Controller
         if ($app->auth->can('core.orders.manage')) {
             $stats[] = ['id' => 'orders', 'label_key' => 'core.admin.menu.orders', 'path' => '/admin/orders',
                 'total' => array_sum($app->orders->counts()), 'pending' => null];
+        }
+        if ($app->auth->can('core.media.manage')) {
+            $stats[] = ['id' => 'media', 'label_key' => 'core.admin.menu.media', 'path' => '/admin/media',
+                'total' => $app->media->list(1, 1)['total'], 'pending' => null];
         }
         if ($app->auth->can('core.accounts.manage')) {
             $stats[] = ['id' => 'accounts', 'label_key' => 'core.admin.menu.accounts', 'path' => '/admin/accounts',

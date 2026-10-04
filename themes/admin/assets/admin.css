@@ -116,6 +116,8 @@
 }
 
 * { box-sizing: border-box; }
+/* The hidden attribute must win over the display rules of the sections (fieldset is a grid). */
+[hidden] { display: none !important; }
 
 body {
     margin: 0;
@@ -404,6 +406,16 @@ code { padding: .1rem .35rem; border: 1px solid var(--line); border-radius: 4px;
 .ext-detail .card-list li { display: grid; gap: .35rem; align-content: start; padding: 1rem; border: 1px solid var(--line); border-radius: 8px; }
 .ext-detail .card-list p { margin: 0; }
 .ext-detail .price { color: var(--link); font-size: 1.25rem; font-weight: 700; }
+
+/* --- Media library --- */
+.media-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr)); gap: 1rem; margin: 0 0 1rem; padding: 0; list-style: none; }
+.media-item { display: grid; gap: .6rem; align-content: start; padding: .75rem; border: 1px solid var(--line); border-radius: 8px; }
+.media-item img { display: block; width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 6px; background: var(--bg); }
+.media-meta { display: grid; gap: .15rem; min-width: 0; overflow-wrap: anywhere; }
+.media-meta strong { color: var(--heading); }
+.media-url input { font-size: .8rem; }
+.media-item form { margin: 0; }
+.media-item form button { width: 100%; }
 
 /* --- Narrow screens: the sidebar becomes an off-canvas menu ------------- */
 @media (max-width: 1023px) {

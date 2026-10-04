@@ -8,6 +8,7 @@ use Modulento\Core\Controller\AccountController;
 use Modulento\Core\Controller\AdminAccountController;
 use Modulento\Core\Controller\AdminCatalogueController;
 use Modulento\Core\Controller\AdminController;
+use Modulento\Core\Controller\AdminMediaController;
 use Modulento\Core\Controller\AdminOrderController;
 use Modulento\Core\Controller\AdminPaymentController;
 use Modulento\Core\Controller\AdminProviderController;
@@ -238,6 +239,7 @@ final class Kernel
         if ($modules->enabled('avatars')) {
             $router->get('/media/avatars/{file}', [MediaController::class, 'avatar'], Router::PUBLIC);
         $router->get('/media/branding/{file}', [MediaController::class, 'branding'], Router::PUBLIC);
+        $router->get('/media/library/{file}', [MediaController::class, 'library'], Router::PUBLIC);
             $router->post('/account/avatar', [AccountController::class, 'setAvatar']);
             $router->post('/account/avatar/delete', [AccountController::class, 'deleteAvatar']);
         }
@@ -283,6 +285,9 @@ final class Kernel
         $router->get('/admin/payments', [AdminPaymentController::class, 'index'], 'core.settings.manage');
         $router->post('/admin/payments', [AdminPaymentController::class, 'save'], 'core.settings.manage');
 
+        $router->get('/admin/media', [AdminMediaController::class, 'index'], 'core.media.manage');
+        $router->post('/admin/media', [AdminMediaController::class, 'upload'], 'core.media.manage');
+        $router->post('/admin/media/{id}/delete', [AdminMediaController::class, 'delete'], 'core.media.manage');
         $router->get('/admin/pages', [PageController::class, 'index'], 'core.pages.manage');
         $router->get('/admin/pages/new', [PageController::class, 'edit'], 'core.pages.manage');
         $router->post('/admin/pages/new', [PageController::class, 'save'], 'core.pages.manage');
@@ -353,6 +358,7 @@ final class Kernel
         $app->addPermission('core.themes.manage', 'core.permission.themes_manage');
         $app->addPermission('core.settings.manage', 'core.permission.settings_manage');
         $app->addPermission('core.pages.manage', 'core.permission.pages_manage');
+        $app->addPermission('core.media.manage', 'core.permission.media_manage');
         $app->addPermission('core.orders.manage', 'core.permission.orders_manage');
         if ($app->modules->enabled('reviews')) {
             $app->addPermission('core.reviews.manage', 'core.permission.reviews_manage');
@@ -371,6 +377,7 @@ final class Kernel
         $app->addAdminMenu('core.admin.menu.settings', '/admin/settings', 'core.settings.manage', 'system');
         $app->addAdminMenu('core.admin.menu.payments', '/admin/payments', 'core.settings.manage', 'marketplace');
         $app->addAdminMenu('core.admin.menu.pages', '/admin/pages', 'core.pages.manage', 'content');
+        $app->addAdminMenu('core.admin.menu.media', '/admin/media', 'core.media.manage', 'content');
         $app->addAdminMenu('core.admin.menu.orders', '/admin/orders', 'core.orders.manage', 'marketplace');
         if ($app->modules->enabled('withdrawal')) {
             $app->addAdminMenu('core.admin.menu.withdrawals', '/admin/withdrawals', 'core.orders.manage', 'marketplace');

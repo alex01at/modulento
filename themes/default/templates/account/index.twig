@@ -2,172 +2,197 @@
 
 {% block title %}{{ trans('core.account.title') }} – {{ site_name }}{% endblock %}
 
+{# Four tabs on one page. Every tab is in the page, the others only hidden, so
+   a form of any tab can be sent at any time; its "tab" field brings the page
+   back to the same tab after saving. #}
 {% block content %}
 {% include 'account/_nav.twig' %}
 <h1>{{ trans('core.account.title') }}</h1>
 
-{% if module('avatars') %}
-<section>
-    <h2>{{ trans('core.account.avatar.title') }}</h2>
-    {% if avatar %}
-        <p><img class="avatar" src="{{ avatar }}" alt="{{ trans('core.account.avatar.title') }}" width="80" height="80"></p>
-    {% endif %}
-    <form method="post" action="{{ url('/account/avatar') }}" enctype="multipart/form-data" class="stack-form">
-        {{ csrf_field() }}
-        <label for="avatar">{{ trans('core.account.avatar.file') }}</label>
-        <input id="avatar" name="avatar" type="file" accept="image/jpeg,image/png,image/webp" required>
-        <small>{{ trans('core.account.avatar.hint') }}</small>
-        <button type="submit">{{ trans('core.account.avatar.save') }}</button>
-    </form>
-    {% if avatar %}
-        <form method="post" action="{{ url('/account/avatar/delete') }}">
+<nav class="tabs" aria-label="{{ trans('core.account.title') }}">
+    {% for name in ['profile', 'security', 'orders', 'data'] %}
+        <a href="{{ url('/account/settings') }}?tab={{ name }}" {{ tab == name ? 'aria-current="page"' }}>{{ trans('core.account.tabs.' ~ name) }}</a>
+    {% endfor %}
+</nav>
+
+<div id="tab-profile" {{ tab != 'profile' ? 'hidden' }}>
+    {% if module('avatars') %}
+    <section>
+        <h2>{{ trans('core.account.avatar.title') }}</h2>
+        {% if avatar %}
+            <p><img class="avatar" src="{{ avatar }}" alt="{{ trans('core.account.avatar.title') }}" width="80" height="80"></p>
+        {% endif %}
+        <form method="post" action="{{ url('/account/avatar') }}" enctype="multipart/form-data" class="stack-form">
             {{ csrf_field() }}
-            <button type="submit" class="link-button">{{ trans('core.account.avatar.delete') }}</button>
+            <input type="hidden" name="tab" value="profile">
+            <label for="avatar">{{ trans('core.account.avatar.file') }}</label>
+            <input id="avatar" name="avatar" type="file" accept="image/jpeg,image/png,image/webp" required>
+            <small>{{ trans('core.account.avatar.hint') }}</small>
+            <button type="submit">{{ trans('core.account.avatar.save') }}</button>
         </form>
+        {% if avatar %}
+            <form method="post" action="{{ url('/account/avatar/delete') }}">
+                {{ csrf_field() }}
+                <input type="hidden" name="tab" value="profile">
+                <button type="submit" class="link-button">{{ trans('core.account.avatar.delete') }}</button>
+            </form>
+        {% endif %}
+    </section>
     {% endif %}
-</section>
-{% endif %}
 
-<section>
-    <h2>{{ trans('core.account.profile.title') }}</h2>
-    <form method="post" action="{{ url('/account/profile') }}" class="stack-form">
-        {{ csrf_field() }}
-        <label for="display_name">{{ trans('core.account.profile.display_name') }}</label>
-        <input id="display_name" name="display_name" value="{{ account.display_name }}" maxlength="100" autocomplete="name">
+    <section>
+        <h2>{{ trans('core.account.profile.title') }}</h2>
+        <form method="post" action="{{ url('/account/profile') }}" class="stack-form">
+            {{ csrf_field() }}
+            <input type="hidden" name="tab" value="profile">
+            <label for="display_name">{{ trans('core.account.profile.display_name') }}</label>
+            <input id="display_name" name="display_name" value="{{ account.display_name }}" maxlength="100" autocomplete="name">
 
-        <label for="locale">{{ trans('core.nav.language') }}</label>
-        <select id="locale" name="locale">
-            {% for code in locales %}
-                <option value="{{ code }}" {{ code == account.locale ? 'selected' }}>{{ locale_name(code) }}</option>
-            {% endfor %}
-        </select>
+            <label for="locale">{{ trans('core.nav.language') }}</label>
+            <select id="locale" name="locale">
+                {% for code in locales %}
+                    <option value="{{ code }}" {{ code == account.locale ? 'selected' }}>{{ locale_name(code) }}</option>
+                {% endfor %}
+            </select>
 
-        <button type="submit">{{ trans('core.account.save') }}</button>
-    </form>
-</section>
+            <button type="submit">{{ trans('core.account.save') }}</button>
+        </form>
+    </section>
 
-{% if is_admin %}
-<section>
-    <h2>{{ trans('core.account.admin_layout.title') }}</h2>
-    <p>{{ trans('core.account.admin_layout.intro') }}</p>
-    <form method="post" action="{{ url('/account/admin-layout') }}" class="stack-form">
-        {{ csrf_field() }}
-        <fieldset>
-            <legend>{{ trans('core.account.admin_layout.choose') }}</legend>
-            {% for layout in admin_layouts %}
-                <label>
-                    <input type="radio" name="admin_layout" value="{{ layout }}" {{ layout == admin_layout ? 'checked' }}>
-                    {{ trans('core.account.admin_layout.' ~ layout) }}
-                </label>
-                <small>{{ trans('core.account.admin_layout.' ~ layout ~ '_hint') }}</small>
-            {% endfor %}
-        </fieldset>
-        <button type="submit">{{ trans('core.account.admin_layout.save') }}</button>
-    </form>
-</section>
-{% endif %}
-
-<section>
-    <h2>{{ trans('core.order.list.buyer') }}</h2>
-    <p><a href="{{ url('/account/orders') }}">{{ trans('core.order.list.buyer') }}</a></p>
-</section>
-
-<section>
-    <h2>{{ trans('core.provider.title') }}</h2>
-    <p>
-        {{ provider_status ? trans('core.provider.status.' ~ provider_status) : trans('core.provider.none') }}
-    </p>
-    <p><a href="{{ url('/account/provider') }}">{{ provider_status ? trans('core.provider.edit') : trans('core.provider.create') }}</a></p>
-    {% if provider_status %}
-        <p><a href="{{ url('/account/offers') }}">{{ trans('core.offer.mine.title') }}</a></p>
-        <p><a href="{{ url('/account/sales') }}">{{ trans('core.order.list.provider') }}</a></p>
+    {% if is_admin %}
+    <section>
+        <h2>{{ trans('core.account.admin_layout.title') }}</h2>
+        <p>{{ trans('core.account.admin_layout.intro') }}</p>
+        <form method="post" action="{{ url('/account/admin-layout') }}" class="stack-form">
+            {{ csrf_field() }}
+            <input type="hidden" name="tab" value="profile">
+            <fieldset>
+                <legend>{{ trans('core.account.admin_layout.choose') }}</legend>
+                {% for layout in admin_layouts %}
+                    <label>
+                        <input type="radio" name="admin_layout" value="{{ layout }}" {{ layout == admin_layout ? 'checked' }}>
+                        {{ trans('core.account.admin_layout.' ~ layout) }}
+                    </label>
+                    <small>{{ trans('core.account.admin_layout.' ~ layout ~ '_hint') }}</small>
+                {% endfor %}
+            </fieldset>
+            <button type="submit">{{ trans('core.account.admin_layout.save') }}</button>
+        </form>
+    </section>
     {% endif %}
-</section>
+</div>
 
-<section>
-    <h2>{{ trans('core.account.email.title') }}</h2>
-    <p>{{ trans('core.account.email.current', {email: account.email}) }}</p>
-    <form method="post" action="{{ url('/account/email') }}" class="stack-form">
-        {{ csrf_field() }}
-        <label for="new_email">{{ trans('core.account.email.new') }}</label>
-        <input id="new_email" name="email" type="email" autocomplete="email" required>
+<div id="tab-security" {{ tab != 'security' ? 'hidden' }}>
+    <section>
+        <h2>{{ trans('core.account.email.title') }}</h2>
+        <p>{{ trans('core.account.email.current', {email: account.email}) }}</p>
+        <form method="post" action="{{ url('/account/email') }}" class="stack-form">
+            {{ csrf_field() }}
+            <input type="hidden" name="tab" value="security">
+            <label for="new_email">{{ trans('core.account.email.new') }}</label>
+            <input id="new_email" name="email" type="email" autocomplete="email" required>
 
-        <label for="email_current_password">{{ trans('core.account.current_password') }}</label>
-        <input id="email_current_password" name="current_password" type="password" autocomplete="current-password" required>
+            <label for="email_current_password">{{ trans('core.account.current_password') }}</label>
+            <input id="email_current_password" name="current_password" type="password" autocomplete="current-password" required>
 
-        <button type="submit">{{ trans('core.account.email.submit') }}</button>
-    </form>
-</section>
+            <button type="submit">{{ trans('core.account.email.submit') }}</button>
+        </form>
+    </section>
 
-<section>
-    <h2>{{ trans('core.account.password.title') }}</h2>
-    <form method="post" action="{{ url('/account/password') }}" class="stack-form">
-        {{ csrf_field() }}
-        <label for="password_current_password">{{ trans('core.account.current_password') }}</label>
-        <input id="password_current_password" name="current_password" type="password" autocomplete="current-password" required>
+    <section>
+        <h2>{{ trans('core.account.password.title') }}</h2>
+        <form method="post" action="{{ url('/account/password') }}" class="stack-form">
+            {{ csrf_field() }}
+            <input type="hidden" name="tab" value="security">
+            <label for="password_current_password">{{ trans('core.account.current_password') }}</label>
+            <input id="password_current_password" name="current_password" type="password" autocomplete="current-password" required>
 
-        <label for="new_password">{{ trans('core.password.new', {min: min_length}) }}</label>
-        <input id="new_password" name="password" type="password" minlength="{{ min_length }}" autocomplete="new-password" required>
+            <label for="new_password">{{ trans('core.password.new', {min: min_length}) }}</label>
+            <input id="new_password" name="password" type="password" minlength="{{ min_length }}" autocomplete="new-password" required>
 
-        <label for="new_password_repeat">{{ trans('core.password.repeat') }}</label>
-        <input id="new_password_repeat" name="password_repeat" type="password" minlength="{{ min_length }}" autocomplete="new-password" required>
+            <label for="new_password_repeat">{{ trans('core.password.repeat') }}</label>
+            <input id="new_password_repeat" name="password_repeat" type="password" minlength="{{ min_length }}" autocomplete="new-password" required>
 
-        <button type="submit">{{ trans('core.account.password.submit') }}</button>
-    </form>
-</section>
+            <button type="submit">{{ trans('core.account.password.submit') }}</button>
+        </form>
+    </section>
 
-{% if module('remember_login') %}
-<section>
-    <h2>{{ trans('core.account.devices.title') }}</h2>
-    <p>{{ trans('core.account.devices.intro', {days: remember_days}) }}</p>
-    {% if devices %}
-        <table>
-            <thead>
-            <tr>
-                <th scope="col">{{ trans('core.account.devices.browser') }}</th>
-                <th scope="col">{{ trans('core.account.devices.created') }}</th>
-                <th scope="col">{{ trans('core.account.devices.last_used') }}</th>
-            </tr>
-            </thead>
-            <tbody>
-            {% for device in devices %}
+    {% if module('remember_login') %}
+    <section>
+        <h2>{{ trans('core.account.devices.title') }}</h2>
+        <p>{{ trans('core.account.devices.intro', {days: remember_days}) }}</p>
+        {% if devices %}
+            <table>
+                <thead>
                 <tr>
-                    <td>{{ device.browser ?? trans('core.account.devices.unknown') }}{% if device.current %} <small>({{ trans('core.account.devices.current') }})</small>{% endif %}</td>
-                    <td>{{ device.created_at }} UTC</td>
-                    <td>{{ device.last_used_at }} UTC</td>
+                    <th scope="col">{{ trans('core.account.devices.browser') }}</th>
+                    <th scope="col">{{ trans('core.account.devices.created') }}</th>
+                    <th scope="col">{{ trans('core.account.devices.last_used') }}</th>
                 </tr>
-            {% endfor %}
-            </tbody>
-        </table>
-        <form method="post" action="{{ url('/account/sessions/revoke') }}">
-            {{ csrf_field() }}
-            <button type="submit">{{ trans('core.account.devices.revoke') }}</button>
-        </form>
-        <p><small>{{ trans('core.account.devices.revoke_hint') }}</small></p>
-    {% else %}
-        <p>{{ trans('core.account.devices.none') }}</p>
+                </thead>
+                <tbody>
+                {% for device in devices %}
+                    <tr>
+                        <td>{{ device.browser ?? trans('core.account.devices.unknown') }}{% if device.current %} <small>({{ trans('core.account.devices.current') }})</small>{% endif %}</td>
+                        <td>{{ device.created_at }} UTC</td>
+                        <td>{{ device.last_used_at }} UTC</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+            <form method="post" action="{{ url('/account/sessions/revoke') }}">
+                {{ csrf_field() }}
+                <input type="hidden" name="tab" value="security">
+                <button type="submit">{{ trans('core.account.devices.revoke') }}</button>
+            </form>
+            <p><small>{{ trans('core.account.devices.revoke_hint') }}</small></p>
+        {% else %}
+            <p>{{ trans('core.account.devices.none') }}</p>
+        {% endif %}
+    </section>
     {% endif %}
-</section>
-{% endif %}
+</div>
 
-<section>
-    <h2>{{ trans('core.account.export.title') }}</h2>
-    <p>{{ trans('core.account.export.intro') }}</p>
-    <p><a href="{{ url('/account/export') }}">{{ trans('core.account.export.download') }}</a></p>
-</section>
+<div id="tab-orders" {{ tab != 'orders' ? 'hidden' }}>
+    <section>
+        <h2>{{ trans('core.order.list.buyer') }}</h2>
+        <p><a href="{{ url('/account/orders') }}">{{ trans('core.order.list.buyer') }}</a></p>
+    </section>
 
-<section>
-    <h2>{{ trans('core.account.delete.title') }}</h2>
-    {% if is_last_admin %}
-        <p>{{ trans('core.account.delete.last_admin') }}</p>
-    {% else %}
-        <p>{{ trans('core.account.delete.intro') }}</p>
-        <form method="post" action="{{ url('/account/delete') }}" class="stack-form">
-            {{ csrf_field() }}
-            <label for="delete_current_password">{{ trans('core.account.current_password') }}</label>
-            <input id="delete_current_password" name="current_password" type="password" autocomplete="current-password" required>
-            <button type="submit" class="danger">{{ trans('core.account.delete.submit') }}</button>
-        </form>
-    {% endif %}
-</section>
+    <section>
+        <h2>{{ trans('core.provider.title') }}</h2>
+        <p>
+            {{ provider_status ? trans('core.provider.status.' ~ provider_status) : trans('core.provider.none') }}
+        </p>
+        <p><a href="{{ url('/account/provider') }}">{{ provider_status ? trans('core.provider.edit') : trans('core.provider.create') }}</a></p>
+        {% if provider_status %}
+            <p><a href="{{ url('/account/offers') }}">{{ trans('core.offer.mine.title') }}</a></p>
+            <p><a href="{{ url('/account/sales') }}">{{ trans('core.order.list.provider') }}</a></p>
+        {% endif %}
+    </section>
+</div>
+
+<div id="tab-data" {{ tab != 'data' ? 'hidden' }}>
+    <section>
+        <h2>{{ trans('core.account.export.title') }}</h2>
+        <p>{{ trans('core.account.export.intro') }}</p>
+        <p><a href="{{ url('/account/export') }}">{{ trans('core.account.export.download') }}</a></p>
+    </section>
+
+    <section>
+        <h2>{{ trans('core.account.delete.title') }}</h2>
+        {% if is_last_admin %}
+            <p>{{ trans('core.account.delete.last_admin') }}</p>
+        {% else %}
+            <p>{{ trans('core.account.delete.intro') }}</p>
+            <form method="post" action="{{ url('/account/delete') }}" class="stack-form">
+                {{ csrf_field() }}
+                <input type="hidden" name="tab" value="data">
+                <label for="delete_current_password">{{ trans('core.account.current_password') }}</label>
+                <input id="delete_current_password" name="current_password" type="password" autocomplete="current-password" required>
+                <button type="submit" class="danger">{{ trans('core.account.delete.submit') }}</button>
+            </form>
+        {% endif %}
+    </section>
+</div>
 {% endblock %}

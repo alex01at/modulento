@@ -205,7 +205,7 @@ final class AdminAccountController extends Controller
      * as far as they exist here (a module or extension may be missing).
      */
     private const PRESETS = [
-        'editor' => ['core.admin.access', 'core.pages.manage', 'core.categories.manage', 'blog.posts.manage'],
+        'editor' => ['core.admin.access', 'core.pages.manage', 'core.media.manage', 'core.categories.manage', 'blog.posts.manage'],
         'moderator' => ['core.admin.access', 'core.reviews.manage', 'core.reports.manage', 'core.offers.manage', 'core.providers.manage'],
         'support' => ['core.admin.access', 'core.orders.manage', 'core.accounts.manage'],
     ];

@@ -5,10 +5,19 @@
 {% block admin %}
 {% include '@admin/_page_header.twig' with {heading: trans('core.admin.settings.title')} only %}
 
+{# One form for all tabs: the sections of the other tabs are only hidden, so
+   saving from any tab sends everything. #}
+<nav class="tabs" aria-label="{{ trans('core.admin.settings.title') }}">
+    {% for name in tabs %}
+        <a href="{{ url('/admin/settings') }}?tab={{ name }}" {{ tab == name ? 'aria-current="page"' }}>{{ trans('core.admin.settings.section.' ~ name) }}</a>
+    {% endfor %}
+</nav>
+
 <form method="post" action="{{ url('/admin/settings') }}">
     {{ csrf_field() }}
+    <input type="hidden" name="tab" value="{{ tab }}">
 
-    <section class="card-box">
+    <section class="card-box" id="general" {{ tab != 'general' ? 'hidden' }}>
         <h2>{{ trans('core.admin.settings.section.general') }}</h2>
         <div class="field-grid">
             <div class="field">
@@ -35,7 +44,7 @@
         </div>
     </section>
 
-    <section class="card-box">
+    <section class="card-box" id="catalogue" {{ tab != 'catalogue' ? 'hidden' }}>
         <h2>{{ trans('core.admin.settings.section.catalogue') }}</h2>
         <div class="field-grid">
             <div class="field">
@@ -62,7 +71,7 @@
         </div>
     </section>
 
-    <fieldset class="card-box">
+    <fieldset class="card-box" id="languages" {{ tab != 'languages' ? 'hidden' }}>
         <legend>{{ trans('core.admin.settings.languages') }}</legend>
         <p><small>{{ trans('core.admin.settings.languages_hint') }}</small></p>
         <div class="check-list">
@@ -85,10 +94,10 @@
                 <small>{{ trans('core.admin.settings.default_language_hint') }}</small>
             </div>
         </div>
-
-        <div class="button-row">
-            <button type="submit">{{ trans('core.account.save') }}</button>
-        </div>
     </fieldset>
+
+    <div class="button-row">
+        <button type="submit">{{ trans('core.account.save') }}</button>
+    </div>
 </form>
 {% endblock %}
