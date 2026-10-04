@@ -248,6 +248,7 @@ final class Kernel
         }
         if ($modules->enabled('contact')) {
             $router->post('/offers/{slug}/contact', [OfferController::class, 'contact']);
+            $router->post('/offers/{slug}/contact/{asker}', [OfferController::class, 'reply']);
         }
         if ($modules->enabled('reviews')) {
             $router->post('/orders/{id}/review', [ReviewController::class, 'create']);

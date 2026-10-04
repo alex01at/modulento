@@ -635,6 +635,21 @@ update check found; that check asks the release server and only runs on the
 Updates page. The settings pages of accounts and administration are split
 into tabs: every tab sits in the same form, so saving keeps all of them.
 
+Visitors' texts are checked against a short list of common swear words and
+insults (`core/data/badwords/de.txt` and `en.txt`, one word per line). Messages
+to providers, order messages and reviews that contain one are refused with a
+note; the list is a starting point, not a moderation system.
+
+Questions to a provider are a thread per offer (**offer page**, the contact
+section, and the offer's provider sees every thread there). The e-mail to the
+provider stays; the provider's answer goes back to the visitor by e-mail, and
+the conversation is also on the offer page. This works for every offer type,
+the freelancer and auction extensions included.
+
+A page's text can show a picture from the media library: the picker next to
+its text field inserts it at the cursor. Only pictures of the library are kept
+by the sanitizer.
+
 Behind a reverse proxy or CDN, list its addresses as `TRUSTED_PROXIES` in
 `.env` ("10.0.0.0/8, 2001:db8::/32"). Only then is the visitor's address taken
 from `X-Forwarded-For`; without it all visitors would share one limit for

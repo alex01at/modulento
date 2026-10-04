@@ -1,0 +1,30 @@
+# English words that are refused in messages, questions and reviews.
+# One word per line, lower case.
+# A word also matches inside a longer word of five letters or more; short
+# words only match as a whole.
+ass
+asshole
+bastard
+bitch
+bitches
+bullshit
+cock
+cunt
+dick
+faggot
+fuck
+fucker
+fucking
+motherfucker
+nigga
+nigger
+piss
+prick
+pussy
+retard
+shit
+shitty
+slut
+twat
+wanker
+whore

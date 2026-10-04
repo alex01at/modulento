@@ -27,6 +27,18 @@
         });
     }
 
+    sections.forEach(function (section) {
+        section.querySelector('.mega-link').addEventListener('click', function (event) {
+            var mouseOnWide = window.matchMedia('(min-width: 1200px) and (hover: hover)').matches;
+            if (mouseOnWide || section.classList.contains('is-open')) {
+                return;
+            }
+            event.preventDefault();
+            closeSections();
+            setSection(section, true);
+        });
+    });
+
     menuToggle.addEventListener('click', function () {
         setMenu(!header.classList.contains('menu-open'));
     });

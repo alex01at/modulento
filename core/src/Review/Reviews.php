@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modulento\Core\Review;
 
 use Modulento\Core\Support\Clock;
+use Modulento\Core\Support\BadWords;
 use PDO;
 use PDOException;
 
@@ -50,6 +51,9 @@ final class Reviews
         }
         if (mb_strlen($body) > self::MAX_LENGTH) {
             return 'core.review.error.too_long';
+        }
+        if (BadWords::find($body) !== null) {
+            return 'core.badword.found';
         }
         if ($order['provider_id'] === null) {
             return 'core.review.error.not_possible';

@@ -10,6 +10,7 @@ use Modulento\Core\Catalogue\OfferView;
 use Modulento\Core\Event\OfferStatusChanged;
 use Modulento\Core\Review\Reviews;
 use Modulento\Core\Review\ReviewView;
+use Modulento\Core\Support\BadWords;
 use Modulento\Core\Support\RateLimiter;
 use Modulento\Core\Support\Session;
 
@@ -120,6 +121,7 @@ final class OfferController extends Controller
                 'provider_name' => $offer['provider_name'],
                 'provider_path' => '/providers/' . $offer['provider_slug'],
                 'category' => $category !== null ? $app->categories->view($category, $locale) : null,
+                'id' => $offer['id'],
                 'is_own' => $account !== null && $account['id'] === $offer['account_id'],
                 // Whether an extension registered a way to order this type
                 // through the order form.
@@ -129,7 +131,50 @@ final class OfferController extends Controller
             'type_template' => $type->detailTemplate(),
             'type_data' => $type->detailData($offer['id'], $locale, $app),
             'reviews' => ReviewView::all($app->reviews->listPublic('offer', $offer['id'], 1, 20)['rows']),
+            'messages' => $this->offerMessages($offer, $account),
         ]);
+    }
+
+    /**
+     * What the visitor may see of the messages about this offer: the provider
+     * sees every thread, another logged-in visitor only their own.
+     *
+     * @return array{threads: list<array<string, mixed>>, thread: list<array<string, string>>}
+     */
+    private function offerMessages(array $offer, ?array $account): array
+    {
+        $app = $this->app;
+        if ($account === null || !$app->modules->enabled('contact')) {
+            return ['threads' => [], 'thread' => []];
+        }
+
+        if ($account['id'] === $offer['account_id']) {
+            return ['threads' => array_map(fn (array $thread) => [
+                'asker_id' => $thread['asker_id'],
+                'asker_name' => $thread['asker_name'] ?: $this->trans('core.offer.contact.asker'),
+                'messages' => $this->messageViews($thread['messages'], $account['id'], $offer['account_id']),
+            ], $app->offerMessages->threads($offer['id'])), 'thread' => []];
+        }
+
+        return [
+            'threads' => [],
+            'thread' => $this->messageViews($app->offerMessages->thread($offer['id'], $account['id']), $account['id'], $offer['account_id']),
+        ];
+    }
+
+    /** @return list<array{body: string, created_at: string, label: string, mine: bool}> */
+    private function messageViews(array $rows, int $viewer, int $provider): array
+    {
+        return array_map(fn (array $row) => [
+            'body' => $row['body'],
+            'created_at' => $row['created_at'],
+            'label' => $this->trans(match (true) {
+                (int) $row['author_id'] === $viewer => 'core.offer.contact.you',
+                (int) $row['author_id'] === $provider => 'core.offer.contact.provider',
+                default => 'core.offer.contact.asker',
+            }),
+            'mine' => (int) $row['author_id'] === $viewer,
+        ], $rows);
     }
 
     /** A logged-in visitor writes to the provider; the provider answers by e-mail. */
@@ -151,12 +196,19 @@ final class OfferController extends Controller
             $this->redirect($path);
             return;
         }
+        if (BadWords::find($message) !== null) {
+            Session::flash('error', $this->trans('core.badword.found'));
+            $this->redirect($path);
+            return;
+        }
         if ((new RateLimiter($app->db))->hit('offer-contact', (string) $account['id'], 5, 3600)) {
             Session::flash('error', $this->trans('core.error.too_many_requests'));
             $this->redirect($path);
             return;
         }
 
+        // Kept on the site as well: the provider answers in the thread, and the e-mail tells them.
+        $app->offerMessages->add($offer['id'], $account['id'], $account['id'], $message);
         $locale = $app->locales->isEnabled($offer['account_locale']) ? $offer['account_locale'] : $app->locales->default();
         $text = $app->offers->text($offer, $locale);
 
@@ -169,6 +221,51 @@ final class OfferController extends Controller
         ], $locale, $account['email']);
 
         Session::flash('success', $this->trans('core.offer.contact.sent'));
+        $this->redirect($path);
+    }
+
+    /** The provider answers in the thread of one visitor; the visitor gets an e-mail. */
+    public function reply(array $params): void
+    {
+        $app = $this->app;
+        $offer = $app->offers->findPublicBySlug($app->translator->locale(), $params['slug']);
+        if ($offer === null) {
+            $this->notFound();
+            return;
+        }
+
+        $account = $app->auth->account();
+        $asker = (int) $params['asker'];
+        $path = '/offers/' . $params['slug'];
+        $message = trim(str_replace("\r\n", "\n", (string) ($_POST['message'] ?? '')));
+
+        if ($account['id'] !== $offer['account_id'] || $app->offerMessages->thread($offer['id'], $asker) === []) {
+            Session::flash('error', $this->trans('core.offer.contact.error'));
+            $this->redirect($path);
+            return;
+        }
+        if (mb_strlen($message) < 1 || mb_strlen($message) > 3000) {
+            Session::flash('error', $this->trans('core.offer.contact.reply_error'));
+        } elseif (BadWords::find($message) !== null) {
+            Session::flash('error', $this->trans('core.badword.found'));
+        } elseif ((new RateLimiter($app->db))->hit('offer-reply', (string) $account['id'], 60, 3600)) {
+            Session::flash('error', $this->trans('core.error.too_many_requests'));
+        } else {
+            $app->offerMessages->add($offer['id'], $asker, $account['id'], $message);
+            $recipient = $app->accounts->findById($asker);
+            if ($recipient !== null) {
+                $locale = $app->locales->isEnabled($recipient['locale']) ? $recipient['locale'] : $app->locales->default();
+                $text = $app->offers->text($offer, $locale);
+                $app->mailer->send($recipient['email'], 'emails/offer_reply.txt.twig', [
+                    'title' => $text['title'],
+                    'link' => $app->url('/offers/' . $text['slug'], $locale, true),
+                    'provider' => $account['display_name'] ?: $offer['provider_name'],
+                    'message' => $message,
+                ], $locale);
+            }
+            Session::flash('success', $this->trans('core.offer.contact.replied'));
+        }
+
         $this->redirect($path);
     }
 

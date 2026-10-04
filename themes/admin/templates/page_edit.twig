@@ -41,6 +41,22 @@
                     <label for="body_{{ code }}">{{ trans('core.admin.pages.field.body') }}</label>
                     <textarea id="body_{{ code }}" name="text[{{ code }}][body]" rows="14" lang="{{ code }}" data-editor="{{ editor() }}">{{ text.body ?? '' }}</textarea>
                     <small>{{ trans('core.admin.pages.field.body_hint') }}</small>
+                    {% if media %}
+                        <details class="media-picker">
+                            <summary>{{ trans('core.admin.pages.media.insert') }}</summary>
+                            <ul class="media-pick">
+                                {% for item in media %}
+                                    <li>
+                                        <button type="button" data-media-insert="body_{{ code }}" data-media-url="{{ item.url }}" data-media-alt="{{ item.title }}" title="{{ item.title ?: item.url }}">
+                                            <img src="{{ item.url }}" alt="" width="{{ item.width }}" height="{{ item.height }}" loading="lazy">
+                                            <span>{{ item.title ?: trans('core.media.list.untitled') }}</span>
+                                        </button>
+                                    </li>
+                                {% endfor %}
+                            </ul>
+                            <small>{{ trans('core.admin.pages.media.hint') }}</small>
+                        </details>
+                    {% endif %}
                 </div>
             </div>
         </fieldset>

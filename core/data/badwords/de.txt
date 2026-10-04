@@ -1,0 +1,38 @@
+# German words that are refused in messages, questions and reviews.
+# One word per line, lower case, without umlauts (ä, ö, ü are written as a, o, u).
+# A word also matches when it is part of a longer word of five letters or more,
+# so "Arschlochkerl" is refused, while short words only match as a whole.
+arsch
+arschloch
+arschgeige
+bastard
+depp
+drecksau
+dreckskerl
+fick
+fickt
+ficken
+ficker
+fotze
+hure
+huren
+hurensohn
+hundesohn
+judensau
+kanake
+miststuck
+missgeburt
+neger
+nutte
+pimmel
+scheisse
+scheiss
+schlampe
+schwanz
+schwuchtel
+spast
+trottel
+vollidiot
+votze
+wichser
+wichsen
