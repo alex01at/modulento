@@ -15,7 +15,7 @@
     {% endfor %}
 </nav>
 
-<div id="tab-profile" {{ tab != 'profile' ? 'hidden' }}>
+<div id="tab-profile" class="account-tab" {{ tab != 'profile' ? 'hidden' }}>
     {% if module('avatars') %}
     <section>
         <h2>{{ trans('core.account.avatar.title') }}</h2>
@@ -82,7 +82,7 @@
     {% endif %}
 </div>
 
-<div id="tab-security" {{ tab != 'security' ? 'hidden' }}>
+<div id="tab-security" class="account-tab" {{ tab != 'security' ? 'hidden' }}>
     <section>
         <h2>{{ trans('core.account.email.title') }}</h2>
         <p>{{ trans('core.account.email.current', {email: account.email}) }}</p>
@@ -153,7 +153,7 @@
     {% endif %}
 </div>
 
-<div id="tab-orders" {{ tab != 'orders' ? 'hidden' }}>
+<div id="tab-orders" class="account-tab" {{ tab != 'orders' ? 'hidden' }}>
     <section>
         <h2>{{ trans('core.order.list.buyer') }}</h2>
         <p><a href="{{ url('/account/orders') }}">{{ trans('core.order.list.buyer') }}</a></p>
@@ -172,7 +172,7 @@
     </section>
 </div>
 
-<div id="tab-data" {{ tab != 'data' ? 'hidden' }}>
+<div id="tab-data" class="account-tab" {{ tab != 'data' ? 'hidden' }}>
     <section>
         <h2>{{ trans('core.account.export.title') }}</h2>
         <p>{{ trans('core.account.export.intro') }}</p>
