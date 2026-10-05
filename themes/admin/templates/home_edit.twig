@@ -9,9 +9,18 @@
     <p>{{ trans('core.home.editor_intro') }}</p>
 </section>
 
+{# One tab per language: everything of that language is on its tab. Settings that do not
+   depend on the language (number, picture, shown or not) stay on the block itself. #}
+<nav class="tabs" aria-label="{{ trans('core.admin.menu.home') }}">
+    {% for locale in locales %}
+        <a href="{{ url('/admin/home') }}?tab={{ locale }}" lang="{{ locale }}" {{ tab == locale ? 'aria-current="page"' }}>{{ locale_name(locale) }}{% if locale == default_locale %} <small>({{ trans('core.admin.settings.default_language') }})</small>{% endif %}</a>
+    {% endfor %}
+</nav>
+
 {# One form for every block. Enter sends the first button, which is the one that saves. #}
 <form method="post" action="{{ url('/admin/home') }}" class="home-editor">
     {{ csrf_field() }}
+    <input type="hidden" name="tab" value="{{ tab }}">
     <button type="submit" name="action" value="save" class="visually-hidden">{{ trans('core.account.save') }}</button>
 
     {% for block in blocks %}
@@ -42,8 +51,8 @@
             {% endif %}
 
             {% for locale in locales %}
-                <fieldset class="home-language" lang="{{ locale }}">
-                    <legend>{{ locale_name(locale) }}{% if locale == default_locale %} <small>({{ trans('core.admin.settings.default_language') }})</small>{% endif %}</legend>
+                <fieldset class="home-language" lang="{{ locale }}" {{ locale != tab ? 'hidden' }}>
+                    <legend>{{ locale_name(locale) }}</legend>
                     {% for field in fields[block.type] %}
                         {% set value = block.texts[locale][field] ?? '' %}
                         {% set name = 'blocks[' ~ id ~ '][texts][' ~ locale ~ '][' ~ field ~ ']' %}
