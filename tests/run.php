@@ -2944,6 +2944,15 @@ check('badwords admin: back to the shipped lists', !$words()->isCustomized() && 
 $post('/admin/badwords', ['words' => 'Doof'], 1);
 check('badwords admin: a visitor or an account without the permission cannot change it', $pdo->query("SELECT COUNT(*) FROM setting WHERE name = 'core.badwords'")->fetchColumn() == 0);
 
+// Every method a controller calls on itself exists (an update once called a method that had been renamed).
+foreach (glob($root . '/core/src/Controller/*.php') as $file) {
+    $name = basename($file, '.php');
+    $source = (string) file_get_contents($file);
+    preg_match_all('/\$this->(\w+)\(/', $source, $calls);
+    $missing = array_filter(array_unique($calls[1]), fn (string $method) => !method_exists('Modulento\\Core\\Controller\\' . $name, $method));
+    check('controllers: ' . $name . ' calls only methods it has' . ($missing === [] ? '' : ': ' . implode(', ', $missing)), $missing === []);
+}
+
 // Packages: a GitHub address names its repository; a zip that is no package is refused.
 check('packages: a GitHub address is read as its repository', Modulento\Core\Package\Packages::repoFromInput('https://github.com/acme/modulento-ext-x.git') === 'acme/modulento-ext-x'
     && Modulento\Core\Package\Packages::repoFromInput(' www.github.com/acme/tool/tree/main ') === 'acme/tool' && Modulento\Core\Package\Packages::repoFromInput('acme/tool') === 'acme/tool');

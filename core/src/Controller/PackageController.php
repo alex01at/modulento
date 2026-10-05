@@ -108,7 +108,8 @@ final class PackageController extends Controller
         }
 
         // From the repository it was installed from, never one a request names.
-        $this->installFrom($package['repo']);
+        $repo = $package['repo'];
+        $this->runInstall(fn () => $this->app->packages->install($repo));
     }
 
     /** Asks every package's repository for its newest version, now. */
