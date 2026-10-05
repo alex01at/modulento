@@ -1263,4 +1263,5 @@ return [
     'core.inline.hide' => 'Hide',
     'core.inline.show' => 'Show',
     'core.inline.edit' => 'Edit text and settings',
+    'core.home.type.categories' => 'Categories',
 ];

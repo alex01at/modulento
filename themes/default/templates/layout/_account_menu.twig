@@ -30,6 +30,12 @@
                 {% endfor %}
             </span>
         </form>
+        {% if impersonation() %}
+            <form method="post" action="{{ url('/account/stop-impersonating') }}">
+                {{ csrf_field() }}
+                <button type="submit" class="link-button">{{ trans('core.impersonation.stop') }}</button>
+            </form>
+        {% endif %}
         <form method="post" action="{{ url('/logout') }}">
             {{ csrf_field() }}
             <button type="submit" class="link-button">{{ trans('core.nav.logout') }}</button>

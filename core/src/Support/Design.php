@@ -31,6 +31,39 @@ final class Design
     ];
     private const MAX_RADIUS = 24;
 
+    /** The look of the in-place editing tools and of the text editor, for every theme. */
+    private const EDITING_CSS = <<<'CSS'
+/* Editing a page in place (administrators, ?edit=1). The tools work without scripts. */
+.inline-bar { margin: 0 0 1.25rem; padding: .75rem 1rem; border: 2px dashed var(--accent); border-radius: .6rem; background: var(--surface); display: flex; flex-wrap: wrap; gap: .5rem 1rem; align-items: center; justify-content: space-between; }
+.inline-bar p { margin: 0; }
+.inline-add { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; margin: 0; }
+.inline-add select { width: auto; }
+.inline-tools { margin: 1rem 0 .5rem; padding: .75rem 1rem; border: 1px dashed var(--accent); border-radius: .5rem; background: var(--surface); font-size: .9rem; }
+.inline-tools.is-hidden-block { opacity: .6; }
+.inline-tools p { margin: 0 0 .4rem; }
+.inline-name .badge { margin-left: .4rem; }
+.inline-steps { display: flex; flex-wrap: wrap; gap: .4rem; margin: 0 0 .5rem; }
+.inline-steps button { min-width: 2.4rem; }
+.inline-edit summary { cursor: pointer; color: var(--accent); font-weight: 600; }
+.inline-edit-form { display: grid; gap: .6rem; margin-top: .6rem; }
+.inline-edit-form .field { display: grid; gap: .25rem; }
+.inline-edit-form input, .inline-edit-form textarea, .inline-edit-form select { width: 100%; }
+
+/* The text editor of the in-place editing (editor.js). */
+.editor { border: 1px solid var(--line); border-radius: 6px; background: var(--card); }
+.editor-bar { display: flex; flex-wrap: wrap; gap: .25rem; padding: .4rem; border-bottom: 1px solid var(--line); background: var(--bg); border-radius: 6px 6px 0 0; }
+.editor-button { padding: .25rem .55rem; border: 1px solid var(--line); border-radius: 4px; background: var(--card); color: var(--text); font-size: .8rem; cursor: pointer; }
+.editor-button:hover, .editor-button[aria-pressed="true"] { border-color: var(--primary); color: var(--link); }
+.editor-bold { font-weight: 700; }
+.editor-italic { font-style: italic; }
+.editor-area { min-height: 16rem; max-height: 40rem; overflow-y: auto; padding: .75rem 1rem; color: var(--text); line-height: 1.6; }
+.editor-area:focus { outline: 2px solid var(--primary); outline-offset: -2px; }
+.editor-area blockquote { margin: .5rem 0; padding-left: 1rem; border-left: 3px solid var(--line); color: var(--muted); }
+.editor textarea { display: none; }
+.editor.editor-source .editor-area { display: none; }
+.editor.editor-source textarea { display: block; width: 100%; min-height: 16rem; border: 0; border-radius: 0 0 6px 6px; font-family: ui-monospace, monospace; font-size: .85rem; }
+CSS;
+
     public function __construct(private Settings $settings)
     {
     }
@@ -131,7 +164,8 @@ final class Design
     {
         return ".edit-page { display: inline-flex; align-items: center; justify-content: center; width: 2.4rem; height: 2.4rem; border-radius: 50%; background: var(--accent, #1f5fbf); color: #fff; box-shadow: 0 .25rem .9rem rgb(0 0 0 / .25); text-decoration: none; }\n"
             . ".edit-page:hover, .edit-page:focus-visible { filter: brightness(1.15); color: #fff; }\n"
-            . ".edit-page svg { width: 1.15rem; height: 1.15rem; }\n";
+            . ".edit-page svg { width: 1.15rem; height: 1.15rem; }\n"
+            . self::EDITING_CSS;
     }
 
     private function colours(array $v): string

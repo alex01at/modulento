@@ -1,0 +1,12 @@
+{# The category tree of the catalogue. Receives block: texts (heading). #}
+{% set tree = categories() %}
+{% if tree %}
+<section>
+    <h2>{{ block.texts.heading }}</h2>
+    <ul class="plain-list">
+        {% for top in tree %}
+            <li><a href="{{ url(top.path) }}">{{ top.name }}</a> <small>({{ top.offer_count }})</small></li>
+        {% endfor %}
+    </ul>
+</section>
+{% endif %}
