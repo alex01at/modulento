@@ -2975,11 +2975,19 @@ $textId = $idOf('text');
 $blocksNow = $homeBlocks();
 check('home editor: a block can be added to the end of the page', $textId !== null && end($blocksNow)['type'] === 'text');
 $post('/admin/home', ['action' => 'save', 'blocks' => [
-    'default-hero' => ['enabled' => '1', 'texts' => ['de' => ['title' => 'Hallo Testwelt', 'button_label' => 'Angebote', 'button_url' => '/offers'], 'en' => ['title' => 'Hello test world', 'button_url' => 'javascript:alert(1)']]],
+    'default-hero' => ['enabled' => '1', 'texts' => ['de' => ['title' => 'Hallo Testwelt', 'button_label' => 'Angebote', 'button_url' => '/offers', 'button_url_x' => '']]],
     'default-offers' => ['enabled' => '1', 'settings' => ['count' => '99'], 'texts' => ['de' => ['heading' => 'Neu hier']]],
-    $textId => ['enabled' => '1', 'texts' => ['de' => ['heading' => 'Über uns', 'body' => '<p>Wir <strong>gern</strong>.</p><script>alert(1)</script>'], 'en' => ['heading' => '']]],
+    $textId => ['enabled' => '1', 'texts' => ['de' => ['heading' => 'Über uns', 'body' => '<p>Wir <strong>gern</strong>.</p><script>alert(1)</script>']]],
+]], 3);
+// English is edited on the English page: the header language decides which texts a form changes.
+$post('/en/admin/home', ['action' => 'save', 'blocks' => [
+    'default-hero' => ['enabled' => '1', 'texts' => ['en' => ['title' => 'Hello test world', 'button_url' => 'javascript:alert(1)']]],
+    $textId => ['enabled' => '1', 'texts' => ['en' => ['heading' => '', 'body' => '<p>We like it.</p>']]],
 ]], 3);
 $stored = $homeBlocks();
+$textBlock = array_values(array_filter($stored, fn (array $b) => $b['type'] === 'text'))[0];
+check('home editor: a language edits only its own texts; the others are kept', $stored[0]['texts']['de']['title'] === 'Hallo Testwelt' && $stored[0]['texts']['en']['title'] === 'Hello test world'
+    && $stored[0]['texts']['en']['button_url'] === '' && $textBlock['texts']['en']['body'] === '<p>We like it.</p>' && $textBlock['texts']['de']['heading'] === 'Über uns');
 check('home editor: texts are kept per language, a script in a text is removed, a javascript address is dropped, a count is limited', $stored[0]['texts']['de']['title'] === 'Hallo Testwelt'
     && $stored[0]['texts']['en']['button_url'] === '' && $stored[1]['settings']['count'] === 12 && !str_contains(json_encode($stored), 'alert(1)<') && !str_contains(json_encode($stored), '<script'));
 check('home: the visitor sees the text, the cleaned HTML, and the English title where there is one', str_contains($get('/', null)['body'], 'Über uns') && str_contains($get('/', null)['body'], '<strong>gern</strong>')
@@ -3000,9 +3008,9 @@ check('home editor: a picture outside the library and a link without a safe addr
     && $lastBlocks[count($lastBlocks) - 2]['texts']['de']['items'] === "Impressum | /impressum\nExtern | https://example.org");
 $body = $get('/', null)['body'];
 check('home: links of the list are shown, paths in the language of the page', str_contains($body, 'href="/impressum"') && str_contains($body, 'href="https://example.org"') && !str_contains($body, 'javascript:x'));
-check('home editor: each language has its own tab; the others are only hidden', preg_match('/<fieldset class="home-language" lang="en" hidden>/', $get('/admin/home?tab=de', 3)['body']) === 1
-    && preg_match('/<fieldset class="home-language" lang="de" hidden>/', $get('/admin/home?tab=en', 3)['body']) === 1
-    && str_contains($get('/admin/home?tab=en', 3)['body'], 'aria-current="page"') && preg_match('/<input type="hidden" name="tab" value="en">/', $get('/admin/home?tab=en', 3)['body']) === 1);
+check('home editor: the form shows the language of the header only, no language tabs', str_contains($get('/admin/home', 3)['body'], '[texts][de][title]')
+    && !str_contains($get('/admin/home', 3)['body'], '[texts][en]') && str_contains($get('/en/admin/home', 3)['body'], '[texts][en][title]')
+    && !str_contains($get('/en/admin/home', 3)['body'], '[texts][de]') && str_contains($get('/en/admin/home', 3)['body'], 'placeholder="Hallo"'));
 $post('/admin/home', ['action' => 'reset'], 3);
 check('home editor: a reset brings back the default page', !$pdo->query("SELECT COUNT(*) FROM setting WHERE name = 'core.home_layout'")->fetchColumn() && str_contains($get('/', null)['body'], 'Willkommen bei'));
 $post('/admin/home', ['action' => 'save', 'blocks' => []], 1);
