@@ -147,6 +147,57 @@ final class HomeLayout
         $this->settings->forget(self::SETTING);
     }
 
+    /** Saves one text field of one block in one language; returns the cleaned value, or null when there is no such field. */
+    public function setField(string $id, string $locale, string $field, string $value): ?string
+    {
+        $blocks = $this->blocks();
+        foreach ($blocks as $i => $block) {
+            if ($block['id'] !== $id) {
+                continue;
+            }
+            if (!in_array($field, self::TEXT_FIELDS[$block['type']] ?? [], true)) {
+                return null;
+            }
+            $clean = self::clean($block['type'], $field, $value);
+            $blocks[$i]['texts'][$locale][$field] = $clean;
+            $this->save($blocks);
+
+            return $clean;
+        }
+
+        return null;
+    }
+
+    /**
+     * The blocks with a new one of a type after the block with the given id;
+     * "start" puts it first.
+     *
+     * @param list<array<string, mixed>> $blocks
+     * @return list<array<string, mixed>>
+     */
+    public static function insertAfter(array $blocks, string $afterId, string $type): array
+    {
+        $new = self::newBlock($type);
+        if ($type === 'offers') {
+            $new['settings'] = ['count' => 6];
+        }
+        if ($afterId === 'start') {
+            return [$new, ...$blocks];
+        }
+
+        $out = [];
+        $placed = false;
+        foreach ($blocks as $block) {
+            $out[] = $block;
+            if ($block['id'] === $afterId) {
+                $out[] = $new;
+                $placed = true;
+            }
+        }
+
+        return $placed ? $out : [...$out, $new];
+    }
+
     /** A new, empty block of a type. */
     public static function newBlock(string $type, ?string $id = null): array
     {

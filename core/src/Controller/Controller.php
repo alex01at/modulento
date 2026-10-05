@@ -40,6 +40,15 @@ abstract class Controller
         return is_string($tab) && in_array($tab, $tabs, true) ? $tab : $tabs[0];
     }
 
+    /** A JSON answer, for the requests the page makes itself. */
+    protected function json(array $data, int $status = 200): void
+    {
+        http_response_code($status);
+        header('Content-Type: application/json; charset=utf-8');
+        header('Cache-Control: no-store');
+        echo json_encode($data, JSON_UNESCAPED_UNICODE);
+    }
+
     /**
      * Where a form wants to come back to: a path of this site given in the
      * request, checked; anything else goes to the default.

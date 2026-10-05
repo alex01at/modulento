@@ -1264,4 +1264,8 @@ return [
     'core.inline.show' => 'Show',
     'core.inline.edit' => 'Edit text and settings',
     'core.home.type.categories' => 'Categories',
+    'core.inline.add_here' => 'Insert a section here',
+    'core.inline.saving' => 'Saving …',
+    'core.inline.saved' => 'Saved.',
+    'core.inline.failed' => 'Not saved. Please try again.',
 ];

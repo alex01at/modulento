@@ -298,6 +298,8 @@ final class Kernel
         $router->post('/admin/design/reset', [DesignController::class, 'reset'], 'core.settings.manage');
         $router->get('/admin/offer-page', [AdminOfferPageController::class, 'index'], 'core.settings.manage');
         $router->post('/admin/offer-page', [AdminOfferPageController::class, 'save'], 'core.settings.manage');
+        $router->post('/admin/home/field', [AdminHomeController::class, 'field'], 'core.settings.manage');
+        $router->post('/admin/offer-page/field', [AdminOfferPageController::class, 'field'], 'core.settings.manage');
         $router->get('/admin/home', [AdminHomeController::class, 'index'], 'core.settings.manage');
         $router->post('/admin/home', [AdminHomeController::class, 'save'], 'core.settings.manage');
         $router->get('/admin/badwords', [AdminBadWordsController::class, 'index'], 'core.settings.manage');

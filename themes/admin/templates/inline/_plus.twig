@@ -1,0 +1,15 @@
+{# The "+" between two blocks: adds a block of one of the given kinds after "after" ("start" for the
+   first place). A details element, so it works without scripts. Receives after, page_path, add_types. #}
+{% if edit_mode() and can('core.settings.manage') %}
+<details class="inline-plus">
+    <summary aria-label="{{ trans('core.inline.add_here') }}"><span aria-hidden="true">+</span></summary>
+    <form method="post" action="{{ url(page_path) }}" class="inline-plus-form">
+        {{ csrf_field() }}
+        <input type="hidden" name="return" value="{{ current_path() }}?edit=1">
+        <input type="hidden" name="action" value="insert:{{ after }}">
+        {% for type in add_types %}
+            <button type="submit" name="add_type" value="{{ type }}">{{ trans('core.home.type.' ~ type) }}</button>
+        {% endfor %}
+    </form>
+</details>
+{% endif %}

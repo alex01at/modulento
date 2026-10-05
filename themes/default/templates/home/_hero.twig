@@ -1,7 +1,7 @@
-{# Receives block: texts (title, text, button_label, button_url). #}
+{# Receives block: texts (title, text, button_label, button_url). The title and the text are edited on the spot. #}
 <section class="home-hero">
-    <h1>{{ block.texts.title }}</h1>
-    {% if block.texts.text %}<p>{{ block.texts.text }}</p>{% endif %}
+    <h1 data-field="title">{{ block.texts.title }}</h1>
+    {% if block.texts.text or edit_mode() %}<p data-field="text">{{ block.texts.text }}</p>{% endif %}
     {% if block.texts.button_label and block.texts.button_url %}
         <p><a class="button" href="{{ block.texts.button_url starts with '/' ? url(block.texts.button_url) : block.texts.button_url }}">{{ block.texts.button_label }}</a></p>
     {% endif %}

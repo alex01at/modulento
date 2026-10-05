@@ -49,6 +49,11 @@ final class AdminHomeController extends Controller
             if (in_array($type, HomeLayout::TYPES, true)) {
                 $blocks[] = HomeLayout::newBlock($type) + ($type === 'offers' ? ['settings' => ['count' => 6]] : []);
             }
+        } elseif (preg_match('/^insert:([a-z0-9-]{1,32})$/', $action, $match) === 1) {
+            $type = (string) ($_POST['add_type'] ?? '');
+            if (in_array($type, HomeLayout::TYPES, true)) {
+                $blocks = HomeLayout::insertAfter($blocks, $match[1], $type);
+            }
         } elseif (preg_match('/^(up|down|delete|toggle):([a-z0-9]{1,16})$/', $action, $match) === 1) {
             $blocks = $this->step($blocks, $match[1], $match[2]);
         }
@@ -147,5 +152,25 @@ final class AdminHomeController extends Controller
         }
 
         return $blocks;
+    }
+
+    /** A text field saved from the page itself, with JavaScript: the cleaned value comes back. */
+    public function field(array $params): void
+    {
+        $app = $this->app;
+        $data = json_decode((string) file_get_contents('php://input'), true);
+        $locale = is_array($data) && is_string($data['locale'] ?? null) ? $data['locale'] : '';
+        if (!is_array($data) || !$app->locales->isEnabled($locale) || !is_string($data['block'] ?? null)
+            || !is_string($data['field'] ?? null) || !is_string($data['value'] ?? null)) {
+            $this->json(['ok' => false], 422);
+            return;
+        }
+
+        $clean = $app->homeLayout->setField($data['block'], $locale, $data['field'], $data['value']);
+        if ($clean === null) {
+            $this->json(['ok' => false], 422);
+            return;
+        }
+        $this->json(['ok' => true, 'value' => $clean]);
     }
 }

@@ -4,12 +4,11 @@
    each block is drawn by its partial in home/. While the page is edited in place, every block
    gets its tools from the administration theme (inline/), hidden blocks included. #}
 {% block content %}
-{% include '@admin/inline/_bar.twig' with {page_path: '/admin/home', add_types: ['hero', 'text', 'offers', 'providers', 'image', 'links']} only %}
+{% include '@admin/inline/_bar.twig' with {page_path: '/admin/home', add_types: ['hero', 'categories', 'text', 'offers', 'providers', 'image', 'links']} only %}
 {% for block in home_blocks(edit_mode()) %}
     {% if edit_mode() %}
-        {% include '@admin/inline/_block.twig' with {block: block, page_path: '/admin/home', fields: block_fields('home')[block.type] ?? [], label_key: 'core.home.type.' ~ block.type, deletable: true} only %}
-    {% endif %}
-    {% if block.enabled %}
+        {% include '@admin/inline/_block.twig' with {block: block, page_path: '/admin/home', partial: 'home/_' ~ block.type ~ '.twig', fields: block_fields('home')[block.type] ?? [], label_key: 'core.home.type.' ~ block.type, deletable: true, add_types: ['hero', 'categories', 'text', 'offers', 'providers', 'image', 'links']} %}
+    {% elseif block.enabled %}
         {% include 'home/_' ~ block.type ~ '.twig' with {block: block} %}
     {% endif %}
 {% endfor %}

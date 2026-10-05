@@ -1,3 +1,3 @@
 {# A free text block of the offer page, in the language of the page. #}
-{% if block.heading %}<h2>{{ block.heading }}</h2>{% endif %}
-{% if block.body %}{{ block.body|raw }}{% endif %}
+{% if block.heading or edit_mode() %}<h2 data-field="heading">{{ block.heading }}</h2>{% endif %}
+{% if block.body or edit_mode() %}<div data-field="body" data-html="1">{{ block.body|raw }}</div>{% endif %}
