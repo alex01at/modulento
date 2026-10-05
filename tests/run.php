@@ -3081,7 +3081,7 @@ $post('/admin/accounts/' . $neuId . '/impersonate', [], 3);
 check('sign-in as: the account is signed in, the administrator is remembered, the last login is not changed', ($_SESSION['account_id'] ?? null) === $neuId
     && ($_SESSION['impersonator'] ?? null) === 3 && $pdo->query("SELECT last_login_at FROM account WHERE id = $neuId")->fetchColumn() === null);
 $r = $get('/account', false);
-check('sign-in as: the page says so, with the way back', str_contains($r['body'], 'Du bist als Neu Benutzer angemeldet') && str_contains($r['body'], 'Zurück zu meinem Konto'));
+check('sign-in as: the page says so, with the way back', str_contains($r['body'], 'Du bist als Neu Benutzer angemeldet') && str_contains($r['body'], 'Beenden und zurück zur Administration'));
 $post('/account/email', ['email' => 'anders@example.test', 'current_password' => 'egal'], false);
 $post('/account/delete', ['current_password' => 'egal'], false);
 check('sign-in as: the address and the account cannot be changed or deleted', $pdo->query("SELECT COUNT(*) FROM account WHERE email = 'neu@example.test'")->fetchColumn() == 1
@@ -3166,9 +3166,9 @@ check('dashboard: before any check it says so; without a repository it says that
 
 // Settings in tabs: one page, every tab in the same form.
 $rr = $get('/account/settings', 3);
-check('settings tabs: the profile is shown first, the other tabs are only hidden', preg_match('/id="tab-profile"\s*>/', $rr['body']) === 1 && preg_match('/id="tab-security" hidden>/', $rr['body']) === 1);
-check('settings tabs: a named tab is shown, an unknown one falls back to the first', preg_match('/id="tab-security"\s*>/', $get('/account/settings?tab=security', 3)['body']) === 1
-    && preg_match('/id="tab-profile"\s*>/', $get('/account/settings?tab=nonsense', 3)['body']) === 1);
+check('settings tabs: the profile is shown first, the other tabs are only hidden', preg_match('/id="tab-profile" class="account-tab"\s*>/', $rr['body']) === 1 && preg_match('/id="tab-security" class="account-tab" hidden>/', $rr['body']) === 1);
+check('settings tabs: a named tab is shown, an unknown one falls back to the first', preg_match('/id="tab-security" class="account-tab"\s*>/', $get('/account/settings?tab=security', 3)['body']) === 1
+    && preg_match('/id="tab-profile" class="account-tab"\s*>/', $get('/account/settings?tab=nonsense', 3)['body']) === 1);
 // The tab a form returns to: the one it was sent from, else the one in the address, else the first.
 $tabOf = function (array $post, array $get, array $tabs): string {
     $_POST = $post;

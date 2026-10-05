@@ -1250,7 +1250,7 @@ return [
     'core.admin.log.end_impersonation' => 'Sign-in as this user ended',
     'core.admin.log.by' => 'by',
     'core.impersonation.banner' => 'You are signed in as {name}.',
-    'core.impersonation.stop' => 'Back to my account',
+    'core.impersonation.stop' => 'End and back to the administration',
     'core.impersonation.ended' => 'You are back at your own account.',
     'core.impersonation.blocked' => 'This is not possible while you are signed in as someone else.',
     'core.permission.accounts_impersonate' => 'Sign in as a user',

@@ -1250,7 +1250,7 @@ return [
     'core.admin.log.end_impersonation' => 'Anmeldung als Benutzer beendet',
     'core.admin.log.by' => 'von',
     'core.impersonation.banner' => 'Du bist als {name} angemeldet.',
-    'core.impersonation.stop' => 'Zurück zu meinem Konto',
+    'core.impersonation.stop' => 'Beenden und zurück zur Administration',
     'core.impersonation.ended' => 'Du bist wieder bei deinem Konto.',
     'core.impersonation.blocked' => 'Während du als jemand anderes angemeldet bist, ist das nicht möglich.',
     'core.permission.accounts_impersonate' => 'Als Benutzer anmelden',
