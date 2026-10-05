@@ -1,0 +1,8 @@
+{# The pictures of the offer. #}
+    {% if offer.images %}
+        <div class="gallery">
+            {% for image in offer.images %}
+                <a href="{{ image.large }}"><img src="{{ loop.first ? image.large : image.thumb }}" alt="{{ trans('core.offer.image_alt', {title: offer.title, number: loop.index}) }}" width="{{ image.width }}" height="{{ image.height }}" {{ not loop.first ? 'loading="lazy"' }}></a>
+            {% endfor %}
+        </div>
+    {% endif %}

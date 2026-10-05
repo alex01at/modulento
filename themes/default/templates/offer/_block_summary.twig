@@ -1,0 +1,3 @@
+{# Summary and description; the description is plain text typed by the provider: escaped, line breaks kept. #}
+    {% if offer.summary %}<p><strong>{{ offer.summary }}</strong></p>{% endif %}
+    <p>{{ offer.description|nl2br }}</p>

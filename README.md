@@ -676,7 +676,14 @@ colour, the font and the corner radius without touching a theme. The values
 are written to a small stylesheet (`/design/<name>.css`, the name changes with
 the values) that the default theme loads after its own. The colours apply to
 the light colour scheme; the dark one stays the theme's. The logo is under
-Themes → Branding. This works for every offer type,
+Themes → Branding.
+
+**Administration → Offer page** sets which parts an offer's page shows and in
+which order: pictures, description, the details of the offer's type,
+reviews, the questions to the provider, and free text blocks (texts in every
+language, the header's language is the one edited). Title, provider, price and
+rating stay on top; hidden parts are kept and come back when shown again.
+Partials in `offer/_block_<type>.twig` draw them. This works for every offer type,
 the freelancer and auction extensions included.
 
 A page's text can show a picture from the media library: the picker next to

@@ -1,0 +1,35 @@
+{% if module('contact') %}
+<section class="offer-messages" id="messages">
+    <h2>{{ trans('core.offer.contact.title') }}</h2>
+    {% if offer.is_own %}
+        <p>{{ trans('core.offer.contact.own') }}</p>
+        {% for thread in messages.threads %}
+            <div class="thread">
+                <h3>{{ trans('core.offer.contact.thread', {name: thread.asker_name}) }}</h3>
+                {% include 'offer/_thread.twig' with {messages: thread.messages} only %}
+                <form method="post" action="{{ url(offer.path ~ '/contact/' ~ thread.asker_id) }}" class="stack-form wide">
+                    {{ csrf_field() }}
+                    <label for="reply-{{ thread.asker_id }}">{{ trans('core.offer.contact.reply_label', {name: thread.asker_name}) }}</label>
+                    <textarea id="reply-{{ thread.asker_id }}" name="message" rows="4" maxlength="3000" required></textarea>
+                    <button type="submit">{{ trans('core.offer.contact.reply') }}</button>
+                </form>
+            </div>
+        {% else %}
+            <p>{{ trans('core.offer.contact.none') }}</p>
+        {% endfor %}
+    {% elseif account %}
+        {% if messages.thread %}
+            {% include 'offer/_thread.twig' with {messages: messages.thread} only %}
+        {% endif %}
+        <form method="post" action="{{ url(offer.path ~ '/contact') }}" class="stack-form wide">
+            {{ csrf_field() }}
+            <label for="message">{{ trans('core.offer.contact.message') }}</label>
+            <textarea id="message" name="message" rows="6" minlength="20" maxlength="3000" required></textarea>
+            <small>{{ trans('core.offer.contact.hint') }}</small>
+            <button type="submit">{{ trans('core.offer.contact.submit') }}</button>
+        </form>
+    {% else %}
+        <p><a href="{{ url('/login') }}">{{ trans('core.offer.contact.login') }}</a></p>
+    {% endif %}
+</section>
+{% endif %}

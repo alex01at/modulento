@@ -1,0 +1,61 @@
+{% extends '@admin/layout.twig' %}
+
+{% block title %}{{ trans('core.admin.menu.offer_page') }} – {{ site_name }}{% endblock %}
+
+{% block admin %}
+{% include '@admin/_page_header.twig' with {heading: trans('core.admin.menu.offer_page')} only %}
+
+<section class="card-box">
+    <p>{{ trans('core.offer_page.editor_intro') }}</p>
+</section>
+
+{# Like the home page: the language of the header is the one edited. #}
+<form method="post" action="{{ url('/admin/offer-page') }}" class="home-editor">
+    {{ csrf_field() }}
+    <button type="submit" name="action" value="save" class="visually-hidden">{{ trans('core.account.save') }}</button>
+
+    {% for block in blocks %}
+        {% set id = block.id %}
+        <fieldset class="card-box home-block{{ block.enabled ? '' : ' is-off' }}" id="block-{{ id }}">
+            <legend>{{ trans(block.label_key) }}</legend>
+            <label class="checkbox">
+                <input type="checkbox" name="blocks[{{ id }}][enabled]" value="1" {{ block.enabled ? 'checked' }}>
+                <span>{{ trans('core.home.enabled') }}</span>
+            </label>
+
+            {% if block.type == 'text' %}
+                {% set value = block.texts[locale].heading ?? '' %}
+                <div class="field">
+                    <label for="heading-{{ id }}">{{ trans('core.home.field.heading') }}</label>
+                    <input id="heading-{{ id }}" name="blocks[{{ id }}][texts][{{ locale }}][heading]" value="{{ value }}" maxlength="300" placeholder="{{ block.texts[default_locale].heading ?? '' }}">
+                </div>
+                <div class="field">
+                    <label for="body-{{ id }}">{{ trans('core.home.field.body') }}</label>
+                    <textarea id="body-{{ id }}" name="blocks[{{ id }}][texts][{{ locale }}][body]" rows="8" lang="{{ locale }}" data-editor="{{ editor() }}">{{ block.texts[locale].body ?? '' }}</textarea>
+                </div>
+            {% endif %}
+
+            <div class="button-row">
+                <button type="submit" name="action" value="up:{{ id }}" class="btn-outline btn-sm">{{ trans('core.home.up') }}</button>
+                <button type="submit" name="action" value="down:{{ id }}" class="btn-outline btn-sm">{{ trans('core.home.down') }}</button>
+                {% if block.type == 'text' %}
+                    <button type="submit" name="action" value="delete:{{ id }}" class="danger btn-sm">{{ trans('core.home.remove') }}</button>
+                {% endif %}
+            </div>
+        </fieldset>
+    {% endfor %}
+
+    <div class="button-row">
+        <button type="submit" name="action" value="add" class="btn-outline">{{ trans('core.offer_page.add_text') }}</button>
+        <button type="submit" name="action" value="save">{{ trans('core.account.save') }}</button>
+    </div>
+</form>
+
+{% if customized %}
+    <form method="post" action="{{ url('/admin/offer-page') }}" class="danger-form">
+        {{ csrf_field() }}
+        <p><small>{{ trans('core.offer_page.reset_hint') }}</small></p>
+        <button type="submit" name="action" value="reset" class="danger">{{ trans('core.home.reset') }}</button>
+    </form>
+{% endif %}
+{% endblock %}
