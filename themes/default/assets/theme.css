@@ -227,10 +227,6 @@ img.avatar { display: block; object-fit: cover; }
 .account-menu summary { position: relative; }
 .unread-badge { position: absolute; top: -.35rem; right: -.45rem; min-width: 1.25rem; height: 1.25rem; padding: 0 .3rem; border-radius: 999px; background: #b3211d; color: #fff; font-size: .7rem; font-weight: 700; line-height: 1.25rem; text-align: center; }
 
-/* Signed in as someone else: a bar the whole page carries, so it is never mistaken for one's own account. */
-.impersonation { position: sticky; top: 0; z-index: 40; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .5rem 1rem; padding: .5rem 1rem; background: #f0a500; color: #1c1600; font-weight: 600; }
-.impersonation .inline-form { margin: 0; }
-
 /* The account settings: each tab is a grid of cards, one column on a phone. */
 .account-tab { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr)); gap: 1.25rem; align-items: start; margin-top: 1.25rem; }
 .account-tab > section { padding: 1.25rem 1.4rem; border: 1px solid var(--line); border-radius: .6rem; background: var(--ground); box-shadow: var(--shadow); }

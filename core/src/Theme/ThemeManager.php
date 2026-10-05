@@ -64,6 +64,14 @@ final class ThemeManager
     }
 
     /** The chosen site theme, or "default" if none is chosen or its folder is gone. */
+    /** A file in the folder of the active site theme, or null when that theme does not bring it. */
+    public function activeFile(string $name): ?string
+    {
+        $path = $this->themesDir . '/' . $this->active() . '/' . $name;
+
+        return is_file($path) ? $path : null;
+    }
+
     public function active(): string
     {
         $chosen = $this->settings->get(self::SETTING, self::DEFAULT_THEME);

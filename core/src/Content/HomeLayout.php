@@ -35,7 +35,8 @@ final class HomeLayout
     private const MAX_BODY = 60000;
     private const MEDIA_PATTERN = '#^/media/library/[a-f0-9]{32}\.(webp|png)$#';
 
-    public function __construct(private Settings $settings)
+    /** @param Closure(): ?string $themeFile the layout a theme brings for a site that has none of its own */
+    public function __construct(private Settings $settings, private ?Closure $themeFile = null)
     {
     }
 
@@ -52,6 +53,11 @@ final class HomeLayout
     public function blocks(): array
     {
         $data = json_decode($this->settings->get(self::SETTING), true);
+        if (!is_array($data)) {
+            // A site without a page of its own shows what its theme brings, else the core's start.
+            $file = $this->themeFile !== null ? ($this->themeFile)() : null;
+            $data = $file !== null ? json_decode((string) file_get_contents($file), true) : null;
+        }
         if (!is_array($data)) {
             return [
                 ['id' => 'default-hero', 'type' => 'hero', 'enabled' => true, 'texts' => [], 'settings' => []],

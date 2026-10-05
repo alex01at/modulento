@@ -159,7 +159,7 @@ final class App
         $this->reports = new Reports($db);
         $this->modules = new Modules($this->settings);
         $this->badWords = new BadWords($this->settings);
-        $this->homeLayout = new HomeLayout($this->settings);
+        $this->homeLayout = new HomeLayout($this->settings, fn (): ?string => $this->themes->activeFile('home-layout.json'));
         $this->design = new Design($this->settings);
         $this->offerLayout = new OfferLayout($this->settings);
         $this->adminLog = new AdminLog($db);
