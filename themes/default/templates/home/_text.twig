@@ -1,0 +1,5 @@
+{# Receives block: texts (heading, body - already cleaned HTML). #}
+<section>
+    {% if block.texts.heading %}<h2>{{ block.texts.heading }}</h2>{% endif %}
+    {{ block.texts.body|raw }}
+</section>

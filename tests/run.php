@@ -2965,6 +2965,46 @@ unlink($notZip);
 check('packages: an upload that is no package is refused', str_contains($_SESSION['_flash']['error'] ?? '', 'kein gültiges Paket'));
 check('packages: uploads cannot be made by an account without the permission', $get('/admin/packages', 1)['status'] === 403);
 
+// The home page: its blocks in the order an administrator sets, texts per language, cleaned on the way in.
+$homeBlocks = fn () => json_decode((string) $pdo->query("SELECT value FROM setting WHERE name = 'core.home_layout'")->fetchColumn(), true);
+$idOf = fn (string $type) => array_values(array_filter($homeBlocks() ?? [], fn (array $b) => $b['type'] === $type))[0]['id'] ?? null;
+check('home editor: the default page shows a title area and the latest offers, the editor needs its permission', str_contains($get('/', null)['body'], 'Willkommen bei')
+    && $get('/admin/home', 3)['status'] === 200 && $get('/admin/home', 1)['status'] === 403);
+$post('/admin/home', ['action' => 'add', 'add_type' => 'text'], 3);
+$textId = $idOf('text');
+$blocksNow = $homeBlocks();
+check('home editor: a block can be added to the end of the page', $textId !== null && end($blocksNow)['type'] === 'text');
+$post('/admin/home', ['action' => 'save', 'blocks' => [
+    'default-hero' => ['enabled' => '1', 'texts' => ['de' => ['title' => 'Hallo Testwelt', 'button_label' => 'Angebote', 'button_url' => '/offers'], 'en' => ['title' => 'Hello test world', 'button_url' => 'javascript:alert(1)']]],
+    'default-offers' => ['enabled' => '1', 'settings' => ['count' => '99'], 'texts' => ['de' => ['heading' => 'Neu hier']]],
+    $textId => ['enabled' => '1', 'texts' => ['de' => ['heading' => 'Über uns', 'body' => '<p>Wir <strong>gern</strong>.</p><script>alert(1)</script>'], 'en' => ['heading' => '']]],
+]], 3);
+$stored = $homeBlocks();
+check('home editor: texts are kept per language, a script in a text is removed, a javascript address is dropped, a count is limited', $stored[0]['texts']['de']['title'] === 'Hallo Testwelt'
+    && $stored[0]['texts']['en']['button_url'] === '' && $stored[1]['settings']['count'] === 12 && !str_contains(json_encode($stored), 'alert(1)<') && !str_contains(json_encode($stored), '<script'));
+check('home: the visitor sees the text, the cleaned HTML, and the English title where there is one', str_contains($get('/', null)['body'], 'Über uns') && str_contains($get('/', null)['body'], '<strong>gern</strong>')
+    && !str_contains($get('/', null)['body'], '<script>alert') && str_contains($get('/en', null)['body'], 'Hello test world') && str_contains($get('/en', null)['body'], 'Über uns'));
+$post('/admin/home', ['action' => 'up:' . $textId], 3);
+check('home editor: a block moves up, and a step saves the form first', $homeBlocks()[1]['id'] === $textId && $homeBlocks()[1]['texts']['de']['heading'] === 'Über uns');
+$post('/admin/home', ['action' => 'down:' . $textId], 3);
+$post('/admin/home', ['action' => 'save', 'blocks' => [$textId => ['texts' => ['de' => ['heading' => 'Über uns']]], 'default-hero' => ['enabled' => '1', 'texts' => ['de' => ['title' => 'Hallo Testwelt']]]]], 3);
+check('home editor: an unchecked block is not shown', str_contains($get('/', null)['body'], 'Über uns') === false && str_contains($get('/', null)['body'], 'Hallo Testwelt'));
+$post('/admin/home', ['action' => 'delete:' . $textId], 3);
+check('home editor: a block can be removed', $idOf('text') === null);
+$post('/admin/home', ['action' => 'save', 'blocks' => ['default-hero' => ['enabled' => '1', 'texts' => ['de' => ['title' => 'Hallo']]]]], 3);
+$post('/admin/home', ['action' => 'add', 'add_type' => 'links'], 3);
+$post('/admin/home', ['action' => 'add', 'add_type' => 'image'], 3);
+$post('/admin/home', ['action' => 'save', 'blocks' => [$idOf('image') => ['enabled' => '1', 'settings' => ['media' => '/media/library/../evil.png'], 'texts' => ['de' => ['caption' => 'Bild']]], $idOf('links') => ['enabled' => '1', 'texts' => ['de' => ['heading' => 'Mehr', 'items' => "Impressum | /impressum\nSeite ohne Adresse\nBöse | javascript:x\nExtern | https://example.org"]]]]], 3);
+$lastBlocks = $homeBlocks();
+check('home editor: a picture outside the library and a link without a safe address are not kept', ($lastBlocks[count($lastBlocks) - 1]['settings']['media'] ?? null) === ''
+    && $lastBlocks[count($lastBlocks) - 2]['texts']['de']['items'] === "Impressum | /impressum\nExtern | https://example.org");
+$body = $get('/', null)['body'];
+check('home: links of the list are shown, paths in the language of the page', str_contains($body, 'href="/impressum"') && str_contains($body, 'href="https://example.org"') && !str_contains($body, 'javascript:x'));
+$post('/admin/home', ['action' => 'reset'], 3);
+check('home editor: a reset brings back the default page', !$pdo->query("SELECT COUNT(*) FROM setting WHERE name = 'core.home_layout'")->fetchColumn() && str_contains($get('/', null)['body'], 'Willkommen bei'));
+$post('/admin/home', ['action' => 'save', 'blocks' => []], 1);
+check('home editor: a visitor without the permission cannot change it', !$pdo->query("SELECT COUNT(*) FROM setting WHERE name = 'core.home_layout'")->fetchColumn());
+
 // Administration layout: the sidebar by default, or a header bar with a mega menu,
 // chosen in the profile settings by administrators only.
 check('admin layout: the sidebar is the default', str_contains($get('/admin', 3)['body'], '<body class="layout-sidebar">') && str_contains($get('/admin', 3)['body'], 'id="sidebar"'));
@@ -3027,14 +3067,14 @@ check('media: removing a picture removes its file too', $pdo->query('SELECT COUN
 // Dashboard: the update card shows what the last check found; the check itself only runs on the Updates page.
 $updateConfig = ['update' => ['repo' => 'acme/modulento']] + $config;
 $app = new Modulento\Core\App($config, $pdo);
-$app->settings->set('core.update_check', json_encode(['version' => '99.0.0', 'checked_at' => '2026-10-04 10:00']));
+$app->settings->set('core.update_check', json_encode(['core' => '99.0.0', 'packages' => [], 'checked_at' => '2026-10-04 10:00']));
 $rr = request($pdo, $updateConfig, 'GET', '/admin', 3);
-check('dashboard: an available update is shown next to the installed version', str_contains($rr['body'], 'Version 99.0.0 verfügbar') && str_contains($rr['body'], '<span class="stat-value">0.0.0</span>'));
-$app->settings->set('core.update_check', json_encode(['version' => '0.0.0', 'checked_at' => '2026-10-04 10:00']));
+check('dashboard: an available update is counted and named, with the installed version next to it', str_contains($rr['body'], 'Modulento 99.0.0') && str_contains($rr['body'], '<span class="stat-value">1</span>'));
+$app->settings->set('core.update_check', json_encode(['core' => '0.0.0', 'packages' => [], 'checked_at' => '2026-10-04 10:00']));
 check('dashboard: an up-to-date check says so with its date', str_contains(request($pdo, $updateConfig, 'GET', '/admin', 3)['body'], 'Aktuell · geprüft am 2026-10-04 10:00 UTC'));
 $app->settings->set('core.update_check', '');
-check('dashboard: before any check it says so, and without a repository there is no card', str_contains(request($pdo, $updateConfig, 'GET', '/admin', 3)['body'], 'Noch nicht auf Updates geprüft')
-    && !str_contains(request($pdo, $config, 'GET', '/admin', 3)['body'], 'stat-label" href="/admin/updates"'));
+check('dashboard: before any check it says so; without a repository it says that updates are off', str_contains(request($pdo, $updateConfig, 'GET', '/admin', 3)['body'], 'Noch nicht auf Updates geprüft')
+    && str_contains(request($pdo, $config, 'GET', '/admin', 3)['body'], 'Updates sind ausgeschaltet'));
 
 // Settings in tabs: one page, every tab in the same form.
 $rr = $get('/account/settings', 3);
@@ -3238,8 +3278,11 @@ check('package: removed from disk and from the list', !is_dir($packageRoot . '/t
 check('package administration needs its permission', $get('/admin/packages', 1)['status'] === 403);
 $r = $get('/admin/packages', 3);
 check('package administration lists packages and the allowed sources', $r['status'] === 200 && str_contains($r['body'], 'acme/modulento-shop') && str_contains($r['body'], 'acme/*, other/exact'));
-check('package administration: every package can be updated from its row; a theme that is no package can be taken over', str_contains($r['body'], '/admin/packages/extension/shop/update')
-    && str_contains($r['body'], 'Als Paket übernehmen') && str_contains($r['body'], '/modulento-theme-sample"'));
+check('package administration: a theme that is no package can be taken over; updates are not offered on this page', str_contains($r['body'], 'Als Paket übernehmen') && str_contains($r['body'], '/modulento-theme-sample"')
+    && !str_contains($r['body'], '/admin/packages/extension/shop/update'));
+$app->settings->set('core.update_check', json_encode(['core' => '0.0.0', 'packages' => ['extension:shop' => '9.0.0'], 'checked_at' => '2026-10-04 10:00']));
+check('updates: a package with a newer release is offered on the one Updates page', str_contains($get('/admin/updates', 3)['body'], '/admin/packages/extension/shop/update'));
+$app->settings->set('core.update_check', '');
 check('package administration: extensions that moved out of the core can be taken over', str_contains($r['body'], '/modulento-ext-freelancer"') && str_contains($r['body'], '/modulento-ext-auction"') && !str_contains($r['body'], '/modulento-ext-example"'));
 check('package administration: no official packages without knowing whose they are', !str_contains($r['body'], 'Offizielle Pakete'));
 $r = request($pdo, ['update' => ['repo' => 'acme/modulento']] + $config, 'GET', '/admin/packages', 3);

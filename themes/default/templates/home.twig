@@ -1,15 +1,11 @@
 {% extends 'layout/base.twig' %}
 
+{# The blocks of the home page in the order an administrator set (Administration → Home page);
+   each block is drawn by its partial in home/. #}
 {% block content %}
-<h1>{{ trans('core.home.title') }}</h1>
-<p>{{ trans('core.home.intro') }}</p>
-
-{% set offers = latest_offers(6) %}
-{% if offers %}
-    <h2>{{ trans('core.offers.latest') }}</h2>
-    {% include 'offer/_cards.twig' %}
-    <p><a href="{{ url('/offers') }}">{{ trans('core.offers.all') }}</a></p>
-{% endif %}
+{% for block in home_blocks() %}
+    {% include 'home/_' ~ block.type ~ '.twig' with {block: block} only %}
+{% endfor %}
 
 {# What extensions show on the home page, e.g. the latest posts of a blog. #}
 {% for section in home_sections() %}

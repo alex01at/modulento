@@ -1,0 +1,12 @@
+{# Receives block: texts (heading), count. #}
+{% set providers = top_providers(block.count) %}
+{% if providers %}
+<section>
+    <h2>{{ block.texts.heading }}</h2>
+    <ul class="plain-list">
+        {% for provider in providers %}
+            <li><a href="{{ url(provider.path) }}">{{ provider.name }}</a>{% if provider.headline %} – {{ provider.headline }}{% endif %}</li>
+        {% endfor %}
+    </ul>
+</section>
+{% endif %}

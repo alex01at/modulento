@@ -6,38 +6,68 @@
 {% include '@admin/_page_header.twig' with {heading: trans('core.update.title')} only %}
 
 <section class="card-box">
-    <p>
-        {{ trans('core.update.current_version') }}:
-        <span class="badge">{{ current_version == '0.0.0' ? trans('core.update.version_unreleased') : current_version }}</span>
-    </p>
-
+    <h2>{{ trans('core.update.components_title') }}</h2>
+    <p>{{ trans('core.update.components_hint') }}</p>
     {% if not enabled %}
         <p>{{ trans('core.update.error.disabled') }}</p>
     {% elseif dev_checkout %}
         <p>{{ trans('core.update.error.dev_checkout') }}</p>
-    {% else %}
-        {% if stale_lock %}
-            <p class="flash flash-error">
-                {{ trans('core.update.stale_lock', {stage: stale_lock.stage, version: stale_lock.release_version, started_at: stale_lock.started_at}) }}
-            </p>
-        {% endif %}
+    {% endif %}
+    {% if stale_lock %}
+        <p class="flash flash-error">
+            {{ trans('core.update.stale_lock', {stage: stale_lock.stage, version: stale_lock.release_version, started_at: stale_lock.started_at}) }}
+        </p>
+    {% endif %}
 
-        {% if available %}
-            <h2>{{ trans('core.update.available', {version: available.version}) }}</h2>
-            {% if available.changelog %}
-                <pre class="changelog">{{ available.changelog }}</pre>
-            {% endif %}
-            <p>{{ trans('core.update.apply_hint') }}</p>
-            <form method="post" action="{{ url('/admin/updates/apply') }}">
-                {{ csrf_field() }}
-                <button type="submit">{{ trans('core.update.apply', {version: available.version}) }}</button>
-            </form>
-        {% else %}
-            <form method="post" action="{{ url('/admin/updates/check') }}">
-                {{ csrf_field() }}
-                <button type="submit">{{ trans('core.update.check') }}</button>
-            </form>
-        {% endif %}
+    <div class="table-wrap">
+        <table>
+            <thead>
+            <tr>
+                <th scope="col">{{ trans('core.update.col_component') }}</th>
+                <th scope="col">{{ trans('core.update.col_installed') }}</th>
+                <th scope="col">{{ trans('core.update.col_latest') }}</th>
+                <th scope="col"><span class="visually-hidden">{{ trans('core.update.col_action') }}</span></th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for component in components %}
+                {% set core = component.kind == 'core' %}
+                <tr>
+                    <th scope="row">
+                        {{ core ? trans('core.update.core') : component.id }}
+                        <small>{{ trans('core.package.kind.' ~ component.kind) }}</small>
+                    </th>
+                    <td>{{ core and component.installed == '0.0.0' ? trans('core.update.version_unreleased') : component.installed }}</td>
+                    <td>
+                        {% if component.latest %}
+                            {{ component.latest }}
+                            {% if component.newer %}<span class="badge badge-pending">{{ trans('core.update.newer') }}</span>{% endif %}
+                        {% else %}
+                            <small>{{ trans('core.update.unknown') }}</small>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if component.newer and (core ? (enabled and not dev_checkout) : can_packages) %}
+                            <form method="post" action="{{ url(component.action) }}" class="inline-form">
+                                {{ csrf_field() }}
+                                <button type="submit" class="btn-sm">{{ trans('core.update.apply', {version: component.latest}) }}</button>
+                            </form>
+                        {% elseif not core and not can_packages %}
+                            <small>{{ trans('core.update.packages_need_permission') }}</small>
+                        {% endif %}
+                    </td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <p><small>{{ checked_at ? trans('core.update.checked_at', {date: checked_at}) : trans('core.update.never_checked') }}</small></p>
+    {% if enabled and not dev_checkout %}
+        <form method="post" action="{{ url('/admin/updates/check') }}">
+            {{ csrf_field() }}
+            <button type="submit">{{ trans('core.update.check') }}</button>
+        </form>
     {% endif %}
 </section>
 
@@ -49,9 +79,5 @@
         <button type="submit" class="btn-outline">{{ trans('core.update.migrations_run') }}</button>
     </form>
 </section>
-{% if can('core.packages.manage') %}
-<section class="card-box">
-    <p>{{ trans('core.update.packages_hint') }} <a href="{{ url('/admin/packages') }}">{{ trans('core.package.title') }}</a></p>
-</section>
-{% endif %}
+
 {% endblock %}

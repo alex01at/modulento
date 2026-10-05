@@ -41,21 +41,12 @@
                         <td>
                             {{ package.version }}
                             {% if package.latest and package.latest != package.version %}
-                                <span class="badge badge-pending">{{ trans('core.package.newer', {version: package.latest}) }}</span>
-                            {% elseif package.latest %}
-                                <span class="badge badge-ok">{{ trans('core.package.current') }}</span>
+                                <a class="badge badge-pending" href="{{ url('/admin/updates') }}">{{ trans('core.package.newer', {version: package.latest}) }}</a>
                             {% endif %}
                         </td>
                         <td>
                             <div class="button-row">
                                 {{ _self.switch(package) }}
-                                {# Always there: without a known newer version it asks the repository first. #}
-                                {% if package.repo != 'upload' %}
-                                <form method="post" action="{{ url('/admin/packages/' ~ package.kind ~ '/' ~ package.id ~ '/update') }}">
-                                    {{ csrf_field() }}
-                                    <button type="submit" class="btn-sm">{{ package.latest and package.latest != package.version ? trans('core.package.update', {version: package.latest}) : trans('core.package.update_now') }}</button>
-                                </form>
-                                {% endif %}
                                 {% if not package.in_use %}
                                     <form method="post" action="{{ url('/admin/packages/' ~ package.kind ~ '/' ~ package.id ~ '/remove') }}">
                                         {{ csrf_field() }}
@@ -70,10 +61,7 @@
             </table>
         </div>
 
-        <form method="post" action="{{ url('/admin/packages/check') }}">
-            {{ csrf_field() }}
-            <button type="submit">{{ trans('core.update.check') }}</button>
-        </form>
+        <p><small>{{ trans('core.package.updates_here') }} <a href="{{ url('/admin/updates') }}">{{ trans('core.update.title') }}</a></small></p>
     {% endif %}
 </section>
 

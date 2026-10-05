@@ -8,6 +8,7 @@ use Closure;
 use Modulento\Core\Package\Packages;
 use Modulento\Core\Support\Migrator;
 use Modulento\Core\Support\Session;
+use Modulento\Core\Support\UpdateChecks;
 use Modulento\Core\Support\UpdateException;
 use Throwable;
 
@@ -15,12 +16,10 @@ use Throwable;
 final class PackageController extends Controller
 {
     /** How long the newest versions found by a check stay on the page. */
-    private const SHOW_CHECK_SECONDS = 900;
 
     public function index(array $params): void
     {
         $app = $this->app;
-        $latest = $this->latestVersions(false);
         $installed = $app->packages->installed();
 
         // Folders that are there without being a package: uploaded by hand,
@@ -53,7 +52,7 @@ final class PackageController extends Controller
 
         $this->render('@admin/packages.twig', [
             'packages' => array_map(fn (array $package) => $package + [
-                'latest' => $latest[$package['kind'] . ':' . $package['id']] ?? null,
+                'latest' => (new UpdateChecks($app))->latest($package['kind'], $package['id']),
                 'in_use' => $this->inUse($package['kind'], $package['id']),
             ], $installed),
             'unmanaged' => $unmanaged,
@@ -110,47 +109,6 @@ final class PackageController extends Controller
         // From the repository it was installed from, never one a request names.
         $repo = $package['repo'];
         $this->runInstall(fn () => $this->app->packages->install($repo));
-    }
-
-    /** Asks every package's repository for its newest version, now. */
-    public function check(array $params): void
-    {
-        $this->latestVersions(true);
-        if ($this->app->packages->installed() === []) {
-            Session::flash('success', $this->trans('core.package.none_installed'));
-        }
-        $this->redirect('/admin/packages');
-    }
-
-    /**
-     * The newest version of every package as the last check found it.
-     * Opening the page never asks GitHub by itself; "check" and "update"
-     * do. For display only: an update asks the repository again.
-     *
-     * @return array<string, string> "kind:id" => version
-     */
-    private function latestVersions(bool $refresh): array
-    {
-        if (!$refresh) {
-            $cached = Session::get('package_versions');
-
-            return is_array($cached) && time() - (int) ($cached['at'] ?? 0) < self::SHOW_CHECK_SECONDS ? $cached['versions'] : [];
-        }
-
-        $versions = [];
-        foreach ($this->app->packages->installed() as $package) {
-            if ($package['repo'] === Packages::UPLOAD_SOURCE) {
-                continue;
-            }
-            try {
-                $versions[$package['kind'] . ':' . $package['id']] = $this->app->packages->latestVersion($package['repo']);
-            } catch (UpdateException $e) {
-                Session::flash('error', $package['repo'] . ': ' . $this->trans($e->messageKey, $e->params));
-            }
-        }
-        Session::set('package_versions', ['at' => time(), 'versions' => $versions]);
-
-        return $versions;
     }
 
     /** Switches an extension on, or makes a theme the site's theme, without leaving this page. */
@@ -210,7 +168,6 @@ final class PackageController extends Controller
 
         try {
             $result = $install();
-            Session::remove('package_versions');
 
             // An enabled extension's new migrations run right away.
             if ($result['kind'] === 'extension') {

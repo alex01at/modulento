@@ -6,49 +6,40 @@ namespace Modulento\Core\Controller;
 
 use Modulento\Core\Support\Migrator;
 use Modulento\Core\Support\Session;
+use Modulento\Core\Support\UpdateChecks;
 use Modulento\Core\Support\UpdateException;
 use Modulento\Core\Support\Updater;
 
 final class UpdateController extends Controller
 {
+    /** Every component in one list: the core, its extensions and themes. */
     public function index(array $params): void
     {
         $updater = $this->updater();
-        $available = Session::get('update_available');
-        Session::remove('update_available');
+        $checks = new UpdateChecks($this->app);
 
         $this->render('@admin/updates.twig', [
             'enabled' => $updater->isEnabled(),
             'dev_checkout' => $updater->isDevelopmentCheckout(),
             'current_version' => $updater->currentVersion(),
             'stale_lock' => $updater->staleLockInfo(),
-            'available' => is_array($available) ? $available : null,
+            'components' => $checks->components(),
+            'checked_at' => $checks->checkedAt(),
+            'can_packages' => $this->app->auth->can('core.packages.manage'),
         ]);
     }
 
+    /** Asks every component's release server once; the answers are kept for the dashboard and this page. */
     public function check(array $params): void
     {
-        try {
-            $meta = $this->updater()->checkForUpdate();
-            // The dashboard shows this result without asking the release server again.
-            $this->app->settings->set('core.update_check', json_encode([
-                'version' => $meta['version'] ?? '',
-                'checked_at' => gmdate('Y-m-d H:i'),
-            ], JSON_THROW_ON_ERROR));
-            if ($meta === null) {
-                Session::flash('success', $this->trans('core.update.up_to_date'));
-            } else {
-                // Display only. apply() asks the release server again and
-                // never takes a version from the session or the request.
-                Session::set('update_available', [
-                    'version' => $meta['version'],
-                    'published_at' => $meta['published_at'],
-                    'changelog' => $meta['changelog'],
-                ]);
-            }
-        } catch (UpdateException $e) {
-            Session::flash('error', $this->trans($e->messageKey, $e->params));
+        $checks = new UpdateChecks($this->app);
+        foreach ($checks->refresh() as $problem) {
+            Session::flash('error', $problem);
         }
+        $count = count($checks->available());
+        Session::flash('success', $count > 0
+            ? $this->trans('core.update.checked_some', ['count' => $count])
+            : $this->trans('core.update.checked_none'));
 
         $this->redirect('/admin/updates');
     }
@@ -83,8 +74,8 @@ final class UpdateController extends Controller
 
         return new Updater(
             $root,
-            $config['update']['repo'],
-            $config['update']['token'],
+            $config['update']['repo'] ?? '',
+            $config['update']['token'] ?? '',
             static function () use ($db, $root): void {
                 Migrator::runAll($db, $root);
             }

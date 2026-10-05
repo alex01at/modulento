@@ -1,0 +1,9 @@
+{# Receives block: texts (heading), count. #}
+{% set offers = latest_offers(block.count) %}
+{% if offers %}
+<section>
+    <h2>{{ block.texts.heading }}</h2>
+    {% include 'offer/_cards.twig' %}
+    <p><a href="{{ url('/offers') }}">{{ trans('core.offers.all') }}</a></p>
+</section>
+{% endif %}

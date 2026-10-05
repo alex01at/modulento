@@ -1,0 +1,7 @@
+{# Receives block: media (path of a picture of the media library), texts (caption). #}
+{% if block.media %}
+<figure>
+    <img src="{{ block.media }}" alt="{{ block.texts.caption }}" loading="lazy">
+    {% if block.texts.caption %}<figcaption>{{ block.texts.caption }}</figcaption>{% endif %}
+</figure>
+{% endif %}

@@ -8,7 +8,7 @@ use Modulento\Core\App;
 use Modulento\Core\Support\Branding;
 use Modulento\Core\Support\Modules;
 use Modulento\Core\Support\Session;
-use Modulento\Core\Support\Updater;
+use Modulento\Core\Support\UpdateChecks;
 use PDO;
 use Throwable;
 
@@ -17,32 +17,6 @@ final class AdminController extends Controller
     public function index(array $params): void
     {
         $this->render('@admin/index.twig', ['stats' => $this->stats(), 'update' => $this->updateStatus()]);
-    }
-
-    /**
-     * The installed version and what the last update check found. The check
-     * itself asks the release server, so it only runs on the Updates page.
-     * Null without the permission or without an update repository.
-     *
-     * @return array{current: string, available: ?string, checked_at: ?string}|null
-     */
-    private function updateStatus(): ?array
-    {
-        $config = $this->app->config;
-        if (!$this->app->auth->can('core.update.manage') || ($config['update']['repo'] ?? '') === '') {
-            return null;
-        }
-
-        $check = json_decode($this->app->settings->get('core.update_check'), true);
-        $check = is_array($check) ? $check : [];
-        $current = Updater::installedVersion($config['app']['root']);
-        $found = (string) ($check['version'] ?? '');
-
-        return [
-            'current' => $current,
-            'available' => $found !== '' && version_compare($found, $current, '>') ? $found : null,
-            'checked_at' => $check['checked_at'] ?? null,
-        ];
     }
 
     public function modules(array $params): void
@@ -84,6 +58,29 @@ final class AdminController extends Controller
             'group' => ['id' => $params['id'], 'label_key' => 'core.admin.group.' . $params['id']],
             'items' => $items,
         ]);
+    }
+
+    /**
+     * How many components have a newer release than the one installed, from
+     * the last check (see UpdateChecks). Null without the permission.
+     *
+     * @return array{count: int, names: list<string>, checked_at: ?string, enabled: bool}|null
+     */
+    private function updateStatus(): ?array
+    {
+        if (!$this->app->auth->can('core.update.manage')) {
+            return null;
+        }
+
+        $checks = new UpdateChecks($this->app);
+        $available = $checks->available();
+
+        return [
+            'count' => count($available),
+            'names' => array_map(fn (array $component) => ($component['kind'] === 'core' ? 'Modulento' : $component['id']) . ' ' . $component['latest'], $available),
+            'checked_at' => $checks->checkedAt(),
+            'enabled' => ($this->app->config['update']['repo'] ?? '') !== '',
+        ];
     }
 
     /** How themes and extensions are built, for whoever administers the site. */
