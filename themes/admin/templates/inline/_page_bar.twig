@@ -1,0 +1,8 @@
+{# The bar of a content page in edit mode: where editing ends, and the way to the page's settings
+   in the administration. Shown to administrators only. Receives page_id. #}
+{% if can('core.pages.manage') %}
+<div class="inline-bar" role="region" aria-label="{{ trans('core.inline.title') }}" data-saving="{{ trans('core.inline.saving') }}" data-saved="{{ trans('core.inline.saved') }}" data-failed="{{ trans('core.inline.failed') }}" data-editor-labels="{{ editor() }}">
+    <p><strong>{{ trans('core.inline.editing') }}</strong> <a href="{{ url(current_path()) }}">{{ trans('core.inline.done') }}</a>
+        · <a href="{{ url('/admin/pages/' ~ page_id) }}">{{ trans('core.inline.page_settings') }}</a></p>
+</div>
+{% endif %}

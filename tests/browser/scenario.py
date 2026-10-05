@@ -58,11 +58,43 @@ async def main():
         check('the "+" after a block inserts a new block right after it', await b.eval("document.querySelectorAll('.inline-block').length") == before + 1
               and await b.eval("document.querySelectorAll('.inline-block')[document.querySelector('#inline-steps').nextElementSibling ? 0 : 0].id") is not None)
 
+        # 2d. a rich text: the toolbar appears while it is edited; a link or a button is not followed
+        await b.click('#inline-steps [data-field="body"]')
+        check('a rich text shows its toolbar while it is edited', await b.exists('.inline-wysiwyg .inline-wysiwyg-bold'))
+        await b.eval("document.querySelector('#inline-steps [data-field=\"body\"]').blur()")
+        await asyncio.sleep(1)
+        await b.goto(BASE + '/?edit=1')
+        await b.click('#inline-cta-links a')
+        check('a button in edit mode is not followed; its form opens instead', await b.location() == '/?edit=1' and await b.eval("!!document.querySelector('#inline-cta-links details.inline-edit[open]')"))
+
+        # 2e. duplicate a block
+        before = await b.eval("document.querySelectorAll('.inline-block').length")
+        await b.click('#inline-steps button[value^="duplicate:"]')
+        check('a block can be duplicated', await b.eval("document.querySelectorAll('.inline-block').length") == before + 1)
+
+        # 2f. a content page is edited on the spot too
+        import random
+        slug = f'probe-{random.randint(1000, 99999)}'
+        await b.goto(BASE + '/admin/pages/new')
+        await b.type_into('input[name="text[de][title]"]', 'Testseite ' + slug)
+        await b.type_into('input[name="text[de][slug]"]', slug)
+        await b.type_into('textarea[name="text[de][body]"]', '<p>Erster Text.</p>')
+        await b.eval("document.querySelector('select[name=\\'status\\']') && (document.querySelector('select[name=\\'status\\']').value = 'published')")
+        await b.click('form[action$="/admin/pages/new"] button[type="submit"]')
+        await b.goto(BASE + f'/{slug}?edit=1')
+        check('a content page can be edited in place, with the pencil', await b.exists('article.inline-block') and await b.exists('.edit-page'))
+        await b.click(f'article h1')
+        await b.eval("(() => { const h = document.querySelector('article h1'); h.focus(); const r = document.createRange(); r.selectNodeContents(h); const s = getSelection(); s.removeAllRanges(); s.addRange(r); document.execCommand('insertText', false, 'Neuer Seitentitel'); h.blur(); })()")
+        await asyncio.sleep(1.2)
+        await b.goto(BASE + f'/{slug}?edit=1')
+        check('the title of a content page is saved on the spot', 'Neuer Seitentitel' in (await b.text('article h1')))
+
+        await b.goto(BASE + '/?edit=1')
         # 3. hide the categories block, then show it again
-        await b.click('#inline-categories button[value="toggle:categories"]')
-        check('a block can be hidden (it shows as hidden while editing)', await b.exists('#inline-categories .badge-disabled'))
-        await b.click('#inline-categories button[value="toggle:categories"]')
-        check('the hidden block can be shown again', not await b.exists('#inline-categories .badge-disabled'))
+        await b.click('#inline-offers button[value="toggle:offers"]')
+        check('a block can be hidden (it shows as hidden while editing)', await b.exists('#inline-offers .badge-disabled'))
+        await b.click('#inline-offers button[value="toggle:offers"]')
+        check('the hidden block can be shown again', not await b.exists('#inline-offers .badge-disabled'))
 
         # 4. add a text block at the end
         before = await b.eval("document.querySelectorAll('.inline-tools').length")

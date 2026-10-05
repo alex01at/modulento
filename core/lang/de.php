@@ -1268,4 +1268,7 @@ return [
     'core.inline.saving' => 'Wird gespeichert …',
     'core.inline.saved' => 'Gespeichert.',
     'core.inline.failed' => 'Nicht gespeichert. Bitte noch einmal versuchen.',
+    'core.inline.page_settings' => 'Einstellungen der Seite',
+    'core.inline.duplicate' => 'Duplizieren',
+    'core.inline.link_edit' => 'Link bearbeiten',
 ];

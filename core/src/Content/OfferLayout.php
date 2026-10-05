@@ -70,12 +70,20 @@ final class OfferLayout
             if (!$block['enabled'] && !$includeHidden) {
                 continue;
             }
-            $heading = (string) (($block['texts'][$locale]['heading'] ?? '') ?: ($block['texts'][$default]['heading'] ?? ''));
-            $body = (string) (($block['texts'][$locale]['body'] ?? '') ?: ($block['texts'][$default]['body'] ?? ''));
-            $view[] = ['id' => $block['id'], 'type' => $block['type'], 'enabled' => $block['enabled'], 'heading' => $heading, 'body' => $body];
+            $text = [];
+            foreach (['heading', 'body', 'button_label', 'button_url'] as $field) {
+                $text[$field] = (string) (($block['texts'][$locale][$field] ?? '') ?: ($block['texts'][$default][$field] ?? ''));
+            }
+            $view[] = ['id' => $block['id'], 'type' => $block['type'], 'enabled' => $block['enabled']] + $text;
         }
 
         return $view;
+    }
+
+    /** The blocks with the block of this id copied right after it (text blocks only are copied on the offer page). */
+    public function duplicate(string $id): void
+    {
+        $this->save(HomeLayout::duplicateAfter($this->blocks(), $id));
     }
 
     /** @param list<array<string, mixed>> $blocks */
@@ -98,7 +106,7 @@ final class OfferLayout
             if ($block['id'] !== $id) {
                 continue;
             }
-            if ($block['type'] !== 'text' || !in_array($field, ['heading', 'body'], true)) {
+            if ($block['type'] !== 'text' || !in_array($field, ['heading', 'body', 'button_label', 'button_url'], true)) {
                 return null;
             }
             $clean = HomeLayout::clean('text', $field, $value);

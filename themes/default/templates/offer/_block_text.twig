@@ -1,3 +1,6 @@
-{# A free text block of the offer page, in the language of the page. #}
+{# A free text block of the offer page, in the language of the page: heading, text and an optional button. #}
 {% if block.heading or edit_mode() %}<h2 data-field="heading">{{ block.heading }}</h2>{% endif %}
 {% if block.body or edit_mode() %}<div data-field="body" data-html="1">{{ block.body|raw }}</div>{% endif %}
+{% if block.button_label and block.button_url %}
+    <p><a class="button" href="{{ block.button_url starts with '/' ? url(block.button_url) : block.button_url }}">{{ block.button_label }}</a></p>
+{% endif %}

@@ -35,7 +35,7 @@ final class AdminOfferPageController extends Controller
                 $blocks[] = HomeLayout::newBlock('text');
             } elseif (preg_match('/^insert:([a-z0-9-]{1,32})$/', $action, $match) === 1) {
                 $blocks = HomeLayout::insertAfter($blocks, $match[1], 'text');
-            } elseif (preg_match('/^(up|down|delete|toggle):([a-z0-9]{1,16})$/', $action, $match) === 1) {
+            } elseif (preg_match('/^(up|down|delete|toggle|duplicate):([a-z0-9-]{1,32})$/', $action, $match) === 1) {
                 $blocks = $this->step($blocks, $match[1], $match[2]);
             }
             $layout->save($blocks);
@@ -92,6 +92,11 @@ final class AdminOfferPageController extends Controller
         }
         if ($index === null) {
             return $blocks;
+        }
+
+        if ($direction === 'duplicate') {
+            // The core's own parts exist once; only text blocks are copied.
+            return $blocks[$index]['type'] === 'text' ? HomeLayout::duplicateAfter($blocks, $id) : $blocks;
         }
 
         if ($direction === 'toggle') {

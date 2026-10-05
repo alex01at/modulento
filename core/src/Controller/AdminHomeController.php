@@ -54,7 +54,7 @@ final class AdminHomeController extends Controller
             if (in_array($type, HomeLayout::TYPES, true)) {
                 $blocks = HomeLayout::insertAfter($blocks, $match[1], $type);
             }
-        } elseif (preg_match('/^(up|down|delete|toggle):([a-z0-9]{1,16})$/', $action, $match) === 1) {
+        } elseif (preg_match('/^(up|down|delete|toggle|duplicate):([a-z0-9-]{1,32})$/', $action, $match) === 1) {
             $blocks = $this->step($blocks, $match[1], $match[2]);
         }
 
@@ -134,6 +134,10 @@ final class AdminHomeController extends Controller
         }
         if ($index === null) {
             return $blocks;
+        }
+
+        if ($direction === 'duplicate') {
+            return HomeLayout::duplicateAfter($blocks, $id);
         }
 
         if ($direction === 'toggle') {

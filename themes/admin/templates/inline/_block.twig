@@ -6,21 +6,24 @@
 <div class="inline-block{{ block.enabled ? '' : ' is-hidden-block' }}" id="inline-{{ id }}" data-block-id="{{ id }}"
      data-field-url="{{ url(page_path) }}/field" data-csrf="{{ csrf_token() }}">
     <div class="inline-tools">
-        <p class="inline-name">
-            <strong>{{ trans(label_key) }}</strong>
-            {% if not block.enabled %}<span class="badge badge-disabled">{{ trans('core.inline.hidden') }}</span>{% endif %}
-        </p>
+        <div class="inline-head">
+            <p class="inline-name">
+                <strong>{{ trans(label_key) }}</strong>
+                {% if not block.enabled %}<span class="badge badge-disabled">{{ trans('core.inline.hidden') }}</span>{% endif %}
+            </p>
 
-        <form method="post" action="{{ url(page_path) }}" class="inline-steps">
-            {{ csrf_field() }}
-            <input type="hidden" name="return" value="{{ current_path() }}?edit=1">
-            <button type="submit" name="action" value="up:{{ id }}" class="btn-outline btn-sm" aria-label="{{ trans('core.home.up') }}">↑</button>
-            <button type="submit" name="action" value="down:{{ id }}" class="btn-outline btn-sm" aria-label="{{ trans('core.home.down') }}">↓</button>
-            <button type="submit" name="action" value="toggle:{{ id }}" class="btn-outline btn-sm">{{ block.enabled ? trans('core.inline.hide') : trans('core.inline.show') }}</button>
-            {% if deletable %}
-                <button type="submit" name="action" value="delete:{{ id }}" class="danger btn-sm">{{ trans('core.home.remove') }}</button>
-            {% endif %}
-        </form>
+            <form method="post" action="{{ url(page_path) }}" class="inline-steps">
+                {{ csrf_field() }}
+                <input type="hidden" name="return" value="{{ current_path() }}?edit=1">
+                <button type="submit" name="action" value="up:{{ id }}" class="btn-outline btn-sm" aria-label="{{ trans('core.home.up') }}">↑</button>
+                <button type="submit" name="action" value="down:{{ id }}" class="btn-outline btn-sm" aria-label="{{ trans('core.home.down') }}">↓</button>
+                <button type="submit" name="action" value="toggle:{{ id }}" class="btn-outline btn-sm">{{ block.enabled ? trans('core.inline.hide') : trans('core.inline.show') }}</button>
+                <button type="submit" name="action" value="duplicate:{{ id }}" class="btn-outline btn-sm">{{ trans('core.inline.duplicate') }}</button>
+                {% if deletable %}
+                    <button type="submit" name="action" value="delete:{{ id }}" class="danger btn-sm">{{ trans('core.home.remove') }}</button>
+                {% endif %}
+            </form>
+        </div>
 
         {% if fields %}
             <details class="inline-edit">
@@ -52,6 +55,8 @@
                             <label for="{{ field }}-{{ id }}">{{ trans('core.home.field.' ~ field) }}</label>
                             {% if field == 'body' %}
                                 <textarea id="{{ field }}-{{ id }}" name="{{ name }}" rows="8" data-editor="{{ editor() }}">{{ value }}</textarea>
+                            {% elseif field == 'button_url' %}
+                                <input id="{{ field }}-{{ id }}" name="{{ name }}" value="{{ value }}" maxlength="500" placeholder="/offers oder https://…">
                             {% elseif field == 'items' or field == 'text' %}
                                 <textarea id="{{ field }}-{{ id }}" name="{{ name }}" rows="3">{{ value }}</textarea>
                             {% else %}
