@@ -10,14 +10,16 @@
     <p>{{ trans('core.admin.dashboard.intro') }}</p>
     <ul class="stats">
         {% if update %}
-            {# The installed version, and what the last check found. #}
-            <li class="card-box stat-card{{ update.available ? ' is-pending' }}">
-                <span class="stat-value">{{ update.current }}</span>
+            {# Every component that has a newer release, counted; the card leads to the one Updates page. #}
+            <li class="card-box stat-card{{ update.count > 0 ? ' is-pending' }}">
+                <span class="stat-value">{{ update.count }}</span>
                 <a class="stat-label" href="{{ url('/admin/updates') }}">{{ trans('core.admin.dashboard.updates') }}</a>
                 <span class="stat-icon">{{ icons.menu('/admin/updates') }}</span>
                 <span class="stat-note">
-                    {% if update.available %}
-                        <a class="badge badge-pending" href="{{ url('/admin/updates') }}">{{ trans('core.admin.dashboard.update_available', {version: update.available}) }}</a>
+                    {% if update.count > 0 %}
+                        <a class="badge badge-pending" href="{{ url('/admin/updates') }}">{{ update.names|join(', ') }}</a>
+                    {% elseif not update.enabled %}
+                        {{ trans('core.admin.dashboard.update_off') }}
                     {% elseif update.checked_at %}
                         {{ trans('core.admin.dashboard.update_current', {date: update.checked_at}) }}
                     {% else %}

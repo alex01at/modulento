@@ -1,0 +1,96 @@
+{% extends '@admin/layout.twig' %}
+
+{% block title %}{{ trans('core.admin.menu.home') }} – {{ site_name }}{% endblock %}
+
+{% block admin %}
+{% include '@admin/_page_header.twig' with {heading: trans('core.admin.menu.home')} only %}
+
+<section class="card-box">
+    <p>{{ trans('core.home.editor_intro') }}</p>
+</section>
+
+{# One form for every block. Enter sends the first button, which is the one that saves. #}
+<form method="post" action="{{ url('/admin/home') }}" class="home-editor">
+    {{ csrf_field() }}
+    <button type="submit" name="action" value="save" class="visually-hidden">{{ trans('core.account.save') }}</button>
+
+    {% for block in blocks %}
+        {% set id = block.id %}
+        <fieldset class="card-box home-block{{ block.enabled ? '' : ' is-off' }}" id="block-{{ id }}">
+            <legend>{{ trans('core.home.type.' ~ block.type) }}</legend>
+
+            <label class="checkbox">
+                <input type="checkbox" name="blocks[{{ id }}][enabled]" value="1" {{ block.enabled ? 'checked' }}>
+                <span>{{ trans('core.home.enabled') }}</span>
+            </label>
+
+            {% if block.type == 'offers' or block.type == 'providers' %}
+                <div class="field">
+                    <label for="count-{{ id }}">{{ trans('core.home.count') }}</label>
+                    <input id="count-{{ id }}" name="blocks[{{ id }}][settings][count]" type="number" min="1" max="12" value="{{ block.settings.count ?? 6 }}">
+                </div>
+            {% elseif block.type == 'image' %}
+                <div class="field">
+                    <label for="media-{{ id }}">{{ trans('core.home.picture') }}</label>
+                    <select id="media-{{ id }}" name="blocks[{{ id }}][settings][media]">
+                        <option value="">{{ trans('core.home.picture_none') }}</option>
+                        {% for picture in pictures %}
+                            <option value="{{ picture.url }}" {{ picture.url == block.settings.media ? 'selected' }}>{{ picture.title ?: picture.url }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            {% endif %}
+
+            {% for locale in locales %}
+                <fieldset class="home-language" lang="{{ locale }}">
+                    <legend>{{ locale_name(locale) }}{% if locale == default_locale %} <small>({{ trans('core.admin.settings.default_language') }})</small>{% endif %}</legend>
+                    {% for field in fields[block.type] %}
+                        {% set value = block.texts[locale][field] ?? '' %}
+                        {% set name = 'blocks[' ~ id ~ '][texts][' ~ locale ~ '][' ~ field ~ ']' %}
+                        <div class="field">
+                            <label for="{{ field }}-{{ id }}-{{ locale }}">{{ trans('core.home.field.' ~ field) }}</label>
+                            {% if field == 'body' %}
+                                <textarea id="{{ field }}-{{ id }}-{{ locale }}" name="{{ name }}" rows="8" lang="{{ locale }}" data-editor="{{ editor() }}">{{ value }}</textarea>
+                            {% elseif field == 'items' %}
+                                <textarea id="{{ field }}-{{ id }}-{{ locale }}" name="{{ name }}" rows="4">{{ value }}</textarea>
+                                <small>{{ trans('core.home.items_hint') }}</small>
+                            {% elseif field == 'text' %}
+                                <textarea id="{{ field }}-{{ id }}-{{ locale }}" name="{{ name }}" rows="3" maxlength="2000">{{ value }}</textarea>
+                            {% else %}
+                                <input id="{{ field }}-{{ id }}-{{ locale }}" name="{{ name }}" value="{{ value }}" maxlength="300">
+                            {% endif %}
+                        </div>
+                    {% endfor %}
+                </fieldset>
+            {% endfor %}
+
+            <div class="button-row">
+                <button type="submit" name="action" value="up:{{ id }}" class="btn-outline btn-sm">{{ trans('core.home.up') }}</button>
+                <button type="submit" name="action" value="down:{{ id }}" class="btn-outline btn-sm">{{ trans('core.home.down') }}</button>
+                <button type="submit" name="action" value="delete:{{ id }}" class="danger btn-sm">{{ trans('core.home.remove') }}</button>
+            </div>
+        </fieldset>
+    {% else %}
+        <p class="empty">{{ trans('core.home.empty') }}</p>
+    {% endfor %}
+
+    <div class="button-row">
+        <label for="add_type" class="visually-hidden">{{ trans('core.home.add') }}</label>
+        <select id="add_type" name="add_type">
+            {% for type in types %}
+                <option value="{{ type }}">{{ trans('core.home.type.' ~ type) }}</option>
+            {% endfor %}
+        </select>
+        <button type="submit" name="action" value="add" class="btn-outline">{{ trans('core.home.add') }}</button>
+        <button type="submit" name="action" value="save">{{ trans('core.account.save') }}</button>
+    </div>
+</form>
+
+{% if customized %}
+    <form method="post" action="{{ url('/admin/home') }}" class="danger-form">
+        {{ csrf_field() }}
+        <p><small>{{ trans('core.home.reset_hint') }}</small></p>
+        <button type="submit" name="action" value="reset" class="danger">{{ trans('core.home.reset') }}</button>
+    </form>
+{% endif %}
+{% endblock %}

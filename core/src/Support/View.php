@@ -224,6 +224,13 @@ final class View
         ), JSON_UNESCAPED_UNICODE)));
         // Whether an optional function of the core is switched on (Administration → Modules).
         $this->twig->addFunction(new TwigFunction('module', fn (string $id) => $app->modules->enabled($id)));
+        // The blocks of the home page, in the current language, enabled ones only.
+        $this->twig->addFunction(new TwigFunction('home_blocks', fn (): array => $app->homeLayout->view(
+            $app->translator->locale(),
+            $app->locales->default(),
+            fn (string $key, array $params = []) => $translator->trans($key, $params),
+            $app->siteName()
+        )));
         // Seconds between two asks for new messages; 0 switches the asking off (Administration → Settings).
         $this->twig->addFunction(new TwigFunction('poll_seconds', fn (): int => (int) $app->settings->get('core.poll_seconds', '60')));
         $this->twig->addFunction(new TwigFunction('has_catalogue', fn () => $app->offers->types() !== []));

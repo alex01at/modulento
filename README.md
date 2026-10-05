@@ -657,7 +657,19 @@ core apply.
 
 **Administration → Packages** installs an extension or theme from a repository
 given as `owner/name` or as its GitHub address, or from a zip file that is
-uploaded (checked like a package from GitHub, not updated automatically). This works for every offer type,
+uploaded (checked like a package from GitHub, not updated automatically).
+
+**Administration → Updates** lists every component in one place: the core,
+each extension and each theme, with the installed and the newest version. A
+check asks each source once and keeps the answer; the dashboard counts what
+has a newer release. The packages page only shows what is installed.
+
+**Administration → Home page** arranges the blocks of the start page: title
+area, text, latest offers, top providers, a picture from the media library and
+a link list. Each block can be moved, hidden or removed, and has its texts in
+every language (a missing text falls back to the default language). The blocks
+are drawn by the theme's `home/_<type>.twig` partials; a theme that brings its
+own `home.twig` decides for itself whether it shows them. This works for every offer type,
 the freelancer and auction extensions included.
 
 A page's text can show a picture from the media library: the picker next to

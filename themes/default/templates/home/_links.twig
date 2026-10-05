@@ -1,0 +1,11 @@
+{# Receives block: texts (heading), links (title, url). #}
+{% if block.links %}
+<section>
+    {% if block.texts.heading %}<h2>{{ block.texts.heading }}</h2>{% endif %}
+    <ul class="plain-list">
+        {% for link in block.links %}
+            <li><a href="{{ link.url starts with '/' ? url(link.url) : link.url }}">{{ link.title }}</a></li>
+        {% endfor %}
+    </ul>
+</section>
+{% endif %}
