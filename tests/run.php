@@ -261,6 +261,7 @@ $pdo->exec("ALTER TABLE report ADD COLUMN provider_id INTEGER");
 $pdo->exec("CREATE TABLE account_avatar (account_id INTEGER PRIMARY KEY REFERENCES account (id) ON DELETE CASCADE, name TEXT, extension TEXT, created_at TEXT)");
 $pdo->exec("CREATE TABLE offer_message (id INTEGER PRIMARY KEY, offer_id INTEGER REFERENCES offer (id) ON DELETE CASCADE, asker_id INTEGER REFERENCES account (id) ON DELETE CASCADE, author_id INTEGER REFERENCES account (id) ON DELETE SET NULL, body TEXT, created_at TEXT)");
 $pdo->exec("CREATE TABLE message_seen (account_id INTEGER REFERENCES account (id) ON DELETE CASCADE, scope TEXT, ref_id INTEGER, sub_id INTEGER DEFAULT 0, seen_id INTEGER, PRIMARY KEY (account_id, scope, ref_id, sub_id))");
+$pdo->exec("CREATE TABLE admin_log (id INTEGER PRIMARY KEY, created_at TEXT, actor_id INTEGER REFERENCES account (id) ON DELETE SET NULL, action TEXT, target_id INTEGER REFERENCES account (id) ON DELETE SET NULL, detail TEXT NOT NULL DEFAULT '')");
 $pdo->exec("CREATE TABLE media (id INTEGER PRIMARY KEY, file TEXT UNIQUE, title TEXT, width INTEGER, height INTEGER, bytes INTEGER, created_at TEXT)");
 $pdo->exec("CREATE TABLE account_preference (account_id INTEGER REFERENCES account (id) ON DELETE CASCADE, name TEXT, value TEXT, PRIMARY KEY (account_id, name))");
 $pdo->exec("ALTER TABLE withdrawal ADD COLUMN handled_at TEXT");
@@ -3057,6 +3058,40 @@ check('design: a visitor or an account without the permission cannot change it',
 check('design: the administration has the form', str_contains($get('/admin/design', 3)['body'], 'name="accent" type="color"') && $get('/admin/design', 1)['status'] === 403);
 $post('/admin/design/reset', [], 3);
 check('design: a reset brings back the theme\'s values', !$design()->isCustomized() && $design()->values()['accent'] === '#1f5fbf');
+
+// Accounts: an administrator creates one, and signs in as any account that is not an administrator, blocked or their own.
+check('accounts: the form to create one needs the permission', $get('/admin/accounts/new', 3)['status'] === 200 && str_contains($get('/admin/accounts/new', 3)['body'], 'name="email"')
+    && $get('/admin/accounts/new', 1)['status'] === 403);
+$post('/admin/accounts/new', ['email' => 'Neu@Example.test', 'display_name' => 'Neu Benutzer', 'locale' => 'de', 'verified' => '1'], 3);
+$neu = $pdo->query("SELECT * FROM account WHERE email = 'neu@example.test'")->fetch();
+check('accounts: created without a password, confirmed, named, and the person gets the link to set one', $neu !== false && $neu['display_name'] === 'Neu Benutzer'
+    && $neu['email_verified_at'] !== null && lastMail($mailLog, 'neu@example.test') !== null && str_contains($_SESSION['_flash']['success'] ?? '', 'angelegt'));
+$post('/admin/accounts/new', ['email' => 'neu@example.test', 'locale' => 'de'], 3);
+check('accounts: a second account with the same address is refused', str_contains($_SESSION['_flash']['error'] ?? '', 'schon ein Konto') && $pdo->query("SELECT COUNT(*) FROM account WHERE email = 'neu@example.test'")->fetchColumn() == 1);
+$post('/admin/accounts/new', ['email' => 'mit@example.test', 'password' => 'correct horse battery', 'locale' => 'en'], 3);
+check('accounts: with a password, it is set right away', $pdo->query("SELECT COUNT(*) FROM account WHERE email = 'mit@example.test'")->fetchColumn() == 1);
+$neuId = (int) $neu['id'];
+$post('/admin/accounts/' . $neuId . '/impersonate', [], 1);
+check('sign-in as: a visitor or an account without the permission cannot', $get('/admin/accounts/' . $neuId, 1)['status'] === 403 && !isset($_SESSION['impersonator']));
+$post('/admin/accounts/3/impersonate', [], 3);
+check('sign-in as: not as oneself', str_contains($_SESSION['_flash']['error'] ?? '', 'nicht übernommen') && ($_SESSION['account_id'] ?? null) === 3);
+$post('/admin/accounts/4/impersonate', [], 3);
+check('sign-in as: not as a blocked account', str_contains($_SESSION['_flash']['error'] ?? '', 'nicht übernommen') && ($_SESSION['account_id'] ?? null) === 3);
+$post('/admin/accounts/' . $neuId . '/impersonate', [], 3);
+check('sign-in as: the account is signed in, the administrator is remembered, the last login is not changed', ($_SESSION['account_id'] ?? null) === $neuId
+    && ($_SESSION['impersonator'] ?? null) === 3 && $pdo->query("SELECT last_login_at FROM account WHERE id = $neuId")->fetchColumn() === null);
+$r = $get('/account', false);
+check('sign-in as: the page says so, with the way back', str_contains($r['body'], 'Du bist als Neu Benutzer angemeldet') && str_contains($r['body'], 'Zurück zu meinem Konto'));
+$post('/account/email', ['email' => 'anders@example.test', 'current_password' => 'egal'], false);
+$post('/account/delete', ['current_password' => 'egal'], false);
+check('sign-in as: the address and the account cannot be changed or deleted', $pdo->query("SELECT COUNT(*) FROM account WHERE email = 'neu@example.test'")->fetchColumn() == 1
+    && $pdo->query("SELECT COUNT(*) FROM account WHERE email = 'anders@example.test'")->fetchColumn() == 0 && str_contains($_SESSION['_flash']['error'] ?? '', 'nicht möglich'));
+$post('/account/stop-impersonating', [], false);
+check('sign-in as: back to the administrator\'s own account, and the end is logged', ($_SESSION['account_id'] ?? null) === 3 && !isset($_SESSION['impersonator'])
+    && $pdo->query("SELECT COUNT(*) FROM admin_log WHERE action = 'end_impersonation' AND target_id = $neuId")->fetchColumn() == 1);
+$start = $pdo->query("SELECT COUNT(*) FROM admin_log WHERE action = 'impersonate' AND target_id = $neuId")->fetchColumn();
+check('sign-in as: every sign-in is logged, and the account page shows the log', $start >= 1 && str_contains($get('/admin/accounts/' . $neuId, 3)['body'], 'Als Benutzer angemeldet')
+    && str_contains($get('/admin/accounts/' . $neuId, 3)['body'], 'Konto angelegt'));
 
 // Administration layout: the sidebar by default, or a header bar with a mega menu,
 // chosen in the profile settings by administrators only.

@@ -6,6 +6,8 @@
 {% block admin %}
 {% include '@admin/_page_header.twig' with {heading: trans('core.admin.accounts.title')} only %}
 
+<p><a class="btn btn-outline" href="{{ url('/admin/accounts/new') }}">{{ trans('core.admin.accounts.new') }}</a></p>
+
 <section class="card-box">
     <div class="card-head">
         <form method="get" action="{{ url('/admin/accounts') }}" class="search-form" role="search">

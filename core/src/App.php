@@ -6,6 +6,7 @@ namespace Modulento\Core;
 
 use Modulento\Core\Account\Accounts;
 use Modulento\Core\Account\Avatars;
+use Modulento\Core\Support\AdminLog;
 use Modulento\Core\Support\BadWords;
 use Modulento\Core\Support\Design;
 use Modulento\Core\Support\Branding;
@@ -95,6 +96,7 @@ final class App
     public readonly HomeLayout $homeLayout;
     public readonly Design $design;
     public readonly OfferLayout $offerLayout;
+    public readonly AdminLog $adminLog;
     public readonly MessageSeen $messageSeen;
     public readonly Preferences $preferences;
     public readonly Reviews $reviews;
@@ -160,6 +162,7 @@ final class App
         $this->homeLayout = new HomeLayout($this->settings);
         $this->design = new Design($this->settings);
         $this->offerLayout = new OfferLayout($this->settings);
+        $this->adminLog = new AdminLog($db);
         $this->messageSeen = new MessageSeen($db);
         $this->reviews = new Reviews($db, $this->badWords);
         $this->orderFiles = new OrderFiles($db, ($config['app']['uploads'] ?? $config['app']['root'] . '/var/uploads') . '/orders');

@@ -135,6 +135,10 @@ final class AccountController extends Controller
      */
     public function revokeSessions(array $params): void
     {
+        if ($this->refusedWhileImpersonated()) {
+            return;
+        }
+
         $this->app->loginTokens->revokeAll($this->accountId());
         $this->app->loginTokens->forget();
         $this->back('success', 'core.account.devices.revoked');
@@ -196,6 +200,10 @@ final class AccountController extends Controller
 
     public function changePassword(array $params): void
     {
+        if ($this->refusedWhileImpersonated()) {
+            return;
+        }
+
         if (!$this->passwordConfirmed()) {
             return;
         }
@@ -227,6 +235,10 @@ final class AccountController extends Controller
 
     public function changeEmail(array $params): void
     {
+        if ($this->refusedWhileImpersonated()) {
+            return;
+        }
+
         if (!$this->passwordConfirmed()) {
             return;
         }
@@ -340,6 +352,10 @@ final class AccountController extends Controller
 
     public function delete(array $params): void
     {
+        if ($this->refusedWhileImpersonated()) {
+            return;
+        }
+
         if (!$this->passwordConfirmed()) {
             return;
         }
@@ -384,6 +400,40 @@ final class AccountController extends Controller
             $this->back('error', 'core.account.wrong_password');
             return false;
         }
+
+        return true;
+    }
+
+    /** Signed in as this account by an administrator: the password, the address and the account itself stay as they are. */
+    public function stopImpersonating(array $params): void
+    {
+        $app = $this->app;
+        $account = $app->auth->account();
+        $administrator = $app->auth->endImpersonation();
+        if ($administrator === null) {
+            $this->redirect('/account');
+            return;
+        }
+
+        $app->adminLog->record($administrator, 'end_impersonation', (int) $account['id'], $account['email']);
+        $admin = $app->accounts->findById($administrator);
+        if ($admin === null || $admin['status'] !== 'active') {
+            // The administrator was blocked or removed meanwhile: nobody stays signed in.
+            $app->auth->logout();
+            $this->redirect('/login');
+            return;
+        }
+
+        Session::flash('success', $this->trans('core.impersonation.ended'));
+        $this->redirect('/admin/accounts/' . (int) $account['id']);
+    }
+
+    private function refusedWhileImpersonated(): bool
+    {
+        if ($this->app->auth->impersonator() === null) {
+            return false;
+        }
+        $this->back('error', 'core.impersonation.blocked');
 
         return true;
     }

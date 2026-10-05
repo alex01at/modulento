@@ -51,6 +51,64 @@ final class Auth
         Session::set('auth_stamp', self::stamp((string) $stmt->fetchColumn()));
     }
 
+    /**
+     * Signs in as another account on behalf of an administrator. The
+     * administrator is remembered for ending it; the account's last login is
+     * not changed by it.
+     */
+    public function impersonate(int $accountId, int $administrator): void
+    {
+        $stmt = $this->db->prepare('SELECT password_hash FROM account WHERE id = :id');
+        $stmt->execute(['id' => $accountId]);
+
+        Session::regenerate();
+        Session::set('account_id', $accountId);
+        Session::set('auth_stamp', self::stamp((string) $stmt->fetchColumn()));
+        Session::set('impersonator', $administrator);
+        $this->accountLoaded = false;
+        $this->permissions = null;
+    }
+
+    /** The administrator who signed in as the current account, or null. */
+    public function impersonator(): ?int
+    {
+        $value = Session::get('impersonator');
+
+        return $value === null ? null : (int) $value;
+    }
+
+    /** Back to the administrator's own account. Null when no one was impersonated. */
+    public function endImpersonation(): ?int
+    {
+        $administrator = $this->impersonator();
+        if ($administrator === null) {
+            return null;
+        }
+
+        Session::regenerate();
+        Session::remove('impersonator');
+        Session::set('account_id', $administrator);
+        $stmt = $this->db->prepare('SELECT password_hash FROM account WHERE id = :id');
+        $stmt->execute(['id' => $administrator]);
+        Session::set('auth_stamp', self::stamp((string) $stmt->fetchColumn()));
+        $this->accountLoaded = false;
+        $this->permissions = null;
+
+        return $administrator;
+    }
+
+    /** Whether an account holds a permission, through its roles ("*" holds all). */
+    public function accountCan(int $accountId, string $permission): bool
+    {
+        $stmt = $this->db->prepare(
+            "SELECT COUNT(*) FROM account_role ar JOIN role_permission rp ON rp.role_id = ar.role_id
+             WHERE ar.account_id = :id AND rp.permission IN (:permission, '*')"
+        );
+        $stmt->execute(['id' => $accountId, 'permission' => $permission]);
+
+        return (int) $stmt->fetchColumn() > 0;
+    }
+
     public function logout(): void
     {
         Session::destroy();

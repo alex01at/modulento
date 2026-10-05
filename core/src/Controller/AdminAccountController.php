@@ -7,6 +7,7 @@ namespace Modulento\Core\Controller;
 use Modulento\Core\App;
 use Modulento\Core\Account\Tokens;
 use Modulento\Core\Account\AccountRemoval;
+use Modulento\Core\Support\PasswordPolicy;
 use Modulento\Core\Support\Session;
 
 /** Accounts and roles as an administrator sees them. */
@@ -30,6 +31,82 @@ final class AdminAccountController extends Controller
         ]);
     }
 
+    /** A form to create an account; the person can set the password later through the e-mail, or it is set here. */
+    public function createForm(array $params): void
+    {
+        $this->render('@admin/accounts_new.twig', [
+            'locales' => $this->app->locales->enabled(),
+            'default_locale' => $this->app->locales->default(),
+            'min_length' => PasswordPolicy::MIN_LENGTH,
+        ]);
+    }
+
+    public function create(array $params): void
+    {
+        $app = $this->app;
+        $email = strtolower(trim((string) ($_POST['email'] ?? '')));
+        $name = trim((string) ($_POST['display_name'] ?? ''));
+        $locale = (string) ($_POST['locale'] ?? '');
+        $password = (string) ($_POST['password'] ?? '');
+        $verified = isset($_POST['verified']);
+
+        if (filter_var($email, FILTER_VALIDATE_EMAIL) === false) {
+            Session::flash('error', $this->trans('core.admin.accounts.invalid_email'));
+            $this->redirect('/admin/accounts/new');
+            return;
+        }
+        if ($app->accounts->findByEmail($email) !== null) {
+            Session::flash('error', $this->trans('core.admin.accounts.exists'));
+            $this->redirect('/admin/accounts/new');
+            return;
+        }
+        $problem = $password === '' ? null : PasswordPolicy::problem($password);
+        if ($problem !== null) {
+            Session::flash('error', $this->trans($problem, ['min' => PasswordPolicy::MIN_LENGTH]));
+            $this->redirect('/admin/accounts/new');
+            return;
+        }
+
+        $locale = $app->locales->isEnabled($locale) ? $locale : $app->locales->default();
+        // Without a password, nobody knows the random one: the person gets the link to set their own.
+        $id = $app->accounts->create($email, $password !== '' ? $password : bin2hex(random_bytes(24)), $locale, $verified);
+        $app->accounts->updateProfile($id, mb_substr($name, 0, 100) ?: null, $locale);
+
+        if ($password === '') {
+            $token = $app->tokens->create($id, Tokens::RESET_PASSWORD, self::RESET_TTL_SECONDS);
+            $app->mailer->send($email, 'emails/reset_password.txt.twig', [
+                'link' => $app->url('/reset-password/' . $token, $locale, true),
+                'minutes' => intdiv(self::RESET_TTL_SECONDS, 60),
+            ], $locale);
+        }
+
+        $app->adminLog->record($app->auth->account()['id'], 'create_account', $id, $email);
+        Session::flash('success', $this->trans($password === '' ? 'core.admin.accounts.created_link' : 'core.admin.accounts.created'));
+        $this->redirect('/admin/accounts/' . $id);
+    }
+
+    /**
+     * Signs the administrator in as this account. Not for administrators
+     * themselves, for an account of their own, or for one that is blocked.
+     */
+    public function impersonate(array $params): void
+    {
+        $app = $this->app;
+        $target = $app->accounts->findById((int) $params['id']);
+        $me = (int) $app->auth->account()['id'];
+
+        if ($target === null || (int) $target['id'] === $me || $target['status'] !== 'active' || $app->auth->accountCan((int) $target['id'], 'core.admin.access')) {
+            Session::flash('error', $this->trans('core.admin.accounts.impersonate_refused'));
+            $this->redirect($target === null ? '/admin/accounts' : '/admin/accounts/' . $target['id']);
+            return;
+        }
+
+        $app->auth->impersonate((int) $target['id'], $me);
+        $app->adminLog->record($me, 'impersonate', (int) $target['id'], $target['email']);
+        Session::flash('success', $this->trans('core.admin.accounts.impersonating', ['name' => $target['display_name'] ?: $target['email']]));
+        $this->redirect('/account');
+    }
+
     public function show(array $params): void
     {
         $account = $this->app->accounts->findById((int) $params['id']);
@@ -47,6 +124,8 @@ final class AdminAccountController extends Controller
             'provider' => $this->app->providers->findByAccount((int) $account['id']),
             'is_self' => (int) $account['id'] === $this->app->auth->account()['id'],
             'is_last_admin' => $this->app->accounts->isLastAdmin((int) $account['id']),
+            'can_impersonate' => $this->app->auth->can('core.accounts.impersonate') && (int) $account['id'] !== $this->app->auth->account()['id'],
+            'activity' => $this->app->adminLog->forTarget((int) $account['id']),
         ]);
     }
 

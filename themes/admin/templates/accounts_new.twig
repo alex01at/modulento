@@ -1,0 +1,44 @@
+{% extends '@admin/layout.twig' %}
+
+{% block title %}{{ trans('core.admin.accounts.new') }} – {{ site_name }}{% endblock %}
+
+{% block admin %}
+{% include '@admin/_page_header.twig' with {heading: trans('core.admin.accounts.new'), crumbs: [{label: trans('core.admin.accounts.title'), path: '/admin/accounts'}]} only %}
+
+<section class="card-box">
+    <p>{{ trans('core.admin.accounts.new_intro') }}</p>
+    <form method="post" action="{{ url('/admin/accounts/new') }}" class="stack-form">
+        {{ csrf_field() }}
+        <div class="field-grid">
+            <div class="field">
+                <label for="new_email">{{ trans('core.account.email.title') }}</label>
+                <input id="new_email" name="email" type="email" autocomplete="off" required>
+            </div>
+            <div class="field">
+                <label for="new_name">{{ trans('core.account.profile.display_name') }}</label>
+                <input id="new_name" name="display_name" maxlength="100" autocomplete="off">
+            </div>
+            <div class="field">
+                <label for="new_locale">{{ trans('core.nav.language') }}</label>
+                <select id="new_locale" name="locale">
+                    {% for code in locales %}
+                        <option value="{{ code }}" {{ code == default_locale ? 'selected' }}>{{ locale_name(code) }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="field">
+                <label for="new_password">{{ trans('core.password.new', {min: min_length}) }}</label>
+                <input id="new_password" name="password" type="password" minlength="{{ min_length }}" autocomplete="new-password">
+                <small>{{ trans('core.admin.accounts.password_optional') }}</small>
+            </div>
+        </div>
+        <label class="checkbox">
+            <input type="checkbox" name="verified" value="1" checked>
+            <span>{{ trans('core.admin.accounts.verified_on_create') }}</span>
+        </label>
+        <div class="button-row">
+            <button type="submit">{{ trans('core.admin.accounts.create') }}</button>
+        </div>
+    </form>
+</section>
+{% endblock %}

@@ -1,0 +1,11 @@
+{# Shown while an administrator has signed in as this account: who it is, and the way back. #}
+{% set who = impersonation() %}
+{% if who %}
+<div class="impersonation" role="status">
+    <span>{{ trans('core.impersonation.banner', {name: who.name}) }}</span>
+    <form method="post" action="{{ url('/account/stop-impersonating') }}" class="inline-form">
+        {{ csrf_field() }}
+        <button type="submit" class="btn-sm">{{ trans('core.impersonation.stop') }}</button>
+    </form>
+</div>
+{% endif %}

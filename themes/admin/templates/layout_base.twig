@@ -22,6 +22,7 @@
 </head>
 <body class="layout-{{ admin_layout() }}">
 <a class="skip-link" href="#content">{{ trans('core.admin.layout.skip') }}</a>
+{% include 'layout/_impersonation.twig' %}
 {% block frame %}{% endblock %}
 </body>
 </html>
