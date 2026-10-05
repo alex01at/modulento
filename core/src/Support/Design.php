@@ -31,6 +31,12 @@ final class Design
     ];
     private const MAX_RADIUS = 24;
 
+    /** The bar of a sign-in as another account: on every theme. */
+    private const SIGN_IN_AS_CSS = <<<'CSS'
+.impersonation { position: sticky; top: 0; z-index: 40; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .5rem 1rem; padding: .5rem 1rem; background: #f0a500; color: #1c1600; font-weight: 600; }
+.impersonation .inline-form { margin: 0; }
+CSS;
+
     /** The look of the in-place editing tools and of the text editor, for every theme. */
     private const EDITING_CSS = <<<'CSS'
 /* Editing a page in place (administrators, ?edit=1). The tools work without scripts. */
@@ -165,7 +171,8 @@ CSS;
         return ".edit-page { display: inline-flex; align-items: center; justify-content: center; width: 2.4rem; height: 2.4rem; border-radius: 50%; background: var(--accent, #1f5fbf); color: #fff; box-shadow: 0 .25rem .9rem rgb(0 0 0 / .25); text-decoration: none; }\n"
             . ".edit-page:hover, .edit-page:focus-visible { filter: brightness(1.15); color: #fff; }\n"
             . ".edit-page svg { width: 1.15rem; height: 1.15rem; }\n"
-            . self::EDITING_CSS;
+            . self::EDITING_CSS
+            . self::SIGN_IN_AS_CSS;
     }
 
     private function colours(array $v): string

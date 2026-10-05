@@ -718,6 +718,16 @@ the header (for accounts that may edit, on the home page and on an offer) is in
 the account menu partial; the rules for it and for the editing tools live in
 the core's stylesheet (`/design/<name>.css`), so every theme shows them alike.
 
+**A theme's own start page.** A site that has no start page of its own shows
+what its theme brings in `home-layout.json` (the same structure as the stored
+layout: blocks with `id`, `type`, `enabled`, `texts` per language and `settings`).
+The Indigo theme ships its start page this way. Once an administrator saves the
+page, the stored one applies.
+
+**A browser test.** `tests/browser/scenario.py` drives a headless Chrome through the
+editing and sign-in flows (see its header). It is not part of `tests/run.php`; it
+needs Chrome and a throwaway installation, because it changes data.
+
 ### The layout
 
 A theme that brings its own `layout/base.twig` takes over three things from
