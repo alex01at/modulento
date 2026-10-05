@@ -1,0 +1,9 @@
+{# A pencil in the header: editing the page in place. Only shown to accounts that may edit,
+   and only on pages that can be edited (the home page and an offer). #}
+{% set editable = editable_page() %}
+{% if editable %}
+    <a class="edit-page" href="{{ editable.url }}" title="{{ trans(editable.label) }}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 20h4L19 9l-4-4L4 16v4z"/><path d="M13.5 6.5l4 4"/></svg>
+        <span class="visually-hidden">{{ trans(editable.label) }}</span>
+    </a>
+{% endif %}
