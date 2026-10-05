@@ -1323,6 +1323,34 @@ check('edit link: an administrator finds the pencil on the home page and on an o
 check('edit link: not on other pages, and the control rules are in the stylesheet the pages load', !str_contains($get('/offers', 3)['body'], 'class="edit-page"')
     && str_contains($get('/design/' . (new Modulento\Core\Support\Design(new Modulento\Core\Support\Settings($pdo)))->fileName(), null)['body'], '.edit-page'));
 
+// Widgets: ready blocks inserted from the "+" menu; a block kept as a widget of one's own, used again, removed again.
+$widgetBlocks = fn () => (new Modulento\Core\Content\HomeLayout(new Modulento\Core\Support\Settings($pdo)))->blocks();
+$widgetCount = fn () => count($widgetBlocks());
+$shipped = $widgetCount();
+$post('/admin/home', ['action' => 'insert:default-hero', 'add_type' => 'widget:builtin:cta'], 3);
+$withCta = $widgetBlocks();
+$ctaBlock = $withCta[1] ?? [];
+check('widgets: a shipped widget is inserted after the block it was chosen at, with its texts and button', count($withCta) === $shipped + 1 && ($ctaBlock['type'] ?? '') === 'text'
+    && ($ctaBlock['texts']['de']['button_url'] ?? '') === '/register' && ($ctaBlock['texts']['en']['heading'] ?? '') === 'Ready to start?');
+$post('/admin/home', ['action' => 'insert:default-hero', 'add_type' => 'widget:builtin:nonsense'], 3);
+$post('/admin/home', ['action' => 'insert:default-hero', 'add_type' => 'widget:own:../../x'], 3);
+check('widgets: an unknown widget inserts nothing', $widgetCount() === $shipped + 1);
+$post('/admin/home', ['action' => 'savewidget:' . $ctaBlock['id'], 'widget_name' => '  Mein   Aufruf  '], 3);
+$own = (new Modulento\Core\Content\Widgets(new Modulento\Core\Support\Settings($pdo)))->own();
+check('widgets: a block saved as a widget keeps its name, kind and texts in every language', count($own) === 1 && $own[0]['name'] === 'Mein Aufruf' && $own[0]['type'] === 'text'
+    && ($own[0]['texts']['en']['button_label'] ?? '') === 'Get started');
+$post('/admin/home', ['action' => 'savewidget:' . $ctaBlock['id'], 'widget_name' => str_repeat('x', 61)], 3);
+check('widgets: a name too long is refused', count((new Modulento\Core\Content\Widgets(new Modulento\Core\Support\Settings($pdo)))->own()) === 1 && str_contains($_SESSION['_flash']['error'] ?? '', 'Namen'));
+$ownId = $own[0]['id'];
+$post('/admin/home', ['action' => 'insert:start', 'add_type' => 'widget:own:' . $ownId], 3);
+check('widgets: an own widget is inserted like a shipped one, as a copy with its own id', $widgetCount() === $shipped + 2 && $widgetBlocks()[0]['texts']['de']['heading'] === 'Bereit loslegen?'
+    && $widgetBlocks()[0]['id'] !== $ctaBlock['id']);
+check('widgets: the own widget is listed on the editor, and the offer page offers it too', str_contains($get('/admin/home', 3)['body'], 'Mein Aufruf')
+    && str_contains($get('/offers/ich-gestalte-dein-logo?edit=1', 3)['body'], 'value="widget:own:' . $ownId . '"'));
+$post('/admin/home', ['action' => 'removewidget:' . $ownId], 3);
+check('widgets: an own widget can be removed; the blocks made from it stay', (new Modulento\Core\Content\Widgets(new Modulento\Core\Support\Settings($pdo)))->own() === [] && $widgetCount() === $shipped + 2);
+$post('/admin/home', ['action' => 'reset'], 3);
+
 // Pictures of the media library: only those, in pages.
 $library = '/media/library/' . str_repeat('a', 32) . '.webp';
 $clean = Modulento\Core\Support\HtmlSanitizer::clean('<p><img src="' . $library . '" alt="Logo"><img src="https://evil.example/x.png"><img src="/media/library/../x.png"><img src="/assets/x.png"></p>');

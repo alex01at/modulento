@@ -25,6 +25,17 @@
             </form>
         </div>
 
+        <details class="inline-widget">
+            <summary>{{ trans('core.widget.save') }}</summary>
+            <form method="post" action="{{ url(page_path) }}" class="inline-widget-form">
+                {{ csrf_field() }}
+                <input type="hidden" name="return" value="{{ current_path() }}?edit=1">
+                <label for="widget-name-{{ id }}">{{ trans('core.widget.name') }}</label>
+                <input id="widget-name-{{ id }}" name="widget_name" maxlength="60" required>
+                <button type="submit" name="action" value="savewidget:{{ id }}">{{ trans('core.widget.save') }}</button>
+            </form>
+        </details>
+
         {% if fields %}
             <details class="inline-edit">
                 <summary>{{ trans('core.inline.edit') }}</summary>

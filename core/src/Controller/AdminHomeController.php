@@ -28,6 +28,7 @@ final class AdminHomeController extends Controller
             'pictures' => array_map(fn (array $row) => ['url' => Library::url($row['file']), 'title' => $row['title']],
                 $app->media->list(1, 200)['rows']),
             'customized' => $layout->isCustomized(),
+            'own_widgets' => $this->app->widgets->own(),
         ]);
     }
 
@@ -50,17 +51,43 @@ final class AdminHomeController extends Controller
                 $blocks[] = HomeLayout::newBlock($type) + ($type === 'offers' ? ['settings' => ['count' => 6]] : []);
             }
         } elseif (preg_match('/^insert:([a-z0-9-]{1,32})$/', $action, $match) === 1) {
-            $type = (string) ($_POST['add_type'] ?? '');
-            if (in_array($type, HomeLayout::TYPES, true)) {
-                $blocks = HomeLayout::insertAfter($blocks, $match[1], $type);
+            $choice = (string) ($_POST['add_type'] ?? '');
+            if (str_starts_with($choice, 'widget:')) {
+                $widget = $this->app->widgets->block(substr($choice, 7));
+                if ($widget !== null) {
+                    $blocks = HomeLayout::placeAfter($blocks, $match[1], $widget);
+                }
+            } elseif (in_array($choice, HomeLayout::TYPES, true)) {
+                $blocks = HomeLayout::insertAfter($blocks, $match[1], $choice);
             }
+        } elseif (preg_match('/^savewidget:([a-z0-9-]{1,32})$/', $action, $match) === 1) {
+            $this->keepAsWidget($blocks, $match[1]);
+        } elseif (preg_match('/^removewidget:([a-z0-9]{1,16})$/', $action, $match) === 1) {
+            $this->app->widgets->removeOwn($match[1]);
+            Session::flash('success', $this->trans('core.widget.removed'));
         } elseif (preg_match('/^(up|down|delete|toggle|duplicate):([a-z0-9-]{1,32})$/', $action, $match) === 1) {
             $blocks = $this->step($blocks, $match[1], $match[2]);
         }
 
         $layout->save($blocks);
-        Session::flash('success', $this->trans($action === 'save' ? 'core.home.saved' : 'core.home.changed'));
+        // A widget step has its own message, set above.
+        if (!str_contains($action, 'widget')) {
+            Session::flash('success', $this->trans($action === 'save' ? 'core.home.saved' : 'core.home.changed'));
+        }
         $this->redirect($this->safeReturn('/admin/home'));
+    }
+
+    /** @param list<array<string, mixed>> $blocks */
+    private function keepAsWidget(array $blocks, string $id): void
+    {
+        foreach ($blocks as $block) {
+            if ($block['id'] === $id) {
+                $saved = $this->app->widgets->saveOwn((string) ($_POST['widget_name'] ?? ''), $block);
+                Session::flash($saved ? 'success' : 'error', $this->trans($saved ? 'core.widget.saved' : 'core.widget.invalid_name'));
+
+                return;
+            }
+        }
     }
 
     /** @param list<array<string, mixed>> $blocks */

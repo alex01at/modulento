@@ -90,6 +90,16 @@ async def main():
         check('the title of a content page is saved on the spot', 'Neuer Seitentitel' in (await b.text('article h1')))
 
         await b.goto(BASE + '/?edit=1')
+        # 2g. a widget: inserted from the "+" menu, and a block kept as a widget of one's own
+        before = await b.eval("document.querySelectorAll('.inline-block').length")
+        await b.click('#inline-hero .inline-plus summary')
+        await b.click('#inline-hero .inline-plus button.inline-widget-choice')
+        check('a shipped widget is inserted from the "+" menu', await b.eval("document.querySelectorAll('.inline-block').length") == before + 1)
+        await b.eval("document.querySelector('#inline-steps details.inline-widget').open = true")
+        await b.type_into('#inline-steps input[name="widget_name"]', 'Probe Widget')
+        await b.click('#inline-steps button[value^="savewidget:"]')
+        check('a block is kept as a widget of one\'s own', 'Das Widget wurde gespeichert' in (await b.eval('document.body.innerText')))
+
         # 3. hide the categories block, then show it again
         await b.click('#inline-offers button[value="toggle:offers"]')
         check('a block can be hidden (it shows as hidden while editing)', await b.exists('#inline-offers .badge-disabled'))

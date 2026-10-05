@@ -730,6 +730,14 @@ the header (for accounts that may edit, on the home page and on an offer) is in
 the account menu partial; the rules for it and for the editing tools live in
 the core's stylesheet (`/design/<name>.css`), so every theme shows them alike.
 
+**Widgets.** A widget is a ready-made block that is inserted from the "+" between
+the blocks. The core brings `cta`, `note`, `benefits`, `faq` and `more` (on the home
+page; the offer page offers the text ones). Any block can be saved as a widget of
+one's own under "Als Widget speichern" (a name of up to 60 characters, at most 50
+own widgets). Own widgets are listed in the page's editor, where they can be
+removed; the list is stored in `core.widgets`. The shipped texts are in
+`core/src/Content/Widgets.php` and their labels are the `core.widget.*` keys.
+
 **A theme's own start page.** A site that has no start page of its own shows
 what its theme brings in `home-layout.json` (the same structure as the stored
 layout: blocks with `id`, `type`, `enabled`, `texts` per language and `settings`).

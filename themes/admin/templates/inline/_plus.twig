@@ -10,6 +10,9 @@
         {% for type in add_types %}
             <button type="submit" name="add_type" value="{{ type }}">{{ trans('core.home.type.' ~ type) }}</button>
         {% endfor %}
+        {% for widget in widget_options() %}
+            <button type="submit" name="add_type" value="widget:{{ widget.key }}" class="inline-widget-choice">{{ widget.label }}</button>
+        {% endfor %}
     </form>
 </details>
 {% endif %}

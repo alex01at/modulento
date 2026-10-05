@@ -97,6 +97,11 @@ CSS;
 .inline-steps button { padding: .2rem .55rem; font-size: .8rem; }
 .inline-tools { padding: .5rem .75rem; }
 .inline-tools .inline-edit { margin-top: .4rem; }
+.inline-widget { margin-top: .4rem; }
+.inline-widget summary { cursor: pointer; color: var(--accent); font-weight: 600; font-size: .9rem; }
+.inline-widget-form { display: flex; flex-wrap: wrap; gap: .4rem; align-items: center; margin-top: .4rem; }
+.inline-widget-form input { min-width: 14rem; }
+.inline-widget-choice { font-style: italic; }
 CSS;
 
     public function __construct(private Settings $settings)

@@ -58,4 +58,24 @@
         <button type="submit" name="action" value="reset" class="danger">{{ trans('core.home.reset') }}</button>
     </form>
 {% endif %}
+
+<section class="card-box">
+    <h2>{{ trans('core.widget.own_title') }}</h2>
+    <p>{{ trans('core.widget.own_hint') }}</p>
+    {% if own_widgets %}
+        <ul class="plain-list">
+            {% for widget in own_widgets %}
+                <li>
+                    <form method="post" action="{{ url('/admin/offer-page') }}" class="inline-form">
+                        {{ csrf_field() }}
+                        <strong>{{ widget.name }}</strong>
+                        <button type="submit" name="action" value="removewidget:{{ widget.id }}" class="danger btn-sm">{{ trans('core.widget.remove') }}</button>
+                    </form>
+                </li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p class="empty">{{ trans('core.widget.own_empty') }}</p>
+    {% endif %}
+</section>
 {% endblock %}

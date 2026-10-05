@@ -20,6 +20,7 @@ use Modulento\Core\Catalogue\OfferImages;
 use Modulento\Core\Catalogue\OfferMessages;
 use Modulento\Core\Content\HomeLayout;
 use Modulento\Core\Content\OfferLayout;
+use Modulento\Core\Content\Widgets;
 use Modulento\Core\Catalogue\Offers;
 use Modulento\Core\Content\Pages;
 use Modulento\Core\Extension\ExtensionManager;
@@ -97,6 +98,7 @@ final class App
     public readonly Design $design;
     public readonly OfferLayout $offerLayout;
     public readonly AdminLog $adminLog;
+    public readonly Widgets $widgets;
     public readonly MessageSeen $messageSeen;
     public readonly Preferences $preferences;
     public readonly Reviews $reviews;
@@ -160,6 +162,7 @@ final class App
         $this->modules = new Modules($this->settings);
         $this->badWords = new BadWords($this->settings);
         $this->homeLayout = new HomeLayout($this->settings, fn (): ?string => $this->themes->activeFile('home-layout.json'));
+        $this->widgets = new Widgets($this->settings);
         $this->design = new Design($this->settings);
         $this->offerLayout = new OfferLayout($this->settings);
         $this->adminLog = new AdminLog($db);
