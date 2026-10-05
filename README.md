@@ -106,6 +106,317 @@ The database is not backed up - export it before updating.
   "Run pending database updates" on the Updates page then applies an
   extension's new migrations. Or as a package, see below.
 
+## Administration guide
+
+Everything an operator does happens under **Administration** (`/admin`). The
+menu has sections; which entries an account sees depends on its roles (see
+"Roles and permissions" below). The header layout (**Profile settings →
+Layout of the administration**) moves the same menu into a bar on top.
+
+Every page of the administration works the same way: the form on it is sent
+as a whole, a flash message above the content says what happened, and where a
+list is long it has pages. A row or a card with a link goes to its detail page.
+
+### Dashboard
+
+The start page shows one card per area the account may manage: the number of
+items, and what waits for a decision. The **Updates** card shows how many
+components have a newer release (see "Updates"). Below the cards are all areas
+as links.
+
+### Content
+
+- **Pages** (`core.pages.manage`): content pages such as the imprint, terms,
+  privacy policy, withdrawal and report forms. A page has a language per text,
+  a status (draft or published), a place in the header or footer, and can be
+  one of the legal roles. A legal role exists only once.
+- **Media library** (`core.media.manage`): pictures for the site. Upload JPEG,
+  PNG or WebP up to 8 MB. Each picture is saved again (metadata is removed,
+  pictures larger than 2400 pixels are scaled down) and gets a fixed address
+  `/media/library/<name>`. The pictures can be inserted into page texts with the
+  picker next to the text field.
+- **Home page** (`core.settings.manage`): the blocks of the start page in their
+  order: title area, text, latest offers, top providers, picture, link list.
+  Blocks can be moved, hidden, removed and added. Texts are edited in the
+  language the header shows; the other languages are kept.
+- **Offer page** (`core.settings.manage`): which parts of an offer's page show
+  and in which order: pictures, description, the details of the offer's type,
+  reviews, questions to the provider, and free text blocks. Title, provider,
+  price and rating stay on top.
+- **Design** (`core.settings.manage`): accent colour, background, text colour,
+  font (four system font families) and corner radius. These values are written
+  to a small stylesheet; the templates stay untouched. The colours apply to the
+  light colour scheme. The logo and the site icon are under **Themes → Branding**.
+
+### Marketplace
+
+- **Offers** (`core.offers.manage`): approve or reject offers from providers.
+  Approval can be switched off under **Settings**, then new offers are
+  published at once.
+- **Categories** (`core.categories.manage`): the category tree offers are
+  filed under, in every language.
+- **Providers** (`core.providers.manage`): approve, reject or suspend provider
+  profiles. Changes to the legal details of an approved provider are flagged
+  for review while the profile stays public.
+- **Orders** (`core.orders.manage`): every order with its state history,
+  messages, attachments and payments. Orders can be moved on by hand where the
+  order flow allows it.
+- **Withdrawals** (`core.orders.manage`): the withdrawal declarations of
+  buyers. Each is passed on to the provider and ticked off as handled.
+- **Payment methods** (`core.settings.manage`): what the platform itself needs
+  for bank transfer, PayPal and Stripe. Each provider sets up their own account
+  details; the platform never holds the money. Test the real payment services
+  with your own sandbox credentials before enabling them.
+
+### Moderation
+
+- **Reviews** (`core.reviews.manage`): hide a review with a reason; the author
+  is told.
+- **Reports** (`core.reports.manage`): notices about content, decided with a
+  reason. Reporters and the affected provider are told the outcome.
+- **Word filter** (`core.settings.manage`): the words that messages, questions
+  to providers, order messages and reviews may not contain. The list ships with
+  the core (`core/data/badwords`) and applies until an administrator saves a
+  list of their own. A saved list replaces the shipped one; **Restore the
+  default list** brings it back. A word matches spellings with special
+  characters (`f*ck`, `sh!t`), stretched letters (`fuuuck`) and capitals. Words
+  of up to four letters only match as a whole word.
+
+### People
+
+- **Accounts** (`core.accounts.manage`): search, block and unblock, mark as
+  verified, send a password reset, change roles, delete. The page of an account
+  shows its log.
+- **Create account**: an account for someone, with or without a password. Without
+  one, the person gets an e-mail with a link to set their own password.
+- **Sign in as this user** (`core.accounts.impersonate`): shows the website as
+  that person sees it, to find out what they see. A bar stays at the top of
+  every page until **End and back to the administration** is clicked. While
+  signed in as someone else, the password, the e-mail address and the account
+  itself cannot be changed or deleted. Administrators cannot be signed in as,
+  nor one's own account, nor a blocked one. Every creation and every sign-in is
+  kept in the account's log.
+- **Roles** (`core.roles.manage`): a role is a set of permissions. Permissions
+  are grouped like the menu. Three presets are offered: editor, moderator and
+  support. Handing out roles hands out permissions, so changing roles needs
+  this permission on its own. The administrator role cannot be changed or
+  deleted.
+
+### System
+
+- **Settings** (`core.settings.manage`): site name, sender address, whether
+  registration is open, the default description, the currency, approval of
+  providers and offers, the languages that are offered and the default language,
+  and how often a signed-in browser asks for new messages (0 switches it off).
+- **Modules** (`core.settings.manage`): optional functions of the core that can
+  be switched off: reviews, the contact form on offers, the withdrawal form,
+  reporting, profile pictures and "stay signed in". A module that is off has no
+  routes, menu entries or links; its data stays.
+- **Themes** (`core.themes.manage`): which theme the site uses, and branding.
+  The administration's own theme cannot be replaced.
+- **Packages** (`core.packages.manage`): install extensions and themes from a
+  repository (`owner/name` or its GitHub address), or from a zip file that is
+  uploaded. See "Packages".
+- **Extensions** (`core.extensions.manage`): switch installed extensions on and
+  off. Their migrations run when they are switched on.
+- **Tasks** (`core.tasks.view`): scheduled tasks and when they last ran. They
+  need a trigger every minute, see "Operations".
+- **Updates** (`core.update.manage`): every component in one list: the core,
+  each extension and each theme, with installed and newest version. A check asks
+  each source once; the result is kept until the next check. See "Updates".
+- **Documentation** (`core.admin.access`): how themes and extensions are built.
+
+### Roles and permissions
+
+Every permission is granted through a role. An account has any number of roles;
+the permissions of all of them count. The first administrator is created by the
+setup and holds every permission (`*`). Without `core.admin.access` an account
+never sees the administration at all, whatever else it may do.
+
+| Permission | What it allows |
+|---|---|
+| `core.admin.access` | to open the administration at all |
+| `core.pages.manage` | content pages |
+| `core.media.manage` | the media library |
+| `core.offers.manage`, `core.categories.manage`, `core.providers.manage` | the catalogue |
+| `core.orders.manage` | orders and withdrawals |
+| `core.reviews.manage`, `core.reports.manage` | moderation |
+| `core.accounts.manage`, `core.accounts.impersonate` | people; signing in as someone |
+| `core.roles.manage` | roles |
+| `core.settings.manage` | settings, modules, payments, design, home page, offer page, word filter |
+| `core.themes.manage`, `core.packages.manage`, `core.extensions.manage` | system |
+| `core.update.manage`, `core.tasks.view` | updates and tasks |
+
+### Updates
+
+**Administration → Updates** is the one place for updates. It lists the core,
+each installed extension and each installed theme with the installed and the
+newest version. **Check** asks every source once and keeps the answers; the
+dashboard and this page read them, so opening a page never asks GitHub.
+**Update** installs the newest release of one component. The core has its own
+migration step, which runs by itself when an update is applied.
+
+Packages installed from a zip file have no repository to update from; upload
+the new zip to update them.
+
+The update itself verifies the checksum of the release, makes a backup of the
+current files under `var/updates/backups/`, applies the new files and runs the
+migrations. A release from a repository is only installed when the server
+provides everything the release needs (its `requires` line names the oldest
+core it runs on).
+
+### Packages
+
+An extension adds a feature, a theme changes the look. Both are installed
+under **Administration → Packages**:
+
+1. **By repository:** type `owner/name` or the address of the repository on
+   GitHub. Only repositories that match `PACKAGE_SOURCES` in `.env` can be
+   installed; without that setting, the owner of the core's repository.
+2. **From a zip:** upload the zip file of a release. It is checked (it must be
+   a package with its manifest) and installed. It is not updated automatically.
+
+A package keeps the repository it first came from; another repository cannot
+take its name. Switching an extension on or off, and choosing the active theme,
+happen on the same page.
+
+### Operations
+
+**What to keep safe.** Back up together: the database, the folder `var/uploads`
+(offer pictures, avatars, branding, media library, order files), the file
+`var/secret.key` (it decrypts the stored payment credentials; without it those
+have to be entered again), and the file `.env` (database access and the update
+settings). A backup of the database alone is not enough to restore the site.
+
+**Scheduled tasks.** Closing auctions, removing unverified accounts and the like
+run through a trigger every minute. The administration
+shows two ways: a scheduled task in the hosting panel that runs
+`php bin/cron.php`, or a secret address (`/cron/<CRON_TOKEN>`) for panels that
+can only call addresses. Without a trigger the site works, but time-based
+things do not happen.
+
+**Logs.** Errors are written to `var/log/php-error.log` and never shown to
+visitors. In development (`APP_ENV="dev"` in `.env`) errors are also shown in
+the browser, and the Twig cache is off. Use production (`prod`) on the live site.
+
+**Messages.** Signed-in browsers ask for new messages every few seconds (the
+interval is in the settings). This is a deliberate choice for shared hosting:
+it needs no permanent connection. Messages stay on their pages either way.
+
+**Languages.** The languages offered are chosen under **Settings**. A language
+gets its interface texts from `core/lang/<code>.php`; a site-specific wording
+goes into `lang/<code>.php` of the installation and overrides the core.
+
+### Security
+
+- Every form and every AJAX call carries a token (CSRF). Forms that are not
+  sent with one are refused.
+- The content security policy allows scripts and styles from the site's own
+  origin only. There is no inline script and no inline style, so a text can
+  never run code.
+- Texts that visitors write are cleaned on the way in (HTML is limited to
+  simple formatting and links to the site or to secure addresses). Pictures in
+  texts must come from the media library.
+- Passwords are hashed. Actions that could be abused are rate-limited: sending
+  messages and questions, withdrawal and report forms, placing orders, starting
+  payments, connecting payment accounts, and resending verification e-mails.
+- Signing in as someone else is limited (see "People") and logged.
+- The payment credentials of providers are encrypted with the key in
+  `var/secret.key`.
+
+### Troubleshooting
+
+- **A page shows "500 - Internal error":** read `var/log/php-error.log`. The
+  first line of the newest entry names the file and the line.
+- **The update fails:** check the Updates page for a message, then the log.
+  An update that was cut off is named on the page as a stale attempt. That notice
+  is information only: it does not block the next attempt.
+- **Scheduled tasks do not run:** the trigger is missing or points to the wrong
+  path. The Tasks page shows when each task last ran.
+- **E-mails do not arrive:** check the sender address under Settings and the
+  mail log. In development, mails are written to `var/log/mail.log`.
+- **A theme looks broken after a change:** the site theme and the administration
+  are separate. A broken site theme cannot lock anyone out; switch back to the
+  default theme under **Themes**.
+- **Signed in as someone else and cannot find the way back:** the bar at the top
+  of every page has the button **End and back to the administration**.
+
+## Developing the core
+
+### Layout of the code
+
+```
+core/src/        Modulento\Core: App (wires every service), Kernel (routes, menu, permissions)
+core/src/Controller/  one class per area; actions take $params and echo via render()/redirect()
+core/src/Support/     Auth, Session, Settings, Router, Mailer, Updater, UpdateChecks, Design, BadWords, ...
+core/src/<Area>/      domain services: Account, Catalogue, Order, Review, Media, Content, Provider, ...
+core/migrations/      NNN_name.sql, applied in order (Migrator); each is written once, never edited after a release
+core/lang/            de.php and en.php: every key in both, the test checks parity
+core/data/            shipped data (the word list)
+themes/default/       the site theme: templates and assets
+themes/admin/         the administration: templates and assets, separate on purpose
+extensions/           extensions in their own repositories, symlinked for development
+tests/run.php         one plain-PHP test file: check('description', condition)
+```
+
+### Recipes
+
+**A new permission and menu entry.** Register the permission in `Kernel::registerCore`
+(`$app->addPermission(name, labelKey)`), its route with that permission as the
+third argument of `$router->get/post`, and the menu entry with
+`$app->addAdminMenu(labelKey, path, permission, group)`. The group is one of
+`content`, `marketplace`, `moderation`, `people`, `system`, `more`. The role editor
+lists the permission automatically, grouped like the menu. Add its label and hint
+(`<label>.hint`) in both language files.
+
+**A new controller action.** Give it a route in `Kernel`, check the permission there
+(not in the action), and redirect after a POST; the flash message is set with
+`Session::flash('success'|'error', $this->trans(key))`. A test calls the route
+through `request()` or `$post()`. The test suite checks that every `$this->method()`
+a controller calls exists.
+
+**A new setting.** Store it with `$app->settings->set(name, value)` (strings only;
+JSON for lists), read it with `get(name, default)`, `has(name)`, and remove it with
+`forget(name)`. Keep the name in the `core.` namespace and document its default.
+
+**A new block type for the home page.** Add the type to `HomeLayout::TYPES`, its text
+fields to `TEXT_FIELDS`, the fallback wording in `HomeLayout::fallback()`, and the
+cleaning rule in `HomeLayout::clean()`. The theme draws it with
+`themes/default/templates/home/_<type>.twig`, receiving `block` (`texts`, `count`,
+`media`, `links`). The editor shows the type automatically.
+
+**A new part of the offer page.** Add it to `OfferLayout::TYPES` (and to
+`BUILT_IN` if it always exists), its partial `offer/_block_<type>.twig` (it receives
+`block` and the whole offer context), and its label `core.offer_page.type.<type>`.
+
+**A new Twig function.** Register it in `Support/View.php` next to the others, with a
+comment; document it in the table "Available in every template" of this README.
+
+**A new migration.** The next number, plain SQL, InnoDB and utf8mb4 as the others.
+Test databases are built by hand in `tests/run.php` (SQLite): add the table there too,
+or the new code fails in the test run.
+
+**Texts.** Every visible text goes through `trans()`; add the key to `de.php` and
+`en.php` in the same change. `php -r` over `array_keys` of both files is the quick
+parity check; the test suite does it as well.
+
+**Tests.** Add a `check()` line in the block of the feature, placed where the data it
+needs still exists (the tests run in order; accounts and offers are deleted later in
+the file). Compare counts, not absolute numbers, when earlier checks have written
+data. A check that cannot fail is worse than none.
+
+### Rules that come from earlier mistakes
+
+- A value that is not a plain string (an array in a form) is refused or ignored, never
+  written into HTML or SQL unchecked.
+- A text a visitor writes is cleaned on the way in, and the cleaned version is what is
+  shown; the list of words is checked on the way in as well.
+- Cache busting: a file under `public/assets/` that changes gets a new `?v=` on every
+  reference, or returning visitors keep the old copy for a year.
+- Templates in themes only. The core passes data; the markup is the theme's.
+- Interface version 1 is frozen: extensions depend on it (see "Interface version 1").
+  Adding is fine, changing or removing is a major version.
+
 ## Packages
 
 Extensions and themes can live in repositories of their own and be installed
