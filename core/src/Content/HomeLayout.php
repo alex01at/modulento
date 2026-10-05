@@ -19,11 +19,12 @@ use Modulento\Core\Support\Settings;
 final class HomeLayout
 {
     public const SETTING = 'core.home_layout';
-    public const TYPES = ['hero', 'text', 'offers', 'providers', 'image', 'links'];
+    public const TYPES = ['hero', 'categories', 'text', 'offers', 'providers', 'image', 'links'];
     /** The text fields of each type. */
     public const TEXT_FIELDS = [
         'hero' => ['title', 'text', 'button_label', 'button_url'],
         'text' => ['heading', 'body'],
+        'categories' => ['heading'],
         'offers' => ['heading'],
         'providers' => ['heading'],
         'image' => ['caption'],
@@ -54,7 +55,9 @@ final class HomeLayout
         if (!is_array($data)) {
             return [
                 ['id' => 'default-hero', 'type' => 'hero', 'enabled' => true, 'texts' => [], 'settings' => []],
+                ['id' => 'default-categories', 'type' => 'categories', 'enabled' => true, 'texts' => [], 'settings' => []],
                 ['id' => 'default-offers', 'type' => 'offers', 'enabled' => true, 'texts' => [], 'settings' => ['count' => 6]],
+                ['id' => 'default-providers', 'type' => 'providers', 'enabled' => true, 'texts' => [], 'settings' => ['count' => 3]],
             ];
         }
 
@@ -208,6 +211,7 @@ final class HomeLayout
         $key = match (true) {
             $type === 'hero' && $field === 'title' => 'core.home.title',
             $type === 'hero' && $field === 'text' => 'core.home.intro',
+            $type === 'categories' && $field === 'heading' => 'core.offers.categories',
             $type === 'offers' && $field === 'heading' => 'core.offers.latest',
             $type === 'providers' && $field === 'heading' => 'core.home.providers',
             default => null,

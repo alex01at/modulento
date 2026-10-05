@@ -711,9 +711,12 @@ The layout loads the editor's script with `{% if edit_mode() %}<script src="{{ a
 this keeps working; it just cannot be edited in place, and the forms under
 **Administration → Home page** and **Offer page** still work.
 
-The themes shipped with the core and their status: `default` has all of it; the
-Indigo theme (its own repository) still draws its home and offer pages without
-blocks and therefore cannot be edited in place yet.
+The themes shipped with the core and their status: `default` and Indigo (its own
+repository, from 0.2.6 on) have the block loop on the home page; the offer page
+is drawn by the default theme and is editable with every theme. The pencil in
+the header (for accounts that may edit, on the home page and on an offer) is in
+the account menu partial; the rules for it and for the editing tools live in
+the core's stylesheet (`/design/<name>.css`), so every theme shows them alike.
 
 ### The layout
 

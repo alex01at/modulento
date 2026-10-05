@@ -3024,11 +3024,11 @@ $textBlock = array_values(array_filter($stored, fn (array $b) => $b['type'] === 
 check('home editor: a language edits only its own texts; the others are kept', $stored[0]['texts']['de']['title'] === 'Hallo Testwelt' && $stored[0]['texts']['en']['title'] === 'Hello test world'
     && $stored[0]['texts']['en']['button_url'] === '' && $textBlock['texts']['en']['body'] === '<p>We like it.</p>' && $textBlock['texts']['de']['heading'] === 'Über uns');
 check('home editor: texts are kept per language, a script in a text is removed, a javascript address is dropped, a count is limited', $stored[0]['texts']['de']['title'] === 'Hallo Testwelt'
-    && $stored[0]['texts']['en']['button_url'] === '' && $stored[1]['settings']['count'] === 12 && !str_contains(json_encode($stored), 'alert(1)<') && !str_contains(json_encode($stored), '<script'));
+    && $stored[0]['texts']['en']['button_url'] === '' && array_values(array_filter($stored, fn (array $b) => $b['id'] === 'default-offers'))[0]['settings']['count'] === 12 && !str_contains(json_encode($stored), 'alert(1)<') && !str_contains(json_encode($stored), '<script'));
 check('home: the visitor sees the text, the cleaned HTML, and the English title where there is one', str_contains($get('/', null)['body'], 'Über uns') && str_contains($get('/', null)['body'], '<strong>gern</strong>')
     && !str_contains($get('/', null)['body'], '<script>alert') && str_contains($get('/en', null)['body'], 'Hello test world') && str_contains($get('/en', null)['body'], 'Über uns'));
 $post('/admin/home', ['action' => 'up:' . $textId], 3);
-check('home editor: a block moves up, and a step saves the form first', $homeBlocks()[1]['id'] === $textId && $homeBlocks()[1]['texts']['de']['heading'] === 'Über uns');
+check('home editor: a block moves up, and a step saves the form first', (function () use ($homeBlocks, $textId) { $pos = array_search($textId, array_column($homeBlocks(), 'id')); return $pos > 0 && $homeBlocks()[$pos]['texts']['de']['heading'] === 'Über uns'; })());
 $post('/admin/home', ['action' => 'down:' . $textId], 3);
 $post('/admin/home', ['action' => 'save', 'blocks' => [$textId => ['texts' => ['de' => ['heading' => 'Über uns']]], 'default-hero' => ['enabled' => '1', 'texts' => ['de' => ['title' => 'Hallo Testwelt']]]]], 3);
 check('home editor: an unchecked block is not shown', str_contains($get('/', null)['body'], 'Über uns') === false && str_contains($get('/', null)['body'], 'Hallo Testwelt'));

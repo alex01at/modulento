@@ -1263,4 +1263,5 @@ return [
     'core.inline.hide' => 'Ausblenden',
     'core.inline.show' => 'Einblenden',
     'core.inline.edit' => 'Text und Einstellungen bearbeiten',
+    'core.home.type.categories' => 'Kategorien',
 ];
