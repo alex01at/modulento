@@ -10,7 +10,6 @@ use Modulento\Core\Catalogue\OfferView;
 use Modulento\Core\Event\OfferStatusChanged;
 use Modulento\Core\Review\Reviews;
 use Modulento\Core\Review\ReviewView;
-use Modulento\Core\Support\BadWords;
 use Modulento\Core\Support\RateLimiter;
 use Modulento\Core\Support\Session;
 
@@ -108,6 +107,16 @@ final class OfferController extends Controller
         $type = $app->offers->type($offer['type']);
         $category = $offer['category_id'] !== null ? $app->categories->find($offer['category_id']) : null;
         $account = $app->auth->account();
+        if ($account !== null) {
+            // Opening the offer marks its threads read: the provider's all, a visitor's own.
+            if ($account['id'] === $offer['account_id']) {
+                foreach ($app->offerMessages->threads($offer['id']) as $thread) {
+                    $app->messageSeen->markThread($account['id'], $offer['id'], $thread['asker_id']);
+                }
+            } else {
+                $app->messageSeen->markThread($account['id'], $offer['id'], $account['id']);
+            }
+        }
 
         $this->render('offer/show.twig', [
             'offer' => [
@@ -196,7 +205,7 @@ final class OfferController extends Controller
             $this->redirect($path);
             return;
         }
-        if (BadWords::find($message) !== null) {
+        if ($app->badWords->find($message) !== null) {
             Session::flash('error', $this->trans('core.badword.found'));
             $this->redirect($path);
             return;
@@ -246,7 +255,7 @@ final class OfferController extends Controller
         }
         if (mb_strlen($message) < 1 || mb_strlen($message) > 3000) {
             Session::flash('error', $this->trans('core.offer.contact.reply_error'));
-        } elseif (BadWords::find($message) !== null) {
+        } elseif ($app->badWords->find($message) !== null) {
             Session::flash('error', $this->trans('core.badword.found'));
         } elseif ((new RateLimiter($app->db))->hit('offer-reply', (string) $account['id'], 60, 3600)) {
             Session::flash('error', $this->trans('core.error.too_many_requests'));

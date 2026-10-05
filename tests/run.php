@@ -260,6 +260,7 @@ $pdo->exec("ALTER TABLE report ADD COLUMN offer_id INTEGER");
 $pdo->exec("ALTER TABLE report ADD COLUMN provider_id INTEGER");
 $pdo->exec("CREATE TABLE account_avatar (account_id INTEGER PRIMARY KEY REFERENCES account (id) ON DELETE CASCADE, name TEXT, extension TEXT, created_at TEXT)");
 $pdo->exec("CREATE TABLE offer_message (id INTEGER PRIMARY KEY, offer_id INTEGER REFERENCES offer (id) ON DELETE CASCADE, asker_id INTEGER REFERENCES account (id) ON DELETE CASCADE, author_id INTEGER REFERENCES account (id) ON DELETE SET NULL, body TEXT, created_at TEXT)");
+$pdo->exec("CREATE TABLE message_seen (account_id INTEGER REFERENCES account (id) ON DELETE CASCADE, scope TEXT, ref_id INTEGER, sub_id INTEGER DEFAULT 0, seen_id INTEGER, PRIMARY KEY (account_id, scope, ref_id, sub_id))");
 $pdo->exec("CREATE TABLE media (id INTEGER PRIMARY KEY, file TEXT UNIQUE, title TEXT, width INTEGER, height INTEGER, bytes INTEGER, created_at TEXT)");
 $pdo->exec("CREATE TABLE account_preference (account_id INTEGER REFERENCES account (id) ON DELETE CASCADE, name TEXT, value TEXT, PRIMARY KEY (account_id, name))");
 $pdo->exec("ALTER TABLE withdrawal ADD COLUMN handled_at TEXT");
@@ -1221,12 +1222,14 @@ $mails = (string) file_get_contents($mailLog);
 check('contact: the provider gets the message with the sender as reply address', lastMail($mailLog, 'plain@example.test')['subject'] === 'Anfrage zu deinem Angebot „Ich gestalte dein Logo“'
     && str_contains($mails, "Reply-To: editor@example.test") && str_contains($mails, 'Logo für mein Café'));
 
+// A fresh service for each check: the requests above save through their own.
+$words = fn () => new Modulento\Core\Support\BadWords(new Modulento\Core\Support\Settings($pdo));
 // Word filter and conversations about an offer. Account 1 provides "Ich gestalte dein Logo",
 // account 2 asks about it.
-check('badwords: listed words are found, in any case, with stretched letters and stars, but not inside short words', Modulento\Core\Support\BadWords::find('Das ist SCHEIßE') === 'scheisse'
-    && Modulento\Core\Support\BadWords::find('du f*ck') === 'fuck' && Modulento\Core\Support\BadWords::find('fuuuuck off') === 'fuck'
-    && Modulento\Core\Support\BadWords::find('Arschlochkerl') === 'arsch' && Modulento\Core\Support\BadWords::find('Das Classic-Auto ist schön, danke.') === null
-    && Modulento\Core\Support\BadWords::find('class assist glass') === null);
+check('badwords: listed words are found, in any case, with stretched letters and stars, but not inside short words', $words()->find('Das ist SCHEIßE') === 'scheisse'
+    && $words()->find('du f*ck') === 'fuck' && $words()->find('fuuuuck off') === 'fuck'
+    && $words()->find('Arschlochkerl') === 'arsch' && $words()->find('Das Classic-Auto ist schön, danke.') === null
+    && $words()->find('class assist glass') === null);
 $count = fn () => (int) $pdo->query('SELECT COUNT(*) FROM offer_message')->fetchColumn();
 $before = $count();
 $post('/offers/ich-gestalte-dein-logo/contact', ['message' => 'Du bist ein verdammter Arschloch, das ist klar.'], 2);
@@ -1251,6 +1254,39 @@ $post('/offers/ich-gestalte-dein-logo/contact/2', ['message' => 'Gern, ich schic
 check('reply: the provider\'s answer is kept and the visitor gets an e-mail', $count() === $before + 1
     && $pdo->query('SELECT COUNT(*) FROM offer_message WHERE author_id = 1 AND asker_id = 2')->fetchColumn() >= 1
     && lastMail($mailLog, 'editor@example.test')['subject'] === 'Antwort zu deinem Angebot „Ich gestalte dein Logo“');
+
+// Polling for new messages: the interval is an administration setting; the badge counts what is unread.
+$post('/admin/settings', ['site_name' => 'Testseite', 'mail_from' => 'noreply@example.test', 'registration' => 'open', 'default_locale' => 'de', 'locales' => ['de', 'en'], 'poll_seconds' => '30'], 3);
+check('polling: the interval is saved, limited to an hour, and shown to logged-in accounts', $pdo->query("SELECT value FROM setting WHERE name = 'core.poll_seconds'")->fetchColumn() === '30'
+    && str_contains($get('/account/settings', 1)['body'], '') && str_contains($get('/offers/ich-gestalte-dein-logo', 1)['body'], 'data-poll="30"'));
+$post('/admin/settings', ['site_name' => 'Testseite', 'mail_from' => 'noreply@example.test', 'registration' => 'open', 'default_locale' => 'de', 'locales' => ['de', 'en'], 'poll_seconds' => '99999'], 3);
+check('polling: a larger value is limited, a visitor gets no badge', $pdo->query("SELECT value FROM setting WHERE name = 'core.poll_seconds'")->fetchColumn() === '3600'
+    && str_contains($get('/offers/ich-gestalte-dein-logo', null)['body'], 'data-unread') === false);
+$unreadOf = function (int $account) use ($get): int {
+    $r = $get('/account/unread', $account);
+
+    return (int) (json_decode($r['body'], true)['count'] ?? -1);
+};
+// Counts include messages of orders from earlier checks, so only the change is compared.
+// Opening the offer first brings both to a known state: nothing unread on the offer.
+$get('/offers/ich-gestalte-dein-logo', 1);
+$get('/offers/ich-gestalte-dein-logo', 2);
+$u1 = $unreadOf(1);
+$u2 = $unreadOf(2);
+$post('/offers/ich-gestalte-dein-logo/contact', ['message' => 'Eine Frage: gibt es das Logo auch als Vektordatei?'], 2);
+check('polling: a new question is unread for the provider, not for the visitor who asked', $unreadOf(1) === $u1 + 1 && $unreadOf(2) === $u2);
+$get('/offers/ich-gestalte-dein-logo', 1);
+check('polling: opening the offer marks its threads read for the provider', $unreadOf(1) === $u1);
+$post('/offers/ich-gestalte-dein-logo/contact/2', ['message' => 'Ja, als SVG und als PDF.'], 1);
+check('polling: an answer is unread for the visitor until they open the offer', $unreadOf(2) === $u2 + 1);
+$get('/offers/ich-gestalte-dein-logo', 2);
+check('polling: opening the offer as the visitor marks the answer read', $unreadOf(2) === $u2);
+$post('/offers/ich-gestalte-dein-logo/contact', ['message' => 'Noch eine Frage: wie lange dauert das?'], 2);
+$get('/offers/ich-gestalte-dein-logo', 1);
+$post('/offers/ich-gestalte-dein-logo/contact/2', ['message' => 'Mein eigener Gedanke, nicht gelesen.'], 2);
+check('polling: a message from oneself is never unread', $unreadOf(2) === $u2);
+$post('/admin/settings', ['site_name' => 'Testseite', 'mail_from' => 'noreply@example.test', 'registration' => 'open', 'default_locale' => 'de', 'locales' => ['de', 'en'], 'poll_seconds' => '0'], 3);
+check('polling: 0 switches the asking off', str_contains($get('/offers/ich-gestalte-dein-logo', 1)['body'], 'data-poll="0"'));
 
 // Pictures of the media library: only those, in pages.
 $library = '/media/library/' . str_repeat('a', 32) . '.webp';
@@ -1572,7 +1608,7 @@ check('showing it again restores the numbers', $review($fileOrder)['status'] ===
 
 $export = json_decode($get('/account/export', 2)['body'], true);
 check('export lists the reviews the account wrote', count($export['reviews'] ?? []) === 2);
-(new Modulento\Core\Review\Reviews($pdo))->anonymise(2);
+(new Modulento\Core\Review\Reviews($pdo, $words()))->anonymise(2);
 check('a deleted account\'s reviews stay without the name', $review($orderId)['author_name'] === '' && str_contains($get('/offers/ich-gestalte-dein-logo', null)['body'], 'Ein Käufer'));
 
 $pdo->exec("UPDATE extension SET enabled = 0 WHERE id = 'freelancer'");
@@ -2895,6 +2931,31 @@ $post('/account/appearance', ['color_scheme' => 'auto'], 3);
 $post('/account/appearance', ['color_scheme' => 'auto'], 1);
 check('colour scheme: "automatic" needs no row and writes no attribute', $pdo->query('SELECT COUNT(*) FROM account_preference')->fetchColumn() == 0
     && str_contains($get('/account/settings', 1)['body'], '<html lang="de">') && str_contains($get('/admin', 3)['body'], '<html lang="de">'));
+// Word filter in the administration: kept in the settings, the shipped lists apply until someone saves one.
+check('badwords admin: only administrators with the settings permission see the word filter', $get('/admin/badwords', 3)['status'] === 200
+    && $get('/admin/badwords', 1)['status'] === 403 && str_contains($get('/admin/badwords', 3)['body'], 'name="words"'));
+$post('/admin/badwords', ['words' => "Blödmann, Schrott\nschrott\n\n  "], 3);
+check('badwords admin: a saved list replaces the shipped one, duplicates and blanks dropped', $pdo->query("SELECT value FROM setting WHERE name = 'core.badwords'")->fetchColumn() === "blödmann\nschrott"
+    && $words()->find('Du Schrott!') === 'schrott' && $words()->find('Scheiße') === null && $words()->isCustomized());
+$post('/admin/badwords', ['words' => " , \n"], 3);
+check('badwords admin: an empty list is refused and the saved one stays', str_contains($_SESSION['_flash']['error'] ?? '', 'leer') && $words()->find('Schrott') === 'schrott');
+$post('/admin/badwords/reset', [], 3);
+check('badwords admin: back to the shipped lists', !$words()->isCustomized() && $words()->find('Scheiße') === 'scheisse' && $words()->find('Schrott') === null);
+$post('/admin/badwords', ['words' => 'Doof'], 1);
+check('badwords admin: a visitor or an account without the permission cannot change it', $pdo->query("SELECT COUNT(*) FROM setting WHERE name = 'core.badwords'")->fetchColumn() == 0);
+
+// Packages: a GitHub address names its repository; a zip that is no package is refused.
+check('packages: a GitHub address is read as its repository', Modulento\Core\Package\Packages::repoFromInput('https://github.com/acme/modulento-ext-x.git') === 'acme/modulento-ext-x'
+    && Modulento\Core\Package\Packages::repoFromInput(' www.github.com/acme/tool/tree/main ') === 'acme/tool' && Modulento\Core\Package\Packages::repoFromInput('acme/tool') === 'acme/tool');
+$notZip = tempnam(sys_get_temp_dir(), 'pkg');
+file_put_contents($notZip, 'Das ist kein ZIP.');
+$_FILES = ['package' => ['tmp_name' => $notZip, 'error' => UPLOAD_ERR_OK, 'size' => filesize($notZip), 'name' => 'paket.zip', 'type' => 'application/zip']];
+$post('/admin/packages/upload', [], 3);
+$_FILES = [];
+unlink($notZip);
+check('packages: an upload that is no package is refused', str_contains($_SESSION['_flash']['error'] ?? '', 'kein gültiges Paket'));
+check('packages: uploads cannot be made by an account without the permission', $get('/admin/packages', 1)['status'] === 403);
+
 // Administration layout: the sidebar by default, or a header bar with a mega menu,
 // chosen in the profile settings by administrators only.
 check('admin layout: the sidebar is the default', str_contains($get('/admin', 3)['body'], '<body class="layout-sidebar">') && str_contains($get('/admin', 3)['body'], 'id="sidebar"'));

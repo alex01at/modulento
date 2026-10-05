@@ -27,6 +27,17 @@ final class Settings
         return $this->all()[$name] ?? $default;
     }
 
+    public function has(string $name): bool
+    {
+        return array_key_exists($name, $this->all());
+    }
+
+    /** Removes a setting, so its default applies again. */
+    public function forget(string $name): void
+    {
+        $this->db->prepare('DELETE FROM setting WHERE name = :name')->execute(['name' => $name]);
+    }
+
     public function set(string $name, string $value): void
     {
         $exists = $this->db->prepare('SELECT COUNT(*) FROM setting WHERE name = :name');

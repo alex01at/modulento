@@ -98,6 +98,14 @@ final class AccountController extends Controller
         $this->back('success', 'core.account.avatar.deleted');
     }
 
+    /** How many messages wait for the account; the page asks every few seconds (see unread.js). */
+    public function unread(array $params): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        header('Cache-Control: no-store');
+        echo json_encode(['count' => $this->app->messageSeen->unread($this->accountId())]);
+    }
+
     public function index(array $params): void
     {
         $this->render('account/index.twig', [

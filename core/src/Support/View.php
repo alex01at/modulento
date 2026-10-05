@@ -224,6 +224,8 @@ final class View
         ), JSON_UNESCAPED_UNICODE)));
         // Whether an optional function of the core is switched on (Administration → Modules).
         $this->twig->addFunction(new TwigFunction('module', fn (string $id) => $app->modules->enabled($id)));
+        // Seconds between two asks for new messages; 0 switches the asking off (Administration → Settings).
+        $this->twig->addFunction(new TwigFunction('poll_seconds', fn (): int => (int) $app->settings->get('core.poll_seconds', '60')));
         $this->twig->addFunction(new TwigFunction('has_catalogue', fn () => $app->offers->types() !== []));
         // Entries extensions add to the main menu, as title/url.
         $this->twig->addFunction(new TwigFunction('nav_links', fn () => array_map(

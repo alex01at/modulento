@@ -36,6 +36,11 @@
                     <option value="closed" {{ settings.registration == 'closed' ? 'selected' }}>{{ trans('core.admin.settings.registration_closed') }}</option>
                 </select>
             </div>
+            <div class="field">
+                <label for="poll_seconds">{{ trans('core.admin.settings.poll_seconds') }}</label>
+                <input id="poll_seconds" name="poll_seconds" type="number" min="0" max="3600" step="1" value="{{ settings.poll_seconds }}">
+                <small>{{ trans('core.admin.settings.poll_seconds_hint') }}</small>
+            </div>
             <div class="field field-wide">
                 <label for="meta_description">{{ trans('core.admin.settings.meta_description') }}</label>
                 <textarea id="meta_description" name="meta_description" rows="3" maxlength="300">{{ settings.meta_description }}</textarea>

@@ -50,10 +50,12 @@
                             <div class="button-row">
                                 {{ _self.switch(package) }}
                                 {# Always there: without a known newer version it asks the repository first. #}
+                                {% if package.repo != 'upload' %}
                                 <form method="post" action="{{ url('/admin/packages/' ~ package.kind ~ '/' ~ package.id ~ '/update') }}">
                                     {{ csrf_field() }}
                                     <button type="submit" class="btn-sm">{{ package.latest and package.latest != package.version ? trans('core.package.update', {version: package.latest}) : trans('core.package.update_now') }}</button>
                                 </form>
+                                {% endif %}
                                 {% if not package.in_use %}
                                     <form method="post" action="{{ url('/admin/packages/' ~ package.kind ~ '/' ~ package.id ~ '/remove') }}">
                                         {{ csrf_field() }}
@@ -136,9 +138,20 @@
     <form method="post" action="{{ url('/admin/packages/install') }}" class="stack-form">
         {{ csrf_field() }}
         <label for="repo">{{ trans('core.package.repo') }}</label>
-        <input id="repo" name="repo" placeholder="owner/modulento-theme-name" required>
+        <input id="repo" name="repo" placeholder="owner/modulento-theme-name oder https://github.com/owner/name" required>
         <small>{{ trans('core.package.sources', {sources: sources|join(', ')}) }}</small>
         <button type="submit">{{ trans('core.package.install') }}</button>
+    </form>
+</section>
+
+<section class="card-box">
+    <h2>{{ trans('core.package.upload_title') }}</h2>
+    <p>{{ trans('core.package.upload_hint') }}</p>
+    <form method="post" action="{{ url('/admin/packages/upload') }}" enctype="multipart/form-data" class="stack-form">
+        {{ csrf_field() }}
+        <label for="package">{{ trans('core.package.upload_file') }}</label>
+        <input id="package" name="package" type="file" accept=".zip,application/zip" required>
+        <button type="submit">{{ trans('core.package.upload_submit') }}</button>
     </form>
 </section>
 {% endblock %}

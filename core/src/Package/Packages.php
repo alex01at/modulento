@@ -100,6 +100,64 @@ final class Packages
         return $this->releases->latest($repo)['version'];
     }
 
+    /** The source of packages uploaded as a zip: not a repository, so they are not updated from one. */
+    public const UPLOAD_SOURCE = 'upload';
+    public const MAX_UPLOAD_BYTES = 50 * 1024 * 1024;
+
+    /** The repository a typed name or a GitHub address points to: "owner/name". */
+    public static function repoFromInput(string $input): string
+    {
+        $input = trim($input);
+        if (preg_match('#^(?:https?://)?(?:www\.)?github\.com/([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+?)(?:\.git)?(?:/.*)?$#i', $input, $match) === 1) {
+            return $match[1] . '/' . $match[2];
+        }
+
+        return $input;
+    }
+
+    /**
+     * Installs a package from a zip file the administrator uploaded. The
+     * checksum is that of the uploaded file itself.
+     *
+     * @return array{kind: string, id: string, version: string, updated: bool}
+     * @throws UpdateException
+     */
+    public function installUpload(string $uploaded): array
+    {
+        $this->ensureDir($this->workDir . '/staging');
+        $zipPath = $this->workDir . '/staging/upload-' . bin2hex(random_bytes(6)) . '.zip';
+        if (!@copy($uploaded, $zipPath)) {
+            throw new UpdateException('core.package.error.upload');
+        }
+
+        return $this->installArchive($zipPath, (string) hash_file('sha256', $zipPath), self::UPLOAD_SOURCE, self::manifestVersion($zipPath));
+    }
+
+    /** The version the manifest of an uploaded package names, which must be a package at all. @throws UpdateException */
+    private static function manifestVersion(string $zipPath): string
+    {
+        $zip = new \ZipArchive();
+        if ($zip->open($zipPath) !== true) {
+            throw new UpdateException('core.package.error.upload');
+        }
+        foreach (['extension.json', 'theme.json'] as $name) {
+            $json = $zip->getFromName($name);
+            if ($json === false) {
+                continue;
+            }
+            $zip->close();
+            $manifest = json_decode($json, true);
+            if (!is_array($manifest) || !is_string($manifest['version'] ?? null)) {
+                throw new UpdateException('core.package.error.manifest');
+            }
+
+            return $manifest['version'];
+        }
+        $zip->close();
+
+        throw new UpdateException('core.package.error.manifest');
+    }
+
     /**
      * Downloads the newest release of a repository and installs it, or
      * updates the package it already is.

@@ -643,7 +643,21 @@ note; the list is a starting point, not a moderation system.
 Questions to a provider are a thread per offer (**offer page**, the contact
 section, and the offer's provider sees every thread there). The e-mail to the
 provider stays; the provider's answer goes back to the visitor by e-mail, and
-the conversation is also on the offer page. This works for every offer type,
+the conversation is also on the offer page.
+
+Signed-in accounts see how many messages wait for them: the number on their
+picture is asked for every few seconds (**Administration → Settings → Ask for
+new messages**, 0 switches it off). "Read" means the conversation was opened
+after the newest message in it; the messages stay reachable on their pages
+without the polling.
+
+The word list is kept under **Administration → Word filter**, one word per
+line. Until someone saves a list of their own, the lists that ship with the
+core apply.
+
+**Administration → Packages** installs an extension or theme from a repository
+given as `owner/name` or as its GitHub address, or from a zip file that is
+uploaded (checked like a package from GitHub, not updated automatically). This works for every offer type,
 the freelancer and auction extensions included.
 
 A page's text can show a picture from the media library: the picker next to
