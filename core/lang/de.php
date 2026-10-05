@@ -1270,6 +1270,7 @@ return [
     'core.inline.failed' => 'Nicht gespeichert. Bitte noch einmal versuchen.',
     'core.inline.page_settings' => 'Einstellungen der Seite',
     'core.inline.duplicate' => 'Duplizieren',
+    'core.inline.move' => 'Mit der Maus verschieben',
     'core.inline.link_edit' => 'Link bearbeiten',
     'core.widget.cta' => 'Aufruf mit Schaltfläche',
     'core.widget.note' => 'Hinweis',

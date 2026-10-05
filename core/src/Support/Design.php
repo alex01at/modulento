@@ -93,6 +93,8 @@ CSS;
 .inline-wysiwyg .inline-wysiwyg-italic { font-style: italic; }
 .inline-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .4rem .75rem; }
 .inline-head p { margin: 0; }
+.inline-grip { cursor: grab; color: var(--muted, #888); font-size: 1.1em; user-select: none; touch-action: none; }
+.inline-block.is-dragging { opacity: .5; }
 .inline-steps { display: flex; flex-wrap: wrap; gap: .3rem; margin: 0; }
 .inline-steps button { padding: .2rem .55rem; font-size: .8rem; }
 .inline-tools { padding: .5rem .75rem; }

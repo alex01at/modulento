@@ -168,6 +168,33 @@ final class HomeLayout
         return null;
     }
 
+    /**
+     * The blocks in the order of the ids. An id that is not there is skipped, a
+     * repeated one counts once, and a block whose id is not listed keeps its
+     * place after the listed ones.
+     *
+     * @param list<array<string, mixed>> $blocks
+     * @param list<string> $ids
+     * @return list<array<string, mixed>>
+     */
+    public static function ordered(array $blocks, array $ids): array
+    {
+        $byId = [];
+        foreach ($blocks as $block) {
+            $byId[(string) $block['id']] = $block;
+        }
+
+        $out = [];
+        foreach (array_unique($ids) as $id) {
+            if (isset($byId[$id])) {
+                $out[] = $byId[$id];
+                unset($byId[$id]);
+            }
+        }
+
+        return array_merge($out, array_values(array_filter($blocks, fn (array $block) => isset($byId[(string) $block['id']]))));
+    }
+
     /** The blocks with the block of this id copied right after it, with a new id and the same content. */
     public static function duplicateAfter(array $blocks, string $id): array
     {
