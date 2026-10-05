@@ -116,6 +116,27 @@ async def main():
         after_ids = await b.eval("[...document.querySelectorAll('.inline-block[data-block-id]')].map(b => b.dataset.blockId)")
         check('a block dragged below the next one stays there after reloading', after_ids[:2] == [before_ids[1], before_ids[0]] and after_ids[2:] == before_ids[2:])
 
+        # 2i. the offer page's blocks are reordered by the same editing script; checked here
+        # on the administration page, which holds the offer page's blocks and its CSRF token
+        await b.goto(BASE + '/admin/offer-page')
+        result = await b.eval(r"""(async () => {
+            const token = document.querySelector('input[name="_csrf"]').value;
+            const order = async () => {
+                const html = await (await fetch('/admin/offer-page', {credentials: 'same-origin'})).text();
+                return [...new Set([...html.matchAll(/name="blocks\[([a-z0-9-]+)\]/g)].map(m => m[1]))];
+            };
+            const send = (ids) => fetch('/admin/offer-page/order', {method: 'POST', credentials: 'same-origin',
+                headers: {'Content-Type': 'application/json', 'X-CSRF-Token': token}, body: JSON.stringify({order: ids})}).then(r => r.status);
+            const before = await order();
+            const status = await send([...before].reverse());
+            const after = await order();
+            await send(before);
+            return {before, status, after, restored: (await order()).join(',') === before.join(',')};
+        })()""")
+        check('the offer page keeps a dragged order after reloading', result['status'] == 200 and result['after'] == list(reversed(result['before'])) and result['restored'])
+
+        await b.goto(BASE + '/?edit=1')
+
         # 3. hide the categories block, then show it again
         await b.click('#inline-offers button[value="toggle:offers"]')
         check('a block can be hidden (it shows as hidden while editing)', await b.exists('#inline-offers .badge-disabled'))
