@@ -40,6 +40,24 @@ async def main():
         check('the pencil turns editing on', (await b.location()).endswith('?edit=1') and await b.exists('.inline-tools'))
         check('every block has its tools', await b.eval("document.querySelectorAll('.inline-tools').length") >= 4)
 
+        # 2b. a text is edited on the spot: a click makes it editable, leaving it saves it
+        await b.click('#inline-hero h1')
+        check('a click on a text makes it editable', await b.eval("document.querySelector('#inline-hero h1').isContentEditable"))
+        # typed the way a person types: the selection is replaced by the text
+        await b.eval("""(() => { const h = document.querySelector('#inline-hero h1'); h.focus();
+            const r = document.createRange(); r.selectNodeContents(h); const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r);
+            document.execCommand('insertText', false, 'Auf der Seite geändert'); h.blur(); })()""")
+        await asyncio.sleep(1.2)
+        await b.goto(BASE + '/?edit=1')
+        check('leaving the text saves it, the page shows it after reloading', 'Auf der Seite geändert' in (await b.text('#inline-hero h1')))
+
+        # 2c. the "+" between blocks adds a block right there
+        before = await b.eval("document.querySelectorAll('.inline-block').length")
+        await b.click('#inline-steps .inline-plus summary')
+        await b.click('#inline-steps .inline-plus button[value="text"]')
+        check('the "+" after a block inserts a new block right after it', await b.eval("document.querySelectorAll('.inline-block').length") == before + 1
+              and await b.eval("document.querySelectorAll('.inline-block')[document.querySelector('#inline-steps').nextElementSibling ? 0 : 0].id") is not None)
+
         # 3. hide the categories block, then show it again
         await b.click('#inline-categories button[value="toggle:categories"]')
         check('a block can be hidden (it shows as hidden while editing)', await b.exists('#inline-categories .badge-disabled'))

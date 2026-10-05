@@ -687,6 +687,11 @@ page's own administration action and comes back to the page, so it works without
 scripts, on a phone too. The site's own text is still edited in the text fields
 of the block.
 
+On the home page and on the offer page the texts can be changed where they stand: a click on a text
+makes it editable, leaving it saves it, Escape undoes. A text is editable when its element carries
+`data-field="<name>"` inside the block (`data-html` for rich text). Between the blocks a "+" offers
+the kinds of block to insert at that place. Both work without scripts too, through the forms.
+
 A theme that wants editing in place does three things in each page it shows:
 
 ```twig
@@ -703,8 +708,10 @@ A theme that wants editing in place does three things in each page it shows:
 
 1. It loops the blocks with `home_blocks(edit_mode())` (or `offer_blocks(...)`), so
    hidden blocks are there while editing and only then.
-2. It puts the tools in front of each block while `edit_mode()` is true.
-3. It draws a block only when `block.enabled`.
+2. While `edit_mode()` is true, it includes `@admin/inline/_block.twig` (tools, the
+   block with its partial, and the "+") instead of the partial alone.
+3. Otherwise it draws a block only when `block.enabled`.
+4. Its partials mark their texts with `data-field` (see above).
 
 The layout loads the editor's script with `{% if edit_mode() %}<script src="{{ admin_asset('editor.js') }}" defer></script>{% endif %}`
 (the default theme does this in `layout/base.twig`). A theme that does none of

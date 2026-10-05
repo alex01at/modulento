@@ -23,9 +23,8 @@
     {% include '@admin/inline/_bar.twig' with {page_path: '/admin/offer-page', add_types: ['text']} only %}
     {% for block in offer_blocks(edit_mode()) %}
         {% if edit_mode() %}
-            {% include '@admin/inline/_block.twig' with {block: block, page_path: '/admin/offer-page', fields: block_fields('offer')[block.type] ?? [], label_key: 'core.offer_page.type.' ~ block.type, deletable: block.type == 'text'} only %}
-        {% endif %}
-        {% if block.enabled %}
+            {% include '@admin/inline/_block.twig' with {block: block, page_path: '/admin/offer-page', partial: 'offer/_block_' ~ block.type ~ '.twig', fields: block_fields('offer')[block.type] ?? [], label_key: 'core.offer_page.type.' ~ block.type, deletable: block.type == 'text', add_types: ['text']} %}
+        {% elseif block.enabled %}
             {% include 'offer/_block_' ~ block.type ~ '.twig' with {block: block} %}
         {% endif %}
     {% endfor %}

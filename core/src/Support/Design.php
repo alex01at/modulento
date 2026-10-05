@@ -68,6 +68,23 @@ CSS;
 .editor textarea { display: none; }
 .editor.editor-source .editor-area { display: none; }
 .editor.editor-source textarea { display: block; width: 100%; min-height: 16rem; border: 0; border-radius: 0 0 6px 6px; font-family: ui-monospace, monospace; font-size: .85rem; }
+/* Texts on the spot, the "+" between blocks, the status line. */
+.inline-editable { border-radius: .2rem; cursor: text; }
+.inline-editable:hover, .inline-editable:focus-visible { outline: 1px dashed var(--accent); outline-offset: .3rem; }
+.inline-editable:hover::after { content: " ✎"; color: var(--accent); font-size: .6em; vertical-align: middle; }
+.inline-editable.is-editing { outline: 2px solid var(--accent); background: var(--surface); }
+.inline-block { position: relative; }
+.inline-off { margin: .5rem 0; color: var(--muted); font-size: .9rem; }
+.inline-plus { margin: .75rem 0; text-align: center; }
+.inline-plus summary { list-style: none; display: inline-flex; align-items: center; justify-content: center; width: 2.2rem; height: 2.2rem; border-radius: 50%; border: 2px dashed var(--accent); color: var(--accent); font-size: 1.3rem; font-weight: 700; cursor: pointer; }
+.inline-plus summary::-webkit-details-marker { display: none; }
+.inline-plus[open] summary { background: var(--accent); color: #fff; border-style: solid; }
+.inline-plus-form { display: flex; flex-wrap: wrap; gap: .4rem; justify-content: center; margin-top: .5rem; }
+.inline-plus-form button { padding: .35rem .8rem; border: 1px solid var(--accent); border-radius: 999px; background: var(--ground); color: var(--accent); font: inherit; cursor: pointer; }
+.inline-plus-form button:hover { background: var(--accent); color: #fff; }
+.inline-status { position: fixed; left: 50%; bottom: 1rem; transform: translateX(-50%); margin: 0; padding: .5rem 1rem; border-radius: .5rem; background: var(--ground); box-shadow: var(--shadow); z-index: 50; }
+.inline-status.is-error { color: var(--error); }
+.inline-status:empty { display: none; }
 CSS;
 
     public function __construct(private Settings $settings)

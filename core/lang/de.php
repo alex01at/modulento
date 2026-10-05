@@ -1264,4 +1264,8 @@ return [
     'core.inline.show' => 'Einblenden',
     'core.inline.edit' => 'Text und Einstellungen bearbeiten',
     'core.home.type.categories' => 'Kategorien',
+    'core.inline.add_here' => 'Hier einen Bereich einfügen',
+    'core.inline.saving' => 'Wird gespeichert …',
+    'core.inline.saved' => 'Gespeichert.',
+    'core.inline.failed' => 'Nicht gespeichert. Bitte noch einmal versuchen.',
 ];

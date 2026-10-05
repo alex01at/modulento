@@ -2,6 +2,6 @@
 {% if block.media %}
 <figure>
     <img src="{{ block.media }}" alt="{{ block.texts.caption }}" loading="lazy">
-    {% if block.texts.caption %}<figcaption>{{ block.texts.caption }}</figcaption>{% endif %}
+    {% if block.texts.caption or edit_mode() %}<figcaption data-field="caption">{{ block.texts.caption }}</figcaption>{% endif %}
 </figure>
 {% endif %}

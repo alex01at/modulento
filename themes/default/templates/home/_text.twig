@@ -1,5 +1,5 @@
 {# Receives block: texts (heading, body - already cleaned HTML). #}
 <section>
-    {% if block.texts.heading %}<h2>{{ block.texts.heading }}</h2>{% endif %}
-    {{ block.texts.body|raw }}
+    {% if block.texts.heading or edit_mode() %}<h2 data-field="heading">{{ block.texts.heading }}</h2>{% endif %}
+    {% if block.texts.body or edit_mode() %}<div data-field="body" data-html="1">{{ block.texts.body|raw }}</div>{% endif %}
 </section>

@@ -90,6 +90,27 @@ final class OfferLayout
         $this->settings->set(self::SETTING, (string) json_encode($clean, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR));
     }
 
+    /** Saves heading or body of a text block in one language; the cleaned value, or null. */
+    public function setField(string $id, string $locale, string $field, string $value): ?string
+    {
+        $blocks = $this->blocks();
+        foreach ($blocks as $i => $block) {
+            if ($block['id'] !== $id) {
+                continue;
+            }
+            if ($block['type'] !== 'text' || !in_array($field, ['heading', 'body'], true)) {
+                return null;
+            }
+            $clean = HomeLayout::clean('text', $field, $value);
+            $blocks[$i]['texts'][$locale][$field] = $clean;
+            $this->save($blocks);
+
+            return $clean;
+        }
+
+        return null;
+    }
+
     public function reset(): void
     {
         $this->settings->forget(self::SETTING);

@@ -13,6 +13,8 @@ class Browser:
         self.ws = await websockets.connect(page['webSocketDebuggerUrl'], max_size=None)
         await self.send('Page.enable')
         await self.send('Runtime.enable')
+        # A headless window has no focus of its own; without this, focus and blur events do not fire.
+        await self.send('Emulation.setFocusEmulationEnabled', {'enabled': True})
         return self
 
     async def close(self):
