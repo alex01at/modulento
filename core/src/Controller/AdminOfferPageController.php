@@ -18,6 +18,7 @@ final class AdminOfferPageController extends Controller
             'locale' => $this->app->translator->locale(),
             'default_locale' => $this->app->locales->default(),
             'customized' => $this->app->offerLayout->isCustomized(),
+            'own_widgets' => array_values(array_filter($this->app->widgets->own(), fn (array $w) => $w['type'] === 'text')),
         ]);
     }
 
@@ -34,12 +35,33 @@ final class AdminOfferPageController extends Controller
             if ($action === 'add') {
                 $blocks[] = HomeLayout::newBlock('text');
             } elseif (preg_match('/^insert:([a-z0-9-]{1,32})$/', $action, $match) === 1) {
-                $blocks = HomeLayout::insertAfter($blocks, $match[1], 'text');
+                $choice = (string) ($_POST['add_type'] ?? 'text');
+                if (str_starts_with($choice, 'widget:')) {
+                    // A widget on the offer page is a text block; the other kinds are not offered here.
+                    $widget = $this->app->widgets->block(substr($choice, 7));
+                    if ($widget !== null && $widget['type'] === 'text') {
+                        $blocks = HomeLayout::placeAfter($blocks, $match[1], $widget);
+                    }
+                } else {
+                    $blocks = HomeLayout::insertAfter($blocks, $match[1], 'text');
+                }
+            } elseif (preg_match('/^savewidget:([a-z0-9-]{1,32})$/', $action, $match) === 1) {
+                foreach ($blocks as $block) {
+                    if ($block['id'] === $match[1] && $block['type'] === 'text') {
+                        $saved = $this->app->widgets->saveOwn((string) ($_POST['widget_name'] ?? ''), $block);
+                        Session::flash($saved ? 'success' : 'error', $this->trans($saved ? 'core.widget.saved' : 'core.widget.invalid_name'));
+                    }
+                }
+            } elseif (preg_match('/^removewidget:([a-z0-9]{1,16})$/', $action, $match) === 1) {
+                $this->app->widgets->removeOwn($match[1]);
+                Session::flash('success', $this->trans('core.widget.removed'));
             } elseif (preg_match('/^(up|down|delete|toggle|duplicate):([a-z0-9-]{1,32})$/', $action, $match) === 1) {
                 $blocks = $this->step($blocks, $match[1], $match[2]);
             }
             $layout->save($blocks);
-            Session::flash('success', $this->trans($action === 'save' ? 'core.offer_page.saved' : 'core.offer_page.changed'));
+            if (!str_contains($action, 'widget')) {
+                Session::flash('success', $this->trans($action === 'save' ? 'core.offer_page.saved' : 'core.offer_page.changed'));
+            }
         }
 
         $this->redirect($this->safeReturn('/admin/offer-page'));

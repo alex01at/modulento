@@ -197,6 +197,18 @@ final class HomeLayout
         if ($type === 'offers') {
             $new['settings'] = ['count' => 6];
         }
+
+        return self::placeAfter($blocks, $afterId, $new);
+    }
+
+    /**
+     * The blocks with the given block placed after the block with the given id; "start" puts it first.
+     *
+     * @param list<array<string, mixed>> $blocks
+     * @return list<array<string, mixed>>
+     */
+    public static function placeAfter(array $blocks, string $afterId, array $new): array
+    {
         if ($afterId === 'start') {
             return [$new, ...$blocks];
         }
