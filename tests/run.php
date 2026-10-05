@@ -1288,6 +1288,31 @@ check('polling: a message from oneself is never unread', $unreadOf(2) === $u2);
 $post('/admin/settings', ['site_name' => 'Testseite', 'mail_from' => 'noreply@example.test', 'registration' => 'open', 'default_locale' => 'de', 'locales' => ['de', 'en'], 'poll_seconds' => '0'], 3);
 check('polling: 0 switches the asking off', str_contains($get('/offers/ich-gestalte-dein-logo', 1)['body'], 'data-poll="0"'));
 
+// The offer page: its parts in the order an administrator sets; a text block in the header's language.
+$offerBlocks = fn () => json_decode((string) $pdo->query("SELECT value FROM setting WHERE name = 'core.offer_layout'")->fetchColumn(), true);
+$offerPage = $get('/offers/ich-gestalte-dein-logo', null);
+check('offer page: by default it shows the description and the questions, as before', $offerPage['status'] === 200 && str_contains($offerPage['body'], 'Ich gestalte dein Logo') && str_contains($offerPage['body'], 'offer-messages'));
+check('offer page editor: only administrators with the settings permission', $get('/admin/offer-page', 3)['status'] === 200 && $get('/admin/offer-page', 1)['status'] === 403);
+$post('/admin/offer-page', ['action' => 'add'], 3);
+$offerTextId = array_values(array_filter($offerBlocks() ?? [], fn (array $b) => $b['type'] === 'text'))[0]['id'] ?? null;
+$offerNow = $offerBlocks();
+check('offer page editor: a text block can be added at the end', $offerTextId !== null && end($offerNow)['type'] === 'text');
+$post('/admin/offer-page', ['action' => 'save', 'blocks' => [
+    $offerTextId => ['enabled' => '1', 'texts' => ['de' => ['heading' => 'Garantie', 'body' => '<p>Zwei Korrekturschleifen.</p><script>x</script>']]],
+    'contact' => ['enabled' => '1'],
+]], 3);
+check('offer page: a text block shows its cleaned text in the page\'s language, and a hidden part disappears', str_contains($get('/offers/ich-gestalte-dein-logo', null)['body'], 'Zwei Korrekturschleifen')
+    && !str_contains($get('/offers/ich-gestalte-dein-logo', null)['body'], '<script>x') && str_contains($get('/offers/ich-gestalte-dein-logo', null)['body'], 'Garantie'));
+$post('/admin/offer-page', ['action' => 'save', 'blocks' => ['contact' => ['texts' => []]]], 3);
+check('offer page editor: a part that is not ticked is hidden, and the page still works', !str_contains($get('/offers/ich-gestalte-dein-logo', null)['body'], 'offer-messages')
+    && str_contains($get('/offers/ich-gestalte-dein-logo', null)['body'], 'Garantie'));
+$post('/admin/offer-page', ['action' => 'up:' . $offerTextId], 3);
+check('offer page editor: parts move; the core parts stay, the text part can be removed', $offerBlocks()[count($offerBlocks()) - 2]['id'] === $offerTextId);
+$post('/admin/offer-page', ['action' => 'delete:' . $offerTextId], 3);
+check('offer page editor: a text block is removed, a core part is not', array_values(array_filter($offerBlocks(), fn (array $b) => $b['type'] === 'text')) === [] && count($offerBlocks()) === 5);
+$post('/admin/offer-page', ['action' => 'reset'], 3);
+check('offer page editor: a reset brings back the default page', !$pdo->query("SELECT COUNT(*) FROM setting WHERE name = 'core.offer_layout'")->fetchColumn());
+
 // Pictures of the media library: only those, in pages.
 $library = '/media/library/' . str_repeat('a', 32) . '.webp';
 $clean = Modulento\Core\Support\HtmlSanitizer::clean('<p><img src="' . $library . '" alt="Logo"><img src="https://evil.example/x.png"><img src="/media/library/../x.png"><img src="/assets/x.png"></p>');

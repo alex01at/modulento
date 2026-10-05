@@ -18,59 +18,12 @@
 
     {% include 'review/_rating.twig' with {rating: offer.rating} only %}
 
-    {% if offer.images %}
-        <div class="gallery">
-            {% for image in offer.images %}
-                <a href="{{ image.large }}"><img src="{{ loop.first ? image.large : image.thumb }}" alt="{{ trans('core.offer.image_alt', {title: offer.title, number: loop.index}) }}" width="{{ image.width }}" height="{{ image.height }}" {{ not loop.first ? 'loading="lazy"' }}></a>
-            {% endfor %}
-        </div>
-    {% endif %}
-
-    {% if offer.summary %}<p><strong>{{ offer.summary }}</strong></p>{% endif %}
-    {# Plain text typed by the provider: escaped, line breaks kept. #}
-    <p>{{ offer.description|nl2br }}</p>
-
-    {# The part that belongs to the offer's type, supplied by its extension. #}
-    {% include type_template %}
+    {# The rest of the page is in the order and of the parts the administration set (Administration → Offer page). #}
+    {% for block in offer_blocks() %}
+        {% include 'offer/_block_' ~ block.type ~ '.twig' with {block: block} %}
+    {% endfor %}
 </article>
 
-{% include 'review/_list.twig' %}
-
-{% if module('contact') %}
-<section class="offer-messages" id="messages">
-    <h2>{{ trans('core.offer.contact.title') }}</h2>
-    {% if offer.is_own %}
-        <p>{{ trans('core.offer.contact.own') }}</p>
-        {% for thread in messages.threads %}
-            <div class="thread">
-                <h3>{{ trans('core.offer.contact.thread', {name: thread.asker_name}) }}</h3>
-                {% include 'offer/_thread.twig' with {messages: thread.messages} only %}
-                <form method="post" action="{{ url(offer.path ~ '/contact/' ~ thread.asker_id) }}" class="stack-form wide">
-                    {{ csrf_field() }}
-                    <label for="reply-{{ thread.asker_id }}">{{ trans('core.offer.contact.reply_label', {name: thread.asker_name}) }}</label>
-                    <textarea id="reply-{{ thread.asker_id }}" name="message" rows="4" maxlength="3000" required></textarea>
-                    <button type="submit">{{ trans('core.offer.contact.reply') }}</button>
-                </form>
-            </div>
-        {% else %}
-            <p>{{ trans('core.offer.contact.none') }}</p>
-        {% endfor %}
-    {% elseif account %}
-        {% if messages.thread %}
-            {% include 'offer/_thread.twig' with {messages: messages.thread} only %}
-        {% endif %}
-        <form method="post" action="{{ url(offer.path ~ '/contact') }}" class="stack-form wide">
-            {{ csrf_field() }}
-            <label for="message">{{ trans('core.offer.contact.message') }}</label>
-            <textarea id="message" name="message" rows="6" minlength="20" maxlength="3000" required></textarea>
-            <small>{{ trans('core.offer.contact.hint') }}</small>
-            <button type="submit">{{ trans('core.offer.contact.submit') }}</button>
-        </form>
-    {% else %}
-        <p><a href="{{ url('/login') }}">{{ trans('core.offer.contact.login') }}</a></p>
-    {% endif %}
-</section>
-{% endif %}
 {# Reporting has to be easy to find where the content is. #}
 {% if module('reports') %}
 <p><small><a href="{{ url('/report') }}?url={{ url(current_path(), null, true)|url_encode }}" rel="nofollow">{{ trans('core.report.link_here') }}</a></small></p>

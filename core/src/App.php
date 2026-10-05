@@ -18,6 +18,7 @@ use Modulento\Core\Catalogue\Categories;
 use Modulento\Core\Catalogue\OfferImages;
 use Modulento\Core\Catalogue\OfferMessages;
 use Modulento\Core\Content\HomeLayout;
+use Modulento\Core\Content\OfferLayout;
 use Modulento\Core\Catalogue\Offers;
 use Modulento\Core\Content\Pages;
 use Modulento\Core\Extension\ExtensionManager;
@@ -93,6 +94,7 @@ final class App
     public readonly BadWords $badWords;
     public readonly HomeLayout $homeLayout;
     public readonly Design $design;
+    public readonly OfferLayout $offerLayout;
     public readonly MessageSeen $messageSeen;
     public readonly Preferences $preferences;
     public readonly Reviews $reviews;
@@ -157,6 +159,7 @@ final class App
         $this->badWords = new BadWords($this->settings);
         $this->homeLayout = new HomeLayout($this->settings);
         $this->design = new Design($this->settings);
+        $this->offerLayout = new OfferLayout($this->settings);
         $this->messageSeen = new MessageSeen($db);
         $this->reviews = new Reviews($db, $this->badWords);
         $this->orderFiles = new OrderFiles($db, ($config['app']['uploads'] ?? $config['app']['root'] . '/var/uploads') . '/orders');

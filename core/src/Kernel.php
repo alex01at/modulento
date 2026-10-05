@@ -10,6 +10,7 @@ use Modulento\Core\Controller\AdminCatalogueController;
 use Modulento\Core\Controller\AdminController;
 use Modulento\Core\Controller\AdminBadWordsController;
 use Modulento\Core\Controller\AdminHomeController;
+use Modulento\Core\Controller\AdminOfferPageController;
 use Modulento\Core\Controller\DesignController;
 use Modulento\Core\Controller\AdminMediaController;
 use Modulento\Core\Controller\AdminOrderController;
@@ -294,6 +295,8 @@ final class Kernel
         $router->get('/admin/design', [DesignController::class, 'index'], 'core.settings.manage');
         $router->post('/admin/design', [DesignController::class, 'save'], 'core.settings.manage');
         $router->post('/admin/design/reset', [DesignController::class, 'reset'], 'core.settings.manage');
+        $router->get('/admin/offer-page', [AdminOfferPageController::class, 'index'], 'core.settings.manage');
+        $router->post('/admin/offer-page', [AdminOfferPageController::class, 'save'], 'core.settings.manage');
         $router->get('/admin/home', [AdminHomeController::class, 'index'], 'core.settings.manage');
         $router->post('/admin/home', [AdminHomeController::class, 'save'], 'core.settings.manage');
         $router->get('/admin/badwords', [AdminBadWordsController::class, 'index'], 'core.settings.manage');
@@ -393,6 +396,7 @@ final class Kernel
         $app->addAdminMenu('core.admin.menu.pages', '/admin/pages', 'core.pages.manage', 'content');
         $app->addAdminMenu('core.admin.menu.media', '/admin/media', 'core.media.manage', 'content');
         $app->addAdminMenu('core.admin.menu.home', '/admin/home', 'core.settings.manage', 'content');
+        $app->addAdminMenu('core.admin.menu.offer_page', '/admin/offer-page', 'core.settings.manage', 'content');
         $app->addAdminMenu('core.admin.menu.design', '/admin/design', 'core.settings.manage', 'system');
         $app->addAdminMenu('core.admin.menu.badwords', '/admin/badwords', 'core.settings.manage', 'moderation');
         $app->addAdminMenu('core.admin.menu.orders', '/admin/orders', 'core.orders.manage', 'marketplace');
