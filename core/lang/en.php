@@ -1270,6 +1270,7 @@ return [
     'core.inline.failed' => 'Not saved. Please try again.',
     'core.inline.page_settings' => 'Page settings',
     'core.inline.duplicate' => 'Duplicate',
+    'core.inline.move' => 'Drag to move',
     'core.inline.link_edit' => 'Edit link',
     'core.widget.cta' => 'Call to action with button',
     'core.widget.note' => 'Note',

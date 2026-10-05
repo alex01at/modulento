@@ -299,6 +299,8 @@ final class Kernel
         $router->get('/admin/offer-page', [AdminOfferPageController::class, 'index'], 'core.settings.manage');
         $router->post('/admin/offer-page', [AdminOfferPageController::class, 'save'], 'core.settings.manage');
         $router->post('/admin/home/field', [AdminHomeController::class, 'field'], 'core.settings.manage');
+        $router->post('/admin/home/order', [AdminHomeController::class, 'order'], 'core.settings.manage');
+        $router->post('/admin/offer-page/order', [AdminOfferPageController::class, 'order'], 'core.settings.manage');
         $router->post('/admin/offer-page/field', [AdminOfferPageController::class, 'field'], 'core.settings.manage');
         $router->get('/admin/home', [AdminHomeController::class, 'index'], 'core.settings.manage');
         $router->post('/admin/home', [AdminHomeController::class, 'save'], 'core.settings.manage');

@@ -4,10 +4,11 @@
    without scripts too. Receives block, page_path, partial, fields, label_key, deletable, add_types. #}
 {% set id = block.id %}
 <div class="inline-block{{ block.enabled ? '' : ' is-hidden-block' }}" id="inline-{{ id }}" data-block-id="{{ id }}"
-     data-field-url="{{ url(page_path) }}/field" data-csrf="{{ csrf_token() }}">
+     data-field-url="{{ url(page_path) }}/field" data-order-url="{{ url(page_path) }}/order" data-csrf="{{ csrf_token() }}">
     <div class="inline-tools">
         <div class="inline-head">
             <p class="inline-name">
+                <span class="inline-grip" title="{{ trans('core.inline.move') }}" aria-hidden="true">⠿</span>
                 <strong>{{ trans(label_key) }}</strong>
                 {% if not block.enabled %}<span class="badge badge-disabled">{{ trans('core.inline.hidden') }}</span>{% endif %}
             </p>

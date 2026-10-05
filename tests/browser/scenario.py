@@ -100,6 +100,22 @@ async def main():
         await b.click('#inline-steps button[value^="savewidget:"]')
         check('a block is kept as a widget of one\'s own', 'Das Widget wurde gespeichert' in (await b.eval('document.body.innerText')))
 
+        # 2h. a block is moved by dragging its handle; the new order is kept after reloading
+        await b.goto(BASE + '/?edit=1')
+        before_ids = await b.eval("[...document.querySelectorAll('.inline-block[data-block-id]')].map(b => b.dataset.blockId)")
+        # the drag as the browser sends it: handle pressed, the first block dropped below the second
+        await b.eval("""(() => { const blocks = [...document.querySelectorAll('.inline-block[data-block-id]')];
+            const first = blocks[0], second = blocks[1]; const dt = new DataTransfer();
+            first.querySelector('.inline-grip').dispatchEvent(new MouseEvent('mousedown', {bubbles: true}));
+            first.dispatchEvent(new DragEvent('dragstart', {bubbles: true, dataTransfer: dt}));
+            const box = second.getBoundingClientRect();
+            second.dispatchEvent(new DragEvent('dragover', {bubbles: true, cancelable: true, clientY: box.bottom - 2, dataTransfer: dt}));
+            first.dispatchEvent(new DragEvent('dragend', {bubbles: true, dataTransfer: dt})); })()""")
+        await asyncio.sleep(1.2)
+        await b.goto(BASE + '/?edit=1')
+        after_ids = await b.eval("[...document.querySelectorAll('.inline-block[data-block-id]')].map(b => b.dataset.blockId)")
+        check('a block dragged below the next one stays there after reloading', after_ids[:2] == [before_ids[1], before_ids[0]] and after_ids[2:] == before_ids[2:])
+
         # 3. hide the categories block, then show it again
         await b.click('#inline-offers button[value="toggle:offers"]')
         check('a block can be hidden (it shows as hidden while editing)', await b.exists('#inline-offers .badge-disabled'))

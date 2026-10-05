@@ -694,7 +694,7 @@ the kinds of block to insert at that place.
 
 Rich texts get a small toolbar while they are edited (paragraph, headings, bold, italic,
 lists, quote, link). A text block can carry a button (`button_label`, `button_url`), which
-is the usual way to make a text a call to action. A block can be duplicated. A content page
+is the usual way to make a text a call to action. A block can be duplicated, and moved by dragging its handle (⠿); on a phone the arrows do the same. A content page
 is edited the same way: its title and body (`data-field`), on its own page with `?edit=1`. Both work without scripts too, through the forms.
 
 A theme that wants editing in place does three things in each page it shows:

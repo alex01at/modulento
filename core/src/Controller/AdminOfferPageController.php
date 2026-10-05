@@ -143,6 +143,21 @@ final class AdminOfferPageController extends Controller
     }
 
     /** A text field saved from the page itself, with JavaScript: the cleaned value comes back. */
+    /** The order of the blocks as dragged on the page, with JavaScript. */
+    public function order(array $params): void
+    {
+        $app = $this->app;
+        $data = json_decode((string) file_get_contents('php://input'), true);
+        $ids = is_array($data) && is_array($data['order'] ?? null) ? $data['order'] : null;
+        if ($ids === null || array_filter($ids, fn ($id) => !is_string($id) || preg_match('/^[a-z0-9-]{1,32}$/', $id) !== 1) !== []) {
+            $this->json(['ok' => false], 422);
+            return;
+        }
+
+        $app->offerLayout->save(HomeLayout::ordered($app->offerLayout->blocks(), $ids));
+        $this->json(['ok' => true]);
+    }
+
     public function field(array $params): void
     {
         $app = $this->app;

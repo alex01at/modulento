@@ -1351,6 +1351,12 @@ $post('/admin/home', ['action' => 'removewidget:' . $ownId], 3);
 check('widgets: an own widget can be removed; the blocks made from it stay', (new Modulento\Core\Content\Widgets(new Modulento\Core\Support\Settings($pdo)))->own() === [] && $widgetCount() === $shipped + 2);
 $post('/admin/home', ['action' => 'reset'], 3);
 
+// Blocks dragged into another order: listed ids first, unknown and repeated ids dropped, the rest kept behind.
+$three = [['id' => 'a'], ['id' => 'b'], ['id' => 'c']];
+$ids = array_map(fn (array $block) => $block['id'], Modulento\Core\Content\HomeLayout::ordered($three, ['c', 'x', 'a', 'c']));
+check('order: the listed order wins, unknown and repeated ids are ignored', $ids === ['c', 'a', 'b']);
+check('order: a list left out keeps every block', count(Modulento\Core\Content\HomeLayout::ordered($three, [])) === 3);
+
 // Pictures of the media library: only those, in pages.
 $library = '/media/library/' . str_repeat('a', 32) . '.webp';
 $clean = Modulento\Core\Support\HtmlSanitizer::clean('<p><img src="' . $library . '" alt="Logo"><img src="https://evil.example/x.png"><img src="/media/library/../x.png"><img src="/assets/x.png"></p>');

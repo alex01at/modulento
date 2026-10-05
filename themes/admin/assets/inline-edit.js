@@ -167,6 +167,76 @@
         });
     });
 
+    // Blocks are moved by dragging their handle (⠿). The order is saved when the drop ends;
+    // on a phone the arrows of each block do the same. A failed save reloads the page.
+    function orderOf(container) {
+        return Array.prototype.map.call(container.querySelectorAll(':scope > .inline-block[data-block-id]'), function (block) {
+            return block.dataset.blockId;
+        });
+    }
+
+    var dragged = null;
+    var startOrder = '';
+
+    Array.prototype.forEach.call(document.querySelectorAll('.inline-block[data-block-id]'), function (block) {
+        var grip = block.querySelector('.inline-grip');
+        if (!grip) {
+            return;
+        }
+        grip.addEventListener('mousedown', function () {
+            block.draggable = true;
+        });
+        grip.addEventListener('mouseup', function () {
+            block.draggable = false;
+        });
+        block.addEventListener('dragstart', function (event) {
+            dragged = block;
+            startOrder = orderOf(block.parentNode).join(',');
+            event.dataTransfer.effectAllowed = 'move';
+            event.dataTransfer.setData('text/plain', block.dataset.blockId);
+            block.classList.add('is-dragging');
+        });
+        block.addEventListener('dragover', function (event) {
+            if (!dragged || dragged === block || dragged.parentNode !== block.parentNode) {
+                return;
+            }
+            event.preventDefault();
+            var box = block.getBoundingClientRect();
+            var before = event.clientY < box.top + box.height / 2;
+            block.parentNode.insertBefore(dragged, before ? block : block.nextSibling);
+        });
+        block.addEventListener('dragend', function () {
+            block.draggable = false;
+            block.classList.remove('is-dragging');
+            if (!dragged) {
+                return;
+            }
+            var container = dragged.parentNode;
+            dragged = null;
+            var order = orderOf(container);
+            if (order.join(',') === startOrder) {
+                return;
+            }
+            say(bar && bar.dataset.saving ? bar.dataset.saving : '…', true);
+            fetch(block.dataset.orderUrl, {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: {'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-Token': block.dataset.csrf},
+                body: JSON.stringify({order: order})
+            }).then(function (response) {
+                if (!response.ok) {
+                    throw new Error('order');
+                }
+                say(bar && bar.dataset.saved ? bar.dataset.saved : 'Saved.', true);
+            }).catch(function () {
+                say(bar && bar.dataset.failed ? bar.dataset.failed : 'Not saved.', false);
+                window.setTimeout(function () {
+                    window.location.reload();
+                }, 1200);
+            });
+        });
+    });
+
     // In edit mode a link or a button of a block is not followed.
     document.addEventListener('click', function (event) {
         var link = event.target.closest ? event.target.closest('.inline-block a') : null;
