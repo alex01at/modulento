@@ -39,6 +39,7 @@
     {% block head %}{% endblock %}
 </head>
 <body>
+{% include 'layout/_impersonation.twig' %}
 <header class="site-header">
     <a class="site-name" href="{{ url('/') }}">
         {% set logoLight = site_logo('light') %}

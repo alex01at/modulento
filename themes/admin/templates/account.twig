@@ -89,4 +89,28 @@
         </section>
     </div>
 </div>
+
+{% if can_impersonate and target.status == 'active' %}
+<section class="card-box">
+    <h2>{{ trans('core.admin.accounts.impersonate') }}</h2>
+    <p>{{ trans('core.admin.accounts.impersonate_hint') }}</p>
+    <form method="post" action="{{ url('/admin/accounts/' ~ target.id ~ '/impersonate') }}">
+        {{ csrf_field() }}
+        <button type="submit" class="btn-outline">{{ trans('core.admin.accounts.impersonate') }}</button>
+    </form>
+</section>
+{% endif %}
+
+<section class="card-box">
+    <h2>{{ trans('core.admin.accounts.activity') }}</h2>
+    {% if activity %}
+        <ul class="plain-list">
+            {% for entry in activity %}
+                <li>{{ entry.created_at }} UTC – {{ trans('core.admin.log.' ~ entry.action) }}{% if entry.actor_id %} ({{ trans('core.admin.log.by') }} #{{ entry.actor_id }}){% endif %}</li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p class="empty">{{ trans('core.admin.accounts.activity_empty') }}</p>
+    {% endif %}
+</section>
 {% endblock %}

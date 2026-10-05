@@ -174,6 +174,7 @@ final class Kernel
         $router->get('/account', [AccountController::class, 'dashboard']);
         $router->get('/account/settings', [AccountController::class, 'index']);
         $router->get('/account/unread', [AccountController::class, 'unread']);
+        $router->post('/account/stop-impersonating', [AccountController::class, 'stopImpersonating']);
         $router->post('/account/profile', [AccountController::class, 'updateProfile']);
         $router->post('/account/appearance', [AccountController::class, 'updateAppearance']);
         $router->post('/account/admin-layout', [AccountController::class, 'updateAdminLayout'], 'core.admin.access');
@@ -336,6 +337,9 @@ final class Kernel
         $router->post('/admin/providers/{id}/decide', [AdminProviderController::class, 'decide'], 'core.providers.manage');
 
         $router->get('/admin/accounts', [AdminAccountController::class, 'index'], 'core.accounts.manage');
+        $router->get('/admin/accounts/new', [AdminAccountController::class, 'createForm'], 'core.accounts.manage');
+        $router->post('/admin/accounts/new', [AdminAccountController::class, 'create'], 'core.accounts.manage');
+        $router->post('/admin/accounts/{id}/impersonate', [AdminAccountController::class, 'impersonate'], 'core.accounts.impersonate');
         $router->get('/admin/accounts/{id}', [AdminAccountController::class, 'show'], 'core.accounts.manage');
         $router->post('/admin/accounts/{id}/block', [AdminAccountController::class, 'block'], 'core.accounts.manage');
         $router->post('/admin/accounts/{id}/unblock', [AdminAccountController::class, 'unblock'], 'core.accounts.manage');
@@ -387,6 +391,7 @@ final class Kernel
         $app->addPermission('core.categories.manage', 'core.permission.categories_manage');
         $app->addPermission('core.providers.manage', 'core.permission.providers_manage');
         $app->addPermission('core.accounts.manage', 'core.permission.accounts_manage');
+        $app->addPermission('core.accounts.impersonate', 'core.permission.accounts_impersonate');
         $app->addPermission('core.roles.manage', 'core.permission.roles_manage');
         $app->addPermission('core.update.manage', 'core.permission.update_manage');
         $app->addPermission('core.packages.manage', 'core.permission.packages_manage');

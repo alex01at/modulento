@@ -229,6 +229,15 @@ final class View
             $app->translator->locale(),
             $app->locales->default()
         )));
+        // Whom the logged-in account is signed in as on behalf of an administrator, or null.
+        $this->twig->addFunction(new TwigFunction('impersonation', function () use ($auth): ?array {
+            if ($auth->impersonator() === null || $auth->account() === null) {
+                return null;
+            }
+            $account = $auth->account();
+
+            return ['name' => ($account['display_name'] ?? '') !== '' ? $account['display_name'] : $account['email']];
+        }));
         // The stylesheet of the design values, named after its content: "/design/<name>.css".
         $this->twig->addFunction(new TwigFunction('design_url', fn (): string => '/design/' . $app->design->fileName()));
         // The blocks of the home page, in the current language, enabled ones only.

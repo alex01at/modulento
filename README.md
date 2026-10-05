@@ -683,7 +683,16 @@ which order: pictures, description, the details of the offer's type,
 reviews, the questions to the provider, and free text blocks (texts in every
 language, the header's language is the one edited). Title, provider, price and
 rating stay on top; hidden parts are kept and come back when shown again.
-Partials in `offer/_block_<type>.twig` draw them. This works for every offer type,
+Partials in `offer/_block_<type>.twig` draw them.
+
+**Administration → Accounts → Create account** makes an account for someone:
+with a password, or without one, in which case the person gets an e-mail to set
+their own. **Sign in as this user** (permission "Sign in as a user",
+`core.accounts.impersonate`) shows the website as that person sees it. A banner
+stays on every page until the way back is taken; the password, the address and
+the account itself cannot be changed while signed in as someone else. An
+administrator cannot be signed in as, nor an account of their own or a blocked
+one. Every creation and sign-in is kept in the account's log (`admin_log`). This works for every offer type,
 the freelancer and auction extensions included.
 
 A page's text can show a picture from the media library: the picker next to
