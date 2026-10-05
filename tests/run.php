@@ -1314,6 +1314,8 @@ check('offer page editor: a text block is removed, a core part is not', array_va
 $post('/admin/offer-page', ['action' => 'reset'], 3);
 check('offer page editor: a reset brings back the default page', !$pdo->query("SELECT COUNT(*) FROM setting WHERE name = 'core.offer_layout'")->fetchColumn());
 
+check('in-place editing: the offer page offers its tools too, built-in parts without a text form', str_contains($get('/offers/ich-gestalte-dein-logo?edit=1', 3)['body'], 'inline-tools')
+    && str_contains($get('/offers/ich-gestalte-dein-logo?edit=1', 3)['body'], 'name="action" value="toggle:') && !str_contains($get('/offers/ich-gestalte-dein-logo', 3)['body'], 'inline-tools'));
 // Pictures of the media library: only those, in pages.
 $library = '/media/library/' . str_repeat('a', 32) . '.webp';
 $clean = Modulento\Core\Support\HtmlSanitizer::clean('<p><img src="' . $library . '" alt="Logo"><img src="https://evil.example/x.png"><img src="/media/library/../x.png"><img src="/assets/x.png"></p>');
@@ -3092,6 +3094,27 @@ check('sign-in as: back to the administrator\'s own account, and the end is logg
 $start = $pdo->query("SELECT COUNT(*) FROM admin_log WHERE action = 'impersonate' AND target_id = $neuId")->fetchColumn();
 check('sign-in as: every sign-in is logged, and the account page shows the log', $start >= 1 && str_contains($get('/admin/accounts/' . $neuId, 3)['body'], 'Als Benutzer angemeldet')
     && str_contains($get('/admin/accounts/' . $neuId, 3)['body'], 'Konto angelegt'));
+
+// Editing in place: administrators see the tools with ?edit=1 on the home and offer page, visitors never; hidden blocks show while editing.
+$post('/admin/home', ['action' => 'add', 'add_type' => 'links'], 3);
+$inlineBlocks = $homeBlocks();
+$linksId = array_values(array_filter($inlineBlocks, fn (array $b) => $b['type'] === 'links'))[0]['id'];
+$post('/admin/home', ['action' => 'toggle:' . $linksId], 3);
+check('in-place editing: off by default, on with ?edit=1 for administrators only', !str_contains($get('/', 3)['body'], 'inline-tools') && str_contains($get('/?edit=1', 3)['body'], 'inline-tools')
+    && !str_contains($get('/?edit=1', null)['body'], 'inline-tools') && !str_contains($get('/?edit=1', 1)['body'], 'inline-tools'));
+check('in-place editing: a hidden block shows its tools while editing, and it stays hidden for visitors', str_contains($get('/?edit=1', 3)['body'], 'id="inline-' . $linksId . '"')
+    && str_contains($get('/?edit=1', 3)['body'], 'badge-disabled') && !str_contains($get('/', null)['body'], 'id="inline-' . $linksId . '"'));
+check('in-place editing: each block has its own steps and text form, sent to the page\'s own action', str_contains($get('/?edit=1', 3)['body'], 'name="action" value="toggle:' . $linksId . '"')
+    && str_contains($get('/?edit=1', 3)['body'], 'name="blocks[' . $linksId . '][texts][de][heading]"') && str_contains($get('/?edit=1', 3)['body'], 'name="return" value="/?edit=1"'));
+$post('/admin/home', ['action' => 'toggle:' . $linksId], 3);
+check('in-place editing: the toggle shows the block again', array_values(array_filter($homeBlocks(), fn (array $b) => $b['id'] === $linksId))[0]['enabled'] === true);
+$post('/admin/home', ['action' => 'delete:' . $linksId], 3);
+$reflect = new ReflectionMethod(Modulento\Core\Controller\Controller::class, 'safeReturn');
+$probe = new class(new Modulento\Core\App($config, $pdo)) extends Modulento\Core\Controller\Controller {};
+$safe = fn (string $ret) => (function () use ($reflect, $probe, $ret) { $_POST = ['return' => $ret]; $_GET = []; return $reflect->invoke($probe, '/admin/home'); })();
+check('in-place editing: a return path must be a path of this site', $safe('/offers/x?edit=1') === '/offers/x?edit=1' && $safe('https://evil.example/') === '/admin/home'
+    && $safe('//evil.example') === '/admin/home' && $safe('/\\evil') === '/admin/home' && $safe("/a\nb") === '/admin/home');
+$_POST = [];
 
 // Administration layout: the sidebar by default, or a header bar with a mega menu,
 // chosen in the profile settings by administrators only.

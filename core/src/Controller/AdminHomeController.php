@@ -40,7 +40,7 @@ final class AdminHomeController extends Controller
         if ($action === 'reset') {
             $layout->reset();
             Session::flash('success', $this->trans('core.home.reset_done'));
-            $this->redirect('/admin/home');
+            $this->redirect($this->safeReturn('/admin/home'));
             return;
         }
 
@@ -49,13 +49,13 @@ final class AdminHomeController extends Controller
             if (in_array($type, HomeLayout::TYPES, true)) {
                 $blocks[] = HomeLayout::newBlock($type) + ($type === 'offers' ? ['settings' => ['count' => 6]] : []);
             }
-        } elseif (preg_match('/^(up|down|delete):([a-z0-9]{1,16})$/', $action, $match) === 1) {
+        } elseif (preg_match('/^(up|down|delete|toggle):([a-z0-9]{1,16})$/', $action, $match) === 1) {
             $blocks = $this->step($blocks, $match[1], $match[2]);
         }
 
         $layout->save($blocks);
         Session::flash('success', $this->trans($action === 'save' ? 'core.home.saved' : 'core.home.changed'));
-        $this->redirect('/admin/home');
+        $this->redirect($this->safeReturn('/admin/home'));
     }
 
     /** @param list<array<string, mixed>> $blocks */
@@ -128,6 +128,12 @@ final class AdminHomeController extends Controller
             }
         }
         if ($index === null) {
+            return $blocks;
+        }
+
+        if ($direction === 'toggle') {
+            $blocks[$index]['enabled'] = !$blocks[$index]['enabled'];
+
             return $blocks;
         }
 

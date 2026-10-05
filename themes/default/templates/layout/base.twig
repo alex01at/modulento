@@ -35,6 +35,8 @@
     {% if account %}
         <script src="{{ theme_asset('account-menu.js') }}" defer></script>
         <script src="{{ theme_asset('unread.js') }}" defer></script>
+    {# The text editor for the text fields of the page being edited in place. #}
+    {% if edit_mode() %}<script src="{{ admin_asset('editor.js') }}" defer></script>{% endif %}
     {% endif %}
     {% block head %}{% endblock %}
 </head>

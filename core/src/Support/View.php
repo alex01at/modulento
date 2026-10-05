@@ -225,9 +225,23 @@ final class View
         // Whether an optional function of the core is switched on (Administration → Modules).
         $this->twig->addFunction(new TwigFunction('module', fn (string $id) => $app->modules->enabled($id)));
         // The parts of an offer's page, in the current language, enabled ones only.
-        $this->twig->addFunction(new TwigFunction('offer_blocks', fn (): array => $app->offerLayout->view(
+        $this->twig->addFunction(new TwigFunction('offer_blocks', fn (bool $all = false): array => $app->offerLayout->view(
             $app->translator->locale(),
-            $app->locales->default()
+            $app->locales->default(),
+            $all
+        )));
+        // Whether the page is being edited in place: an administrator with the settings permission, "?edit=1".
+        $this->twig->addFunction(new TwigFunction('edit_mode', fn (): bool => $auth->can('core.settings.manage')
+            && $auth->impersonator() === null && ($_GET['edit'] ?? '') === '1'));
+        // The fields a block of a page has, for the in-place editor.
+        $this->twig->addFunction(new TwigFunction('block_fields', fn (string $page): array => match ($page) {
+            'home' => \Modulento\Core\Content\HomeLayout::TEXT_FIELDS,
+            default => ['text' => ['heading', 'body']],
+        }));
+        // The pictures of the media library, for the picture of a block.
+        $this->twig->addFunction(new TwigFunction('library_pictures', fn (): array => array_map(
+            fn (array $row) => ['url' => \Modulento\Core\Media\Library::url($row['file']), 'title' => $row['title']],
+            $app->media->list(1, 200)['rows']
         )));
         // Whom the logged-in account is signed in as on behalf of an administrator, or null.
         $this->twig->addFunction(new TwigFunction('impersonation', function () use ($auth): ?array {
@@ -241,11 +255,12 @@ final class View
         // The stylesheet of the design values, named after its content: "/design/<name>.css".
         $this->twig->addFunction(new TwigFunction('design_url', fn (): string => '/design/' . $app->design->fileName()));
         // The blocks of the home page, in the current language, enabled ones only.
-        $this->twig->addFunction(new TwigFunction('home_blocks', fn (): array => $app->homeLayout->view(
+        $this->twig->addFunction(new TwigFunction('home_blocks', fn (bool $all = false): array => $app->homeLayout->view(
             $app->translator->locale(),
             $app->locales->default(),
             fn (string $key, array $params = []) => $translator->trans($key, $params),
-            $app->siteName()
+            $app->siteName(),
+            $all
         )));
         // Seconds between two asks for new messages; 0 switches the asking off (Administration → Settings).
         $this->twig->addFunction(new TwigFunction('poll_seconds', fn (): int => (int) $app->settings->get('core.poll_seconds', '60')));

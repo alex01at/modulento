@@ -1,0 +1,64 @@
+{# The tools of one block while the page is being edited. Every control is a small form that
+   sends the page's own administration action and comes back to this page: it works without
+   scripts, on a phone as well. Receives block, page_path, fields (the text fields of the
+   block's type), label_key, deletable. #}
+{% set id = block.id %}
+<div class="inline-tools{{ block.enabled ? '' : ' is-hidden-block' }}" id="inline-{{ id }}">
+    <p class="inline-name">
+        <strong>{{ trans(label_key) }}</strong>
+        {% if not block.enabled %}<span class="badge badge-disabled">{{ trans('core.inline.hidden') }}</span>{% endif %}
+    </p>
+
+    <form method="post" action="{{ url(page_path) }}" class="inline-steps">
+        {{ csrf_field() }}
+        <input type="hidden" name="return" value="{{ current_path() }}?edit=1">
+        <button type="submit" name="action" value="up:{{ id }}" class="btn-outline btn-sm" aria-label="{{ trans('core.home.up') }}">↑</button>
+        <button type="submit" name="action" value="down:{{ id }}" class="btn-outline btn-sm" aria-label="{{ trans('core.home.down') }}">↓</button>
+        <button type="submit" name="action" value="toggle:{{ id }}" class="btn-outline btn-sm">{{ block.enabled ? trans('core.inline.hide') : trans('core.inline.show') }}</button>
+        {% if deletable %}
+            <button type="submit" name="action" value="delete:{{ id }}" class="danger btn-sm">{{ trans('core.home.remove') }}</button>
+        {% endif %}
+    </form>
+
+    {% if fields %}
+        <details class="inline-edit">
+            <summary>{{ trans('core.inline.edit') }}</summary>
+            <form method="post" action="{{ url(page_path) }}" class="inline-edit-form">
+                {{ csrf_field() }}
+                <input type="hidden" name="return" value="{{ current_path() }}?edit=1">
+                {% if block.enabled %}<input type="hidden" name="blocks[{{ id }}][enabled]" value="1">{% endif %}
+                {% if block.type == 'offers' or block.type == 'providers' %}
+                    <div class="field">
+                        <label for="count-{{ id }}">{{ trans('core.home.count') }}</label>
+                        <input id="count-{{ id }}" name="blocks[{{ id }}][settings][count]" type="number" min="1" max="12" value="{{ block.count }}">
+                    </div>
+                {% elseif block.type == 'image' %}
+                    <div class="field">
+                        <label for="media-{{ id }}">{{ trans('core.home.picture') }}</label>
+                        <select id="media-{{ id }}" name="blocks[{{ id }}][settings][media]">
+                            <option value="">{{ trans('core.home.picture_none') }}</option>
+                            {% for picture in library_pictures() %}
+                                <option value="{{ picture.url }}" {{ picture.url == block.media ? 'selected' }}>{{ picture.title ?: picture.url }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                {% endif %}
+                {% for field in fields %}
+                    {% set value = block.texts[locale()][field] ?? '' %}
+                    {% set name = 'blocks[' ~ id ~ '][texts][' ~ locale() ~ '][' ~ field ~ ']' %}
+                    <div class="field">
+                        <label for="{{ field }}-{{ id }}">{{ trans('core.home.field.' ~ field) }}</label>
+                        {% if field == 'body' %}
+                            <textarea id="{{ field }}-{{ id }}" name="{{ name }}" rows="8" data-editor="{{ editor() }}">{{ value }}</textarea>
+                        {% elseif field == 'items' or field == 'text' %}
+                            <textarea id="{{ field }}-{{ id }}" name="{{ name }}" rows="3">{{ value }}</textarea>
+                        {% else %}
+                            <input id="{{ field }}-{{ id }}" name="{{ name }}" value="{{ value }}" maxlength="300">
+                        {% endif %}
+                    </div>
+                {% endfor %}
+                <button type="submit" name="action" value="save">{{ trans('core.account.save') }}</button>
+            </form>
+        </details>
+    {% endif %}
+</div>

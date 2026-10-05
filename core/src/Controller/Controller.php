@@ -40,6 +40,21 @@ abstract class Controller
         return is_string($tab) && in_array($tab, $tabs, true) ? $tab : $tabs[0];
     }
 
+    /**
+     * Where a form wants to come back to: a path of this site given in the
+     * request, checked; anything else goes to the default.
+     */
+    protected function safeReturn(string $default): string
+    {
+        $path = $_POST['return'] ?? $_GET['return'] ?? null;
+        if (!is_string($path) || !str_starts_with($path, '/') || str_starts_with($path, '//')
+            || str_contains($path, '\\') || preg_match('/[\x00-\x20]/', $path) === 1) {
+            return $default;
+        }
+
+        return $path;
+    }
+
     protected function trans(string $key, array $replacements = []): string
     {
         return $this->app->translator->trans($key, $replacements);
