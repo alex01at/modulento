@@ -1,0 +1,57 @@
+{% extends '@admin/layout.twig' %}
+
+{% block title %}{{ trans('core.admin.menu.design') }} – {{ site_name }}{% endblock %}
+
+{% block admin %}
+{% include '@admin/_page_header.twig' with {heading: trans('core.admin.menu.design')} only %}
+
+<section class="card-box">
+    <h2>{{ trans('core.design.title') }}</h2>
+    <p>{{ trans('core.design.intro') }}</p>
+    <form method="post" action="{{ url('/admin/design') }}" class="stack-form wide">
+        {{ csrf_field() }}
+        <div class="field-grid">
+            <div class="field">
+                <label for="accent">{{ trans('core.design.accent') }}</label>
+                <input id="accent" name="accent" type="color" value="{{ values.accent }}">
+                <small>{{ trans('core.design.accent_hint') }}</small>
+            </div>
+            <div class="field">
+                <label for="ground">{{ trans('core.design.ground') }}</label>
+                <input id="ground" name="ground" type="color" value="{{ values.ground }}">
+            </div>
+            <div class="field">
+                <label for="text">{{ trans('core.design.text') }}</label>
+                <input id="text" name="text" type="color" value="{{ values.text }}">
+            </div>
+            <div class="field">
+                <label for="font">{{ trans('core.design.font') }}</label>
+                <select id="font" name="font">
+                    {% for font in fonts %}
+                        <option value="{{ font }}" {{ font == values.font ? 'selected' }}>{{ trans('core.design.font.' ~ font) }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="field">
+                <label for="radius">{{ trans('core.design.radius') }}</label>
+                <input id="radius" name="radius" type="number" min="0" max="24" step="1" value="{{ values.radius }}">
+                <small>{{ trans('core.design.radius_hint') }}</small>
+            </div>
+        </div>
+        <div class="button-row">
+            <button type="submit">{{ trans('core.account.save') }}</button>
+        </div>
+    </form>
+</section>
+
+<section class="card-box">
+    <p><small>{{ trans('core.design.logo_hint') }} <a href="{{ url('/admin/themes') }}">{{ trans('core.admin.menu.themes') }}</a></small></p>
+    {% if customized %}
+        <form method="post" action="{{ url('/admin/design/reset') }}" class="danger-form">
+            {{ csrf_field() }}
+            <p><small>{{ trans('core.design.reset_hint') }}</small></p>
+            <button type="submit" class="danger">{{ trans('core.design.reset') }}</button>
+        </form>
+    {% endif %}
+</section>
+{% endblock %}

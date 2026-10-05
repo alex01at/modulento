@@ -224,6 +224,8 @@ final class View
         ), JSON_UNESCAPED_UNICODE)));
         // Whether an optional function of the core is switched on (Administration → Modules).
         $this->twig->addFunction(new TwigFunction('module', fn (string $id) => $app->modules->enabled($id)));
+        // The stylesheet of the design values, named after its content: "/design/<name>.css".
+        $this->twig->addFunction(new TwigFunction('design_url', fn (): string => '/design/' . $app->design->fileName()));
         // The blocks of the home page, in the current language, enabled ones only.
         $this->twig->addFunction(new TwigFunction('home_blocks', fn (): array => $app->homeLayout->view(
             $app->translator->locale(),

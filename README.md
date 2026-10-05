@@ -669,7 +669,14 @@ area, text, latest offers, top providers, a picture from the media library and
 a link list. Each block can be moved, hidden or removed, and has its texts in
 every language (a missing text falls back to the default language). The blocks
 are drawn by the theme's `home/_<type>.twig` partials; a theme that brings its
-own `home.twig` decides for itself whether it shows them. This works for every offer type,
+own `home.twig` decides for itself whether it shows them.
+
+**Administration → Design** sets the accent colour, the background, the text
+colour, the font and the corner radius without touching a theme. The values
+are written to a small stylesheet (`/design/<name>.css`, the name changes with
+the values) that the default theme loads after its own. The colours apply to
+the light colour scheme; the dark one stays the theme's. The logo is under
+Themes → Branding. This works for every offer type,
 the freelancer and auction extensions included.
 
 A page's text can show a picture from the media library: the picker next to
