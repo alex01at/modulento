@@ -20,12 +20,11 @@ final class AdminHomeController extends Controller
         $layout = $app->homeLayout;
 
         $this->render('@admin/home_edit.twig', [
-            'tab' => $this->tab($app->locales->enabled()),
+            'locale' => $app->translator->locale(),
+            'default_locale' => $app->locales->default(),
             'blocks' => $this->blocksForForm($layout->blocks()),
             'types' => HomeLayout::TYPES,
             'fields' => HomeLayout::TEXT_FIELDS,
-            'locales' => $app->locales->enabled(),
-            'default_locale' => $app->locales->default(),
             'pictures' => array_map(fn (array $row) => ['url' => Library::url($row['file']), 'title' => $row['title']],
                 $app->media->list(1, 200)['rows']),
             'customized' => $layout->isCustomized(),
@@ -41,7 +40,7 @@ final class AdminHomeController extends Controller
         if ($action === 'reset') {
             $layout->reset();
             Session::flash('success', $this->trans('core.home.reset_done'));
-            $this->redirect('/admin/home?tab=' . $this->tab($this->app->locales->enabled()));
+            $this->redirect('/admin/home');
             return;
         }
 
@@ -56,8 +55,7 @@ final class AdminHomeController extends Controller
 
         $layout->save($blocks);
         Session::flash('success', $this->trans($action === 'save' ? 'core.home.saved' : 'core.home.changed'));
-        // Back to the language the form was sent from.
-        $this->redirect('/admin/home?tab=' . $this->tab($this->app->locales->enabled()));
+        $this->redirect('/admin/home');
     }
 
     /** @param list<array<string, mixed>> $blocks */
@@ -87,12 +85,12 @@ final class AdminHomeController extends Controller
             $input = $posted[$id];
             $type = $block['type'];
 
-            $texts = [];
-            foreach ($this->app->locales->enabled() as $locale) {
-                foreach (HomeLayout::TEXT_FIELDS[$type] as $field) {
-                    $value = is_string($input['texts'][$locale][$field] ?? null) ? $input['texts'][$locale][$field] : '';
-                    $texts[$locale][$field] = HomeLayout::clean($type, $field, $value);
-                }
+            // Only the language the administration is in is edited here; the texts of the others stay.
+            $locale = $this->app->translator->locale();
+            $texts = $block['texts'];
+            foreach (HomeLayout::TEXT_FIELDS[$type] as $field) {
+                $value = is_string($input['texts'][$locale][$field] ?? null) ? $input['texts'][$locale][$field] : '';
+                $texts[$locale][$field] = HomeLayout::clean($type, $field, $value);
             }
 
             $settings = [];

@@ -9,18 +9,11 @@
     <p>{{ trans('core.home.editor_intro') }}</p>
 </section>
 
-{# One tab per language: everything of that language is on its tab. Settings that do not
-   depend on the language (number, picture, shown or not) stay on the block itself. #}
-<nav class="tabs" aria-label="{{ trans('core.admin.menu.home') }}">
-    {% for locale in locales %}
-        <a href="{{ url('/admin/home') }}?tab={{ locale }}" lang="{{ locale }}" {{ tab == locale ? 'aria-current="page"' }}>{{ locale_name(locale) }}{% if locale == default_locale %} <small>({{ trans('core.admin.settings.default_language') }})</small>{% endif %}</a>
-    {% endfor %}
-</nav>
-
+{# Only the language the administration is in is edited here, like everywhere else: to edit
+   another language, choose it in the header. Placeholders show the default language's text. #}
 {# One form for every block. Enter sends the first button, which is the one that saves. #}
 <form method="post" action="{{ url('/admin/home') }}" class="home-editor">
     {{ csrf_field() }}
-    <input type="hidden" name="tab" value="{{ tab }}">
     <button type="submit" name="action" value="save" class="visually-hidden">{{ trans('core.account.save') }}</button>
 
     {% for block in blocks %}
@@ -50,28 +43,28 @@
                 </div>
             {% endif %}
 
-            {% for locale in locales %}
-                <fieldset class="home-language" lang="{{ locale }}" {{ locale != tab ? 'hidden' }}>
-                    <legend>{{ locale_name(locale) }}</legend>
-                    {% for field in fields[block.type] %}
-                        {% set value = block.texts[locale][field] ?? '' %}
-                        {% set name = 'blocks[' ~ id ~ '][texts][' ~ locale ~ '][' ~ field ~ ']' %}
-                        <div class="field">
-                            <label for="{{ field }}-{{ id }}-{{ locale }}">{{ trans('core.home.field.' ~ field) }}</label>
-                            {% if field == 'body' %}
-                                <textarea id="{{ field }}-{{ id }}-{{ locale }}" name="{{ name }}" rows="8" lang="{{ locale }}" data-editor="{{ editor() }}">{{ value }}</textarea>
-                            {% elseif field == 'items' %}
-                                <textarea id="{{ field }}-{{ id }}-{{ locale }}" name="{{ name }}" rows="4">{{ value }}</textarea>
-                                <small>{{ trans('core.home.items_hint') }}</small>
-                            {% elseif field == 'text' %}
-                                <textarea id="{{ field }}-{{ id }}-{{ locale }}" name="{{ name }}" rows="3" maxlength="2000">{{ value }}</textarea>
-                            {% else %}
-                                <input id="{{ field }}-{{ id }}-{{ locale }}" name="{{ name }}" value="{{ value }}" maxlength="300">
-                            {% endif %}
-                        </div>
-                    {% endfor %}
-                </fieldset>
-            {% endfor %}
+            {% set locale = locale %}
+            <fieldset class="home-language" lang="{{ locale }}">
+                <legend>{{ locale_name(locale) }}</legend>
+                {% for field in fields[block.type] %}
+                    {% set value = block.texts[locale][field] ?? '' %}
+                    {% set hint = block.texts[default_locale][field] ?? '' %}
+                    {% set name = 'blocks[' ~ id ~ '][texts][' ~ locale ~ '][' ~ field ~ ']' %}
+                    <div class="field">
+                        <label for="{{ field }}-{{ id }}">{{ trans('core.home.field.' ~ field) }}</label>
+                        {% if field == 'body' %}
+                            <textarea id="{{ field }}-{{ id }}" name="{{ name }}" rows="8" lang="{{ locale }}" placeholder="{{ hint|striptags }}" data-editor="{{ editor() }}">{{ value }}</textarea>
+                        {% elseif field == 'items' %}
+                            <textarea id="{{ field }}-{{ id }}" name="{{ name }}" rows="4" placeholder="{{ hint }}">{{ value }}</textarea>
+                            <small>{{ trans('core.home.items_hint') }}</small>
+                        {% elseif field == 'text' %}
+                            <textarea id="{{ field }}-{{ id }}" name="{{ name }}" rows="3" maxlength="2000" placeholder="{{ hint }}">{{ value }}</textarea>
+                        {% else %}
+                            <input id="{{ field }}-{{ id }}" name="{{ name }}" value="{{ value }}" maxlength="300" placeholder="{{ hint }}">
+                        {% endif %}
+                    </div>
+                {% endfor %}
+            </fieldset>
 
             <div class="button-row">
                 <button type="submit" name="action" value="up:{{ id }}" class="btn-outline btn-sm">{{ trans('core.home.up') }}</button>
