@@ -27,6 +27,7 @@ final class SettingsController extends Controller
                 'offer_approval' => $app->offers->approvalRequired() ? 'required' : 'off',
                 'currency' => $app->offers->currency(),
                 'meta_description' => $app->settings->get('core.meta_description'),
+                'poll_seconds' => (int) $app->settings->get('core.poll_seconds', '60'),
             ],
             'available_locales' => $app->locales->available(),
             'enabled_locales' => $app->locales->enabled(),
@@ -56,6 +57,8 @@ final class SettingsController extends Controller
         // Shown on pages that have no description of their own (an offer's
         // summary, a blog post's), and used for og:description.
         $app->settings->set('core.meta_description', mb_substr(trim((string) ($_POST['meta_description'] ?? '')), 0, 300));
+        // Seconds between two asks for new messages; 0 switches the asking off.
+        $app->settings->set('core.poll_seconds', (string) max(0, min(3600, (int) ($_POST['poll_seconds'] ?? 0))));
         $app->locales->save($default, $enabled);
 
         $approvalRequired = ($_POST['provider_approval'] ?? '') !== 'off';

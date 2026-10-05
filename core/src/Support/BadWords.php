@@ -6,8 +6,11 @@ namespace Modulento\Core\Support;
 
 /**
  * Refuses the most common swear words and insults in text that visitors
- * write for others: messages, questions and reviews. The lists live in
- * core/data/badwords, one file per language, and every list is checked
+ * write for others: messages, questions and reviews.
+ *
+ * The list is kept in the settings, one word per line, once an administrator
+ * has saved it under Administration → Word filter. Until then the lists in
+ * core/data/badwords (one file per language) apply. Every word is checked
  * whatever the language of the text.
  *
  * Spelling tricks are undone first: capitals, accents, "f*ck", "sh!t", and
@@ -16,24 +19,30 @@ namespace Modulento\Core\Support;
  */
 final class BadWords
 {
-    private const DIRECTORY = __DIR__ . '/../../data/badwords';
+    public const DEFAULT_DIRECTORY = __DIR__ . '/../../data/badwords';
+    public const SETTING = 'core.badwords';
     /** Shorter words only match as a whole, so they are not found inside other words. */
     private const SUBSTRING_MIN_LENGTH = 5;
-
+    private const MAX_WORDS = 1000;
+    private const MAX_WORD_LENGTH = 40;
     private const ACCENTS = [
         'ß' => 'ss', 'ä' => 'a', 'ö' => 'o', 'ü' => 'u', 'à' => 'a', 'á' => 'a', 'â' => 'a', 'ã' => 'a', 'å' => 'a',
         'è' => 'e', 'é' => 'e', 'ê' => 'e', 'ë' => 'e', 'ì' => 'i', 'í' => 'i', 'î' => 'i', 'ï' => 'i',
         'ò' => 'o', 'ó' => 'o', 'ô' => 'o', 'õ' => 'o', 'ù' => 'u', 'ú' => 'u', 'û' => 'u', 'ñ' => 'n', 'ç' => 'c', 'ý' => 'y',
     ];
 
-    /** @var array<string, string>|null folded word => listed word */
-    private static ?array $words = null;
+    /** @var array<string, string>|null folded word => word as listed */
+    private ?array $folded = null;
+
+    public function __construct(private Settings $settings, private string $directory = self::DEFAULT_DIRECTORY)
+    {
+    }
 
     /** The first listed word the text contains, as listed, or null. */
-    public static function find(string $text): ?string
+    public function find(string $text): ?string
     {
-        $words = self::words();
-        foreach (self::tokens($text) as $token) {
+        $words = $this->foldedWords();
+        foreach ($this->tokens($text) as $token) {
             if (isset($words[$token])) {
                 return $words[$token];
             }
@@ -47,32 +56,90 @@ final class BadWords
         return null;
     }
 
-    /** @return array<string, string> */
-    private static function words(): array
+    /** The list as it applies, one word per entry. @return list<string> */
+    public function words(): array
     {
-        if (self::$words !== null) {
-            return self::$words;
+        return array_values(array_unique(array_values($this->foldedWords())));
+    }
+
+    /** Whether an administrator has saved a list of their own. */
+    public function isCustomized(): bool
+    {
+        return $this->settings->has(self::SETTING);
+    }
+
+    /**
+     * Saves a list typed by an administrator: words separated by line breaks,
+     * commas or spaces. Duplicates, empty entries and overlong words are
+     * dropped. @return int the number of words saved
+     */
+    public function save(string $typed): int
+    {
+        $words = [];
+        foreach (preg_split('/[\s,;]+/u', mb_strtolower($typed, 'UTF-8')) ?: [] as $word) {
+            $word = trim($word);
+            if ($word !== '' && mb_strlen($word) <= self::MAX_WORD_LENGTH) {
+                $words[$word] = true;
+            }
+        }
+        $words = array_slice(array_keys($words), 0, self::MAX_WORDS);
+        // An empty list would switch the filter off; the saved one stays.
+        if ($words === []) {
+            return 0;
         }
 
-        self::$words = [];
-        foreach (glob(self::DIRECTORY . '/*.txt') ?: [] as $file) {
-            foreach (file($file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) ?: [] as $line) {
-                $word = trim($line);
-                if ($word === '' || str_starts_with($word, '#')) {
-                    continue;
-                }
-                self::$words[self::collapse(self::fold($word))] = $word;
+        $this->settings->set(self::SETTING, implode("\n", $words));
+        $this->folded = null;
+
+        return count($words);
+    }
+
+    /** Back to the lists that ship with the core. */
+    public function reset(): void
+    {
+        $this->settings->forget(self::SETTING);
+        $this->folded = null;
+    }
+
+    /** @return array<string, string> */
+    private function foldedWords(): array
+    {
+        if ($this->folded !== null) {
+            return $this->folded;
+        }
+
+        $words = $this->isCustomized()
+            ? preg_split('/\R/', $this->settings->get(self::SETTING)) ?: []
+            : $this->shippedWords();
+
+        $this->folded = [];
+        foreach ($words as $word) {
+            $word = trim($word);
+            if ($word !== '' && !str_starts_with($word, '#')) {
+                $this->folded[self::collapse(self::fold($word))] = $word;
             }
         }
 
-        return self::$words;
+        return $this->folded;
+    }
+
+    /** @return list<string> the words of the lists that ship with the core */
+    private function shippedWords(): array
+    {
+        $words = [];
+        foreach (glob($this->directory . '/*.txt') ?: [] as $file) {
+            foreach (file($file, FILE_IGNORE_NEW_LINES) ?: [] as $line) {
+                $words[] = $line;
+            }
+        }
+
+        return $words;
     }
 
     /** @return list<string> the words of the text, folded as the lists are */
-    private static function tokens(string $text): array
+    private function tokens(string $text): array
     {
-        $folded = self::fold($text);
-        $tokens = preg_split('/[^a-z]+/', $folded, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+        $tokens = preg_split('/[^a-z]+/', self::fold($text), -1, PREG_SPLIT_NO_EMPTY) ?: [];
 
         return array_map([self::class, 'collapse'], $tokens);
     }

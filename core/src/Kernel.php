@@ -8,6 +8,7 @@ use Modulento\Core\Controller\AccountController;
 use Modulento\Core\Controller\AdminAccountController;
 use Modulento\Core\Controller\AdminCatalogueController;
 use Modulento\Core\Controller\AdminController;
+use Modulento\Core\Controller\AdminBadWordsController;
 use Modulento\Core\Controller\AdminMediaController;
 use Modulento\Core\Controller\AdminOrderController;
 use Modulento\Core\Controller\AdminPaymentController;
@@ -169,6 +170,7 @@ final class Kernel
 
         $router->get('/account', [AccountController::class, 'dashboard']);
         $router->get('/account/settings', [AccountController::class, 'index']);
+        $router->get('/account/unread', [AccountController::class, 'unread']);
         $router->post('/account/profile', [AccountController::class, 'updateProfile']);
         $router->post('/account/appearance', [AccountController::class, 'updateAppearance']);
         $router->post('/account/admin-layout', [AccountController::class, 'updateAdminLayout'], 'core.admin.access');
@@ -286,6 +288,9 @@ final class Kernel
         $router->get('/admin/payments', [AdminPaymentController::class, 'index'], 'core.settings.manage');
         $router->post('/admin/payments', [AdminPaymentController::class, 'save'], 'core.settings.manage');
 
+        $router->get('/admin/badwords', [AdminBadWordsController::class, 'index'], 'core.settings.manage');
+        $router->post('/admin/badwords', [AdminBadWordsController::class, 'save'], 'core.settings.manage');
+        $router->post('/admin/badwords/reset', [AdminBadWordsController::class, 'reset'], 'core.settings.manage');
         $router->get('/admin/media', [AdminMediaController::class, 'index'], 'core.media.manage');
         $router->post('/admin/media', [AdminMediaController::class, 'upload'], 'core.media.manage');
         $router->post('/admin/media/{id}/delete', [AdminMediaController::class, 'delete'], 'core.media.manage');
@@ -342,6 +347,7 @@ final class Kernel
 
         $router->get('/admin/packages', [PackageController::class, 'index'], 'core.packages.manage');
         $router->post('/admin/packages/install', [PackageController::class, 'install'], 'core.packages.manage');
+        $router->post('/admin/packages/upload', [PackageController::class, 'upload'], 'core.packages.manage');
         $router->post('/admin/packages/check', [PackageController::class, 'check'], 'core.packages.manage');
         $router->post('/admin/packages/{kind}/{id}/update', [PackageController::class, 'update'], 'core.packages.manage');
         $router->post('/admin/packages/{kind}/{id}/remove', [PackageController::class, 'remove'], 'core.packages.manage');
@@ -379,6 +385,7 @@ final class Kernel
         $app->addAdminMenu('core.admin.menu.payments', '/admin/payments', 'core.settings.manage', 'marketplace');
         $app->addAdminMenu('core.admin.menu.pages', '/admin/pages', 'core.pages.manage', 'content');
         $app->addAdminMenu('core.admin.menu.media', '/admin/media', 'core.media.manage', 'content');
+        $app->addAdminMenu('core.admin.menu.badwords', '/admin/badwords', 'core.settings.manage', 'moderation');
         $app->addAdminMenu('core.admin.menu.orders', '/admin/orders', 'core.orders.manage', 'marketplace');
         if ($app->modules->enabled('withdrawal')) {
             $app->addAdminMenu('core.admin.menu.withdrawals', '/admin/withdrawals', 'core.orders.manage', 'marketplace');

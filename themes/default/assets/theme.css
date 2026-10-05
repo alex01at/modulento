@@ -220,3 +220,7 @@ img.avatar { display: block; object-fit: cover; }
 .thread-messages li { padding: .6rem .8rem; border: 1px solid var(--line, #dfe4ea); border-radius: .4rem; }
 .thread-messages li.is-mine { background: var(--field, #fff); border-color: var(--primary, #1b00ff); }
 .thread-messages p { margin: .3rem 0 0; }
+
+/* The number of unread messages, on the account's picture. */
+.account-menu summary { position: relative; }
+.unread-badge { position: absolute; top: -.35rem; right: -.45rem; min-width: 1.25rem; height: 1.25rem; padding: 0 .3rem; border-radius: 999px; background: #b3211d; color: #fff; font-size: .7rem; font-weight: 700; line-height: 1.25rem; text-align: center; }

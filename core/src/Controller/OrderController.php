@@ -11,7 +11,6 @@ use Modulento\Core\Order\ProviderPaymentMethod;
 use Modulento\Core\Payment\BankAccount;
 use Modulento\Core\Payment\Payments;
 use Modulento\Core\Review\ReviewView;
-use Modulento\Core\Support\BadWords;
 use Modulento\Core\Support\RateLimiter;
 use Modulento\Core\Support\Session;
 use RuntimeException;
@@ -206,6 +205,7 @@ final class OrderController extends Controller
 
         [$order, $role] = $found;
         $app = $this->app;
+        $app->messageSeen->markOrder($app->auth->account()['id'], $order['id']);
         $locale = $app->translator->locale();
         $flow = $app->orders->flow($order['flow']);
         $method = $app->orders->paymentMethods()[$order['payment_method']] ?? null;
@@ -351,7 +351,7 @@ final class OrderController extends Controller
         // A message is text, files, or both.
         if (($body === '' && $uploads === []) || mb_strlen($body) > 5000) {
             Session::flash('error', $this->trans('core.order.message.error'));
-        } elseif (BadWords::find($body) !== null) {
+        } elseif ($app->badWords->find($body) !== null) {
             Session::flash('error', $this->trans('core.badword.found'));
         } elseif ($fileProblem !== null) {
             Session::flash('error', $this->trans($fileProblem, self::fileLimits()));

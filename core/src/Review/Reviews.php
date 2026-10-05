@@ -18,7 +18,7 @@ final class Reviews
 {
     public const MAX_LENGTH = 2000;
 
-    public function __construct(private PDO $db)
+    public function __construct(private PDO $db, private BadWords $badWords)
     {
     }
 
@@ -52,7 +52,7 @@ final class Reviews
         if (mb_strlen($body) > self::MAX_LENGTH) {
             return 'core.review.error.too_long';
         }
-        if (BadWords::find($body) !== null) {
+        if ($this->badWords->find($body) !== null) {
             return 'core.badword.found';
         }
         if ($order['provider_id'] === null) {

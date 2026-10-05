@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modulento\Core\Controller;
 
+use Closure;
 use Modulento\Core\Package\Packages;
 use Modulento\Core\Support\Migrator;
 use Modulento\Core\Support\Session;
@@ -63,7 +64,27 @@ final class PackageController extends Controller
 
     public function install(array $params): void
     {
-        $this->installFrom(trim((string) ($_POST['repo'] ?? '')));
+        // A name such as owner/name, or the address of the repository on GitHub.
+        $repo = Packages::repoFromInput((string) ($_POST['repo'] ?? ''));
+        $this->runInstall(fn () => $this->app->packages->install($repo));
+    }
+
+    /** A zip file the administrator chose, for packages that are not on GitHub. */
+    public function upload(array $params): void
+    {
+        $file = is_array($_FILES['package'] ?? null) ? $_FILES['package'] : [];
+        if (($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK || !is_file($file['tmp_name'] ?? '')) {
+            Session::flash('error', $this->trans('core.package.error.upload'));
+            $this->redirect('/admin/packages');
+            return;
+        }
+        if (filesize($file['tmp_name']) > Packages::MAX_UPLOAD_BYTES) {
+            Session::flash('error', $this->trans('core.package.error.upload_size'));
+            $this->redirect('/admin/packages');
+            return;
+        }
+
+        $this->runInstall(fn () => $this->app->packages->installUpload($file['tmp_name']));
     }
 
     public function update(array $params): void
@@ -117,6 +138,9 @@ final class PackageController extends Controller
 
         $versions = [];
         foreach ($this->app->packages->installed() as $package) {
+            if ($package['repo'] === Packages::UPLOAD_SOURCE) {
+                continue;
+            }
             try {
                 $versions[$package['kind'] . ':' . $package['id']] = $this->app->packages->latestVersion($package['repo']);
             } catch (UpdateException $e) {
@@ -178,12 +202,13 @@ final class PackageController extends Controller
         $this->redirect('/admin/packages');
     }
 
-    private function installFrom(string $repo): void
+    /** @param Closure(): array{kind: string, id: string, version: string, updated: bool} $install */
+    private function runInstall(Closure $install): void
     {
         @set_time_limit(0);
 
         try {
-            $result = $this->app->packages->install($repo);
+            $result = $install();
             Session::remove('package_versions');
 
             // An enabled extension's new migrations run right away.

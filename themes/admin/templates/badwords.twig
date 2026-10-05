@@ -1,0 +1,28 @@
+{% extends '@admin/layout.twig' %}
+
+{% block title %}{{ trans('core.admin.menu.badwords') }} – {{ site_name }}{% endblock %}
+
+{% block admin %}
+{% include '@admin/_page_header.twig' with {heading: trans('core.admin.menu.badwords')} only %}
+
+<section class="card-box">
+    <h2>{{ trans('core.badwords.title') }}</h2>
+    <p>{{ trans('core.badwords.intro') }}</p>
+    <form method="post" action="{{ url('/admin/badwords') }}" class="stack-form wide">
+        {{ csrf_field() }}
+        <label for="words">{{ trans('core.badwords.field') }}</label>
+        <textarea id="words" name="words" rows="18" maxlength="60000" spellcheck="false">{{ words }}</textarea>
+        <small>{{ trans('core.badwords.hint', {count: count}) }}</small>
+        <div class="button-row">
+            <button type="submit">{{ trans('core.account.save') }}</button>
+        </div>
+    </form>
+    {% if customized %}
+        <form method="post" action="{{ url('/admin/badwords/reset') }}" class="danger-form">
+            {{ csrf_field() }}
+            <p><small>{{ trans('core.badwords.reset_hint') }}</small></p>
+            <button type="submit" class="danger">{{ trans('core.badwords.reset') }}</button>
+        </form>
+    {% endif %}
+</section>
+{% endblock %}
