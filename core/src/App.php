@@ -7,6 +7,7 @@ namespace Modulento\Core;
 use Modulento\Core\Account\Accounts;
 use Modulento\Core\Account\Avatars;
 use Modulento\Core\Support\BadWords;
+use Modulento\Core\Support\Design;
 use Modulento\Core\Support\Branding;
 use Modulento\Core\Support\MessageSeen;
 use Modulento\Core\Account\LoginTokens;
@@ -91,6 +92,7 @@ final class App
     public readonly OfferMessages $offerMessages;
     public readonly BadWords $badWords;
     public readonly HomeLayout $homeLayout;
+    public readonly Design $design;
     public readonly MessageSeen $messageSeen;
     public readonly Preferences $preferences;
     public readonly Reviews $reviews;
@@ -154,6 +156,7 @@ final class App
         $this->modules = new Modules($this->settings);
         $this->badWords = new BadWords($this->settings);
         $this->homeLayout = new HomeLayout($this->settings);
+        $this->design = new Design($this->settings);
         $this->messageSeen = new MessageSeen($db);
         $this->reviews = new Reviews($db, $this->badWords);
         $this->orderFiles = new OrderFiles($db, ($config['app']['uploads'] ?? $config['app']['root'] . '/var/uploads') . '/orders');

@@ -3008,6 +3008,23 @@ check('home editor: a reset brings back the default page', !$pdo->query("SELECT 
 $post('/admin/home', ['action' => 'save', 'blocks' => []], 1);
 check('home editor: a visitor without the permission cannot change it', !$pdo->query("SELECT COUNT(*) FROM setting WHERE name = 'core.home_layout'")->fetchColumn());
 
+// Design: colours, font and radius, written as a stylesheet the pages load; only administrators change them.
+check('design: the pages load the stylesheet of the values, and the default values are the theme\'s', str_contains($get('/', null)['body'], '<link rel="stylesheet" href="/design/')
+    && str_contains($get('/design/' . $app->design->fileName(), null)['body'], '--accent: #1f5fbf'));
+$post('/admin/design', ['accent' => '#00aa55', 'ground' => '#fffdf5', 'text' => '#222222', 'font' => 'serif', 'radius' => '12'], 3);
+$css = $get('/design/' . $app->design->fileName(), null)['body'];
+check('design: saved values are written to the stylesheet, for the light scheme only', str_contains($css, '--accent: #00aa55') && str_contains($css, '--radius: 12px')
+    && str_contains($css, 'Georgia') && str_contains($css, 'prefers-color-scheme: light') && str_contains($css, 'data-theme="light"'));
+$post('/admin/design', ['accent' => 'rot', 'font' => 'Comic', 'radius' => '99', 'ground' => '#abcdef', 'text' => '#111111'], 3);
+$design = fn () => new Modulento\Core\Support\Design(new Modulento\Core\Support\Settings($pdo));
+$values = $design()->values();
+check('design: an invalid value keeps the one it had, a valid one is saved', $values['accent'] === '#00aa55' && $values['font'] === 'serif' && $values['radius'] === 12 && $values['ground'] === '#abcdef'
+    && str_contains($_SESSION['_flash']['error'] ?? '', 'Nicht gespeichert'));
+check('design: a visitor or an account without the permission cannot change it', $post('/admin/design', ['accent' => '#000000'], 1)['status'] === 403 && $design()->values()['accent'] === '#00aa55');
+check('design: the administration has the form', str_contains($get('/admin/design', 3)['body'], 'name="accent" type="color"') && $get('/admin/design', 1)['status'] === 403);
+$post('/admin/design/reset', [], 3);
+check('design: a reset brings back the theme\'s values', !$design()->isCustomized() && $design()->values()['accent'] === '#1f5fbf');
+
 // Administration layout: the sidebar by default, or a header bar with a mega menu,
 // chosen in the profile settings by administrators only.
 check('admin layout: the sidebar is the default', str_contains($get('/admin', 3)['body'], '<body class="layout-sidebar">') && str_contains($get('/admin', 3)['body'], 'id="sidebar"'));

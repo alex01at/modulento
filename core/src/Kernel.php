@@ -10,6 +10,7 @@ use Modulento\Core\Controller\AdminCatalogueController;
 use Modulento\Core\Controller\AdminController;
 use Modulento\Core\Controller\AdminBadWordsController;
 use Modulento\Core\Controller\AdminHomeController;
+use Modulento\Core\Controller\DesignController;
 use Modulento\Core\Controller\AdminMediaController;
 use Modulento\Core\Controller\AdminOrderController;
 use Modulento\Core\Controller\AdminPaymentController;
@@ -243,6 +244,7 @@ final class Kernel
             $router->get('/media/avatars/{file}', [MediaController::class, 'avatar'], Router::PUBLIC);
         $router->get('/media/branding/{file}', [MediaController::class, 'branding'], Router::PUBLIC);
         $router->get('/media/library/{file}', [MediaController::class, 'library'], Router::PUBLIC);
+        $router->get('/design/{file}', [DesignController::class, 'stylesheet'], Router::PUBLIC);
             $router->post('/account/avatar', [AccountController::class, 'setAvatar']);
             $router->post('/account/avatar/delete', [AccountController::class, 'deleteAvatar']);
         }
@@ -289,6 +291,9 @@ final class Kernel
         $router->get('/admin/payments', [AdminPaymentController::class, 'index'], 'core.settings.manage');
         $router->post('/admin/payments', [AdminPaymentController::class, 'save'], 'core.settings.manage');
 
+        $router->get('/admin/design', [DesignController::class, 'index'], 'core.settings.manage');
+        $router->post('/admin/design', [DesignController::class, 'save'], 'core.settings.manage');
+        $router->post('/admin/design/reset', [DesignController::class, 'reset'], 'core.settings.manage');
         $router->get('/admin/home', [AdminHomeController::class, 'index'], 'core.settings.manage');
         $router->post('/admin/home', [AdminHomeController::class, 'save'], 'core.settings.manage');
         $router->get('/admin/badwords', [AdminBadWordsController::class, 'index'], 'core.settings.manage');
@@ -388,6 +393,7 @@ final class Kernel
         $app->addAdminMenu('core.admin.menu.pages', '/admin/pages', 'core.pages.manage', 'content');
         $app->addAdminMenu('core.admin.menu.media', '/admin/media', 'core.media.manage', 'content');
         $app->addAdminMenu('core.admin.menu.home', '/admin/home', 'core.settings.manage', 'content');
+        $app->addAdminMenu('core.admin.menu.design', '/admin/design', 'core.settings.manage', 'system');
         $app->addAdminMenu('core.admin.menu.badwords', '/admin/badwords', 'core.settings.manage', 'moderation');
         $app->addAdminMenu('core.admin.menu.orders', '/admin/orders', 'core.orders.manage', 'marketplace');
         if ($app->modules->enabled('withdrawal')) {
