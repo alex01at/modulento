@@ -10,6 +10,23 @@ use Modulento\Core\Support\Session;
 
 final class PageController extends Controller
 {
+    /** A title or body of a page saved from the page itself (edit mode): the cleaned value comes back. */
+    public function field(array $params): void
+    {
+        $data = json_decode((string) file_get_contents('php://input'), true);
+        $locale = is_array($data) && is_string($data['locale'] ?? null) ? $data['locale'] : '';
+        if (!is_array($data) || !$this->app->locales->isEnabled($locale) || !is_string($data['field'] ?? null) || !is_string($data['value'] ?? null)) {
+            $this->json(['ok' => false], 422);
+            return;
+        }
+        $clean = $this->app->pages->setText((int) $params['id'], $locale, $data['field'], $data['value']);
+        if ($clean === null) {
+            $this->json(['ok' => false], 422);
+            return;
+        }
+        $this->json(['ok' => true, 'value' => $clean]);
+    }
+
     /** Registered last of all routes: any one-segment address nothing else claimed. */
     public function show(array $params): void
     {
@@ -32,6 +49,7 @@ final class PageController extends Controller
 
         $this->render('page.twig', [
             'page' => [
+                'id' => $found['page']['id'],
                 'title' => $found['text']['title'],
                 'body' => $found['text']['body'],
                 'meta_description' => $found['text']['meta_description'],

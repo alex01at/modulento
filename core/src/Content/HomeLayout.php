@@ -23,7 +23,7 @@ final class HomeLayout
     /** The text fields of each type. */
     public const TEXT_FIELDS = [
         'hero' => ['title', 'text', 'button_label', 'button_url'],
-        'text' => ['heading', 'body'],
+        'text' => ['heading', 'body', 'button_label', 'button_url'],
         'categories' => ['heading'],
         'offers' => ['heading'],
         'providers' => ['heading'],
@@ -166,6 +166,22 @@ final class HomeLayout
         }
 
         return null;
+    }
+
+    /** The blocks with the block of this id copied right after it, with a new id and the same content. */
+    public static function duplicateAfter(array $blocks, string $id): array
+    {
+        $out = [];
+        foreach ($blocks as $block) {
+            $out[] = $block;
+            if ($block['id'] === $id) {
+                $copy = $block;
+                $copy['id'] = bin2hex(random_bytes(4));
+                $out[] = $copy;
+            }
+        }
+
+        return $out;
     }
 
     /**

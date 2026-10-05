@@ -85,6 +85,18 @@ CSS;
 .inline-status { position: fixed; left: 50%; bottom: 1rem; transform: translateX(-50%); margin: 0; padding: .5rem 1rem; border-radius: .5rem; background: var(--ground); box-shadow: var(--shadow); z-index: 50; }
 .inline-status.is-error { color: var(--error); }
 .inline-status:empty { display: none; }
+/* The toolbar of a rich text, and the line with the name and the steps of a block. */
+.inline-wysiwyg { display: flex; flex-wrap: wrap; gap: .3rem; margin: 0 0 .4rem; padding: .3rem; border: 1px solid var(--accent); border-radius: .4rem; background: var(--ground); }
+.inline-wysiwyg button { min-width: 2rem; padding: .25rem .5rem; border: 1px solid var(--line); border-radius: .3rem; background: var(--surface); color: var(--text); font: inherit; font-size: .85rem; cursor: pointer; }
+.inline-wysiwyg button:hover { border-color: var(--accent); color: var(--accent); }
+.inline-wysiwyg .inline-wysiwyg-bold { font-weight: 700; }
+.inline-wysiwyg .inline-wysiwyg-italic { font-style: italic; }
+.inline-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .4rem .75rem; }
+.inline-head p { margin: 0; }
+.inline-steps { display: flex; flex-wrap: wrap; gap: .3rem; margin: 0; }
+.inline-steps button { padding: .2rem .55rem; font-size: .8rem; }
+.inline-tools { padding: .5rem .75rem; }
+.inline-tools .inline-edit { margin-top: .4rem; }
 CSS;
 
     public function __construct(private Settings $settings)

@@ -1268,4 +1268,7 @@ return [
     'core.inline.saving' => 'Saving …',
     'core.inline.saved' => 'Saved.',
     'core.inline.failed' => 'Not saved. Please try again.',
+    'core.inline.page_settings' => 'Page settings',
+    'core.inline.duplicate' => 'Duplicate',
+    'core.inline.link_edit' => 'Edit link',
 ];

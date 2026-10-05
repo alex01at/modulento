@@ -242,6 +242,9 @@ final class View
             if (preg_match('#^/offers/[^/]+$#', $path) === 1) {
                 return ['url' => $app->url($path, null) . '?edit=1', 'label' => 'core.inline.start'];
             }
+            if (preg_match('#^/[^/]+$#', $path) === 1 && $app->pages->findPublishedBySlug($app->translator->locale(), substr($path, 1)) !== null) {
+                return ['url' => $app->url($path, null) . '?edit=1', 'label' => 'core.inline.start'];
+            }
 
             return null;
         }));
@@ -251,7 +254,7 @@ final class View
         // The fields a block of a page has, for the in-place editor.
         $this->twig->addFunction(new TwigFunction('block_fields', fn (string $page): array => match ($page) {
             'home' => \Modulento\Core\Content\HomeLayout::TEXT_FIELDS,
-            default => ['text' => ['heading', 'body']],
+            default => ['text' => ['heading', 'body', 'button_label', 'button_url']],
         }));
         // The pictures of the media library, for the picture of a block.
         $this->twig->addFunction(new TwigFunction('library_pictures', fn (): array => array_map(

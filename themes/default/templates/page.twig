@@ -9,10 +9,12 @@
 {% endblock %}
 
 {% block content %}
+{# In edit mode the title and the body are edited on the spot (administrators, ?edit=1). #}
+{% if edit_mode() %}{% include '@admin/inline/_page_bar.twig' with {page_id: page.id} only %}{% endif %}
 {# page.locale differs from the page's language when this language has no text of its own. #}
-<article lang="{{ page.locale }}">
-    <h1>{{ page.title }}</h1>
+<article lang="{{ page.locale }}"{% if edit_mode() %} class="inline-block" data-block-id="page-{{ page.id }}" data-field-url="{{ url('/admin/pages/' ~ page.id) }}/field" data-csrf="{{ csrf_token() }}"{% endif %}>
+    <h1{% if edit_mode() %} data-field="title"{% endif %}>{{ page.title }}</h1>
     {# Cleaned to a fixed set of formatting elements when it was saved. #}
-    {{ page.body|raw }}
+    <div{% if edit_mode() %} data-field="body" data-html="1"{% endif %}>{{ page.body|raw }}</div>
 </article>
 {% endblock %}

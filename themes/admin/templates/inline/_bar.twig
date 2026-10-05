@@ -1,7 +1,7 @@
 {# The bar above the blocks of an editable page: the way into editing, and the way out,
    and adding a block. Shown to administrators only. Receives page_path, add_types. #}
 {% if can('core.settings.manage') %}
-<div class="inline-bar" role="region" aria-label="{{ trans('core.inline.title') }}" data-saving="{{ trans('core.inline.saving') }}" data-saved="{{ trans('core.inline.saved') }}" data-failed="{{ trans('core.inline.failed') }}">
+<div class="inline-bar" role="region" aria-label="{{ trans('core.inline.title') }}" data-saving="{{ trans('core.inline.saving') }}" data-saved="{{ trans('core.inline.saved') }}" data-failed="{{ trans('core.inline.failed') }}" data-editor-labels="{{ editor() }}">
     {% if edit_mode() %}
         <p><strong>{{ trans('core.inline.editing') }}</strong> <a href="{{ url(current_path()) }}">{{ trans('core.inline.done') }}</a></p>
         <form method="post" action="{{ url(page_path) }}" class="inline-add">

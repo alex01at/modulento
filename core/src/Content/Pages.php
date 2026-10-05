@@ -83,6 +83,42 @@ final class Pages
     }
 
     /**
+     * Saves the title or the body of a page in one language, from the page itself.
+     * Null when the field is unknown, the language has no text of this page yet, or the
+     * title is empty. Returns the cleaned value.
+     */
+    public function setText(int $id, string $locale, string $field, string $value): ?string
+    {
+        if (!in_array($field, ['title', 'body'], true)) {
+            return null;
+        }
+        $value = trim((string) preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F]/', '', $value));
+        if ($field === 'title') {
+            if ($value === '' || mb_strlen($value) > 200) {
+                return null;
+            }
+        } else {
+            $value = HtmlSanitizer::clean($value);
+        }
+
+        $stmt = $this->db->prepare("UPDATE page_translation SET {$field} = :value WHERE page_id = :id AND locale = :locale");
+        $stmt->execute(['value' => $value, 'id' => $id, 'locale' => $locale]);
+        if ($stmt->rowCount() === 0 && !$this->hasText($id, $locale)) {
+            return null;
+        }
+
+        return $value;
+    }
+
+    private function hasText(int $id, string $locale): bool
+    {
+        $stmt = $this->db->prepare('SELECT COUNT(*) FROM page_translation WHERE page_id = :id AND locale = :locale');
+        $stmt->execute(['id' => $id, 'locale' => $locale]);
+
+        return (int) $stmt->fetchColumn() > 0;
+    }
+
+    /**
      * Title and path of the pages shown in a menu, in a language.
      *
      * @param string $where "header", "footer" or a role from self::ROLES

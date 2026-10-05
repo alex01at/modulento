@@ -690,7 +690,12 @@ of the block.
 On the home page and on the offer page the texts can be changed where they stand: a click on a text
 makes it editable, leaving it saves it, Escape undoes. A text is editable when its element carries
 `data-field="<name>"` inside the block (`data-html` for rich text). Between the blocks a "+" offers
-the kinds of block to insert at that place. Both work without scripts too, through the forms.
+the kinds of block to insert at that place.
+
+Rich texts get a small toolbar while they are edited (paragraph, headings, bold, italic,
+lists, quote, link). A text block can carry a button (`button_label`, `button_url`), which
+is the usual way to make a text a call to action. A block can be duplicated. A content page
+is edited the same way: its title and body (`data-field`), on its own page with `?edit=1`. Both work without scripts too, through the forms.
 
 A theme that wants editing in place does three things in each page it shows:
 
