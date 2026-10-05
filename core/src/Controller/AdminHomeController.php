@@ -20,6 +20,7 @@ final class AdminHomeController extends Controller
         $layout = $app->homeLayout;
 
         $this->render('@admin/home_edit.twig', [
+            'tab' => $this->tab($app->locales->enabled()),
             'blocks' => $this->blocksForForm($layout->blocks()),
             'types' => HomeLayout::TYPES,
             'fields' => HomeLayout::TEXT_FIELDS,
@@ -40,7 +41,7 @@ final class AdminHomeController extends Controller
         if ($action === 'reset') {
             $layout->reset();
             Session::flash('success', $this->trans('core.home.reset_done'));
-            $this->redirect('/admin/home');
+            $this->redirect('/admin/home?tab=' . $this->tab($this->app->locales->enabled()));
             return;
         }
 
@@ -55,7 +56,8 @@ final class AdminHomeController extends Controller
 
         $layout->save($blocks);
         Session::flash('success', $this->trans($action === 'save' ? 'core.home.saved' : 'core.home.changed'));
-        $this->redirect('/admin/home');
+        // Back to the language the form was sent from.
+        $this->redirect('/admin/home?tab=' . $this->tab($this->app->locales->enabled()));
     }
 
     /** @param list<array<string, mixed>> $blocks */

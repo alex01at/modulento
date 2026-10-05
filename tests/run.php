@@ -3000,6 +3000,9 @@ check('home editor: a picture outside the library and a link without a safe addr
     && $lastBlocks[count($lastBlocks) - 2]['texts']['de']['items'] === "Impressum | /impressum\nExtern | https://example.org");
 $body = $get('/', null)['body'];
 check('home: links of the list are shown, paths in the language of the page', str_contains($body, 'href="/impressum"') && str_contains($body, 'href="https://example.org"') && !str_contains($body, 'javascript:x'));
+check('home editor: each language has its own tab; the others are only hidden', preg_match('/<fieldset class="home-language" lang="en" hidden>/', $get('/admin/home?tab=de', 3)['body']) === 1
+    && preg_match('/<fieldset class="home-language" lang="de" hidden>/', $get('/admin/home?tab=en', 3)['body']) === 1
+    && str_contains($get('/admin/home?tab=en', 3)['body'], 'aria-current="page"') && preg_match('/<input type="hidden" name="tab" value="en">/', $get('/admin/home?tab=en', 3)['body']) === 1);
 $post('/admin/home', ['action' => 'reset'], 3);
 check('home editor: a reset brings back the default page', !$pdo->query("SELECT COUNT(*) FROM setting WHERE name = 'core.home_layout'")->fetchColumn() && str_contains($get('/', null)['body'], 'Willkommen bei'));
 $post('/admin/home', ['action' => 'save', 'blocks' => []], 1);
