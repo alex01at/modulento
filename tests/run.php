@@ -1316,6 +1316,13 @@ check('offer page editor: a reset brings back the default page', !$pdo->query("S
 
 check('in-place editing: the offer page offers its tools too, built-in parts without a text form', str_contains($get('/offers/ich-gestalte-dein-logo?edit=1', 3)['body'], 'inline-tools')
     && str_contains($get('/offers/ich-gestalte-dein-logo?edit=1', 3)['body'], 'name="action" value="toggle:') && !str_contains($get('/offers/ich-gestalte-dein-logo', 3)['body'], 'inline-tools'));
+// The pencil: in the header of the home page and of an offer, for whoever may edit; nowhere else, and not to visitors.
+check('edit link: an administrator finds the pencil on the home page and on an offer, a visitor does not', str_contains($get('/', 3)['body'], 'class="edit-page" href="/?edit=1"')
+    && str_contains($get('/offers/ich-gestalte-dein-logo', 3)['body'], 'class="edit-page" href="/offers/ich-gestalte-dein-logo?edit=1"')
+    && !str_contains($get('/', null)['body'], 'class="edit-page"') && !str_contains($get('/', 1)['body'], 'class="edit-page"'));
+check('edit link: not on other pages, and the control rules are in the stylesheet the pages load', !str_contains($get('/offers', 3)['body'], 'class="edit-page"')
+    && str_contains($get('/design/' . (new Modulento\Core\Support\Design(new Modulento\Core\Support\Settings($pdo)))->fileName(), null)['body'], '.edit-page'));
+
 // Pictures of the media library: only those, in pages.
 $library = '/media/library/' . str_repeat('a', 32) . '.webp';
 $clean = Modulento\Core\Support\HtmlSanitizer::clean('<p><img src="' . $library . '" alt="Logo"><img src="https://evil.example/x.png"><img src="/media/library/../x.png"><img src="/assets/x.png"></p>');

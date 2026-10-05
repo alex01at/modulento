@@ -1,6 +1,7 @@
 {# The logged-in account's menu in the header: its picture opens the way to
    the settings, the colour scheme and to logging out. A <details> element, so it works without
    scripts; account-menu.js only closes it on Escape or a click elsewhere. #}
+{% include 'layout/_edit_link.twig' %}
 {% set picture = account_avatar() %}
 {% set name = account.display_name ?: account.email %}
 <details class="account-menu">

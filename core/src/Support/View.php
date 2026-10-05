@@ -230,6 +230,21 @@ final class View
             $app->locales->default(),
             $all
         )));
+        // The editable page this is, with the link that turns editing on, for the account that may edit it; null otherwise.
+        $this->twig->addFunction(new TwigFunction('editable_page', function () use ($app, $auth): ?array {
+            if (!$auth->can('core.settings.manage') || $auth->impersonator() !== null) {
+                return null;
+            }
+            $path = $app->path;
+            if ($path === '/') {
+                return ['url' => $app->url('/', null) . '?edit=1', 'label' => 'core.inline.start'];
+            }
+            if (preg_match('#^/offers/[^/]+$#', $path) === 1) {
+                return ['url' => $app->url($path, null) . '?edit=1', 'label' => 'core.inline.start'];
+            }
+
+            return null;
+        }));
         // Whether the page is being edited in place: an administrator with the settings permission, "?edit=1".
         $this->twig->addFunction(new TwigFunction('edit_mode', fn (): bool => $auth->can('core.settings.manage')
             && $auth->impersonator() === null && ($_GET['edit'] ?? '') === '1'));

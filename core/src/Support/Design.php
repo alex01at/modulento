@@ -113,13 +113,25 @@ final class Design
 
         return ":root {\n    --font: " . self::FONTS[$v['font']] . ";\n    --radius: " . $v['radius'] . "px;\n}\n"
             . "@media (prefers-color-scheme: light) {\n    :root:not([data-theme=\"dark\"]) {\n" . $this->colours($v) . "    }\n}\n"
-            . ":root[data-theme=\"light\"] {\n" . $this->colours($v) . "}\n";
+            . ":root[data-theme=\"light\"] {\n" . $this->colours($v) . "}\n"
+            . $this->controls();
     }
 
     /** A name for the stylesheet that changes with its content, so a new design is never served from a cache. */
     public function fileName(): string
     {
         return substr(sha1($this->css()), 0, 16) . '.css';
+    }
+
+    /**
+     * Rules for the administration's own controls on the site (the edit link), so
+     * that they look the same with every theme. Written once here, not per theme.
+     */
+    private function controls(): string
+    {
+        return ".edit-page { display: inline-flex; align-items: center; justify-content: center; width: 2.4rem; height: 2.4rem; border-radius: 50%; background: var(--accent, #1f5fbf); color: #fff; box-shadow: 0 .25rem .9rem rgb(0 0 0 / .25); text-decoration: none; }\n"
+            . ".edit-page:hover, .edit-page:focus-visible { filter: brightness(1.15); color: #fff; }\n"
+            . ".edit-page svg { width: 1.15rem; height: 1.15rem; }\n";
     }
 
     private function colours(array $v): string
