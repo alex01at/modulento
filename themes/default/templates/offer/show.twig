@@ -18,9 +18,16 @@
 
     {% include 'review/_rating.twig' with {rating: offer.rating} only %}
 
-    {# The rest of the page is in the order and of the parts the administration set (Administration → Offer page). #}
-    {% for block in offer_blocks() %}
-        {% include 'offer/_block_' ~ block.type ~ '.twig' with {block: block} %}
+    {# The rest of the page is in the order and of the parts the administration set (Administration → Offer page).
+       While it is edited in place, every part gets its tools from the administration theme. #}
+    {% include '@admin/inline/_bar.twig' with {page_path: '/admin/offer-page', add_types: ['text']} only %}
+    {% for block in offer_blocks(edit_mode()) %}
+        {% if edit_mode() %}
+            {% include '@admin/inline/_block.twig' with {block: block, page_path: '/admin/offer-page', fields: block_fields('offer')[block.type] ?? [], label_key: 'core.offer_page.type.' ~ block.type, deletable: block.type == 'text'} only %}
+        {% endif %}
+        {% if block.enabled %}
+            {% include 'offer/_block_' ~ block.type ~ '.twig' with {block: block} %}
+        {% endif %}
     {% endfor %}
 </article>
 

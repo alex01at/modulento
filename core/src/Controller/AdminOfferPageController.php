@@ -33,14 +33,14 @@ final class AdminOfferPageController extends Controller
         } else {
             if ($action === 'add') {
                 $blocks[] = HomeLayout::newBlock('text');
-            } elseif (preg_match('/^(up|down|delete):([a-z0-9]{1,16})$/', $action, $match) === 1) {
+            } elseif (preg_match('/^(up|down|delete|toggle):([a-z0-9]{1,16})$/', $action, $match) === 1) {
                 $blocks = $this->step($blocks, $match[1], $match[2]);
             }
             $layout->save($blocks);
             Session::flash('success', $this->trans($action === 'save' ? 'core.offer_page.saved' : 'core.offer_page.changed'));
         }
 
-        $this->redirect('/admin/offer-page');
+        $this->redirect($this->safeReturn('/admin/offer-page'));
     }
 
     /**
@@ -89,6 +89,12 @@ final class AdminOfferPageController extends Controller
             }
         }
         if ($index === null) {
+            return $blocks;
+        }
+
+        if ($direction === 'toggle') {
+            $blocks[$index]['enabled'] = !$blocks[$index]['enabled'];
+
             return $blocks;
         }
 

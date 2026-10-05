@@ -676,6 +676,45 @@ theme works by upload alone - no symlink, no copy step, no build. The content
 security policy allows scripts and styles from the site's own origin only: no
 inline `<script>`, no inline `style`, no external hosts.
 
+### Editing pages in place
+
+An administrator with the settings permission sees a page's blocks as tools when
+the page is opened with `?edit=1` (a link at the top of the home page and the
+offer page). The tools come from the administration theme (`inline/_bar.twig`,
+`inline/_block.twig`); the site theme only has to draw its blocks in a loop, so
+that **any theme** can take part. Every control is a small form that sends the
+page's own administration action and comes back to the page, so it works without
+scripts, on a phone too. The site's own text is still edited in the text fields
+of the block.
+
+A theme that wants editing in place does three things in each page it shows:
+
+```twig
+{% include '@admin/inline/_bar.twig' with {page_path: '/admin/home', add_types: ['hero', 'text', 'offers', 'providers', 'image', 'links']} only %}
+{% for block in home_blocks(edit_mode()) %}
+    {% if edit_mode() %}
+        {% include '@admin/inline/_block.twig' with {block: block, page_path: '/admin/home', fields: block_fields('home')[block.type] ?? [], label_key: 'core.home.type.' ~ block.type, deletable: true} only %}
+    {% endif %}
+    {% if block.enabled %}
+        {% include 'home/_' ~ block.type ~ '.twig' with {block: block} %}
+    {% endif %}
+{% endfor %}
+```
+
+1. It loops the blocks with `home_blocks(edit_mode())` (or `offer_blocks(...)`), so
+   hidden blocks are there while editing and only then.
+2. It puts the tools in front of each block while `edit_mode()` is true.
+3. It draws a block only when `block.enabled`.
+
+The layout loads the editor's script with `{% if edit_mode() %}<script src="{{ admin_asset('editor.js') }}" defer></script>{% endif %}`
+(the default theme does this in `layout/base.twig`). A theme that does none of
+this keeps working; it just cannot be edited in place, and the forms under
+**Administration → Home page** and **Offer page** still work.
+
+The themes shipped with the core and their status: `default` has all of it; the
+Indigo theme (its own repository) still draws its home and offer pages without
+blocks and therefore cannot be edited in place yet.
+
 ### The layout
 
 A theme that brings its own `layout/base.twig` takes over three things from

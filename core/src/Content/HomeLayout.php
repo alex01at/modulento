@@ -82,11 +82,11 @@ final class HomeLayout
      * @param Closure(string, array<string, string>): string $trans
      * @return list<array<string, mixed>>
      */
-    public function view(string $locale, string $default, Closure $trans, string $siteName): array
+    public function view(string $locale, string $default, Closure $trans, string $siteName, bool $includeHidden = false): array
     {
         $view = [];
         foreach ($this->blocks() as $block) {
-            if (!$block['enabled']) {
+            if (!$block['enabled'] && !$includeHidden) {
                 continue;
             }
             $texts = [];
@@ -105,6 +105,7 @@ final class HomeLayout
             $view[] = [
                 'id' => $block['id'],
                 'type' => $block['type'],
+                'enabled' => $block['enabled'],
                 'texts' => $texts,
                 'count' => max(1, min(12, (int) ($block['settings']['count'] ?? 6))),
                 'media' => (string) ($block['settings']['media'] ?? ''),

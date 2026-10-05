@@ -1255,4 +1255,12 @@ return [
     'core.impersonation.blocked' => 'This is not possible while you are signed in as someone else.',
     'core.permission.accounts_impersonate' => 'Sign in as a user',
     'core.permission.accounts_impersonate.hint' => 'Sign in as an account to see the website the way that person does. Every sign-in is logged.',
+    'core.inline.title' => 'Edit the page',
+    'core.inline.editing' => 'Editing.',
+    'core.inline.done' => 'Done',
+    'core.inline.start' => 'Edit this page',
+    'core.inline.hidden' => 'hidden',
+    'core.inline.hide' => 'Hide',
+    'core.inline.show' => 'Show',
+    'core.inline.edit' => 'Edit text and settings',
 ];

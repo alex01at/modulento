@@ -63,16 +63,16 @@ final class OfferLayout
      *
      * @return list<array{id: string, type: string, heading: string, body: string}>
      */
-    public function view(string $locale, string $default): array
+    public function view(string $locale, string $default, bool $includeHidden = false): array
     {
         $view = [];
         foreach ($this->blocks() as $block) {
-            if (!$block['enabled']) {
+            if (!$block['enabled'] && !$includeHidden) {
                 continue;
             }
             $heading = (string) (($block['texts'][$locale]['heading'] ?? '') ?: ($block['texts'][$default]['heading'] ?? ''));
             $body = (string) (($block['texts'][$locale]['body'] ?? '') ?: ($block['texts'][$default]['body'] ?? ''));
-            $view[] = ['id' => $block['id'], 'type' => $block['type'], 'heading' => $heading, 'body' => $body];
+            $view[] = ['id' => $block['id'], 'type' => $block['type'], 'enabled' => $block['enabled'], 'heading' => $heading, 'body' => $body];
         }
 
         return $view;

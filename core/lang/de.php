@@ -1255,4 +1255,12 @@ return [
     'core.impersonation.blocked' => 'Während du als jemand anderes angemeldet bist, ist das nicht möglich.',
     'core.permission.accounts_impersonate' => 'Als Benutzer anmelden',
     'core.permission.accounts_impersonate.hint' => 'Sich als ein Konto anmelden, um die Website so zu sehen wie die Person. Jede Anmeldung wird protokolliert.',
+    'core.inline.title' => 'Seite bearbeiten',
+    'core.inline.editing' => 'Bearbeitungsmodus.',
+    'core.inline.done' => 'Fertig',
+    'core.inline.start' => 'Seite direkt bearbeiten',
+    'core.inline.hidden' => 'ausgeblendet',
+    'core.inline.hide' => 'Ausblenden',
+    'core.inline.show' => 'Einblenden',
+    'core.inline.edit' => 'Text und Einstellungen bearbeiten',
 ];
