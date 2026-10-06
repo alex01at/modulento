@@ -1018,8 +1018,17 @@ operator creates plans and grants them under **Administration → Subscriptions*
 hand has no end, or an end date that counts to its last day. A plan is changed
 there, with the features it includes; a plan that has had accounts can only be
 switched off, not deleted. Customers see the active plans on **/subscriptions**
-and their own on **/account/subscription** (in the account menu). The recurring
-payment through the payment provider is not there yet.
+and their own on **/account/subscription** (in the account menu). Customers pay for
+a plan on **/subscriptions**: by bank transfer to the operator's account (set under
+**Administration → Subscriptions → Bank account for transfers**; the operator then
+confirms the money under "Open transfers", which gives the plan for its months), or
+by Stripe as a subscription on the platform's own Stripe account (the keys are the
+ones of **Payment methods**). Stripe's notifications for subscriptions are
+`checkout.session.completed` (mode subscription), `invoice.paid`,
+`invoice.payment_failed` and `customer.subscription.deleted`; they must reach the
+same `/webhooks/stripe` endpoint as platform events, not only Connect events.
+Orders of providers keep their own payment flow; only subscriptions are paid to the
+operator.
 
 An extension declares the features it sells in its `register()` with
 `$registrar->subscriptionFeature('visitenkarte.logo', 'visitenkarte.feature.logo')`,

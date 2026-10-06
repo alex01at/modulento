@@ -1,0 +1,39 @@
+{% extends 'layout/base.twig' %}
+
+{% block title %}{{ trans('core.subscriptions.order.title') }} – {{ site_name }}{% endblock %}
+
+{% block content %}
+{% include 'account/_nav.twig' %}
+<h1>{{ trans('core.subscriptions.order.title') }}</h1>
+
+<dl>
+    <dt>{{ trans('core.subscriptions.order.plan') }}</dt>
+    <dd>{{ order.plan_name }}</dd>
+    <dt>{{ trans('core.subscriptions.order.amount') }}</dt>
+    <dd>{{ money(order.amount_cents, order.currency) }} <small>{{ trans(order.months == 1 ? 'core.subscriptions.period_one' : 'core.subscriptions.period', {count: order.months}) }}</small></dd>
+</dl>
+
+{% if order.status == 'paid' %}
+    <p class="flash flash-success" role="status">{{ trans('core.subscriptions.order.paid') }}</p>
+{% elseif order.status == 'canceled' %}
+    <p class="flash flash-error" role="status">{{ trans('core.subscriptions.order.canceled') }}</p>
+{% elseif order.method == 'stripe' %}
+    <p>{{ trans('core.subscriptions.order.pending_stripe') }}</p>
+{% elseif bank %}
+    <p>{{ trans('core.subscriptions.order.transfer_intro') }}</p>
+    <dl>
+        <dt>{{ trans('core.subscriptions.order.holder') }}</dt>
+        <dd>{{ bank.holder }}</dd>
+        <dt>{{ trans('core.subscriptions.order.iban') }}</dt>
+        <dd><code>{{ bank.iban }}</code></dd>
+        {% if bank.bic %}
+            <dt>{{ trans('core.subscriptions.order.bic') }}</dt>
+            <dd><code>{{ bank.bic }}</code></dd>
+        {% endif %}
+        <dt>{{ trans('core.subscriptions.order.reference') }}</dt>
+        <dd><strong><code>{{ order.reference }}</code></strong></dd>
+    </dl>
+{% endif %}
+
+<p><a href="{{ url('/subscriptions') }}">{{ trans('core.subscriptions.order.back') }}</a></p>
+{% endblock %}

@@ -266,6 +266,11 @@ final class Kernel
             // What customers see: the overview of the plans, and the account's own subscription.
             $router->get('/subscriptions', [SubscriptionController::class, 'overview'], Router::PUBLIC);
             $router->get('/account/subscription', [SubscriptionController::class, 'account']);
+            $router->post('/subscriptions/{id}/order', [SubscriptionController::class, 'order']);
+            $router->get('/subscriptions/orders/{id}', [SubscriptionController::class, 'orderPage']);
+            $router->post('/account/subscription/cancel', [SubscriptionController::class, 'cancel']);
+            $router->post('/admin/subscriptions/bank', [AdminSubscriptionController::class, 'saveBank'], 'core.settings.manage');
+            $router->post('/admin/subscriptions/orders/{id}/paid', [AdminSubscriptionController::class, 'confirmTransfer'], 'core.settings.manage');
         }
         if ($modules->enabled('contact')) {
             $router->post('/offers/{slug}/contact', [OfferController::class, 'contact']);

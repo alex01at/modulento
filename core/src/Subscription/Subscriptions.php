@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Modulento\Core\Subscription;
 
+use DateTimeImmutable;
+use DateTimeZone;
 use InvalidArgumentException;
 use Modulento\Core\Support\Clock;
 use Modulento\Core\Support\Modules;
@@ -127,7 +129,7 @@ final class Subscriptions
      * it had is cancelled, not deleted. Without an end the plan is open-ended,
      * as when an operator grants it by hand.
      */
-    public function assign(int $accountId, ?int $planId, ?string $periodEnd = null): void
+    public function assign(int $accountId, ?int $planId, ?string $periodEnd = null, ?string $providerRef = null): void
     {
         if ($periodEnd !== null && preg_match('/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/', $periodEnd) !== 1) {
             throw new InvalidArgumentException('subscription: period end');
@@ -137,17 +139,25 @@ final class Subscriptions
         }
 
         $now = Clock::now();
-        $this->db->beginTransaction();
+        // Inside a transaction of the caller (an order settled by its payment), this one joins it.
+        $own = !$this->db->inTransaction();
+        if ($own) {
+            $this->db->beginTransaction();
+        }
         try {
             $this->db->prepare("UPDATE subscription SET status = 'canceled', updated_at = :now WHERE account_id = :account AND status <> 'canceled'")
                 ->execute(['now' => $now, 'account' => $accountId]);
             if ($planId !== null) {
-                $this->db->prepare("INSERT INTO subscription (account_id, plan_id, status, period_end, created_at, updated_at) VALUES (:account, :plan, 'active', :end, :created, :updated)")
-                    ->execute(['account' => $accountId, 'plan' => $planId, 'end' => $periodEnd, 'created' => $now, 'updated' => $now]);
+                $this->db->prepare("INSERT INTO subscription (account_id, plan_id, status, period_end, provider_ref, created_at, updated_at) VALUES (:account, :plan, 'active', :end, :ref, :created, :updated)")
+                    ->execute(['account' => $accountId, 'plan' => $planId, 'end' => $periodEnd, 'ref' => $providerRef, 'created' => $now, 'updated' => $now]);
             }
-            $this->db->commit();
+            if ($own) {
+                $this->db->commit();
+            }
         } catch (PDOException $e) {
-            $this->db->rollBack();
+            if ($own) {
+                $this->db->rollBack();
+            }
             throw $e;
         }
     }
@@ -175,7 +185,7 @@ final class Subscriptions
     public function current(int $accountId): ?array
     {
         $stmt = $this->db->prepare(
-            "SELECT s.id, s.status, s.period_end, p.slug, p.name, p.features
+            "SELECT s.id, s.status, s.period_end, s.provider_ref, p.slug, p.name, p.features
              FROM subscription s JOIN subscription_plan p ON p.id = s.plan_id
              WHERE s.account_id = :account AND s.status IN ('trialing', 'active', 'past_due')
                AND (s.period_end IS NULL OR s.period_end > :now)
@@ -188,6 +198,7 @@ final class Subscriptions
             'id' => (int) $row['id'],
             'status' => $row['status'],
             'period_end' => $row['period_end'],
+            'provider_ref' => $row['provider_ref'],
             'slug' => $row['slug'],
             'name' => $row['name'],
             'features' => $this->features($row['features']),
@@ -224,6 +235,44 @@ final class Subscriptions
         }
 
         return ['name' => $name, 'price' => $priceCents, 'currency' => $currency, 'period' => $periodMonths, 'features' => implode(',', array_values(array_unique($features)))];
+    }
+
+    /** The subscription a Stripe subscription id belongs to, with the months of its plan. */
+    public function byProviderRef(string $ref): ?array
+    {
+        $stmt = $this->db->prepare(
+            'SELECT s.id, s.account_id, s.status, s.period_end, p.period_months
+             FROM subscription s JOIN subscription_plan p ON p.id = s.plan_id WHERE s.provider_ref = :ref ORDER BY s.id DESC LIMIT 1'
+        );
+        $stmt->execute(['ref' => $ref]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        return $row === false ? null : ['id' => (int) $row['id'], 'account_id' => (int) $row['account_id'], 'status' => $row['status'], 'period_end' => $row['period_end'], 'months' => (int) $row['period_months']];
+    }
+
+    /** A paid renewal: the subscription runs on for the months of its plan, from its end or from now. */
+    public function extend(int $subscriptionId, int $months): void
+    {
+        $stmt = $this->db->prepare('SELECT period_end FROM subscription WHERE id = :id');
+        $stmt->execute(['id' => $subscriptionId]);
+        $end = $stmt->fetchColumn();
+        $from = is_string($end) && $end > Clock::now() ? $end : Clock::now();
+
+        $this->db->prepare("UPDATE subscription SET status = 'active', period_end = :end, updated_at = :now WHERE id = :id")
+            ->execute(['end' => self::addMonths($from, $months), 'now' => Clock::now(), 'id' => $subscriptionId]);
+    }
+
+    /** Stripe reports a change of the subscription's state (past due, cancelled). */
+    public function setStatusByProviderRef(string $ref, string $status): void
+    {
+        $this->db->prepare('UPDATE subscription SET status = :status, updated_at = :now WHERE provider_ref = :ref AND status <> :canceled')
+            ->execute(['status' => $status, 'now' => Clock::now(), 'ref' => $ref, 'canceled' => 'canceled']);
+    }
+
+    /** A UTC time of the form Y-m-d H:i:s, moved by whole months. */
+    public static function addMonths(string $from, int $months): string
+    {
+        return (new DateTimeImmutable($from, new DateTimeZone('UTC')))->modify('+' . $months . ' months')->format('Y-m-d H:i:s');
     }
 
     private function planIsActive(int $planId): bool

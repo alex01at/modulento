@@ -1362,7 +1362,8 @@ $subModules = new Modulento\Core\Support\Modules(new Modulento\Core\Support\Sett
 $subs = new Modulento\Core\Subscription\Subscriptions($pdo, $subModules);
 // The tables of migration 022, in SQLite's words.
 $pdo->exec("CREATE TABLE subscription_plan (id INTEGER PRIMARY KEY, slug TEXT UNIQUE, name TEXT, price_cents INTEGER, currency TEXT, period_months INTEGER, features TEXT NOT NULL DEFAULT '', active INTEGER NOT NULL DEFAULT 1)");
-$pdo->exec("CREATE TABLE subscription (id INTEGER PRIMARY KEY, account_id INTEGER REFERENCES account (id) ON DELETE CASCADE, plan_id INTEGER REFERENCES subscription_plan (id), status TEXT, period_end TEXT, created_at TEXT, updated_at TEXT)");
+$pdo->exec("CREATE TABLE subscription (id INTEGER PRIMARY KEY, account_id INTEGER REFERENCES account (id) ON DELETE CASCADE, plan_id INTEGER REFERENCES subscription_plan (id), status TEXT, period_end TEXT, provider_ref TEXT NULL, created_at TEXT, updated_at TEXT)");
+$pdo->exec("CREATE TABLE subscription_order (id INTEGER PRIMARY KEY, account_id INTEGER REFERENCES account (id) ON DELETE CASCADE, plan_id INTEGER REFERENCES subscription_plan (id), method TEXT, status TEXT, reference TEXT UNIQUE, amount_cents INTEGER, currency TEXT, stripe_session TEXT NULL, created_at TEXT, paid_at TEXT NULL)");
 $pdo->exec("INSERT INTO account (email, password_hash, created_at) VALUES ('abo-test@example.test', 'x', '" . Modulento\Core\Support\Clock::now() . "')");
 $subAccount = (int) $pdo->lastInsertId();
 $subPlan = $subs->createPlan('abo-test', 'Testabo', 900, 'EUR', 1, ['abo.test.one', 'abo.test.two']);
@@ -2922,6 +2923,79 @@ ini_restore('error_log');
 @unlink($keyPath);
 @rmdir(dirname($keyPath));
 @unlink($mailLog);
+
+// --- Subscriptions paid: by transfer to the operator, or by Stripe on the platform's account ---
+$payBilling = fn ($app) => $app->subscriptionBilling;
+$payApp()->payments->setEnabled(Modulento\Core\Payment\Payments::TRANSFER, true);
+$payApp()->payments->setEnabled(Modulento\Core\Payment\Payments::STRIPE, true);
+$payApp()->payments->saveStripeKeys('sk_test_subscriptions', $webhookSecret);
+$pdo->exec("INSERT INTO account (email, password_hash, status, created_at, email_verified_at, terms_accepted_at) VALUES ('abo-pay@example.test', 'x', 'active', '" . Modulento\Core\Support\Clock::now() . "', '" . Modulento\Core\Support\Clock::now() . "', '" . Modulento\Core\Support\Clock::now() . "')");
+$payAccount = (int) $pdo->lastInsertId();
+$payPlan = $payApp()->subscriptions->createPlan('abo-pay', 'Zahlabo', 900, 'EUR', 1, ['abo.pay.one']);
+$bankRefused = (function () use ($payApp) { try { $payApp()->subscriptionBilling->saveBank('Kasse', 'DE00000000000000000000', ''); return false; } catch (InvalidArgumentException) { return true; } })();
+$payApp()->subscriptionBilling->saveBank('Modulento Betrieb', 'DE89 3704 0044 0532 0130 00', 'COBADEFFXXX');
+check('subscription billing: the operator bank account is checked and stored normalised', $bankRefused && $payApp()->subscriptionBilling->bank()['iban'] === 'DE89370400440532013000' && $payApp()->subscriptionBilling->methods()['transfer'] === true);
+
+$http->reset();
+$pPost('/subscriptions/' . $payPlan . '/order', ['method' => 'transfer'], $payAccount);
+$transfer = $pdo->query("SELECT id, status, reference, method, amount_cents FROM subscription_order WHERE account_id = $payAccount")->fetch();
+check('subscription billing: an order by transfer waits for its money, with a reference and the price', $transfer['method'] === 'transfer' && $transfer['status'] === 'pending' && preg_match('/^ABO-[A-F0-9]{8}$/', $transfer['reference']) === 1 && (int) $transfer['amount_cents'] === 900);
+check('subscription billing: the order page shows the reference to the account that ordered it, and not to another', $get('/subscriptions/orders/' . $transfer['id'], $payAccount)['status'] === 200 && str_contains($get('/subscriptions/orders/' . $transfer['id'], $payAccount)['body'], $transfer['reference']) && $get('/subscriptions/orders/' . $transfer['id'], 3)['status'] === 404);
+$post('/admin/subscriptions/orders/' . $transfer['id'] . '/paid', [], 3);
+$transferPaid = $pdo->query("SELECT status FROM subscription_order WHERE id = {$transfer['id']}")->fetchColumn();
+$payGranted = $payApp()->subscriptions->current($payAccount);
+check('subscription billing: confirming the money gives the plan for one month, once', $transferPaid === 'paid' && $payGranted !== null && $payGranted['name'] === 'Zahlabo' && $payGranted['provider_ref'] === null && $payGranted['period_end'] > Modulento\Core\Support\Clock::now(20 * 86400) && $payGranted['period_end'] < Modulento\Core\Support\Clock::now(40 * 86400));
+$post('/admin/subscriptions/orders/' . $transfer['id'] . '/paid', [], 3);
+check('subscription billing: a second confirmation changes nothing', $pdo->query("SELECT COUNT(*) FROM subscription WHERE account_id = $payAccount AND status = 'active'")->fetchColumn() == 1);
+
+$http->reset();
+$http->answer(200, ['id' => 'cs_test_SUB1', 'url' => 'https://checkout.stripe.com/c/pay/cs_test_SUB1']);
+$pPost('/subscriptions/' . $payPlan . '/order', ['method' => 'stripe'], $payAccount);
+$checkoutRequest = $http->requests[0] ?? null;
+check('subscription billing: Stripe gets a subscription checkout on the platform account, with the reference', $checkoutRequest !== null && str_contains($checkoutRequest['body'] ?? '', 'mode=subscription') && str_contains($checkoutRequest['body'] ?? '', '%5Binterval%5D=month') && !isset($checkoutRequest['headers']['Stripe-Account']));
+$stripeOrder = $pdo->query("SELECT id, reference, status, stripe_session FROM subscription_order WHERE account_id = $payAccount AND method = 'stripe'")->fetch();
+check('subscription billing: the order waits for Stripe and remembers the session', $stripeOrder['status'] === 'pending' && $stripeOrder['stripe_session'] === 'cs_test_SUB1');
+
+$subBody = fn (string $type, array $object) => (string) json_encode(['id' => 'evt_sub_' . bin2hex(random_bytes(3)), 'type' => $type, 'data' => ['object' => $object]]);
+$paidSession = $subBody('checkout.session.completed', ['id' => 'cs_test_SUB1', 'mode' => 'subscription', 'payment_status' => 'paid', 'amount_total' => 900, 'currency' => 'eur', 'subscription' => 'sub_TEST1', 'client_reference_id' => $stripeOrder['reference'], 'metadata' => ['subscription_order' => $stripeOrder['reference']]]);
+check('subscription billing: an unsigned notification changes nothing', $hook($paidSession, '') === 400 && $pdo->query("SELECT status FROM subscription_order WHERE id = {$stripeOrder['id']}")->fetchColumn() === 'pending');
+$hook($paidSession, $sign($paidSession, $webhookSecret));
+$stripeGranted = $payApp()->subscriptions->current($payAccount);
+check('subscription billing: a signed, paid checkout gives the plan and keeps the Stripe subscription id', $pdo->query("SELECT status FROM subscription_order WHERE id = {$stripeOrder['id']}")->fetchColumn() === 'paid' && $stripeGranted['provider_ref'] === 'sub_TEST1');
+$hook($paidSession, $sign($paidSession, $webhookSecret));
+check('subscription billing: the same notification twice changes nothing', $pdo->query("SELECT COUNT(*) FROM subscription WHERE account_id = $payAccount AND status = 'active'")->fetchColumn() == 1);
+
+$firstInvoice = $subBody('invoice.paid', ['subscription' => 'sub_TEST1', 'billing_reason' => 'subscription_create']);
+$hook($firstInvoice, $sign($firstInvoice, $webhookSecret));
+$endBefore = $payApp()->subscriptions->current($payAccount)['period_end'];
+check('subscription billing: the first invoice is the checkout itself and extends nothing', $endBefore === $stripeGranted['period_end']);
+$renewal = $subBody('invoice.paid', ['subscription' => 'sub_TEST1', 'billing_reason' => 'subscription_cycle']);
+$hook($renewal, $sign($renewal, $webhookSecret));
+$endAfter = $payApp()->subscriptions->current($payAccount)['period_end'];
+check('subscription billing: a paid renewal runs the plan on for its months', $endAfter > $endBefore && $endAfter > Modulento\Core\Support\Clock::now(50 * 86400));
+$payApp()->subscriptions->setStatusByProviderRef('sub_TEST1', 'past_due');
+$payPast = $payApp()->subscriptions->current($payAccount);
+check('subscription billing: an overdue subscription still counts until its period ends', $payPast !== null && $payPast['status'] === 'past_due');
+
+$http->reset();
+$http->answer(200, ['id' => 'sub_TEST1', 'status' => 'active', 'cancel_at_period_end' => true]);
+$pPost('/account/subscription/cancel', [], $payAccount);
+$cancelRequest = $http->requests[0] ?? null;
+check('subscription billing: ending the renewal asks Stripe to stop at the end of the period', $cancelRequest !== null && str_ends_with($cancelRequest['url'], '/v1/subscriptions/sub_TEST1') && str_contains($cancelRequest['body'] ?? '', 'cancel_at_period_end=true'));
+$ended = $subBody('customer.subscription.deleted', ['id' => 'sub_TEST1']);
+$hook($ended, $sign($ended, $webhookSecret));
+check('subscription billing: the end reported by Stripe cancels the subscription', $payApp()->subscriptions->current($payAccount) === null);
+
+$http->reset();
+$pPost('/subscriptions/' . $payPlan . '/order', ['method' => 'stripe'], $payAccount + 1000);
+check('subscription billing: an order is refused without a plan that is offered', $http->requests === []);
+$pdo->exec("DELETE FROM subscription_order WHERE account_id = $payAccount");
+$pdo->exec("DELETE FROM subscription WHERE account_id = $payAccount");
+$pdo->exec("DELETE FROM account WHERE id = $payAccount");
+$pdo->exec("DELETE FROM subscription_plan WHERE slug = 'abo-pay'");
+$payApp()->subscriptionBilling->saveBank('', '', '');
+$payApp()->payments->setEnabled(Modulento\Core\Payment\Payments::TRANSFER, false);
+$payApp()->payments->saveStripeKeys('', '');
 
 // --- Modules: optional functions of the core ------------------------------------
 check('modules: the page needs the settings permission', $get('/admin/modules', 1)['status'] === 403 && $post('/admin/modules', ['modules' => []], 2)['status'] === 403);

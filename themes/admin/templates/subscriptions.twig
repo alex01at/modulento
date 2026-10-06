@@ -10,6 +10,10 @@
         <p>{{ trans('core.admin.subscriptions.intro') }}</p>
     </div>
 
+    {% if not methods.transfer and not methods.stripe %}
+        <p class="flash flash-error" role="status">{{ trans('core.admin.subscriptions.methods.none') }}</p>
+    {% endif %}
+
     <h2>{{ trans('core.admin.subscriptions.plans.title') }}</h2>
     {% if plans %}
         <table>
@@ -56,6 +60,57 @@
         <small>{{ trans('core.admin.subscriptions.plans.form.features_hint') }}</small>
         <button type="submit">{{ trans('core.admin.subscriptions.plans.form.save') }}</button>
     </form>
+</section>
+
+<section class="card-box">
+    <h2>{{ trans('core.admin.subscriptions.bank.title') }}</h2>
+    <p>{{ trans('core.admin.subscriptions.bank.intro') }}</p>
+    <form method="post" action="{{ url('/admin/subscriptions/bank') }}" class="stack-form">
+        {{ csrf_field() }}
+        <label for="bank-holder">{{ trans('core.admin.subscriptions.bank.holder') }}</label>
+        <input id="bank-holder" name="holder" maxlength="100" value="{{ bank.holder ?? '' }}">
+        <label for="bank-iban">{{ trans('core.admin.subscriptions.bank.iban') }}</label>
+        <input id="bank-iban" name="iban" maxlength="34" value="{{ bank.iban ?? '' }}">
+        <label for="bank-bic">{{ trans('core.admin.subscriptions.bank.bic') }}</label>
+        <input id="bank-bic" name="bic" maxlength="11" value="{{ bank.bic ?? '' }}">
+        <small>{{ trans('core.admin.subscriptions.bank.hint') }}</small>
+        <button type="submit">{{ trans('core.admin.subscriptions.bank.save') }}</button>
+    </form>
+</section>
+
+<section class="card-box">
+    <h2>{{ trans('core.admin.subscriptions.transfers.title') }}</h2>
+    {% if transfers %}
+        <table>
+            <thead>
+            <tr>
+                <th scope="col">{{ trans('core.admin.subscriptions.transfers.reference') }}</th>
+                <th scope="col">{{ trans('core.admin.subscriptions.recent.account') }}</th>
+                <th scope="col">{{ trans('core.admin.subscriptions.recent.plan') }}</th>
+                <th scope="col">{{ trans('core.admin.subscriptions.transfers.amount') }}</th>
+                <th scope="col"><span class="visually-hidden">{{ trans('core.admin.subscriptions.transfers.confirm') }}</span></th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for order in transfers %}
+                <tr>
+                    <td><code>{{ order.reference }}</code></td>
+                    <td>{{ order.email }}</td>
+                    <td>{{ order.plan_name }}</td>
+                    <td>{{ money(order.amount_cents, order.currency) }}</td>
+                    <td>
+                        <form method="post" action="{{ url('/admin/subscriptions/orders/' ~ order.id ~ '/paid') }}">
+                            {{ csrf_field() }}
+                            <button type="submit">{{ trans('core.admin.subscriptions.transfers.confirm') }}</button>
+                        </form>
+                    </td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p>{{ trans('core.admin.subscriptions.transfers.none') }}</p>
+    {% endif %}
 </section>
 
 <section class="card-box">

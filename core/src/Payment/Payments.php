@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modulento\Core\Payment;
 
+use Closure;
 use Modulento\Core\App;
 use Modulento\Core\Order\OrderNotifier;
 use Modulento\Core\Order\Orders;
@@ -42,6 +43,9 @@ final class Payments
     private const STRIPE_CHECKOUT_HOSTS = ['checkout.stripe.com'];
     private const STRIPE_CONNECT_HOSTS = ['connect.stripe.com'];
     private const PAYPAL_HOSTS = ['www.paypal.com', 'www.sandbox.paypal.com'];
+
+    /** @var Closure[] */
+    private array $stripeListeners = [];
 
     public function __construct(
         private PDO $db,
@@ -453,6 +457,11 @@ final class Payments
             return 400;
         }
 
+        // Other parts of the site (subscriptions) act on the same verified events.
+        foreach ($this->stripeListeners as $listener) {
+            $listener($event);
+        }
+
         // The second one reports payments that complete later (a bank debit).
         if (!in_array($event['type'] ?? null, ['checkout.session.completed', 'checkout.session.async_payment_succeeded'], true)
             || !is_array($event['data']['object'] ?? null)) {
@@ -468,6 +477,28 @@ final class Payments
         // Also for a session this site does not know: asking Stripe to
         // send it again would not change that.
         return 200;
+    }
+
+    /** @param Closure(array): void $listener called with every verified Stripe event, before the orders are looked at */
+    public function onStripeEvent(Closure $listener): void
+    {
+        $this->stripeListeners[] = $listener;
+    }
+
+    /**
+     * The address of a Stripe checkout for a subscription, on the platform's
+     * own account (no connected account: the operator is the seller).
+     */
+    public function startSubscriptionCheckout(int $amount, string $currency, int $months, string $productName, string $reference, string $successUrl, string $cancelUrl): array
+    {
+        $session = $this->stripe()->createSubscriptionCheckout($amount, $currency, $months, $productName, $reference, $successUrl, $cancelUrl);
+
+        return ['id' => $session['id'], 'url' => self::redirectTarget($session['url'], self::STRIPE_CHECKOUT_HOSTS)];
+    }
+
+    public function cancelStripeSubscription(string $subscription): void
+    {
+        $this->stripe()->cancelSubscription($subscription);
     }
 
     /**
