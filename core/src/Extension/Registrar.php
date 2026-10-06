@@ -75,6 +75,12 @@ final class Registrar
         $this->app->orders->registerPaymentMethod($method);
     }
 
+    /** A feature the extension sells with a subscription plan; the name is a language key. */
+    public function subscriptionFeature(string $key, string $labelKey): void
+    {
+        $this->app->subscriptions->declareFeature($key, $labelKey);
+    }
+
     /** An entry in the site's main menu, e.g. "Blog". The path is one of this extension's public routes. */
     public function navigation(string $labelKey, string $path): void
     {

@@ -18,6 +18,7 @@
     <div class="account-menu-items">
         <span class="account-menu-name">{{ name }}</span>
         <a href="{{ url('/account/settings') }}">{{ trans('core.nav.profile_settings') }}</a>
+        {% if module('subscriptions') %}<a href="{{ url('/account/subscription') }}">{{ trans('core.account.subscription.nav') }}</a>{% endif %}
         {# The colour scheme is chosen right here; the page one is on comes back. #}
         {% set chosen = color_scheme() %}
         <form method="post" action="{{ url('/account/appearance') }}" class="account-menu-scheme">

@@ -12,6 +12,7 @@ use Modulento\Core\Controller\AdminBadWordsController;
 use Modulento\Core\Controller\AdminHomeController;
 use Modulento\Core\Controller\AdminOfferPageController;
 use Modulento\Core\Controller\AdminSubscriptionController;
+use Modulento\Core\Controller\SubscriptionController;
 use Modulento\Core\Controller\DesignController;
 use Modulento\Core\Controller\AdminMediaController;
 use Modulento\Core\Controller\AdminOrderController;
@@ -259,6 +260,12 @@ final class Kernel
             $router->get('/admin/subscriptions', [AdminSubscriptionController::class, 'index'], 'core.settings.manage');
             $router->post('/admin/subscriptions/plans', [AdminSubscriptionController::class, 'createPlan'], 'core.settings.manage');
             $router->post('/admin/subscriptions/assign', [AdminSubscriptionController::class, 'assign'], 'core.settings.manage');
+            $router->get('/admin/subscriptions/plans/{id}', [AdminSubscriptionController::class, 'plan'], 'core.settings.manage');
+            $router->post('/admin/subscriptions/plans/{id}', [AdminSubscriptionController::class, 'updatePlan'], 'core.settings.manage');
+            $router->post('/admin/subscriptions/plans/{id}/delete', [AdminSubscriptionController::class, 'deletePlan'], 'core.settings.manage');
+            // What customers see: the overview of the plans, and the account's own subscription.
+            $router->get('/subscriptions', [SubscriptionController::class, 'overview'], Router::PUBLIC);
+            $router->get('/account/subscription', [SubscriptionController::class, 'account']);
         }
         if ($modules->enabled('contact')) {
             $router->post('/offers/{slug}/contact', [OfferController::class, 'contact']);

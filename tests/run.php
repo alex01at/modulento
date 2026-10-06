@@ -1407,8 +1407,42 @@ $post('/admin/subscriptions/assign', ['email' => 'abo-test@example.test', 'plan'
 check('subscriptions admin: an empty plan removes the grant', $subs->current($subAccount) === null);
 $pdo->exec("DELETE FROM subscription WHERE plan_id = {$adminPlan['id']}");
 $pdo->exec("DELETE FROM subscription_plan WHERE id = {$adminPlan['id']}");
+$subs->declareFeature('abo.declared', 'core.module.subscriptions.name');
+check('subscriptions: an extension declares a feature with its name key; a bad key is refused', $subs->declaredFeatures() === ['abo.declared' => 'core.module.subscriptions.name'] && (function () use ($subs) { try { $subs->declareFeature('Bad Key', 'x'); return false; } catch (InvalidArgumentException) { return true; } })());
+$editId = $subs->createPlan('abo-edit', 'Vorher', 500, 'EUR', 1, ['abo.test.one']);
+$subs->updatePlan($editId, 'Nachher', 1200, 'EUR', 3, ['abo.test.two', 'abo.declared'], true);
+$edited = $subs->plan($editId);
+check('subscriptions: a plan is changed, its key stays', $edited['name'] === 'Nachher' && $edited['price_cents'] === 1200 && $edited['period_months'] === 3 && $edited['features'] === ['abo.test.two', 'abo.declared'] && $edited['slug'] === 'abo-edit');
+$subs->assign($subAccount, $editId);
+check('subscriptions: a change applies at once to an account that has the plan', $subs->allows($subAccount, 'abo.declared') && !$subs->allows($subAccount, 'abo.test.one'));
+$subs->updatePlan($editId, 'Nachher', 1200, 'EUR', 3, ['abo.test.two', 'abo.declared'], false);
+check('subscriptions: an inactive plan is not offered, but its holders keep it', !in_array('abo-edit', array_column($subs->activePlans(), 'slug'), true) && $subs->allows($subAccount, 'abo.declared'));
+$refusedDelete = false;
+try {
+    $subs->deletePlan($editId);
+} catch (InvalidArgumentException) {
+    $refusedDelete = true;
+}
+check('subscriptions: a plan with a history cannot be deleted', $refusedDelete && $subs->plan($editId) !== null);
+$subs->assign($subAccount, null);
+check('subscriptions: a plan that has had a holder stays, even after the holder left it', (function () use ($subs, $editId) { try { $subs->deletePlan($editId); return false; } catch (InvalidArgumentException) { return $subs->plan($editId) !== null; } })());
+$unused = $subs->createPlan('abo-unused', 'Ungenutzt', 100, 'EUR', 1, []);
+$subs->deletePlan($unused);
+check('subscriptions: a plan nobody has had is deleted', $subs->plan($unused) === null);
+$overview = $get('/subscriptions', null);
+check('subscriptions: the overview is public, with the active plans only', $overview['status'] === 200 && str_contains($overview['body'], 'Testabo') && !str_contains($overview['body'], 'Nachher'));
+$accountPage = $get('/account/subscription', 2);
+check('subscriptions: an account sees its own subscription page', $accountPage['status'] === 200 && str_contains($accountPage['body'], 'Mein Abo'));
+$adminEdit = $get('/admin/subscriptions/plans/' . $subPlan, 3);
+check('subscriptions admin: the plan page shows the features, and needs the permission', $adminEdit['status'] === 200 && str_contains($adminEdit['body'], 'abo.test.one') && $get('/admin/subscriptions/plans/' . $subPlan, 1)['status'] === 403 && $get('/admin/subscriptions/plans/999999', 3)['status'] === 404);
+$post('/admin/subscriptions/plans/' . $subPlan, ['name' => 'Testabo neu', 'price' => '12,50', 'currency' => 'EUR', 'period_months' => 3, 'features' => ['abo.test.one'], 'new_features' => 'abo.typed, abo.test.two', 'active' => '1'], 3);
+$changedByForm = $subs->plan($subPlan);
+check('subscriptions admin: the form saves the plan with ticked and typed features', $changedByForm['name'] === 'Testabo neu' && $changedByForm['price_cents'] === 1250 && $changedByForm['features'] === ['abo.test.one', 'abo.typed', 'abo.test.two']);
+$subModules->save(array_values(array_diff(array_keys(Modulento\Core\Support\Modules::ALL), ['subscriptions'])));
+check('subscriptions: switched off, the overview and the account page are gone', $get('/subscriptions', null)['status'] === 404 && $get('/account/subscription', 2)['status'] === 404);
+$subModules->save(array_keys(Modulento\Core\Support\Modules::ALL));
 $pdo->exec("DELETE FROM account WHERE id = $subAccount");
-$pdo->exec("DELETE FROM subscription_plan WHERE slug = 'abo-test'");
+$pdo->exec("DELETE FROM subscription_plan WHERE slug IN ('abo-test', 'abo-edit')");
 
 // Pictures of the media library: only those, in pages.
 $library = '/media/library/' . str_repeat('a', 32) . '.webp';
