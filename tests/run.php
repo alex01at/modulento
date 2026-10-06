@@ -1357,6 +1357,41 @@ $ids = array_map(fn (array $block) => $block['id'], Modulento\Core\Content\HomeL
 check('order: the listed order wins, unknown and repeated ids are ignored', $ids === ['c', 'a', 'b']);
 check('order: a list left out keeps every block', count(Modulento\Core\Content\HomeLayout::ordered($three, [])) === 3);
 
+// Subscriptions: plans, what an account may use, and the module that switches all of it off.
+$subModules = new Modulento\Core\Support\Modules(new Modulento\Core\Support\Settings($pdo));
+$subs = new Modulento\Core\Subscription\Subscriptions($pdo, $subModules);
+// The tables of migration 022, in SQLite's words.
+$pdo->exec("CREATE TABLE subscription_plan (id INTEGER PRIMARY KEY, slug TEXT UNIQUE, name TEXT, price_cents INTEGER, currency TEXT, period_months INTEGER, features TEXT NOT NULL DEFAULT '', active INTEGER NOT NULL DEFAULT 1)");
+$pdo->exec("CREATE TABLE subscription (id INTEGER PRIMARY KEY, account_id INTEGER REFERENCES account (id) ON DELETE CASCADE, plan_id INTEGER REFERENCES subscription_plan (id), status TEXT, period_end TEXT, created_at TEXT, updated_at TEXT)");
+$pdo->exec("INSERT INTO account (email, password_hash, created_at) VALUES ('abo-test@example.test', 'x', '" . Modulento\Core\Support\Clock::now() . "')");
+$subAccount = (int) $pdo->lastInsertId();
+$subPlan = $subs->createPlan('abo-test', 'Testabo', 900, 'EUR', 1, ['abo.test.one', 'abo.test.two']);
+$refused = 0;
+foreach ([fn () => $subs->createPlan('Bad Slug', 'x', 1, 'EUR', 1, []), fn () => $subs->createPlan('abo-test', 'Doppelt', 1, 'EUR', 1, []), fn () => $subs->createPlan('abo-x', 'x', 1, 'eur', 1, [])] as $try) {
+    try {
+        $try();
+    } catch (InvalidArgumentException) {
+        $refused++;
+    }
+}
+check('subscriptions: a plan with a bad slug, a taken slug or a bad currency is refused', $refused === 3);
+check('subscriptions: a plan lists its features', in_array(['abo.test.one', 'abo.test.two'], array_column($subs->plans(), 'features'), true));
+check('subscriptions: with the module on, a feature needs a plan', $subModules->enabled('subscriptions') && $subs->allows($subAccount, 'abo.test.one') === false);
+$subs->assign($subAccount, $subPlan);
+check('subscriptions: a plan grants its features only', $subs->allows($subAccount, 'abo.test.one') && $subs->allows($subAccount, 'abo.test.two') && !$subs->allows($subAccount, 'abo.other'));
+$subs->assign($subAccount, $subPlan, Modulento\Core\Support\Clock::now(-60));
+check('subscriptions: a plan whose period is over grants nothing', $subs->current($subAccount) === null && !$subs->allows($subAccount, 'abo.test.one'));
+$subs->assign($subAccount, $subPlan, Modulento\Core\Support\Clock::now(3600));
+check('subscriptions: a plan within its period grants its features', $subs->allows($subAccount, 'abo.test.one'));
+$subs->assign($subAccount, null);
+check('subscriptions: removing the plan cancels it and keeps the history', $subs->current($subAccount) === null && (int) $pdo->query("SELECT COUNT(*) FROM subscription WHERE account_id = $subAccount AND status = 'canceled'")->fetchColumn() >= 3);
+$subModules->save(array_values(array_diff(array_keys(Modulento\Core\Support\Modules::ALL), ['subscriptions'])));
+check('subscriptions: switched off, every feature is open to everyone', !$subModules->enabled('subscriptions') && $subs->allows($subAccount, 'abo.test.one') && $subs->allows(999999, 'abo.other'));
+$subModules->save(array_keys(Modulento\Core\Support\Modules::ALL));
+check('subscriptions: switched on again, the plans apply again', $subModules->enabled('subscriptions') && !$subs->allows($subAccount, 'abo.test.one'));
+$pdo->exec("DELETE FROM account WHERE id = $subAccount");
+$pdo->exec("DELETE FROM subscription_plan WHERE slug = 'abo-test'");
+
 // Pictures of the media library: only those, in pages.
 $library = '/media/library/' . str_repeat('a', 32) . '.webp';
 $clean = Modulento\Core\Support\HtmlSanitizer::clean('<p><img src="' . $library . '" alt="Logo"><img src="https://evil.example/x.png"><img src="/media/library/../x.png"><img src="/assets/x.png"></p>');
@@ -2839,9 +2874,9 @@ ini_restore('error_log');
 // --- Modules: optional functions of the core ------------------------------------
 check('modules: the page needs the settings permission', $get('/admin/modules', 1)['status'] === 403 && $post('/admin/modules', ['modules' => []], 2)['status'] === 403);
 $r = $get('/admin/modules', 3);
-check('modules: everything is on until switched off', $r['status'] === 200 && substr_count($r['body'], 'name="modules[]"') === 6 && substr_count($r['body'], ' checked') === 6);
+check('modules: everything is on until switched off', $r['status'] === 200 && substr_count($r['body'], 'name="modules[]"') === 7 && substr_count($r['body'], ' checked') === 7);
 $post('/admin/modules', ['modules' => ['contact', 'avatars', 'nonsense', ['x']]], 3);
-check('modules: switched off is stored, unknown names are ignored', $pdo->query("SELECT value FROM setting WHERE name = 'core.modules_disabled'")->fetchColumn() === 'reviews,withdrawal,reports,remember_login');
+check('modules: switched off is stored, unknown names are ignored', $pdo->query("SELECT value FROM setting WHERE name = 'core.modules_disabled'")->fetchColumn() === 'reviews,withdrawal,reports,remember_login,subscriptions');
 $pdo->exec("UPDATE extension SET enabled = 1 WHERE id = 'freelancer'");
 $home = $get('/', null)['body'];
 check('modules: without withdrawal and reports their footer links are gone', !str_contains($home, 'href="/withdrawal"') && !str_contains($home, '/report'));

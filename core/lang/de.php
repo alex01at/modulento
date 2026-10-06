@@ -108,6 +108,8 @@ return [
     'core.module.reports.description' => 'Meldeformular für rechtswidrige Inhalte. Für Plattformen mit Inhalten Dritter nach dem DSA vorgeschrieben.',
     'core.module.avatars.name' => 'Profilbilder',
     'core.module.avatars.description' => 'Konten können ein eigenes Profilbild hochladen.',
+    'core.module.subscriptions.name' => 'Abos',
+    'core.module.subscriptions.description' => 'Pläne, die Konten für Funktionen buchen. Aus: alle Funktionen sind für alle offen.',
     'core.module.remember_login.name' => 'Angemeldet bleiben',
     'core.module.remember_login.description' => 'Checkbox beim Anmelden und Liste der gemerkten Geräte.',
     'core.admin.docs.title' => 'Dokumentation',
