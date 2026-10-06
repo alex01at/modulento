@@ -11,6 +11,7 @@ use Modulento\Core\Controller\AdminController;
 use Modulento\Core\Controller\AdminBadWordsController;
 use Modulento\Core\Controller\AdminHomeController;
 use Modulento\Core\Controller\AdminOfferPageController;
+use Modulento\Core\Controller\AdminSubscriptionController;
 use Modulento\Core\Controller\DesignController;
 use Modulento\Core\Controller\AdminMediaController;
 use Modulento\Core\Controller\AdminOrderController;
@@ -253,6 +254,12 @@ final class Kernel
         if ($modules->enabled('remember_login')) {
             $router->post('/account/sessions/revoke', [AccountController::class, 'revokeSessions']);
         }
+        // Plans and grants: the administration of the subscriptions module only.
+        if ($modules->enabled('subscriptions')) {
+            $router->get('/admin/subscriptions', [AdminSubscriptionController::class, 'index'], 'core.settings.manage');
+            $router->post('/admin/subscriptions/plans', [AdminSubscriptionController::class, 'createPlan'], 'core.settings.manage');
+            $router->post('/admin/subscriptions/assign', [AdminSubscriptionController::class, 'assign'], 'core.settings.manage');
+        }
         if ($modules->enabled('contact')) {
             $router->post('/offers/{slug}/contact', [OfferController::class, 'contact']);
             $router->post('/offers/{slug}/contact/{asker}', [OfferController::class, 'reply']);
@@ -406,6 +413,9 @@ final class Kernel
         $app->addAdminMenu('core.admin.menu.pages', '/admin/pages', 'core.pages.manage', 'content');
         $app->addAdminMenu('core.admin.menu.media', '/admin/media', 'core.media.manage', 'content');
         $app->addAdminMenu('core.admin.menu.home', '/admin/home', 'core.settings.manage', 'content');
+        if ($app->modules->enabled('subscriptions')) {
+            $app->addAdminMenu('core.admin.menu.subscriptions', '/admin/subscriptions', 'core.settings.manage', 'marketplace');
+        }
         $app->addAdminMenu('core.admin.menu.offer_page', '/admin/offer-page', 'core.settings.manage', 'content');
         $app->addAdminMenu('core.admin.menu.design', '/admin/design', 'core.settings.manage', 'system');
         $app->addAdminMenu('core.admin.menu.badwords', '/admin/badwords', 'core.settings.manage', 'moderation');

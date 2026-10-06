@@ -1013,8 +1013,10 @@ time. An extension asks `$app->subscriptions->allows($accountId, 'feature')`
 before it grants a feature that is sold. Switched off, every feature is open to
 everyone; switched on, a feature needs a plan that lists it. So an extension
 checks only features that are sold, and only once the module is in use. The
-plans are created and granted by the operator in code for now; the screens and
-the recurring payment are not there yet.
+operator creates plans and grants them under **Administration → Subscriptions**
+(in the marketplace group, shown only while the module is on). A plan granted by
+hand has no end, or an end date that counts to its last day. The recurring
+payment through the payment provider is not there yet.
 
 **Administration → Media library** keeps the pictures for the site: JPEG, PNG
 or WebP up to 8 MB, saved again on upload (metadata is removed, pictures larger

@@ -1,0 +1,109 @@
+{% extends '@admin/layout.twig' %}
+
+{% block title %}{{ trans('core.admin.subscriptions.title') }} – {{ site_name }}{% endblock %}
+
+{% block admin %}
+{% include '@admin/_page_header.twig' with {heading: trans('core.admin.subscriptions.title')} only %}
+
+<section class="card-box">
+    <div class="card-head">
+        <p>{{ trans('core.admin.subscriptions.intro') }}</p>
+    </div>
+
+    <h2>{{ trans('core.admin.subscriptions.plans.title') }}</h2>
+    {% if plans %}
+        <table>
+            <thead>
+            <tr>
+                <th scope="col">{{ trans('core.admin.subscriptions.plans.name') }}</th>
+                <th scope="col">{{ trans('core.admin.subscriptions.plans.price') }}</th>
+                <th scope="col">{{ trans('core.admin.subscriptions.plans.features') }}</th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for plan in plans %}
+                <tr>
+                    <td><strong>{{ plan.name }}</strong> <small>{{ plan.slug }}</small>{% if not plan.active %} <span class="badge badge-disabled">{{ trans('core.admin.subscriptions.plans.inactive') }}</span>{% endif %}</td>
+                    <td>{{ money(plan.price_cents, plan.currency) }} / {{ trans(plan.period_months == 1 ? 'core.admin.subscriptions.plans.months_one' : 'core.admin.subscriptions.plans.months', {count: plan.period_months}) }}</td>
+                    <td>{{ plan.features|join(', ') ?: '–' }}</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p>{{ trans('core.admin.subscriptions.plans.none') }}</p>
+    {% endif %}
+
+    <form method="post" action="{{ url('/admin/subscriptions/plans') }}" class="stack-form">
+        {{ csrf_field() }}
+        <label for="plan-name">{{ trans('core.admin.subscriptions.plans.form.name') }}</label>
+        <input id="plan-name" name="name" maxlength="100" required>
+        <label for="plan-slug">{{ trans('core.admin.subscriptions.plans.form.slug') }}</label>
+        <input id="plan-slug" name="slug" maxlength="40" pattern="[a-z0-9-]+" required>
+        <small>{{ trans('core.admin.subscriptions.plans.form.slug_hint') }}</small>
+        <label for="plan-price">{{ trans('core.admin.subscriptions.plans.form.price') }}</label>
+        <input id="plan-price" name="price" inputmode="decimal" placeholder="9,90" required>
+        <label for="plan-currency">{{ trans('core.admin.subscriptions.plans.form.currency') }}</label>
+        <input id="plan-currency" name="currency" value="EUR" maxlength="3" pattern="[A-Za-z]{3}" required>
+        <label for="plan-period">{{ trans('core.admin.subscriptions.plans.form.period') }}</label>
+        <select id="plan-period" name="period_months">
+            {% for months in periods %}
+                <option value="{{ months }}" {{ months == 1 ? 'selected' }}>{{ trans(months == 1 ? 'core.admin.subscriptions.plans.months_one' : 'core.admin.subscriptions.plans.months', {count: months}) }}</option>
+            {% endfor %}
+        </select>
+        <label for="plan-features">{{ trans('core.admin.subscriptions.plans.form.features') }}</label>
+        <textarea id="plan-features" name="features" rows="3"></textarea>
+        <small>{{ trans('core.admin.subscriptions.plans.form.features_hint') }}</small>
+        <button type="submit">{{ trans('core.admin.subscriptions.plans.form.save') }}</button>
+    </form>
+</section>
+
+<section class="card-box">
+    <h2>{{ trans('core.admin.subscriptions.assign.title') }}</h2>
+    <p>{{ trans('core.admin.subscriptions.assign.intro') }}</p>
+    <form method="post" action="{{ url('/admin/subscriptions/assign') }}" class="stack-form">
+        {{ csrf_field() }}
+        <label for="assign-email">{{ trans('core.admin.subscriptions.assign.email') }}</label>
+        <input id="assign-email" name="email" type="email" required>
+        <label for="assign-plan">{{ trans('core.admin.subscriptions.assign.plan') }}</label>
+        <select id="assign-plan" name="plan">
+            <option value="">{{ trans('core.admin.subscriptions.assign.none') }}</option>
+            {% for plan in plans|filter(p => p.active) %}
+                <option value="{{ plan.id }}">{{ plan.name }}</option>
+            {% endfor %}
+        </select>
+        <label for="assign-until">{{ trans('core.admin.subscriptions.assign.until') }}</label>
+        <input id="assign-until" name="until" type="date">
+        <small>{{ trans('core.admin.subscriptions.assign.until_hint') }}</small>
+        <button type="submit">{{ trans('core.admin.subscriptions.assign.submit') }}</button>
+    </form>
+</section>
+
+<section class="card-box">
+    <h2>{{ trans('core.admin.subscriptions.recent.title') }}</h2>
+    {% if recent %}
+        <table>
+            <thead>
+            <tr>
+                <th scope="col">{{ trans('core.admin.subscriptions.recent.account') }}</th>
+                <th scope="col">{{ trans('core.admin.subscriptions.recent.plan') }}</th>
+                <th scope="col">{{ trans('core.admin.subscriptions.recent.status') }}</th>
+                <th scope="col">{{ trans('core.admin.subscriptions.recent.until') }}</th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for row in recent %}
+                <tr>
+                    <td>{{ row.email }}</td>
+                    <td>{{ row.plan_name }}</td>
+                    <td>{{ trans('core.admin.subscriptions.status.' ~ row.status) }}</td>
+                    <td>{{ row.period_end ? row.period_end|slice(0, 10) : trans('core.admin.subscriptions.recent.open') }}</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p>{{ trans('core.admin.subscriptions.recent.none') }}</p>
+    {% endif %}
+</section>
+{% endblock %}
