@@ -1389,6 +1389,24 @@ $subModules->save(array_values(array_diff(array_keys(Modulento\Core\Support\Modu
 check('subscriptions: switched off, every feature is open to everyone', !$subModules->enabled('subscriptions') && $subs->allows($subAccount, 'abo.test.one') && $subs->allows(999999, 'abo.other'));
 $subModules->save(array_keys(Modulento\Core\Support\Modules::ALL));
 check('subscriptions: switched on again, the plans apply again', $subModules->enabled('subscriptions') && !$subs->allows($subAccount, 'abo.test.one'));
+$adminPage = $get('/admin/subscriptions', 3);
+check('subscriptions admin: the page is there with the module on', $adminPage['status'] === 200 && str_contains($adminPage['body'], 'Testabo'));
+check('subscriptions admin: the page needs the settings permission', $get('/admin/subscriptions', 1)['status'] === 403);
+$subModules->save(array_values(array_diff(array_keys(Modulento\Core\Support\Modules::ALL), ['subscriptions'])));
+check('subscriptions admin: with the module off there is no page and no action', $get('/admin/subscriptions', 3)['status'] === 404 && $post('/admin/subscriptions/plans', ['name' => 'x', 'slug' => 'abo-off', 'price' => '1', 'currency' => 'EUR', 'period_months' => 1], 3)['status'] === 404);
+$subModules->save(array_keys(Modulento\Core\Support\Modules::ALL));
+$post('/admin/subscriptions/plans', ['name' => 'Admin-Test', 'slug' => 'abo-admin', 'price' => '9,90', 'currency' => 'eur', 'period_months' => 1, 'features' => 'abo.test.one, abo.admin'], 3);
+$adminPlan = array_values(array_filter($subs->plans(), fn ($p) => $p['slug'] === 'abo-admin'))[0] ?? null;
+check('subscriptions admin: a plan is created from the form with its price in cents and its features', $adminPlan !== null && $adminPlan['price_cents'] === 990 && $adminPlan['currency'] === 'EUR' && $adminPlan['features'] === ['abo.test.one', 'abo.admin']);
+$post('/admin/subscriptions/assign', ['email' => 'nobody@example.test', 'plan' => $adminPlan['id'], 'until' => '2099-12-31'], 3);
+check('subscriptions admin: an unknown address grants nothing', $subs->current($subAccount) === null);
+$post('/admin/subscriptions/assign', ['email' => 'abo-test@example.test', 'plan' => $adminPlan['id'], 'until' => '2099-12-31'], 3);
+$granted = $subs->current($subAccount);
+check('subscriptions admin: a grant runs to the end of the given day and is logged', $granted !== null && $granted['name'] === 'Admin-Test' && $granted['period_end'] === '2099-12-31 23:59:59' && $pdo->query("SELECT COUNT(*) FROM admin_log WHERE action = 'subscription_assign' AND target_id = $subAccount")->fetchColumn() >= 1);
+$post('/admin/subscriptions/assign', ['email' => 'abo-test@example.test', 'plan' => '', 'until' => ''], 3);
+check('subscriptions admin: an empty plan removes the grant', $subs->current($subAccount) === null);
+$pdo->exec("DELETE FROM subscription WHERE plan_id = {$adminPlan['id']}");
+$pdo->exec("DELETE FROM subscription_plan WHERE id = {$adminPlan['id']}");
 $pdo->exec("DELETE FROM account WHERE id = $subAccount");
 $pdo->exec("DELETE FROM subscription_plan WHERE slug = 'abo-test'");
 

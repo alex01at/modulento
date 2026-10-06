@@ -99,6 +99,25 @@ final class Subscriptions
         }
     }
 
+    /** The newest subscriptions of all accounts, for the administration. */
+    public function recent(int $limit): array
+    {
+        $rows = $this->db->query(
+            'SELECT s.id, s.status, s.period_end, s.created_at, a.email, p.name AS plan_name
+             FROM subscription s JOIN account a ON a.id = s.account_id JOIN subscription_plan p ON p.id = s.plan_id
+             ORDER BY s.id DESC LIMIT ' . max(1, $limit)
+        )->fetchAll(PDO::FETCH_ASSOC);
+
+        return array_map(fn (array $row) => [
+            'id' => (int) $row['id'],
+            'status' => $row['status'],
+            'period_end' => $row['period_end'],
+            'created_at' => $row['created_at'],
+            'email' => $row['email'],
+            'plan_name' => $row['plan_name'],
+        ], $rows);
+    }
+
     /** The subscription that counts for the account now, or null. */
     public function current(int $accountId): ?array
     {
