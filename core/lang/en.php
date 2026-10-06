@@ -108,6 +108,8 @@ return [
     'core.module.reports.description' => 'Report form for illegal content. Required by the DSA for platforms with content of others.',
     'core.module.avatars.name' => 'Profile pictures',
     'core.module.avatars.description' => 'Accounts can upload a picture of their own.',
+    'core.module.subscriptions.name' => 'Subscriptions',
+    'core.module.subscriptions.description' => 'Plans that accounts book for features. Off: every feature is open to everyone.',
     'core.module.remember_login.name' => 'Stay logged in',
     'core.module.remember_login.description' => 'The box at login and the list of remembered devices.',
     'core.admin.docs.title' => 'Documentation',

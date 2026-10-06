@@ -1001,11 +1001,20 @@ whichever way the device was logged in.
 
 **Administration → Modules** switches optional functions of the core on and
 off: reviews, the contact form on offers, the withdrawal form, reporting
-content, profile pictures and "stay logged in". A module that is off has no
+content, profile pictures, "stay logged in" and subscriptions. A module that is off has no
 routes, menu entries or links; its data stays and is back when it is switched
 on again (`$app->modules->enabled('reviews')`, in templates `module('reviews')`).
 The withdrawal and the report form are legal duties in many cases - switch
 them off only where they do not apply.
+
+**Subscriptions** (the module "Subscriptions") sell plans to accounts: a plan
+has a price, a period and a list of features, and an account has one plan at a
+time. An extension asks `$app->subscriptions->allows($accountId, 'feature')`
+before it grants a feature that is sold. Switched off, every feature is open to
+everyone; switched on, a feature needs a plan that lists it. So an extension
+checks only features that are sold, and only once the module is in use. The
+plans are created and granted by the operator in code for now; the screens and
+the recurring payment are not there yet.
 
 **Administration → Media library** keeps the pictures for the site: JPEG, PNG
 or WebP up to 8 MB, saved again on upload (metadata is removed, pictures larger

@@ -36,6 +36,7 @@ use Modulento\Core\Payment\StripePayment;
 use Modulento\Core\Payment\TransferPayment;
 use Modulento\Core\Provider\Providers;
 use Modulento\Core\Review\Reviews;
+use Modulento\Core\Subscription\Subscriptions;
 use Modulento\Core\Support\Modules;
 use Modulento\Core\Support\Auth;
 use Modulento\Core\Support\CurlHttpClient;
@@ -100,6 +101,7 @@ final class App
     public readonly AdminLog $adminLog;
     public readonly Widgets $widgets;
     public readonly MessageSeen $messageSeen;
+    public readonly Subscriptions $subscriptions;
     public readonly Preferences $preferences;
     public readonly Reviews $reviews;
     public readonly Packages $packages;
@@ -160,6 +162,7 @@ final class App
         $this->withdrawals = new Withdrawals($db);
         $this->reports = new Reports($db);
         $this->modules = new Modules($this->settings);
+        $this->subscriptions = new Subscriptions($db, $this->modules);
         $this->badWords = new BadWords($this->settings);
         $this->homeLayout = new HomeLayout($this->settings, fn (): ?string => $this->themes->activeFile('home-layout.json'));
         $this->widgets = new Widgets($this->settings);
