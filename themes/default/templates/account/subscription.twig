@@ -33,5 +33,27 @@
     <p>{{ trans('core.account.subscription.none') }}</p>
 {% endif %}
 
+{% if invoices %}
+    <h2>{{ trans('core.account.subscription.invoices') }}</h2>
+    <table>
+        <thead>
+        <tr>
+            <th scope="col">{{ trans('core.account.subscription.invoice_number') }}</th>
+            <th scope="col">{{ trans('core.account.subscription.invoice_date') }}</th>
+            <th scope="col">{{ trans('core.account.subscription.invoice_amount') }}</th>
+        </tr>
+        </thead>
+        <tbody>
+        {% for invoice in invoices %}
+            <tr>
+                <td><a href="{{ url('/account/subscription/invoices/' ~ invoice.id) }}">{{ invoice.number }}</a></td>
+                <td>{{ invoice.issued_at|slice(0, 10) }}</td>
+                <td>{{ money(invoice.gross_cents, invoice.currency) }}</td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+{% endif %}
+
 <p><a href="{{ url('/subscriptions') }}">{{ trans('core.account.subscription.overview') }}</a></p>
 {% endblock %}

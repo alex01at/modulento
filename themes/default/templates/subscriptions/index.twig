@@ -17,11 +17,7 @@
                     <p class="muted">{{ plan.feature_labels|join(', ') }}</p>
                 {% endif %}
                 {% if signed_in and (methods.transfer or methods.stripe) %}
-                    <form method="post" action="{{ url('/subscriptions/' ~ plan.id ~ '/order') }}" class="button-row">
-                        {{ csrf_field() }}
-                        {% if methods.transfer %}<button type="submit" name="method" value="transfer" class="button">{{ trans('core.subscriptions.buy.transfer') }}</button>{% endif %}
-                        {% if methods.stripe %}<button type="submit" name="method" value="stripe" class="button">{{ trans('core.subscriptions.buy.stripe') }}</button>{% endif %}
-                    </form>
+                    <p><a class="button" href="{{ url('/subscriptions/' ~ plan.id ~ '/checkout') }}">{{ trans('core.subscriptions.buy.book') }}</a></p>
                 {% elseif not signed_in and (methods.transfer or methods.stripe) %}
                     <p><a href="{{ url('/login') }}">{{ trans('core.subscriptions.buy.login') }}</a></p>
                 {% endif %}

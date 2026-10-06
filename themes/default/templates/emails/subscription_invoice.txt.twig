@@ -1,0 +1,7 @@
+{# Plain text: nothing here is HTML-escaped. Blocks: subject, body. #}
+{% block subject %}{{ trans('core.mail.subscription_invoice.subject', {number: number}) }}{% endblock %}
+{% block body %}
+{{ trans('core.mail.subscription_invoice.body', {number: number, plan: plan, amount: amount, link: link}) }}
+
+{{ trans('core.mail.signature') }}
+{% endblock %}

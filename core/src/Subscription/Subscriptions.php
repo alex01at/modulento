@@ -241,13 +241,13 @@ final class Subscriptions
     public function byProviderRef(string $ref): ?array
     {
         $stmt = $this->db->prepare(
-            'SELECT s.id, s.account_id, s.status, s.period_end, p.period_months
+            'SELECT s.id, s.account_id, s.status, s.period_end, p.period_months, p.name AS plan_name, p.currency
              FROM subscription s JOIN subscription_plan p ON p.id = s.plan_id WHERE s.provider_ref = :ref ORDER BY s.id DESC LIMIT 1'
         );
         $stmt->execute(['ref' => $ref]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
 
-        return $row === false ? null : ['id' => (int) $row['id'], 'account_id' => (int) $row['account_id'], 'status' => $row['status'], 'period_end' => $row['period_end'], 'months' => (int) $row['period_months']];
+        return $row === false ? null : ['id' => (int) $row['id'], 'account_id' => (int) $row['account_id'], 'status' => $row['status'], 'period_end' => $row['period_end'], 'months' => (int) $row['period_months'], 'plan_name' => $row['plan_name']];
     }
 
     /** A paid renewal: the subscription runs on for the months of its plan, from its end or from now. */

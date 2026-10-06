@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modulento\Core\Controller;
 
 use InvalidArgumentException;
+use Modulento\Core\Support\Countries;
 use Modulento\Core\Support\Money;
 use Modulento\Core\Support\Session;
 
@@ -25,6 +26,9 @@ final class AdminSubscriptionController extends Controller
             'bank' => $app->subscriptionBilling->bank(),
             'transfers' => $app->subscriptionBilling->pendingTransfers(),
             'methods' => $app->subscriptionBilling->methods(),
+            'issuer' => $app->invoices->issuer(),
+            'invoices' => $app->invoices->recent(50),
+            'countries' => Countries::CODES,
         ]);
     }
 
@@ -143,6 +147,34 @@ final class AdminSubscriptionController extends Controller
         }
 
         $this->redirect('/admin/subscriptions');
+    }
+
+    /** The seller's details that go on every invoice for a subscription, and the tax rate. */
+    public function saveIssuer(array $params): void
+    {
+        $app = $this->app;
+        try {
+            $app->invoices->saveIssuer($_POST);
+            $app->adminLog->record($app->auth->account()['id'], 'subscription_issuer', null, '');
+            Session::flash('success', $this->trans('core.admin.subscriptions.flash.issuer_saved'));
+        } catch (InvalidArgumentException) {
+            Session::flash('error', $this->trans('core.admin.subscriptions.error.issuer'));
+        }
+
+        $this->redirect('/admin/subscriptions');
+    }
+
+    /** An invoice as the buyer has it, for the administration: support can see what was sent. */
+    public function invoice(array $params): void
+    {
+        $invoice = $this->app->invoices->find((int) $params['id']);
+        if ($invoice === null) {
+            http_response_code(404);
+            $this->render('error.twig', ['status' => 404, 'message_key' => 'core.error.not_found']);
+            return;
+        }
+
+        $this->render('subscriptions/invoice.twig', ['invoice' => $invoice, 'back' => '/admin/subscriptions']);
     }
 
     /** The money of a transfer has arrived: the plan is given to the account from now. */

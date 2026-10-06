@@ -1030,6 +1030,19 @@ same `/webhooks/stripe` endpoint as platform events, not only Connect events.
 Orders of providers keep their own payment flow; only subscriptions are paid to the
 operator.
 
+Before a plan can be sold, the operator enters the seller's details under the same
+page (name, address, VAT ID, VAT rate in percent, a note such as the small business
+rule). A buyer gives a billing address on the checkout page, which is kept for the
+next orders. Every payment gets a numbered invoice (`RE-<year>-<number>`), without
+gaps per year, with the VAT taken out of the gross price; it is mailed as a link
+and shown under **My subscription** and in the administration. The details and the
+VAT rate of an invoice stay as they were when it was issued. A transfer subscription
+that ends within a week gets one reminder mail (task `core.subscription-reminders`);
+a renewal ordered before the end starts when the current plan ends.
+
+Invoices are a tool, not legal advice: which details an invoice must show, and
+whether the VAT rate applies, is for the operator to check with a tax adviser.
+
 An extension declares the features it sells in its `register()` with
 `$registrar->subscriptionFeature('visitenkarte.logo', 'visitenkarte.feature.logo')`,
 where the last argument is a language key. The operator then ticks the features

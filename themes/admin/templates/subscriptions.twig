@@ -13,6 +13,9 @@
     {% if not methods.transfer and not methods.stripe %}
         <p class="flash flash-error" role="status">{{ trans('core.admin.subscriptions.methods.none') }}</p>
     {% endif %}
+    {% if not issuer %}
+        <p class="flash flash-error" role="status">{{ trans('core.admin.subscriptions.issuer.missing') }}</p>
+    {% endif %}
 
     <h2>{{ trans('core.admin.subscriptions.plans.title') }}</h2>
     {% if plans %}
@@ -60,6 +63,65 @@
         <small>{{ trans('core.admin.subscriptions.plans.form.features_hint') }}</small>
         <button type="submit">{{ trans('core.admin.subscriptions.plans.form.save') }}</button>
     </form>
+</section>
+
+<section class="card-box">
+    <h2>{{ trans('core.admin.subscriptions.issuer.title') }}</h2>
+    <p>{{ trans('core.admin.subscriptions.issuer.intro') }}</p>
+    <form method="post" action="{{ url('/admin/subscriptions/invoice-settings') }}" class="stack-form">
+        {{ csrf_field() }}
+        <label for="issuer-name">{{ trans('core.admin.subscriptions.issuer.name') }}</label>
+        <input id="issuer-name" name="name" maxlength="150" value="{{ issuer.name ?? '' }}" required>
+        <label for="issuer-street">{{ trans('core.admin.subscriptions.issuer.street') }}</label>
+        <input id="issuer-street" name="street" maxlength="200" value="{{ issuer.street ?? '' }}" required>
+        <label for="issuer-postal">{{ trans('core.admin.subscriptions.issuer.postal_code') }}</label>
+        <input id="issuer-postal" name="postal_code" maxlength="20" value="{{ issuer.postal_code ?? '' }}" required>
+        <label for="issuer-city">{{ trans('core.admin.subscriptions.issuer.city') }}</label>
+        <input id="issuer-city" name="city" maxlength="100" value="{{ issuer.city ?? '' }}" required>
+        <label for="issuer-country">{{ trans('core.admin.subscriptions.issuer.country') }}</label>
+        <select id="issuer-country" name="country" required>
+            {% for code in countries %}
+                <option value="{{ code }}" {{ code == (issuer.country ?? 'DE') ? 'selected' }}>{{ trans('core.country.' ~ code) }}</option>
+            {% endfor %}
+        </select>
+        <label for="issuer-vat">{{ trans('core.admin.subscriptions.issuer.vat_id') }}</label>
+        <input id="issuer-vat" name="vat_id" maxlength="20" value="{{ issuer.vat_id ?? '' }}" placeholder="ATU12345678">
+        <label for="issuer-rate">{{ trans('core.admin.subscriptions.issuer.tax_rate') }}</label>
+        <input id="issuer-rate" name="tax_rate" type="number" min="0" max="30" value="{{ issuer.tax_rate ?? 19 }}" required>
+        <small>{{ trans('core.admin.subscriptions.issuer.tax_rate_hint') }}</small>
+        <label for="issuer-note">{{ trans('core.admin.subscriptions.issuer.note') }}</label>
+        <textarea id="issuer-note" name="note" rows="2" maxlength="300">{{ issuer.note ?? '' }}</textarea>
+        <small>{{ trans('core.admin.subscriptions.issuer.note_hint') }}</small>
+        <button type="submit">{{ trans('core.admin.subscriptions.issuer.save') }}</button>
+    </form>
+</section>
+
+<section class="card-box">
+    <h2>{{ trans('core.admin.subscriptions.invoices.title') }}</h2>
+    {% if invoices %}
+        <table>
+            <thead>
+            <tr>
+                <th scope="col">{{ trans('core.admin.subscriptions.invoices.number') }}</th>
+                <th scope="col">{{ trans('core.admin.subscriptions.invoices.date') }}</th>
+                <th scope="col">{{ trans('core.admin.subscriptions.invoices.buyer') }}</th>
+                <th scope="col">{{ trans('core.admin.subscriptions.invoices.amount') }}</th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for invoice in invoices %}
+                <tr>
+                    <td><a href="{{ url('/admin/subscriptions/invoices/' ~ invoice.id) }}">{{ invoice.number }}</a></td>
+                    <td>{{ invoice.issued_at|slice(0, 10) }}</td>
+                    <td>{{ invoice.buyer.name }}</td>
+                    <td>{{ money(invoice.gross_cents, invoice.currency) }}</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p>{{ trans('core.admin.subscriptions.invoices.none') }}</p>
+    {% endif %}
 </section>
 
 <section class="card-box">
