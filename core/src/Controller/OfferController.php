@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modulento\Core\Controller;
 
 use Modulento\Core\Catalogue\OfferImages;
+use Modulento\Core\Catalogue\OfferType;
 use Modulento\Core\Catalogue\Offers;
 use Modulento\Core\Catalogue\OfferView;
 use Modulento\Core\Event\OfferStatusChanged;
@@ -317,7 +318,86 @@ final class OfferController extends Controller
             return;
         }
 
-        $this->renderForm(null, $type->id(), null, []);
+        // A new offer is made in steps; the first one starts it from the beginning.
+        $step = max(1, min(self::WIZARD_STEPS, (int) ($_GET['step'] ?? 1)));
+        if ($step === 1) {
+            Session::set('offer_wizard', ['type' => $type->id(), 'values' => []]);
+        }
+        $state = Session::get('offer_wizard');
+        if (!is_array($state) || ($state['type'] ?? null) !== $type->id()) {
+            $this->redirect('/account/offers/new?type=' . $type->id() . '&step=1');
+            return;
+        }
+
+        $this->renderWizard($type, $step, $state['values'] ?? [], []);
+    }
+
+    /**
+     * One step of making a new offer: what it asks is kept in the session. The last
+     * step saves everything at once, through the same save as the form for an offer.
+     */
+    public function wizard(array $params): void
+    {
+        $app = $this->app;
+        $provider = $this->provider();
+        if ($provider === null) {
+            return;
+        }
+
+        $type = $app->offers->type((string) ($_POST['type'] ?? ''));
+        if ($type === null) {
+            $this->redirect('/account/offers');
+            return;
+        }
+        $state = Session::get('offer_wizard');
+        if (!is_array($state) || ($state['type'] ?? null) !== $type->id()) {
+            $this->redirect('/account/offers/new?type=' . $type->id() . '&step=1');
+            return;
+        }
+
+        $step = max(1, min(self::WIZARD_STEPS - 1, (int) ($_POST['wizard_step'] ?? 1)));
+        $primary = $app->translator->locale();
+        $values = is_array($state['values'] ?? null) ? $state['values'] : [];
+        $errors = [];
+
+        switch ($step) {
+            case 1:
+                $chosen = is_array($_POST['locales'] ?? null) ? array_filter($_POST['locales'], 'is_string') : [];
+                $values['locales'] = array_values(array_unique([$primary, ...array_intersect($app->locales->enabled(), $chosen)]));
+                break;
+            case 2:
+                $category = (int) ($_POST['category_id'] ?? 0);
+                if (!array_key_exists($category, $app->categories->all())) {
+                    $errors[] = 'core.offer.error.category';
+                }
+                $values['category_id'] = $category;
+                break;
+            case 3:
+            case 4:
+                $fields = $step === 3 ? ['title', 'summary'] : ['description'];
+                foreach ($values['locales'] ?? [$primary] as $code) {
+                    $input = is_array($_POST['text'][$code] ?? null) ? $_POST['text'][$code] : [];
+                    foreach ($fields as $field) {
+                        $values['text'][$code][$field] = trim(is_string($input[$field] ?? null) ? $input[$field] : '');
+                    }
+                }
+                if ($step === 3 && trim((string) ($values['text'][$primary]['title'] ?? '')) === '') {
+                    $errors[] = 'core.offer.error.text';
+                }
+                break;
+            case 5:
+                // Whatever the offer's type asks for, under the names its form uses.
+                $values['type_fields'] = array_diff_key($_POST, array_flip(['type', 'wizard_step', '_csrf', 'category_id', 'text']));
+                break;
+        }
+
+        Session::set('offer_wizard', ['type' => $type->id(), 'values' => $values]);
+        if ($errors !== []) {
+            $this->renderWizard($type, $step, $values, array_map(fn (string $key) => $this->trans($key), array_unique($errors)));
+            return;
+        }
+
+        $this->redirect('/account/offers/new?type=' . $type->id() . '&step=' . ($step + 1));
     }
 
     public function edit(array $params): void
@@ -376,6 +456,9 @@ final class OfferController extends Controller
         $id = $app->offers->save($offer['id'] ?? null, (int) $provider['id'], $typeId, $shared['category_id'], $shared['texts']);
         $app->offers->setPriceFrom($id, $type->save($id, $specific['values'], $app));
 
+        if ($offer === null) {
+            Session::remove('offer_wizard');
+        }
         Session::flash('success', $this->trans($offer === null ? 'core.offer.saved_new' : 'core.offer.saved'));
         $this->redirect('/account/offers/' . $id);
     }
@@ -501,6 +584,76 @@ final class OfferController extends Controller
         $type = $this->app->offers->type($typeId);
 
         return $type !== null ? $this->trans($type->labelKey()) : $typeId;
+    }
+
+    /** The steps of making a new offer: the languages, the category, the texts, the type's own fields, and a review. */
+    private const WIZARD_STEPS = 6;
+
+    /** @param array<string, mixed> $values what the steps so far have asked for */
+    private function renderWizard(OfferType $type, int $step, array $values, array $errors): void
+    {
+        $app = $this->app;
+        $primary = $app->translator->locale();
+        $selected = $values['locales'] ?? [$primary];
+        $texts = [];
+        foreach ($selected as $code) {
+            $texts[$code] = $values['text'][$code] ?? [];
+        }
+
+        $this->render('account/offer_wizard.twig', [
+            'type' => ['id' => $type->id(), 'label_key' => $type->labelKey(), 'template' => $type->formTemplate()],
+            'step' => $step,
+            'steps' => self::WIZARD_STEPS,
+            'primary' => $primary,
+            'locales' => $app->locales->enabled(),
+            'selected' => $selected,
+            'texts' => $texts,
+            'category_id' => (int) ($values['category_id'] ?? 0),
+            'categories' => $app->categories->tree($primary),
+            'category_name' => $this->categoryName((int) ($values['category_id'] ?? 0), $primary),
+            'type_data' => $step === 5 ? $type->formData(null, $values['type_fields'] ?? null, $app) : [],
+            // The answers as one form's fields, for the review: the last save reads them as any form.
+            'answers' => $step === self::WIZARD_STEPS ? $this->answers($type->id(), $values) : [],
+            'errors' => $errors,
+        ]);
+    }
+
+    private function categoryName(int $id, string $locale): string
+    {
+        $category = $id > 0 ? $this->app->categories->find($id) : null;
+
+        return $category !== null ? ($this->app->categories->view($category, $locale)['name'] ?? '') : '';
+    }
+
+    /** @return list<array{0: string, 1: string}> name and value of each answer, as a form would send them */
+    private function answers(string $typeId, array $values): array
+    {
+        $pairs = [['type', $typeId]];
+        if (isset($values['category_id'])) {
+            $pairs[] = ['category_id', (string) $values['category_id']];
+        }
+        foreach ($values['text'] ?? [] as $code => $fields) {
+            if (!in_array($code, $values['locales'] ?? [], true)) {
+                continue;
+            }
+            foreach ($fields as $field => $value) {
+                $pairs[] = ['text[' . $code . '][' . $field . ']', (string) $value];
+            }
+        }
+        $walk = function (string $name, mixed $value) use (&$walk, &$pairs): void {
+            if (is_array($value)) {
+                foreach ($value as $key => $inner) {
+                    $walk($name . '[' . $key . ']', $inner);
+                }
+                return;
+            }
+            $pairs[] = [$name, (string) $value];
+        };
+        foreach ($values['type_fields'] ?? [] as $key => $value) {
+            $walk((string) $key, $value);
+        }
+
+        return $pairs;
     }
 
     /** @param array<string, mixed>|null $typed the form as sent, after a failed validation */

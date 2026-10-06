@@ -162,8 +162,11 @@ final class AdminController extends Controller
     public function enableExtension(array $params): void
     {
         try {
-            $this->app->extensions->enable($params['id']);
+            $switchedOff = $this->app->extensions->enable($params['id']);
             Session::flash('success', $this->trans('core.admin.extensions.enabled', ['id' => $params['id']]));
+            foreach ($switchedOff as $id) {
+                Session::flash('success', $this->trans('core.admin.extensions.switched_off', ['id' => $id]));
+            }
         } catch (Throwable $e) {
             error_log('Enabling extension ' . $params['id'] . ' failed: ' . $e);
             Session::flash('error', $this->trans('core.admin.extensions.enable_failed', ['id' => $params['id'], 'reason' => $e->getMessage()]));

@@ -1047,8 +1047,26 @@ check('overview of a provider: sales, offers and a button per kind of offer', st
 $offerRow = fn (string $where = '1 = 1') => $pdo->query("SELECT * FROM offer WHERE {$where} ORDER BY id DESC")->fetch();
 
 check('offers: without a provider profile the form leads to the profile', $get('/account/offers', 3)['body'] === '' && ($_SESSION['_flash']['error'] ?? '') !== '');
+// The offer is made in steps: languages, category, texts, description, the type's own fields, review.
+// The session keeps the answers from one step to the next (false: same session as before).
+$wizardSteps = function (string $type, array $answers) use ($get, $post, $pdo): array {
+    $category = (int) $pdo->query('SELECT id FROM category ORDER BY id LIMIT 1')->fetchColumn();
+    $get('/account/offers/new?type=' . $type, 1);
+    $post('/account/offers/wizard', ['type' => $type, 'wizard_step' => 1, 'locales' => ['en']], false);
+    $post('/account/offers/wizard', ['type' => $type, 'wizard_step' => 2, 'category_id' => $category], false);
+    $post('/account/offers/wizard', ['type' => $type, 'wizard_step' => 3, 'text' => ['de' => ['title' => 'Assistent-Titel', 'summary' => 'Kurz'], 'en' => ['title' => 'Wizard title', 'summary' => '']]], false);
+    $post('/account/offers/wizard', ['type' => $type, 'wizard_step' => 4, 'text' => ['de' => ['description' => 'Beschreibung'], 'en' => ['description' => 'Description']]], false);
+    $post('/account/offers/wizard', ['type' => $type, 'wizard_step' => 5] + $answers, false);
+    return $get('/account/offers/new?type=' . $type . '&step=6', false);
+};
 $r = $get('/account/offers/new?type=freelancer.service', 1);
-check('offer form shows the type\'s own fields', $r['status'] === 200 && str_contains($r['body'], 'name="package[1][price]"') && str_contains($r['body'], 'Paket „Basis“'));
+check('offer wizard: the first step asks for the languages, and the type\'s fields come at step five', $r['status'] === 200 && str_contains($r['body'], 'name="locales[]"') && str_contains($r['body'], 'Schritt 1 von 6'));
+$r = $get('/account/offers/new?type=freelancer.service&step=5', false);
+check('offer wizard: the type\'s own fields are there at step five', $r['status'] === 200 && str_contains($r['body'], 'name="package[1][price]"') && str_contains($r['body'], 'Paket „Basis“'));
+$review = $wizardSteps('freelancer.service', ['package' => [1 => ['price' => '20', 'delivery_days' => '3']]]);
+check('offer wizard: the review shows what was entered, and its hidden fields carry the answers to the save', $review['status'] === 200 && str_contains($review['body'], 'Assistent-Titel') && str_contains($review['body'], 'name="text[de][title]"') && str_contains($review['body'], 'name="package[1][price]" value="20"'));
+$r = $get('/account/offers/new?type=freelancer.service&step=3', false);
+check('offer wizard: a language chosen at the start gets its own fields', str_contains($r['body'], 'name="text[en][title]"') && !str_contains($r['body'], 'name="text[fr]'));
 $r = $post('/account/offers/new', ['package' => [1 => ['price' => 'viel', 'delivery_days' => '0']]] + $offerForm, 1);
 check('offer: the type\'s validation refuses, typed values stay', $offerRow() === false && str_contains($r['body'], 'Preis zwischen') && str_contains($r['body'], 'value="Ich gestalte dein Logo"') && str_contains($r['body'], 'value="viel"'));
 $r = $post('/account/offers/new', ['text' => ['de' => ['title' => '', 'summary' => 'x', 'description' => '']]] + $offerForm, 1);
@@ -1862,7 +1880,7 @@ $closeAuctions = function () use ($pdo, $config): int {
 };
 
 $r = $get('/account/offers/new?type=auction.lot', 1);
-check('auction: the offer form shows the lot\'s fields', $r['status'] === 200 && str_contains($r['body'], 'name="start_price"') && str_contains($r['body'], 'name="duration_days"'));
+check('auction: the lot\'s fields are asked for in the wizard, at step five', $r['status'] === 200 && str_contains($r['body'], 'Schritt 1 von 6') && str_contains($wizardSteps('auction.lot', ['start_price' => '10', 'step' => '', 'duration_days' => '3'])['body'], 'name="start_price"') && str_contains($get('/account/offers/new?type=auction.lot&step=5', false)['body'], 'name="duration_days"'));
 $r = $post('/account/offers/new', ['start_price' => '0,50', 'duration_days' => '4'] + $lotForm, 1);
 check('auction: starting price and duration are checked', $lot() === false && str_contains($r['body'], 'Startpreis zwischen') && str_contains($r['body'], 'Laufzeit'));
 $post('/account/offers/new', $lotForm, 1);
