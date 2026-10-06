@@ -228,6 +228,7 @@ return [
     'core.subscriptions.checkout.postal_code' => 'PLZ',
     'core.subscriptions.checkout.city' => 'Ort',
     'core.subscriptions.checkout.country' => 'Land',
+    'core.subscriptions.error.feature' => 'Diese Funktion ist mit deinem Plan nicht freigeschaltet. Die Pläne findest du unter Abos.',
     'core.subscriptions.error.address' => 'Bitte die Rechnungsanschrift vollständig angeben.',
     'core.subscriptions.invoice.title' => 'Rechnung',
     'core.subscriptions.invoice.date' => 'Datum',

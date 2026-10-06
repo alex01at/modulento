@@ -19,6 +19,8 @@ final class Router
     public const PUBLIC = 'public';
     /** Any logged-in account. The default. */
     public const AUTH = 'auth';
+    /** The prefix of an access that names a feature of a subscription plan. */
+    public const FEATURE = 'feature:';
 
     /** @var array<int, array{method: string, regex: string, handler: array|Closure, access: string, csrfExempt: bool}> */
     private array $routes = [];
@@ -123,6 +125,16 @@ final class Router
             }
             $this->fail(403, 'core.error.forbidden');
             return false;
+        }
+
+        // A feature of a subscription plan: "feature:<key>" as the access of a route.
+        if (str_starts_with($access, self::FEATURE)) {
+            if (!$this->app->subscriptions->allows((int) $auth->account()['id'], substr($access, strlen(self::FEATURE)))) {
+                $this->fail(403, 'core.subscriptions.error.feature');
+                return false;
+            }
+
+            return true;
         }
 
         if ($access !== self::AUTH && !$auth->can($access)) {

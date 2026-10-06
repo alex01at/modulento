@@ -1048,6 +1048,13 @@ An extension declares the features it sells in its `register()` with
 where the last argument is a language key. The operator then ticks the features
 per plan. A feature no extension has declared can still be typed in by hand.
 
+A route is unlocked by a feature with the access `feature:<key>`, e.g.
+`$router->post('/visitenkarte/logo', $handler, 'feature:visitenkarte.logo')`: an
+account whose plan does not list the feature gets a refusal, a visitor none. In a
+template, `{% if feature('visitenkarte.logo') %}` shows the control only where it
+works. The route check is the one that counts; a hidden control alone protects
+nothing. Switched off, the module leaves every feature open.
+
 **Administration → Media library** keeps the pictures for the site: JPEG, PNG
 or WebP up to 8 MB, saved again on upload (metadata is removed, pictures larger
 than 2400 pixels are scaled down). Each picture has a fixed address
