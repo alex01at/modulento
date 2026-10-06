@@ -22,6 +22,9 @@ final class AdminSubscriptionController extends Controller
             'plans' => $app->subscriptions->plans(),
             'recent' => $app->subscriptions->recent(50),
             'periods' => [1, 3, 6, 12],
+            'bank' => $app->subscriptionBilling->bank(),
+            'transfers' => $app->subscriptionBilling->pendingTransfers(),
+            'methods' => $app->subscriptionBilling->methods(),
         ]);
     }
 
@@ -121,6 +124,41 @@ final class AdminSubscriptionController extends Controller
             Session::flash('error', $this->trans('core.admin.subscriptions.error.plan_in_use'));
             $this->redirect('/admin/subscriptions/plans/' . $id);
         }
+    }
+
+    /** The operator's bank account, to which the transfers for subscriptions are paid. */
+    public function saveBank(array $params): void
+    {
+        $app = $this->app;
+        try {
+            $app->subscriptionBilling->saveBank(
+                (string) ($_POST['holder'] ?? ''),
+                (string) ($_POST['iban'] ?? ''),
+                (string) ($_POST['bic'] ?? '')
+            );
+            $app->adminLog->record($app->auth->account()['id'], 'subscription_bank', null, '');
+            Session::flash('success', $this->trans('core.admin.subscriptions.flash.bank_saved'));
+        } catch (InvalidArgumentException) {
+            Session::flash('error', $this->trans('core.admin.subscriptions.error.bank'));
+        }
+
+        $this->redirect('/admin/subscriptions');
+    }
+
+    /** The money of a transfer has arrived: the plan is given to the account from now. */
+    public function confirmTransfer(array $params): void
+    {
+        $app = $this->app;
+        $id = (int) $params['id'];
+        try {
+            $app->subscriptionBilling->confirmTransfer($id);
+            $app->adminLog->record($app->auth->account()['id'], 'subscription_transfer', null, (string) $id);
+            Session::flash('success', $this->trans('core.admin.subscriptions.flash.transfer_confirmed'));
+        } catch (InvalidArgumentException) {
+            Session::flash('error', $this->trans('core.admin.subscriptions.error.transfer'));
+        }
+
+        $this->redirect('/admin/subscriptions');
     }
 
     /** Gives an account a plan, or takes its plan away. The end date is the last day, included. */

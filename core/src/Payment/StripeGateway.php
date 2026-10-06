@@ -85,6 +85,51 @@ final class StripeGateway
         return ['id' => $session['id'], 'url' => $session['url']];
     }
 
+    /**
+     * A Checkout Session on the platform's own account for a subscription:
+     * the buyer pays every period and Stripe repeats the charge.
+     *
+     * @param int $amount in minor units, for one period of $months months
+     * @return array{id: string, url: string}
+     */
+    public function createSubscriptionCheckout(int $amount, string $currency, int $months, string $productName, string $reference, string $successUrl, string $cancelUrl): array
+    {
+        $session = $this->call('POST', '/v1/checkout/sessions', [
+            'mode' => 'subscription',
+            'line_items' => [[
+                'quantity' => 1,
+                'price_data' => [
+                    'currency' => strtolower($currency),
+                    'unit_amount' => $amount,
+                    'recurring' => ['interval' => 'month', 'interval_count' => $months],
+                    'product_data' => ['name' => $productName],
+                ],
+            ]],
+            'client_reference_id' => $reference,
+            'metadata' => ['subscription_order' => $reference],
+            // Repeated on every invoice, so that a renewal can be matched to its subscription.
+            'subscription_data' => ['metadata' => ['subscription_order' => $reference]],
+            'success_url' => $successUrl,
+            'cancel_url' => $cancelUrl,
+        ]);
+
+        if (!is_string($session['id'] ?? null) || !is_string($session['url'] ?? null)) {
+            throw new PaymentException('core.payment.error.unexpected', 'Stripe POST /v1/checkout/sessions (subscription): no id or url');
+        }
+
+        return ['id' => $session['id'], 'url' => $session['url']];
+    }
+
+    /** Ends the renewal at the close of the current period; the subscription runs to its end. */
+    public function cancelSubscription(string $subscription): void
+    {
+        if (preg_match('/^sub_[A-Za-z0-9]+$/', $subscription) !== 1) {
+            throw new PaymentException('core.payment.error.unexpected', 'Stripe: malformed subscription id');
+        }
+
+        $this->call('POST', '/v1/subscriptions/' . $subscription, ['cancel_at_period_end' => 'true']);
+    }
+
     /** @return array{id: string, paid: bool, amount: int, currency: string} what Stripe knows about a session */
     public function checkoutSession(string $account, string $sessionId): array
     {

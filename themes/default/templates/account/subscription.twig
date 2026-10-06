@@ -13,6 +13,13 @@
             <strong>{{ trans('core.admin.subscriptions.status.' ~ current.status) }}</strong>
             · {{ current.period_end ? trans('core.account.subscription.until', {date: current.period_end|slice(0, 10)}) : trans('core.account.subscription.open') }}
         </p>
+        {% if current.provider_ref %}
+            <form method="post" action="{{ url('/account/subscription/cancel') }}">
+                {{ csrf_field() }}
+                <button type="submit" class="link-button">{{ trans('core.account.subscription.cancel') }}</button>
+                <small>{{ trans('core.account.subscription.cancel_hint') }}</small>
+            </form>
+        {% endif %}
         {% if current.feature_labels %}
             <h3>{{ trans('core.account.subscription.features') }}</h3>
             <ul>
