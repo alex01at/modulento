@@ -1,0 +1,38 @@
+{% extends 'layout/base.twig' %}
+
+{% block title %}{{ trans('core.subscriptions.checkout.title') }} – {{ site_name }}{% endblock %}
+
+{% block content %}
+{% include 'account/_nav.twig' %}
+<h1>{{ trans('core.subscriptions.checkout.title') }}</h1>
+<p><strong>{{ plan.name }}</strong> · {{ money(plan.price_cents, plan.currency) }} <small>{{ trans(plan.period_months == 1 ? 'core.subscriptions.period_one' : 'core.subscriptions.period', {count: plan.period_months}) }}</small></p>
+
+{% if not methods.transfer and not methods.stripe %}
+    <p>{{ trans('core.subscriptions.checkout.none') }}</p>
+{% else %}
+    <form method="post" action="{{ url('/subscriptions/' ~ plan.id ~ '/checkout') }}" class="stack-form">
+        {{ csrf_field() }}
+        <h2>{{ trans('core.subscriptions.checkout.address') }}</h2>
+        <p><small>{{ trans('core.subscriptions.checkout.address_hint') }}</small></p>
+        <label for="billing-name">{{ trans('core.subscriptions.checkout.name') }}</label>
+        <input id="billing-name" name="name" value="{{ address.name ?? '' }}" maxlength="150" autocomplete="name" required>
+        <label for="billing-street">{{ trans('core.subscriptions.checkout.street') }}</label>
+        <input id="billing-street" name="street" value="{{ address.street ?? '' }}" maxlength="200" autocomplete="street-address" required>
+        <label for="billing-postal">{{ trans('core.subscriptions.checkout.postal_code') }}</label>
+        <input id="billing-postal" name="postal_code" value="{{ address.postal_code ?? '' }}" maxlength="20" autocomplete="postal-code" required>
+        <label for="billing-city">{{ trans('core.subscriptions.checkout.city') }}</label>
+        <input id="billing-city" name="city" value="{{ address.city ?? '' }}" maxlength="100" autocomplete="address-level2" required>
+        <label for="billing-country">{{ trans('core.subscriptions.checkout.country') }}</label>
+        <select id="billing-country" name="country" required>
+            {% for code in countries %}
+                <option value="{{ code }}" {{ code == (address.country ?? 'DE') ? 'selected' }}>{{ trans('core.country.' ~ code) }}</option>
+            {% endfor %}
+        </select>
+
+        <div class="button-row">
+            {% if methods.transfer %}<button type="submit" name="method" value="transfer">{{ trans('core.subscriptions.buy.transfer') }}</button>{% endif %}
+            {% if methods.stripe %}<button type="submit" name="method" value="stripe">{{ trans('core.subscriptions.buy.stripe') }}</button>{% endif %}
+        </div>
+    </form>
+{% endif %}
+{% endblock %}

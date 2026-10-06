@@ -36,6 +36,7 @@ use Modulento\Core\Payment\StripePayment;
 use Modulento\Core\Payment\TransferPayment;
 use Modulento\Core\Provider\Providers;
 use Modulento\Core\Review\Reviews;
+use Modulento\Core\Subscription\Invoices;
 use Modulento\Core\Subscription\SubscriptionBilling;
 use Modulento\Core\Subscription\Subscriptions;
 use Modulento\Core\Support\Modules;
@@ -103,6 +104,7 @@ final class App
     public readonly Widgets $widgets;
     public readonly MessageSeen $messageSeen;
     public readonly Subscriptions $subscriptions;
+    public readonly Invoices $invoices;
     public readonly SubscriptionBilling $subscriptionBilling;
     public readonly Preferences $preferences;
     public readonly Reviews $reviews;
@@ -165,7 +167,13 @@ final class App
         $this->reports = new Reports($db);
         $this->modules = new Modules($this->settings);
         $this->subscriptions = new Subscriptions($db, $this->modules);
-        $this->subscriptionBilling = new SubscriptionBilling($db, $this->settings, $this->modules, $this->subscriptions, $this->payments);
+        $this->invoices = new Invoices($db, $this->settings);
+        // Mails and links are resolved when they are used: the mailer is built further down.
+        $this->subscriptionBilling = new SubscriptionBilling(
+            $db, $this->settings, $this->modules, $this->subscriptions, $this->payments, $this->invoices,
+            fn (string $to, string $template, array $data, string $locale): bool => $this->mailer->send($to, $template, $data, $locale),
+            fn (string $path): string => $this->url($path, null, true)
+        );
         $this->payments->onStripeEvent(fn (array $event) => $this->subscriptionBilling->stripeEvent($event));
         $this->badWords = new BadWords($this->settings);
         $this->homeLayout = new HomeLayout($this->settings, fn (): ?string => $this->themes->activeFile('home-layout.json'));

@@ -1362,8 +1362,10 @@ $subModules = new Modulento\Core\Support\Modules(new Modulento\Core\Support\Sett
 $subs = new Modulento\Core\Subscription\Subscriptions($pdo, $subModules);
 // The tables of migration 022, in SQLite's words.
 $pdo->exec("CREATE TABLE subscription_plan (id INTEGER PRIMARY KEY, slug TEXT UNIQUE, name TEXT, price_cents INTEGER, currency TEXT, period_months INTEGER, features TEXT NOT NULL DEFAULT '', active INTEGER NOT NULL DEFAULT 1)");
-$pdo->exec("CREATE TABLE subscription (id INTEGER PRIMARY KEY, account_id INTEGER REFERENCES account (id) ON DELETE CASCADE, plan_id INTEGER REFERENCES subscription_plan (id), status TEXT, period_end TEXT, provider_ref TEXT NULL, created_at TEXT, updated_at TEXT)");
+$pdo->exec("CREATE TABLE subscription (id INTEGER PRIMARY KEY, account_id INTEGER REFERENCES account (id) ON DELETE CASCADE, plan_id INTEGER REFERENCES subscription_plan (id), status TEXT, period_end TEXT, provider_ref TEXT NULL, reminded_for TEXT NULL, created_at TEXT, updated_at TEXT)");
 $pdo->exec("CREATE TABLE subscription_order (id INTEGER PRIMARY KEY, account_id INTEGER REFERENCES account (id) ON DELETE CASCADE, plan_id INTEGER REFERENCES subscription_plan (id), method TEXT, status TEXT, reference TEXT UNIQUE, amount_cents INTEGER, currency TEXT, stripe_session TEXT NULL, created_at TEXT, paid_at TEXT NULL)");
+$pdo->exec("CREATE TABLE subscription_billing_address (account_id INTEGER PRIMARY KEY REFERENCES account (id) ON DELETE CASCADE, name TEXT, street TEXT, postal_code TEXT, city TEXT, country TEXT, updated_at TEXT)");
+$pdo->exec("CREATE TABLE subscription_invoice (id INTEGER PRIMARY KEY, number TEXT UNIQUE, year INTEGER, seq INTEGER, source_ref TEXT UNIQUE, account_id INTEGER NULL REFERENCES account (id) ON DELETE SET NULL, plan_name TEXT, months INTEGER, currency TEXT, net_cents INTEGER, tax_rate INTEGER, tax_cents INTEGER, gross_cents INTEGER, buyer_name TEXT, buyer_street TEXT, buyer_postal_code TEXT, buyer_city TEXT, buyer_country TEXT, issuer TEXT, issued_at TEXT, UNIQUE (year, seq))");
 $pdo->exec("INSERT INTO account (email, password_hash, created_at) VALUES ('abo-test@example.test', 'x', '" . Modulento\Core\Support\Clock::now() . "')");
 $subAccount = (int) $pdo->lastInsertId();
 $subPlan = $subs->createPlan('abo-test', 'Testabo', 900, 'EUR', 1, ['abo.test.one', 'abo.test.two']);
@@ -2926,9 +2928,11 @@ ini_restore('error_log');
 
 // --- Subscriptions paid: by transfer to the operator, or by Stripe on the platform's account ---
 $payBilling = fn ($app) => $app->subscriptionBilling;
+$addr = ['name' => 'Kundin Test', 'street' => 'Ringweg 4', 'postal_code' => '20095', 'city' => 'Hamburg', 'country' => 'DE'];
 $payApp()->payments->setEnabled(Modulento\Core\Payment\Payments::TRANSFER, true);
 $payApp()->payments->setEnabled(Modulento\Core\Payment\Payments::STRIPE, true);
 $payApp()->payments->saveStripeKeys('sk_test_subscriptions', $webhookSecret);
+$payApp()->invoices->saveIssuer(['name' => 'Modulento Betrieb', 'street' => 'Musterweg 1', 'postal_code' => '10115', 'city' => 'Berlin', 'country' => 'de', 'vat_id' => 'DE123456789', 'tax_rate' => '19', 'note' => '']);
 $pdo->exec("INSERT INTO account (email, password_hash, status, created_at, email_verified_at, terms_accepted_at) VALUES ('abo-pay@example.test', 'x', 'active', '" . Modulento\Core\Support\Clock::now() . "', '" . Modulento\Core\Support\Clock::now() . "', '" . Modulento\Core\Support\Clock::now() . "')");
 $payAccount = (int) $pdo->lastInsertId();
 $payPlan = $payApp()->subscriptions->createPlan('abo-pay', 'Zahlabo', 900, 'EUR', 1, ['abo.pay.one']);
@@ -2937,7 +2941,7 @@ $payApp()->subscriptionBilling->saveBank('Modulento Betrieb', 'DE89 3704 0044 05
 check('subscription billing: the operator bank account is checked and stored normalised', $bankRefused && $payApp()->subscriptionBilling->bank()['iban'] === 'DE89370400440532013000' && $payApp()->subscriptionBilling->methods()['transfer'] === true);
 
 $http->reset();
-$pPost('/subscriptions/' . $payPlan . '/order', ['method' => 'transfer'], $payAccount);
+$pPost('/subscriptions/' . $payPlan . '/checkout', $addr + ['method' => 'transfer'], $payAccount);
 $transfer = $pdo->query("SELECT id, status, reference, method, amount_cents FROM subscription_order WHERE account_id = $payAccount")->fetch();
 check('subscription billing: an order by transfer waits for its money, with a reference and the price', $transfer['method'] === 'transfer' && $transfer['status'] === 'pending' && preg_match('/^ABO-[A-F0-9]{8}$/', $transfer['reference']) === 1 && (int) $transfer['amount_cents'] === 900);
 check('subscription billing: the order page shows the reference to the account that ordered it, and not to another', $get('/subscriptions/orders/' . $transfer['id'], $payAccount)['status'] === 200 && str_contains($get('/subscriptions/orders/' . $transfer['id'], $payAccount)['body'], $transfer['reference']) && $get('/subscriptions/orders/' . $transfer['id'], 3)['status'] === 404);
@@ -2950,7 +2954,7 @@ check('subscription billing: a second confirmation changes nothing', $pdo->query
 
 $http->reset();
 $http->answer(200, ['id' => 'cs_test_SUB1', 'url' => 'https://checkout.stripe.com/c/pay/cs_test_SUB1']);
-$pPost('/subscriptions/' . $payPlan . '/order', ['method' => 'stripe'], $payAccount);
+$pPost('/subscriptions/' . $payPlan . '/checkout', $addr + ['method' => 'stripe'], $payAccount);
 $checkoutRequest = $http->requests[0] ?? null;
 check('subscription billing: Stripe gets a subscription checkout on the platform account, with the reference', $checkoutRequest !== null && str_contains($checkoutRequest['body'] ?? '', 'mode=subscription') && str_contains($checkoutRequest['body'] ?? '', '%5Binterval%5D=month') && !isset($checkoutRequest['headers']['Stripe-Account']));
 $stripeOrder = $pdo->query("SELECT id, reference, status, stripe_session FROM subscription_order WHERE account_id = $payAccount AND method = 'stripe'")->fetch();
@@ -2987,8 +2991,39 @@ $hook($ended, $sign($ended, $webhookSecret));
 check('subscription billing: the end reported by Stripe cancels the subscription', $payApp()->subscriptions->current($payAccount) === null);
 
 $http->reset();
-$pPost('/subscriptions/' . $payPlan . '/order', ['method' => 'stripe'], $payAccount + 1000);
+$pPost('/subscriptions/' . $payPlan . '/checkout', $addr + ['method' => 'stripe'], $payAccount + 1000);
 check('subscription billing: an order is refused without a plan that is offered', $http->requests === []);
+$checkoutPage = $pPost('/subscriptions/' . $payPlan . '/checkout', ['method' => 'nothing'], $payAccount);
+check('subscription billing: an order without a complete address is refused and changes nothing', $checkoutPage['status'] === 302 && $pdo->query("SELECT COUNT(*) FROM subscription_order WHERE account_id = $payAccount AND method = 'transfer'")->fetchColumn() == 1);
+check('subscription billing: the checkout page is there and remembers the address', $get('/subscriptions/' . $payPlan . '/checkout', $payAccount)['status'] === 200 && str_contains($get('/subscriptions/' . $payPlan . '/checkout', $payAccount)['body'], 'Ringweg 4'));
+
+$invoice = $pdo->query("SELECT id, number, net_cents, tax_cents, gross_cents, tax_rate, buyer_name, source_ref FROM subscription_invoice WHERE source_ref = 'order:" . $transfer['reference'] . "'")->fetch();
+check('invoices: a transfer confirmed gets its invoice, numbered and with the operator\'s VAT taken out of the gross price', $invoice !== false && preg_match('/^RE-\d{4}-\d{6}$/', $invoice['number']) === 1 && (int) $invoice['gross_cents'] === 900 && (int) $invoice['tax_rate'] === 19 && (int) $invoice['net_cents'] + (int) $invoice['tax_cents'] === 900 && $invoice['buyer_name'] === 'Kundin Test');
+check('invoices: the account sees its own invoice, another account does not', $get('/account/subscription/invoices/' . $invoice['id'], $payAccount)['status'] === 200 && str_contains($get('/account/subscription/invoices/' . $invoice['id'], $payAccount)['body'], $invoice['number']) && $get('/account/subscription/invoices/' . $invoice['id'], 3)['status'] === 404);
+check('invoices: the administration shows the invoice to support', $get('/admin/subscriptions/invoices/' . $invoice['id'], 3)['status'] === 200 && $get('/admin/subscriptions/invoices/' . $invoice['id'], 1)['status'] === 403);
+$numbers = $payApp()->invoices->recent(10);
+check('invoices: an invoice that is issued twice is the same invoice', $payApp()->invoices->issue($payAccount, 'order:' . $transfer['reference'], 'x', 1, 1, 'EUR')['number'] === $invoice['number'] && count($numbers) >= 2);
+
+$hookInvoices = $pdo->query("SELECT COUNT(*) FROM subscription_invoice WHERE source_ref = 'order:" . $stripeOrder['reference'] . "'")->fetchColumn();
+check('invoices: a Stripe payment gets exactly one invoice, even when the notification comes twice', (int) $hookInvoices === 1);
+$renewals = $pdo->query("SELECT COUNT(*) FROM subscription_invoice WHERE source_ref LIKE 'stripe:%' AND account_id = $payAccount")->fetchColumn();
+check('invoices: a paid renewal gets its own invoice', (int) $renewals === 1);
+
+$pdo->exec("UPDATE subscription SET provider_ref = NULL WHERE account_id = $payAccount");
+$payApp()->subscriptions->assign($payAccount, $payPlan, Modulento\Core\Support\Clock::now(3 * 86400));
+$reminded = $payApp()->subscriptionBilling->sendReminders();
+check('reminders: a transfer subscription that ends within a week gets one reminder', $reminded === 1 && $payApp()->subscriptionBilling->sendReminders() === 0);
+$payApp()->subscriptions->assign($payAccount, $payPlan, Modulento\Core\Support\Clock::now(30 * 86400));
+check('reminders: a subscription that runs longer gets none', $payApp()->subscriptionBilling->sendReminders() === 0);
+$payApp()->subscriptions->assign($payAccount, $payPlan, Modulento\Core\Support\Clock::now(3 * 86400));
+check('reminders: a renewal of a transfer keeps the days left, from the end of the current plan', (function () use ($payApp, $payAccount, $payPlan, $pPost, $pdo) {
+    $before = $payApp()->subscriptions->current($payAccount)['period_end'];
+    $pdo->exec("INSERT INTO subscription_order (account_id, plan_id, method, status, reference, amount_cents, currency, created_at) VALUES ($payAccount, $payPlan, 'transfer', 'pending', 'ABO-RENEW01', 900, 'EUR', '" . Modulento\Core\Support\Clock::now() . "')");
+    $orderId = (int) $pdo->lastInsertId();
+    $payApp()->subscriptionBilling->confirmTransfer($orderId);
+    $after = $payApp()->subscriptions->current($payAccount)['period_end'];
+    return $after > $before && $after >= Modulento\Core\Support\Clock::now(30 * 86400);
+})());
 $pdo->exec("DELETE FROM subscription_order WHERE account_id = $payAccount");
 $pdo->exec("DELETE FROM subscription WHERE account_id = $payAccount");
 $pdo->exec("DELETE FROM account WHERE id = $payAccount");

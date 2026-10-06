@@ -6,6 +6,7 @@ namespace Modulento\Core\Controller;
 
 use InvalidArgumentException;
 use Modulento\Core\Payment\Payments;
+use Modulento\Core\Support\Countries;
 use Modulento\Core\Payment\PaymentException;
 use Modulento\Core\Support\Session;
 
@@ -29,9 +30,30 @@ final class SubscriptionController extends Controller
     public function account(array $params): void
     {
         $app = $this->app;
-        $current = $app->subscriptions->current((int) $app->auth->account()['id']);
+        $accountId = (int) $app->auth->account()['id'];
+        $current = $app->subscriptions->current($accountId);
         $this->render('account/subscription.twig', [
             'current' => $current === null ? null : $current + ['feature_labels' => $this->labels($current['features'])],
+            'invoices' => $app->invoices->ofAccount($accountId),
+        ]);
+    }
+
+    /** The page before paying: the billing address (kept for later orders) and the ways to pay. */
+    public function checkout(array $params): void
+    {
+        $app = $this->app;
+        $plan = $app->subscriptions->plan((int) $params['id']);
+        if ($plan === null || !$plan['active']) {
+            http_response_code(404);
+            $this->render('error.twig', ['status' => 404, 'message_key' => 'core.error.not_found']);
+            return;
+        }
+
+        $this->render('subscriptions/checkout.twig', [
+            'plan' => $plan + ['feature_labels' => $this->labels($plan['features'])],
+            'address' => $app->invoices->billingAddress((int) $app->auth->account()['id']) ?? [],
+            'methods' => $app->subscriptionBilling->methods(),
+            'countries' => Countries::CODES,
         ]);
     }
 
@@ -43,8 +65,17 @@ final class SubscriptionController extends Controller
         $planId = (int) $params['id'];
         $method = (string) ($_POST['method'] ?? '');
         $offered = $app->subscriptionBilling->methods();
+        $back = '/subscriptions/' . $planId . '/checkout';
 
         try {
+            $app->invoices->saveBillingAddress($accountId, [
+                'name' => $_POST['name'] ?? '',
+                'street' => $_POST['street'] ?? '',
+                'postal_code' => $_POST['postal_code'] ?? '',
+                'city' => $_POST['city'] ?? '',
+                'country' => $_POST['country'] ?? '',
+            ]);
+
             if ($method === 'transfer' && $offered['transfer']) {
                 $order = $app->subscriptionBilling->startTransfer($accountId, $planId);
                 $this->redirect('/subscriptions/orders/' . $order['id']);
@@ -63,11 +94,13 @@ final class SubscriptionController extends Controller
             Session::flash('error', $this->trans('core.subscriptions.error.method'));
         } catch (PaymentException $e) {
             Session::flash('error', $this->trans(Payments::report($e)));
-        } catch (InvalidArgumentException) {
-            Session::flash('error', $this->trans('core.subscriptions.error.unavailable'));
+        } catch (InvalidArgumentException $e) {
+            Session::flash('error', $this->trans(str_contains($e->getMessage(), 'address')
+                ? 'core.subscriptions.error.address'
+                : 'core.subscriptions.error.unavailable'));
         }
 
-        $this->redirect('/subscriptions');
+        $this->redirect($back);
     }
 
     /** One of the account's own orders: the bank details while the transfer is open, the state afterwards. */
@@ -85,6 +118,20 @@ final class SubscriptionController extends Controller
             'order' => $order,
             'bank' => $order['method'] === 'transfer' && $order['status'] === 'pending' ? $app->subscriptionBilling->bank() : null,
         ]);
+    }
+
+    /** One of the account's own invoices, to print or keep. */
+    public function invoice(array $params): void
+    {
+        $app = $this->app;
+        $invoice = $app->invoices->find((int) $params['id'], (int) $app->auth->account()['id']);
+        if ($invoice === null) {
+            http_response_code(404);
+            $this->render('error.twig', ['status' => 404, 'message_key' => 'core.error.not_found']);
+            return;
+        }
+
+        $this->render('subscriptions/invoice.twig', ['invoice' => $invoice, 'back' => '/account/subscription']);
     }
 
     public function cancel(array $params): void

@@ -8,7 +8,7 @@ It changes data (a block, a text, an account): use a throwaway installation.
 
 The scenario: sign in, edit the home page in place, add and hide blocks, change a text;
 then sign in as a new account and back to the administration."""
-import asyncio, os, re, sys, tempfile, time
+import asyncio, os, re, sys, tempfile, time, uuid
 sys.path.insert(0, __file__.rsplit('/', 1)[0])
 from browser import Browser
 
@@ -176,6 +176,22 @@ async def main():
         check('the way back leads to the administration account page', (await b.location()) == account_url)
         await b.goto(BASE + '/admin')
         check('the administration opens again after the way back', 'Übersicht' in (await b.eval('document.body.innerText')) or await b.exists('.sidebar, .admin-menu, .header-nav'))
+        # 8. subscriptions: a plan made in the administration is offered, and the account's page is there
+        slug = 'szenario-' + uuid.uuid4().hex[:6]
+        await b.goto(BASE + '/admin/subscriptions')
+        await b.type_into('#plan-name', 'Szenario-Plan')
+        await b.type_into('#plan-slug', slug)
+        await b.type_into('#plan-price', '4,90')
+        await b.type_into('#plan-features', 'szenario.feature')
+        await b.click('form[action$="/admin/subscriptions/plans"] button[type="submit"]')
+        check('subscriptions: a plan made in the administration is listed there', 'Szenario-Plan' in (await b.eval('document.body.innerText')))
+        await b.goto(BASE + '/subscriptions')
+        check('subscriptions: the plan is offered on the public overview', 'Szenario-Plan' in (await b.eval('document.body.innerText')))
+        await b.goto(BASE + '/account/subscription')
+        check('subscriptions: the account has its own subscription page', 'Mein Abo' in (await b.eval('document.body.innerText')))
+        await b.goto(BASE + '/admin/subscriptions')
+        check('subscriptions: the administration shows the bank account and the invoice details', 'Bankverbindung für Überweisungen' in (await b.eval('document.body.innerText')) and 'Angaben für die Rechnungen' in (await b.eval('document.body.innerText')))
+
     finally:
         await b.close()
     failed = [n for n, ok in results if not ok]

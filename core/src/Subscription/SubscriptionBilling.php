@@ -4,14 +4,14 @@ declare(strict_types=1);
 
 namespace Modulento\Core\Subscription;
 
-use DateTimeImmutable;
-use DateTimeZone;
+use Closure;
 use InvalidArgumentException;
 use Modulento\Core\Payment\BankAccount;
 use Modulento\Core\Payment\PaymentException;
 use Modulento\Core\Payment\Payments;
 use Modulento\Core\Support\Clock;
 use Modulento\Core\Support\Modules;
+use Modulento\Core\Support\Money;
 use Modulento\Core\Support\Settings;
 use PDO;
 use PDOException;
@@ -19,19 +19,29 @@ use PDOException;
 /**
  * How an account pays for a plan: by bank transfer to the operator's account,
  * confirmed by hand once the money is there, or by Stripe on the platform's own
- * account. Unlike orders, the money of a subscription belongs to the operator,
- * so it goes to the operator's account and never to a provider.
+ * account. The money of a subscription belongs to the operator, so it never goes
+ * to a provider. Every payment gets its invoice, and a reminder goes out before a
+ * transfer subscription ends.
  */
 final class SubscriptionBilling
 {
     private const BANK = 'core.subscriptions.bank';
+    /** Days before the end of a period in which the reminder goes out. */
+    private const REMIND_DAYS = 7;
 
+    /**
+     * @param Closure(string, string, array<string, mixed>, string): bool $notify sends a mail: address, template, data, locale
+     * @param Closure(string): string $url the absolute address of a path on the site
+     */
     public function __construct(
         private PDO $db,
         private Settings $settings,
         private Modules $modules,
         private Subscriptions $subscriptions,
-        private Payments $payments
+        private Payments $payments,
+        private Invoices $invoices,
+        private Closure $notify,
+        private Closure $url
     ) {
     }
 
@@ -71,8 +81,9 @@ final class SubscriptionBilling
     public function methods(): array
     {
         return [
-            'transfer' => $this->payments->isEnabled(Payments::TRANSFER) && $this->bank() !== null,
-            'stripe' => $this->payments->isEnabled(Payments::STRIPE) && $this->payments->stripeConfigured(),
+            // Nothing is sold before the seller's details for the invoices are there.
+            'transfer' => $this->payments->isEnabled(Payments::TRANSFER) && $this->bank() !== null && $this->invoices->issuer() !== null,
+            'stripe' => $this->payments->isEnabled(Payments::STRIPE) && $this->payments->stripeConfigured() && $this->invoices->issuer() !== null,
         ];
     }
 
@@ -119,8 +130,9 @@ final class SubscriptionBilling
     }
 
     /**
-     * The operator confirms that the money of a transfer has arrived: the plan is
-     * given to the account for its months, from now.
+     * The operator confirms that the money of a transfer has arrived. The plan
+     * runs for its months: from now, or from the end of a plan the account still
+     * has, so that an early renewal loses no days.
      */
     public function confirmTransfer(int $orderId): void
     {
@@ -135,12 +147,16 @@ final class SubscriptionBilling
                 $this->db->rollBack();
                 throw new InvalidArgumentException('order: already settled');
             }
-            $this->subscriptions->assign($order['account_id'], $order['plan_id'], Subscriptions::addMonths(Clock::now(), $order['months']));
+            $current = $this->subscriptions->current($order['account_id']);
+            $from = $current !== null && $current['period_end'] !== null && $current['period_end'] > Clock::now() ? $current['period_end'] : Clock::now();
+            $this->subscriptions->assign($order['account_id'], $order['plan_id'], Subscriptions::addMonths($from, $order['months']));
             $this->db->commit();
         } catch (PDOException $e) {
             $this->db->rollBack();
             throw $e;
         }
+
+        $this->invoiceAndMail($order, 'order:' . $order['reference']);
     }
 
     /** Stops the renewal of the account's Stripe subscription; it runs to the end of the period. */
@@ -175,10 +191,7 @@ final class SubscriptionBilling
             $this->stripeSessionPaid($object);
         } elseif ($type === 'invoice.paid' && ($object['billing_reason'] ?? null) === 'subscription_cycle' && is_string($object['subscription'] ?? null)) {
             // The first invoice is the checkout's payment, handled above.
-            $row = $this->subscriptions->byProviderRef($object['subscription']);
-            if ($row !== null) {
-                $this->subscriptions->extend($row['id'], $row['months']);
-            }
+            $this->stripeRenewal($object);
         } elseif ($type === 'invoice.payment_failed' && is_string($object['subscription'] ?? null)) {
             $this->subscriptions->setStatusByProviderRef($object['subscription'], 'past_due');
         } elseif ($type === 'customer.subscription.deleted' && is_string($object['id'] ?? null)) {
@@ -214,15 +227,111 @@ final class SubscriptionBilling
             $this->db->rollBack();
             throw $e;
         }
+
+        $this->invoiceAndMail($order, 'order:' . $order['reference']);
+    }
+
+    /** A renewal Stripe charged: the subscription runs on, and the renewal gets its invoice. */
+    private function stripeRenewal(array $invoice): void
+    {
+        $row = $this->subscriptions->byProviderRef($invoice['subscription']);
+        if ($row === null) {
+            return;
+        }
+
+        $this->subscriptions->extend($row['id'], $row['months']);
+        $this->invoiceAndMail([
+            'account_id' => $row['account_id'],
+            'plan_name' => $row['plan_name'],
+            'months' => $row['months'],
+            'amount_cents' => (int) ($invoice['amount_paid'] ?? 0),
+            'currency' => strtoupper((string) ($invoice['currency'] ?? '')),
+        ], 'stripe:' . (string) ($invoice['id'] ?? $invoice['subscription']));
+    }
+
+    /**
+     * Mails the reminder for each transfer subscription that ends within the next
+     * week. One reminder per period: the end of the period is remembered.
+     *
+     * @return int the number of reminders sent
+     */
+    public function sendReminders(): int
+    {
+        if (!$this->modules->enabled('subscriptions')) {
+            return 0;
+        }
+
+        $now = Clock::now();
+        $stmt = $this->db->prepare(
+            "SELECT s.id, s.period_end, p.name AS plan_name, a.id AS account_id, a.email, a.locale
+             FROM subscription s JOIN subscription_plan p ON p.id = s.plan_id JOIN account a ON a.id = s.account_id
+             WHERE s.status = 'active' AND s.provider_ref IS NULL AND s.period_end > :now AND s.period_end <= :until
+               AND (s.reminded_for IS NULL OR s.reminded_for <> s.period_end)"
+        );
+        $stmt->execute(['now' => $now, 'until' => Clock::now(self::REMIND_DAYS * 86400)]);
+
+        $sent = 0;
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $row['locale'] = $row['locale'] !== null && $row['locale'] !== '' ? $row['locale'] : 'de';
+            $this->db->prepare('UPDATE subscription SET reminded_for = :end WHERE id = :id')->execute(['end' => $row['period_end'], 'id' => $row['id']]);
+            $sent += ($this->notify)($row['email'], 'emails/subscription_ending.txt.twig', [
+                'plan' => $row['plan_name'],
+                'until' => substr((string) $row['period_end'], 0, 10),
+                'link' => ($this->url)('/subscriptions'),
+            ], $row['locale']) ? 1 : 0;
+        }
+
+        return $sent;
     }
 
     // --- internals -----------------------------------------------------------------------
+
+    /**
+     * Issues the invoice for a payment and mails its link. A missing seller or buyer
+     * address is logged: the payment itself stands.
+     *
+     * @param array{account_id: int, plan_name: string, months: int, amount_cents: int, currency: string} $payment
+     */
+    private function invoiceAndMail(array $payment, string $source): void
+    {
+        try {
+            $invoice = $this->invoices->issue((int) $payment['account_id'], $source, $payment['plan_name'], (int) $payment['months'], (int) $payment['amount_cents'], $payment['currency']);
+        } catch (InvalidArgumentException $e) {
+            error_log('Subscription invoice for ' . $source . ' was not issued: ' . $e->getMessage());
+
+            return;
+        }
+
+        $account = $this->db->prepare('SELECT email, locale FROM account WHERE id = :id');
+        $account->execute(['id' => $payment['account_id']]);
+        $who = $account->fetch(PDO::FETCH_ASSOC);
+        if ($who === false) {
+            return;
+        }
+        // The column defaults to German; an empty value is treated the same way.
+        $who['locale'] = $who['locale'] !== null && $who['locale'] !== '' ? $who['locale'] : 'de';
+
+        ($this->notify)($who['email'], 'emails/subscription_invoice.txt.twig', [
+            'number' => $invoice['number'],
+            'plan' => $payment['plan_name'],
+            'amount' => Money::format($invoice['gross_cents'], $invoice['currency'], $who['locale']),
+            'link' => ($this->url)('/account/subscription/invoices/' . $invoice['id']),
+        ], $who['locale']);
+    }
 
     private function createOrder(int $accountId, int $planId, string $method): array
     {
         $plan = $this->subscriptions->plan($planId);
         if ($plan === null || !$plan['active']) {
             throw new InvalidArgumentException('order: unknown or inactive plan');
+        }
+        if ($this->invoices->billingAddress($accountId) === null) {
+            throw new InvalidArgumentException('order: address missing');
+        }
+        // A running Stripe subscription would be charged twice.
+        $current = $this->subscriptions->current($accountId);
+        if ($current !== null && $current['provider_ref'] !== null) {
+            throw new InvalidArgumentException('order: a Stripe subscription is running');
         }
 
         for ($try = 0; ; $try++) {

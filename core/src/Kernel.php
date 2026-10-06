@@ -266,8 +266,12 @@ final class Kernel
             // What customers see: the overview of the plans, and the account's own subscription.
             $router->get('/subscriptions', [SubscriptionController::class, 'overview'], Router::PUBLIC);
             $router->get('/account/subscription', [SubscriptionController::class, 'account']);
-            $router->post('/subscriptions/{id}/order', [SubscriptionController::class, 'order']);
+            $router->get('/subscriptions/{id}/checkout', [SubscriptionController::class, 'checkout']);
+            $router->post('/subscriptions/{id}/checkout', [SubscriptionController::class, 'order']);
             $router->get('/subscriptions/orders/{id}', [SubscriptionController::class, 'orderPage']);
+            $router->get('/account/subscription/invoices/{id}', [SubscriptionController::class, 'invoice']);
+            $router->get('/admin/subscriptions/invoices/{id}', [AdminSubscriptionController::class, 'invoice'], 'core.settings.manage');
+            $router->post('/admin/subscriptions/invoice-settings', [AdminSubscriptionController::class, 'saveIssuer'], 'core.settings.manage');
             $router->post('/account/subscription/cancel', [SubscriptionController::class, 'cancel']);
             $router->post('/admin/subscriptions/bank', [AdminSubscriptionController::class, 'saveBank'], 'core.settings.manage');
             $router->post('/admin/subscriptions/orders/{id}/paid', [AdminSubscriptionController::class, 'confirmTransfer'], 'core.settings.manage');
@@ -461,6 +465,7 @@ final class Kernel
         );
         // Deadlines of orders: what happens when nobody acts in time.
         $app->scheduler->register('core.order-deadlines', 5, fn (App $app) => $app->orders->runDeadlines($app));
+        $app->scheduler->register('core.subscription-reminders', 60, fn (App $app) => $app->subscriptionBilling->sendReminders());
         // Expired mail links and "stay logged in" tokens, and registrations
         // whose address was never confirmed within a week.
         $app->scheduler->register('core.account-cleanup', 60, function (App $app): void {
