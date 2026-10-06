@@ -1444,6 +1444,44 @@ check('subscriptions admin: the form saves the plan with ticked and typed featur
 $subModules->save(array_values(array_diff(array_keys(Modulento\Core\Support\Modules::ALL), ['subscriptions'])));
 check('subscriptions: switched off, the overview and the account page are gone', $get('/subscriptions', null)['status'] === 404 && $get('/account/subscription', 2)['status'] === 404);
 $subModules->save(array_keys(Modulento\Core\Support\Modules::ALL));
+// A route that needs a feature of a plan: "feature:<key>" as its access.
+$featureRoute = function (?int $as) use ($pdo, $config): array {
+    $_SESSION = [];
+    if ($as !== null) {
+        $hash = $pdo->query('SELECT password_hash FROM account WHERE id = ' . $as)->fetchColumn();
+        $_SESSION = ['account_id' => $as, 'auth_stamp' => Modulento\Core\Support\Auth::stamp((string) $hash)];
+    }
+    $_SESSION['_csrf'] = 'test-token';
+    $app = new Modulento\Core\App($config, $pdo);
+    $app->translator->load($config['app']['root'] . '/core/lang', 'core');
+    Modulento\Core\Kernel::registerCore($app);
+    $called = false;
+    $app->router->get('/abo-feature', function () use (&$called): void {
+        $called = true;
+    }, 'feature:abo.test.one');
+    Modulento\Core\Kernel::registerLast($app);
+    Modulento\Core\Kernel::loadThemeTexts($app);
+    Modulento\Core\Kernel::prepareRequest($app, '/abo-feature', startSession: false);
+    http_response_code(200);
+    ob_start();
+    $app->router->dispatch('GET', $app->path);
+    ob_end_clean();
+
+    return ['called' => $called, 'status' => (int) http_response_code()];
+};
+$featurePlan = $subs->createPlan('abo-route', 'Routenplan', 100, 'EUR', 1, ['abo.test.one']);
+$featureNone = $featureRoute(3);
+check('feature routes: an account without the feature gets a refusal, the route does not run', $featureNone['called'] === false && $featureNone['status'] === 403);
+$subs->assign(3, $featurePlan, Modulento\Core\Support\Clock::now(30 * 86400));
+$featureOk = $featureRoute(3);
+check('feature routes: an account whose plan lists the feature gets the route', $featureOk['called'] === true);
+check('feature routes: a visitor gets no route either', $featureRoute(null)['called'] === false);
+$subs->assign(3, null);
+$subModules->save(array_values(array_diff(array_keys(Modulento\Core\Support\Modules::ALL), ['subscriptions'])));
+check('feature routes: switched off, every feature route is open', $featureRoute(3)['called'] === true);
+$subModules->save(array_keys(Modulento\Core\Support\Modules::ALL));
+$pdo->exec("DELETE FROM subscription WHERE plan_id = $featurePlan");
+$pdo->exec("DELETE FROM subscription_plan WHERE id = $featurePlan");
 $pdo->exec("DELETE FROM account WHERE id = $subAccount");
 $pdo->exec("DELETE FROM subscription_plan WHERE slug IN ('abo-test', 'abo-edit')");
 

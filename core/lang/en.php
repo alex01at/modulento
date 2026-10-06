@@ -228,6 +228,7 @@ return [
     'core.subscriptions.checkout.postal_code' => 'Postal code',
     'core.subscriptions.checkout.city' => 'City',
     'core.subscriptions.checkout.country' => 'Country',
+    'core.subscriptions.error.feature' => 'This feature is not unlocked by your plan. You find the plans under Subscriptions.',
     'core.subscriptions.error.address' => 'Please give the billing address in full.',
     'core.subscriptions.invoice.title' => 'Invoice',
     'core.subscriptions.invoice.date' => 'Date',
