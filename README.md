@@ -1015,8 +1015,16 @@ everyone; switched on, a feature needs a plan that lists it. So an extension
 checks only features that are sold, and only once the module is in use. The
 operator creates plans and grants them under **Administration → Subscriptions**
 (in the marketplace group, shown only while the module is on). A plan granted by
-hand has no end, or an end date that counts to its last day. The recurring
+hand has no end, or an end date that counts to its last day. A plan is changed
+there, with the features it includes; a plan that has had accounts can only be
+switched off, not deleted. Customers see the active plans on **/subscriptions**
+and their own on **/account/subscription** (in the account menu). The recurring
 payment through the payment provider is not there yet.
+
+An extension declares the features it sells in its `register()` with
+`$registrar->subscriptionFeature('visitenkarte.logo', 'visitenkarte.feature.logo')`,
+where the last argument is a language key. The operator then ticks the features
+per plan. A feature no extension has declared can still be typed in by hand.
 
 **Administration → Media library** keeps the pictures for the site: JPEG, PNG
 or WebP up to 8 MB, saved again on upload (metadata is removed, pictures larger

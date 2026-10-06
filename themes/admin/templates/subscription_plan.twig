@@ -1,0 +1,61 @@
+{% extends '@admin/layout.twig' %}
+
+{% block title %}{{ plan.name }} – {{ trans('core.admin.subscriptions.title') }} – {{ site_name }}{% endblock %}
+
+{% block admin %}
+{% include '@admin/_page_header.twig' with {heading: plan.name, crumbs: [{label: trans('core.admin.subscriptions.title'), path: '/admin/subscriptions'}]} only %}
+
+<section class="card-box">
+    <div class="card-head">
+        <p>{{ trans('core.admin.subscriptions.plan.intro') }}</p>
+        <p><small>{{ trans('core.admin.subscriptions.plans.form.slug') }}: <code>{{ plan.slug }}</code></small></p>
+    </div>
+    <form method="post" action="{{ url('/admin/subscriptions/plans/' ~ plan.id) }}" class="stack-form">
+        {{ csrf_field() }}
+        <label for="plan-name">{{ trans('core.admin.subscriptions.plans.form.name') }}</label>
+        <input id="plan-name" name="name" value="{{ plan.name }}" maxlength="100" required>
+        <label for="plan-price">{{ trans('core.admin.subscriptions.plans.form.price') }}</label>
+        <input id="plan-price" name="price" value="{{ price }}" inputmode="decimal" required>
+        <label for="plan-currency">{{ trans('core.admin.subscriptions.plans.form.currency') }}</label>
+        <input id="plan-currency" name="currency" value="{{ plan.currency }}" maxlength="3" pattern="[A-Za-z]{3}" required>
+        <label for="plan-period">{{ trans('core.admin.subscriptions.plans.form.period') }}</label>
+        <select id="plan-period" name="period_months">
+            {% for months in periods %}
+                <option value="{{ months }}" {{ months == plan.period_months ? 'selected' }}>{{ trans(months == 1 ? 'core.admin.subscriptions.plans.months_one' : 'core.admin.subscriptions.plans.months', {count: months}) }}</option>
+            {% endfor %}
+        </select>
+
+        <fieldset>
+            <legend>{{ trans('core.admin.subscriptions.plan.features') }}</legend>
+            {% if features is empty %}
+                <p><small>{{ trans('core.admin.subscriptions.plan.no_features') }}</small></p>
+            {% endif %}
+            {% for feature in features %}
+                <label class="checkbox">
+                    <input type="checkbox" name="features[]" value="{{ feature.key }}" {{ feature.key in plan.features ? 'checked' }}>
+                    <span>{% if feature.label_key %}{{ trans(feature.label_key) }} <small>{{ feature.key }}</small>{% else %}{{ feature.key }}{% endif %}</span>
+                </label>
+            {% endfor %}
+            <label for="plan-new-features">{{ trans('core.admin.subscriptions.plan.new_features') }}</label>
+            <input id="plan-new-features" name="new_features" placeholder="visitenkarte.logo">
+            <small>{{ trans('core.admin.subscriptions.plan.new_features_hint') }}</small>
+        </fieldset>
+
+        <label class="checkbox">
+            <input type="checkbox" name="active" value="1" {{ plan.active ? 'checked' }}>
+            <span>{{ trans('core.admin.subscriptions.plan.active') }}</span>
+        </label>
+        <small>{{ trans('core.admin.subscriptions.plan.active_hint') }}</small>
+        <button type="submit">{{ trans('core.admin.subscriptions.plan.save') }}</button>
+    </form>
+</section>
+
+<section class="card-box">
+    <h2>{{ trans('core.admin.subscriptions.plan.delete.title') }}</h2>
+    <p>{{ trans('core.admin.subscriptions.plan.delete.intro') }}</p>
+    <form method="post" action="{{ url('/admin/subscriptions/plans/' ~ plan.id ~ '/delete') }}">
+        {{ csrf_field() }}
+        <button type="submit" class="danger">{{ trans('core.admin.subscriptions.plan.delete.submit') }}</button>
+    </form>
+</section>
+{% endblock %}

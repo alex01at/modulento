@@ -12,5 +12,8 @@
     {% elseif has_catalogue() %}
         <a href="{{ url('/account/provider') }}">{{ trans('core.provider.create') }}</a>
     {% endif %}
+    {% if module('subscriptions') %}
+        <a href="{{ url('/account/subscription') }}">{{ trans('core.account.subscription.nav') }}</a>
+    {% endif %}
     <a href="{{ url('/account/settings') }}">{{ trans('core.account.settings') }}</a>
 </nav>

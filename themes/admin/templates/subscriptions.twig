@@ -23,7 +23,7 @@
             <tbody>
             {% for plan in plans %}
                 <tr>
-                    <td><strong>{{ plan.name }}</strong> <small>{{ plan.slug }}</small>{% if not plan.active %} <span class="badge badge-disabled">{{ trans('core.admin.subscriptions.plans.inactive') }}</span>{% endif %}</td>
+                    <td><a href="{{ url('/admin/subscriptions/plans/' ~ plan.id) }}"><strong>{{ plan.name }}</strong></a> <small>{{ plan.slug }}</small>{% if not plan.active %} <span class="badge badge-disabled">{{ trans('core.admin.subscriptions.plans.inactive') }}</span>{% endif %}</td>
                     <td>{{ money(plan.price_cents, plan.currency) }} / {{ trans(plan.period_months == 1 ? 'core.admin.subscriptions.plans.months_one' : 'core.admin.subscriptions.plans.months', {count: plan.period_months}) }}</td>
                     <td>{{ plan.features|join(', ') ?: '–' }}</td>
                 </tr>

@@ -54,6 +54,75 @@ final class AdminSubscriptionController extends Controller
         $this->redirect('/admin/subscriptions');
     }
 
+    /** One plan: its settings, the features it includes, and deleting it when nobody has had it. */
+    public function plan(array $params): void
+    {
+        $app = $this->app;
+        $plan = $app->subscriptions->plan((int) $params['id']);
+        if ($plan === null) {
+            http_response_code(404);
+            $this->render('error.twig', ['status' => 404, 'message_key' => 'core.error.not_found']);
+            return;
+        }
+
+        // The features this plan has, the ones extensions declare, and any key a plan has kept.
+        $declared = $app->subscriptions->declaredFeatures();
+        $keys = array_values(array_unique([...array_keys($declared), ...$plan['features']]));
+        $this->render('@admin/subscription_plan.twig', [
+            'plan' => $plan,
+            'price' => Money::input($plan['price_cents'], $app->translator->locale()),
+            'features' => array_map(fn (string $key) => ['key' => $key, 'label_key' => $declared[$key] ?? null], $keys),
+            'periods' => [1, 3, 6, 12],
+        ]);
+    }
+
+    public function updatePlan(array $params): void
+    {
+        $app = $this->app;
+        $id = (int) $params['id'];
+        $price = Money::parse((string) ($_POST['price'] ?? ''));
+        // The boxes ticked, and any keys typed in by hand.
+        $features = array_values(array_filter(is_array($_POST['features'] ?? null) ? $_POST['features'] : [], 'is_string'));
+        $typed = preg_split('/[\s,]+/', (string) ($_POST['new_features'] ?? ''), -1, PREG_SPLIT_NO_EMPTY) ?: [];
+        $features = array_values(array_unique([...$features, ...$typed]));
+
+        try {
+            if ($price === null || $app->subscriptions->plan($id) === null) {
+                throw new InvalidArgumentException('plan: price');
+            }
+            $app->subscriptions->updatePlan(
+                $id,
+                (string) ($_POST['name'] ?? ''),
+                $price,
+                strtoupper(trim((string) ($_POST['currency'] ?? ''))),
+                (int) ($_POST['period_months'] ?? 0),
+                $features,
+                isset($_POST['active'])
+            );
+            $app->adminLog->record($app->auth->account()['id'], 'subscription_plan_change', null, (string) $id);
+            Session::flash('success', $this->trans('core.admin.subscriptions.flash.plan_saved'));
+        } catch (InvalidArgumentException) {
+            Session::flash('error', $this->trans('core.admin.subscriptions.error.plan'));
+        }
+
+        $this->redirect('/admin/subscriptions/plans/' . $id);
+    }
+
+    public function deletePlan(array $params): void
+    {
+        $app = $this->app;
+        $id = (int) $params['id'];
+        try {
+            $app->subscriptions->deletePlan($id);
+            $app->adminLog->record($app->auth->account()['id'], 'subscription_plan_delete', null, (string) $id);
+            Session::flash('success', $this->trans('core.admin.subscriptions.flash.plan_deleted'));
+            $this->redirect('/admin/subscriptions');
+        } catch (InvalidArgumentException) {
+            Session::flash('error', $this->trans('core.admin.subscriptions.error.plan_in_use'));
+            $this->redirect('/admin/subscriptions/plans/' . $id);
+        }
+    }
+
     /** Gives an account a plan, or takes its plan away. The end date is the last day, included. */
     public function assign(array $params): void
     {

@@ -1,0 +1,30 @@
+{% extends 'layout/base.twig' %}
+
+{% block title %}{{ trans('core.account.subscription.title') }} – {{ site_name }}{% endblock %}
+
+{% block content %}
+{% include 'account/_nav.twig' %}
+<h1>{{ trans('core.account.subscription.title') }}</h1>
+
+{% if current %}
+    <section>
+        <h2>{{ current.name }}</h2>
+        <p>
+            <strong>{{ trans('core.admin.subscriptions.status.' ~ current.status) }}</strong>
+            · {{ current.period_end ? trans('core.account.subscription.until', {date: current.period_end|slice(0, 10)}) : trans('core.account.subscription.open') }}
+        </p>
+        {% if current.feature_labels %}
+            <h3>{{ trans('core.account.subscription.features') }}</h3>
+            <ul>
+                {% for label in current.feature_labels %}
+                    <li>{{ label }}</li>
+                {% endfor %}
+            </ul>
+        {% endif %}
+    </section>
+{% else %}
+    <p>{{ trans('core.account.subscription.none') }}</p>
+{% endif %}
+
+<p><a href="{{ url('/subscriptions') }}">{{ trans('core.account.subscription.overview') }}</a></p>
+{% endblock %}
