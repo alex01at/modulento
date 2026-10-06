@@ -419,6 +419,10 @@ data. A check that cannot fail is worse than none.
 
 ## Packages
 
+Only one extension is active at a time. Enabling one (under **Administration →
+Extensions**, or on the Packages page) switches the others off; their tables and
+data stay. A theme is chosen the same way: one at a time.
+
 Extensions and themes can live in repositories of their own and be installed
 and updated under **Administration → Packages**: enter `owner/name`, and the
 newest release of that GitHub repository is downloaded, checked against its
@@ -880,6 +884,14 @@ Core services an extension uses instead of SQL on core tables, all on the
 links), `mailer` (`send(to, '@<id>/emails/x.txt.twig', data, locale)`),
 `settings`, `locales`, `pages`, `providers`, `offers`, `categories`,
 `offerImages`, `orders`, `roles`, `auth`, `events`, and `url()`.
+
+### Creating an offer
+
+A new offer is made in six steps: the languages (the own one is always in), the
+category, title and short text, the description, the fields of the offer's type,
+and a review that saves the offer as a draft. The steps keep their answers in the
+session until the review saves them through the same save as the form of an offer;
+the form for editing an existing offer stays one page.
 
 ### Offer types
 
