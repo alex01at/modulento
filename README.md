@@ -426,6 +426,28 @@ needs still exists (the tests run in order; accounts and offers are deleted late
 the file). Compare counts, not absolute numbers, when earlier checks have written
 data. A check that cannot fail is worse than none.
 
+### First setup of subscriptions, step by step
+
+1. **Administration → Modules:** check that "Subscriptions" is on.
+2. **Administration → Subscriptions → Details for the invoices:** name, address,
+   VAT ID, VAT rate. Without these nothing is sold.
+3. The same page, **Bank account for transfers:** IBAN (and BIC) of the account
+   the buyers pay into.
+4. Under **Payment methods:** switch on bank transfer and/or Stripe, and give the
+   platform's Stripe keys if Stripe is used.
+5. Create a plan: name, key, price, currency, period, the features it includes.
+   A feature key can be typed in by hand.
+6. Test it yourself first: order a plan with a test account, confirm the transfer
+   under **Open transfers**, and check the invoice under **Invoices** and in the
+   account's **My subscription**.
+
+### Offers for providers
+
+A provider opens **Account → My offers → New offer** and chooses the type. The
+wizard asks in turn for the languages, the category, title and short text, the
+description, the type's own fields, and then shows a review. The offer is saved
+as a draft; pictures are added on its edit page, and **submit** sends it for review.
+
 ### Open points
 
 Known and not done yet, in order of how much they matter before selling:
