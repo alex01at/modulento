@@ -37,6 +37,11 @@ Two rules shape everything:
 
 ## Installing
 
+**What you need:** PHP 8.3 or newer with PDO and the usual extensions for
+images and HTTP, a MySQL or MariaDB database, and an address that points at
+the site over HTTPS. Payments are optional; without them the site runs, and
+nothing can be bought.
+
 1. Take `modulento-<version>.zip` from the releases and upload its unpacked
    content. It already contains `vendor/`, so Composer is not needed.
 2. Point the domain's document root at the `public/` folder. Where the
@@ -51,6 +56,22 @@ Two rules shape everything:
    shows both ways: a scheduled task in the hosting panel that runs
    `php bin/cron.php`, or - where the panel can only call addresses - a secret
    URL.
+
+### After the installation
+
+- **Theme:** **Administration → Themes** chooses the look. The standard theme
+  is there from the start; more come from the Packages page.
+- **Extensions:** **Administration → Packages** installs an extension from its
+  repository (or from an uploaded zip). Only one extension is active at a time:
+  enabling one switches the others off, their data stays.
+- **Payments:** **Administration → Payment methods** switches Stripe and bank
+  transfer on, with the platform's Stripe keys. Each provider sets up its own
+  payment account under **Account → Payments**.
+- **Subscriptions** (optional module, under **Administration → Modules**): plans
+  under **Administration → Subscriptions**, the bank account and the seller's
+  details for the invoices there too. Nothing is sold before these are filled
+  in. Stripe needs the webhook `/webhooks/stripe` to receive the subscription
+  events of the platform account (see "Subscriptions" below).
 
 ## Developing
 
@@ -404,6 +425,19 @@ parity check; the test suite does it as well.
 needs still exists (the tests run in order; accounts and offers are deleted later in
 the file). Compare counts, not absolute numbers, when earlier checks have written
 data. A check that cannot fail is worse than none.
+
+### Open points
+
+Known and not done yet, in order of how much they matter before selling:
+
+- Real Stripe subscriptions and the bank transfer have not been run against a live
+  account; the tests use a stand-in for Stripe.
+- No feature is gated by a subscription plan yet; the mechanism is there
+  (`feature:<key>` routes, `feature()` in templates), the choice of features is not.
+- Editing an existing offer is still one page; the six-step wizard is for new offers.
+- Freelancer packages have been checked up to the form, not up to the save through
+  the wizard.
+- The offer header says "ab" (from) for auction lots; for a lot it is the current price.
 
 ### Rules that come from earlier mistakes
 
