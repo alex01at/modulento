@@ -133,8 +133,14 @@ final class PackageController extends Controller
             Session::flash('error', $this->trans('core.error.forbidden'));
         } elseif ($kind === 'extension' && isset($app->extensions->discover()[$id])) {
             try {
-                $on ? $app->extensions->enable($id) : $app->extensions->disable($id);
+                $switchedOff = $on ? $app->extensions->enable($id) : [];
+                if (!$on) {
+                    $app->extensions->disable($id);
+                }
                 Session::flash('success', $this->trans($on ? 'core.admin.extensions.enabled' : 'core.admin.extensions.disabled', ['id' => $id]));
+                foreach ($switchedOff as $other) {
+                    Session::flash('success', $this->trans('core.admin.extensions.switched_off', ['id' => $other]));
+                }
             } catch (Throwable $e) {
                 error_log('Enabling extension ' . $id . ' failed: ' . $e);
                 Session::flash('error', $this->trans('core.admin.extensions.enable_failed', ['id' => $id, 'reason' => $e->getMessage()]));

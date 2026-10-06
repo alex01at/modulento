@@ -94,10 +94,13 @@ final class ExtensionManager
     }
 
     /**
-     * Runs the extension's migrations and marks it enabled. It is loaded
-     * from the next request on.
+     * Runs the extension's migrations and marks it enabled. Only one extension is
+     * active at a time: any other that was enabled is switched off (its data stays).
+     * It is loaded from the next request on.
+     *
+     * @return string[] the extensions that were switched off for it
      */
-    public function enable(string $id): void
+    public function enable(string $id): array
     {
         $manifest = $this->discover()[$id] ?? throw new RuntimeException("Extension \"{$id}\" not found");
 
@@ -118,6 +121,12 @@ final class ExtensionManager
              ON DUPLICATE KEY UPDATE version = VALUES(version), enabled = 1, enabled_at = NOW()'
         );
         $stmt->execute(['id' => $manifest->id, 'version' => $manifest->version]);
+
+        $others = array_values(array_diff($this->enabledIds(), [$manifest->id]));
+        $stmt = $this->db->prepare('UPDATE extension SET enabled = 0 WHERE id <> :id AND enabled = 1');
+        $stmt->execute(['id' => $manifest->id]);
+
+        return $others;
     }
 
     /** Stops loading the extension. Its tables and data stay untouched. */

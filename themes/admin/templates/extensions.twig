@@ -6,6 +6,7 @@
 {% include '@admin/_page_header.twig' with {heading: trans('core.admin.extensions.title')} only %}
 
 <section class="card-box">
+<p>{{ trans('core.admin.extensions.single') }}</p>
 {% if extensions is empty %}
     <p class="empty">{{ trans('core.admin.extensions.none') }}</p>
 {% else %}

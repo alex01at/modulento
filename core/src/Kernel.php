@@ -202,6 +202,8 @@ final class Kernel
         $router->get('/account/offers', [OfferController::class, 'mine']);
         $router->get('/account/offers/new', [OfferController::class, 'create']);
         $router->post('/account/offers/new', [OfferController::class, 'save']);
+        // Before the routes with {id}, which would take "wizard" for an offer.
+        $router->post('/account/offers/wizard', [OfferController::class, 'wizard']);
         $router->get('/account/offers/{id}', [OfferController::class, 'edit']);
         $router->post('/account/offers/{id}', [OfferController::class, 'save']);
         $router->post('/account/offers/{id}/submit', [OfferController::class, 'submit']);

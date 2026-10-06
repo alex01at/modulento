@@ -1,0 +1,120 @@
+{% extends 'layout/base.twig' %}
+
+{% block title %}{{ trans('core.offer.mine.new', {type: trans(type.label_key)}) }} – {{ site_name }}{% endblock %}
+
+{% block content %}
+{% include 'account/_nav.twig' %}
+<p><a href="{{ url('/account/offers') }}">{{ trans('core.offer.mine.title') }}</a></p>
+<h1>{{ trans('core.offer.mine.new', {type: trans(type.label_key)}) }}</h1>
+<p class="muted">{{ trans('core.offer.wizard.progress', {step: step, steps: steps}) }}</p>
+
+{% for error in errors %}
+    <p class="flash flash-error" role="alert">{{ error }}</p>
+{% endfor %}
+
+{% if step == 1 %}
+    <h2>{{ trans('core.offer.wizard.languages') }}</h2>
+    <p>{{ trans('core.offer.wizard.languages_hint') }}</p>
+    <form method="post" action="{{ url('/account/offers/wizard') }}" class="stack-form">
+        {{ csrf_field() }}
+        <input type="hidden" name="type" value="{{ type.id }}">
+        <input type="hidden" name="wizard_step" value="1">
+        <fieldset>
+            {% for code in locales %}
+                <label class="checkbox">
+                    <input type="checkbox" name="locales[]" value="{{ code }}" {{ code in selected ? 'checked' }} {{ code == primary ? 'disabled' }}>
+                    <span>{{ locale_name(code) }}{% if code == primary %} <small>{{ trans('core.offer.wizard.primary') }}</small>{% endif %}</span>
+                </label>
+            {% endfor %}
+        </fieldset>
+        <button type="submit">{{ trans('core.offer.wizard.next') }}</button>
+    </form>
+
+{% elseif step == 2 %}
+    <h2>{{ trans('core.offer.wizard.category') }}</h2>
+    <form method="post" action="{{ url('/account/offers/wizard') }}" class="stack-form">
+        {{ csrf_field() }}
+        <input type="hidden" name="type" value="{{ type.id }}">
+        <input type="hidden" name="wizard_step" value="2">
+        <label for="category_id">{{ trans('core.offer.field.category') }}</label>
+        <select id="category_id" name="category_id" required>
+            <option value=""></option>
+            {% for top in categories %}
+                <option value="{{ top.id }}" {{ top.id == category_id ? 'selected' }}>{{ top.name }}</option>
+                {% for child in top.children %}
+                    <option value="{{ child.id }}" {{ child.id == category_id ? 'selected' }}>– {{ child.name }}</option>
+                {% endfor %}
+            {% endfor %}
+        </select>
+        <button type="submit">{{ trans('core.offer.wizard.next') }}</button>
+    </form>
+
+{% elseif step == 3 %}
+    <h2>{{ trans('core.offer.wizard.texts') }}</h2>
+    <p>{{ trans('core.offer.wizard.texts_hint') }}</p>
+    <form method="post" action="{{ url('/account/offers/wizard') }}" class="stack-form wide">
+        {{ csrf_field() }}
+        <input type="hidden" name="type" value="{{ type.id }}">
+        <input type="hidden" name="wizard_step" value="3">
+        {% for code in selected %}
+            <fieldset>
+                <legend>{{ locale_name(code) }}</legend>
+                <label for="title_{{ code }}">{{ trans('core.offer.field.title') }}</label>
+                <input id="title_{{ code }}" name="text[{{ code }}][title]" value="{{ texts[code].title ?? '' }}" maxlength="150" lang="{{ code }}" {{ code == primary ? 'required' }}>
+                <label for="summary_{{ code }}">{{ trans('core.offer.field.summary') }}</label>
+                <input id="summary_{{ code }}" name="text[{{ code }}][summary]" value="{{ texts[code].summary ?? '' }}" maxlength="300" lang="{{ code }}">
+            </fieldset>
+        {% endfor %}
+        <button type="submit">{{ trans('core.offer.wizard.next') }}</button>
+    </form>
+
+{% elseif step == 4 %}
+    <h2>{{ trans('core.offer.wizard.description') }}</h2>
+    <form method="post" action="{{ url('/account/offers/wizard') }}" class="stack-form wide">
+        {{ csrf_field() }}
+        <input type="hidden" name="type" value="{{ type.id }}">
+        <input type="hidden" name="wizard_step" value="4">
+        {% for code in selected %}
+            <fieldset>
+                <legend>{{ locale_name(code) }}</legend>
+                <label for="description_{{ code }}">{{ trans('core.offer.field.description') }}</label>
+                <textarea id="description_{{ code }}" name="text[{{ code }}][description]" rows="10" maxlength="10000" lang="{{ code }}">{{ texts[code].description ?? '' }}</textarea>
+            </fieldset>
+        {% endfor %}
+        <button type="submit">{{ trans('core.offer.wizard.next') }}</button>
+    </form>
+
+{% elseif step == 5 %}
+    <h2>{{ trans('core.offer.wizard.details') }}</h2>
+    <form method="post" action="{{ url('/account/offers/wizard') }}" class="stack-form wide">
+        {{ csrf_field() }}
+        <input type="hidden" name="type" value="{{ type.id }}">
+        <input type="hidden" name="wizard_step" value="5">
+        {% include type.template %}
+        <button type="submit">{{ trans('core.offer.wizard.next') }}</button>
+    </form>
+
+{% else %}
+    <h2>{{ trans('core.offer.wizard.review') }}</h2>
+    <p>{{ trans('core.offer.wizard.review_hint') }}</p>
+    <dl>
+        <dt>{{ trans('core.offer.field.category') }}</dt>
+        <dd>{{ category_name }}</dd>
+        {% for code, fields in texts %}
+            <dt>{{ trans('core.offer.wizard.title_in', {language: locale_name(code)}) }}</dt>
+            <dd>{{ fields.title }}{% if fields.summary %} – {{ fields.summary }}{% endif %}</dd>
+        {% endfor %}
+    </dl>
+    <form method="post" action="{{ url('/account/offers/new') }}" class="button-row">
+        {{ csrf_field() }}
+        {% for pair in answers %}
+            {% if pair[0] != '_csrf' %}<input type="hidden" name="{{ pair[0] }}" value="{{ pair[1] }}">{% endif %}
+        {% endfor %}
+        <button type="submit">{{ trans('core.offer.wizard.save') }}</button>
+    </form>
+{% endif %}
+
+{% if step > 1 %}
+    <p><a href="{{ url('/account/offers/new?type=' ~ type.id ~ '&step=' ~ (step - 1)) }}">{{ trans('core.offer.wizard.back') }}</a></p>
+{% endif %}
+{% endblock %}
