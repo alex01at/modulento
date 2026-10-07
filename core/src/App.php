@@ -35,6 +35,7 @@ use Modulento\Core\Payment\PaypalPayment;
 use Modulento\Core\Payment\StripePayment;
 use Modulento\Core\Payment\TransferPayment;
 use Modulento\Core\Provider\Providers;
+use Modulento\Core\Review\AccountRatings;
 use Modulento\Core\Review\Reviews;
 use Modulento\Core\Subscription\Invoices;
 use Modulento\Core\Subscription\SubscriptionBilling;
@@ -108,6 +109,7 @@ final class App
     public readonly SubscriptionBilling $subscriptionBilling;
     public readonly Preferences $preferences;
     public readonly Reviews $reviews;
+    public readonly AccountRatings $accountRatings;
     public readonly Packages $packages;
     public readonly Payments $payments;
 
@@ -183,6 +185,7 @@ final class App
         $this->adminLog = new AdminLog($db);
         $this->messageSeen = new MessageSeen($db);
         $this->reviews = new Reviews($db, $this->badWords);
+        $this->accountRatings = new AccountRatings($db, $this->badWords);
         $this->orderFiles = new OrderFiles($db, ($config['app']['uploads'] ?? $config['app']['root'] . '/var/uploads') . '/orders');
         $this->offerImages = new OfferImages($db, ($config['app']['uploads'] ?? $config['app']['root'] . '/var/uploads') . '/offers');
         $this->themes = new ThemeManager($themesDir, $this->settings);

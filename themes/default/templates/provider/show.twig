@@ -26,6 +26,12 @@
 
     {% include 'review/_list.twig' %}
 
+    {# Direct ratings of the person or business behind this profile - separate from order reviews above. #}
+    {% if account_ratings and module('reviews') %}
+        {% include 'review/_rating.twig' with {rating: account_rating} only %}
+    {% endif %}
+    {% include 'review/_account_rating_list.twig' %}
+
     {% if provider.legal %}
         <section>
             <h2>{{ trans('core.provider.legal_title') }}</h2>

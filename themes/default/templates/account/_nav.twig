@@ -15,5 +15,8 @@
     {% if module('subscriptions') %}
         <a href="{{ url('/account/subscription') }}">{{ trans('core.account.subscription.nav') }}</a>
     {% endif %}
+    {% if module('reviews') %}
+        <a href="{{ url('/account/ratings') }}">{{ trans('core.account_rating.nav') }}</a>
+    {% endif %}
     <a href="{{ url('/account/settings') }}">{{ trans('core.account.settings') }}</a>
 </nav>

@@ -79,6 +79,68 @@
     </section>
 {% endif %}
 
+{# A direct rating of the account on the other side - separate from the order review above. #}
+{% if can_rate_account and module('reviews') %}
+    <section>
+        <h2>{{ trans('core.account_rating.write') }}</h2>
+        <form method="post" action="{{ url('/accounts/' ~ account_rating_target ~ '/rating') }}" class="stack-form wide">
+            {{ csrf_field() }}
+            <input type="hidden" name="return" value="{{ current_path() }}">
+            <fieldset>
+                <legend>{{ trans('core.account_rating.rating') }}</legend>
+                {% for stars in 5..1 %}
+                    <label class="checkbox">
+                        <input type="radio" name="rating" value="{{ stars }}" required>
+                        <span><span aria-hidden="true">{% for i in 1..5 %}{{ i <= stars ? '★' : '☆' }}{% endfor %}</span> {{ trans('core.account_rating.stars', {rating: stars}) }}</span>
+                    </label>
+                {% endfor %}
+            </fieldset>
+            <label for="account_rating_body">{{ trans('core.account_rating.body') }}</label>
+            <textarea id="account_rating_body" name="body" rows="5" maxlength="2000"></textarea>
+            <small>{{ trans('core.account_rating.public_hint') }}</small>
+            <button type="submit">{{ trans('core.account_rating.submit') }}</button>
+        </form>
+    </section>
+{% elseif my_account_rating and module('reviews') %}
+    <section>
+        <h2>{{ trans('core.account_rating.one') }}</h2>
+        <p>
+            <span role="img" aria-label="{{ trans('core.account_rating.stars', {rating: my_account_rating.rating}) }}"><span aria-hidden="true">{% for i in 1..5 %}{{ i <= my_account_rating.rating ? '★' : '☆' }}{% endfor %}</span></span>
+            <small>{{ my_account_rating.created_at }} UTC</small>
+        </p>
+        {% if my_account_rating.body %}<p>{{ my_account_rating.body|nl2br }}</p>{% endif %}
+        {% if my_account_rating.reply %}
+            <p class="reply"><small>{{ trans('core.account_rating.reply_by_rated') }}</small><br>{{ my_account_rating.reply|nl2br }}</p>
+        {% endif %}
+    </section>
+{% endif %}
+
+{% if their_account_rating and module('reviews') %}
+    <section>
+        <h2>{{ trans('core.account_rating.received') }}</h2>
+        {% if their_account_rating.status == 'hidden' %}
+            <p class="flash flash-error">{{ trans('core.account_rating.hidden_notice') }}</p>
+        {% endif %}
+        <p>
+            <span role="img" aria-label="{{ trans('core.account_rating.stars', {rating: their_account_rating.rating}) }}"><span aria-hidden="true">{% for i in 1..5 %}{{ i <= their_account_rating.rating ? '★' : '☆' }}{% endfor %}</span></span>
+            <small>{{ their_account_rating.created_at }} UTC</small>
+        </p>
+        {% if their_account_rating.body %}<p>{{ their_account_rating.body|nl2br }}</p>{% endif %}
+        {% if their_account_rating.reply %}
+            <p class="reply"><small>{{ trans('core.account_rating.reply_by_rated') }}</small><br>{{ their_account_rating.reply|nl2br }}</p>
+        {% elseif can_reply_account %}
+            <form method="post" action="{{ url('/account-ratings/' ~ their_account_rating.id ~ '/reply') }}" class="stack-form wide">
+                {{ csrf_field() }}
+                <input type="hidden" name="return" value="{{ current_path() }}">
+                <label for="account_rating_reply">{{ trans('core.account_rating.reply') }}</label>
+                <textarea id="account_rating_reply" name="reply" rows="4" maxlength="2000" required></textarea>
+                <small>{{ trans('core.account_rating.reply_hint') }}</small>
+                <button type="submit">{{ trans('core.account_rating.reply_submit') }}</button>
+            </form>
+        {% endif %}
+    </section>
+{% endif %}
+
 <section>
     <h2>{{ trans('core.order.details') }}</h2>
     <table>

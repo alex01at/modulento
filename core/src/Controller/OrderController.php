@@ -10,6 +10,7 @@ use Modulento\Core\Order\OrderNotifier;
 use Modulento\Core\Order\ProviderPaymentMethod;
 use Modulento\Core\Payment\BankAccount;
 use Modulento\Core\Payment\Payments;
+use Modulento\Core\Review\AccountRatingView;
 use Modulento\Core\Review\ReviewView;
 use Modulento\Core\Support\RateLimiter;
 use Modulento\Core\Support\Session;
@@ -221,6 +222,14 @@ final class OrderController extends Controller
         $files = $app->orderFiles->ofOrder($order['id']);
         $review = $app->reviews->findByOrder($order['id']);
 
+        // The account behind the other side of this order - a direct rating
+        // rates that account, not the order (see AccountRatings::canRate()).
+        $myAccountId = (int) $app->auth->account()['id'];
+        $counterpartAccountId = $role === 'buyer' ? ($provider['account_id'] ?? null) : $order['buyer_id'];
+        $counterpartAccountId = $counterpartAccountId !== null ? (int) $counterpartAccountId : null;
+        $myAccountRating = $counterpartAccountId !== null ? $app->accountRatings->findByPair($myAccountId, $counterpartAccountId) : null;
+        $theirAccountRating = $counterpartAccountId !== null ? $app->accountRatings->findByPair($counterpartAccountId, $myAccountId) : null;
+
         $this->render('order/show.twig', [
             'order' => $this->summary($order) + [
                 'items' => $order['items'],
@@ -260,6 +269,11 @@ final class OrderController extends Controller
             'review' => $review !== null ? ReviewView::of($review) : null,
             'can_review' => $role === 'buyer' && $review === null && $app->orders->isReviewable($order),
             'can_reply' => $role === 'provider' && $review !== null && $review['reply'] === null && $review['status'] === 'published',
+            'account_rating_target' => $counterpartAccountId,
+            'can_rate_account' => $counterpartAccountId !== null && $app->accountRatings->canRate($myAccountId, $counterpartAccountId),
+            'my_account_rating' => $myAccountRating !== null ? AccountRatingView::of($myAccountRating) : null,
+            'their_account_rating' => $theirAccountRating !== null ? AccountRatingView::of($theirAccountRating) : null,
+            'can_reply_account' => $theirAccountRating !== null && $theirAccountRating['reply'] === null && $theirAccountRating['status'] === 'published',
         ]);
     }
 

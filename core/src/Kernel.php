@@ -32,6 +32,7 @@ use Modulento\Core\Controller\PaymentSettingsController;
 use Modulento\Core\Controller\HandbookController;
 use Modulento\Core\Controller\ProviderController;
 use Modulento\Core\Controller\RegistrationController;
+use Modulento\Core\Controller\AccountRatingController;
 use Modulento\Core\Controller\ReviewController;
 use Modulento\Core\Controller\SettingsController;
 use Modulento\Core\Controller\UpdateController;
@@ -293,6 +294,14 @@ final class Kernel
             $router->get('/admin/reviews', [ReviewController::class, 'index'], 'core.reviews.manage');
             $router->post('/admin/reviews/{id}/hide', [ReviewController::class, 'hide'], 'core.reviews.manage');
             $router->post('/admin/reviews/{id}/show', [ReviewController::class, 'show'], 'core.reviews.manage');
+        
+            // Rating an account directly, not one order - see AccountRatings::canRate().
+            $router->get('/account/ratings', [AccountRatingController::class, 'mine']);
+            $router->post('/accounts/{id}/rating', [AccountRatingController::class, 'create']);
+            $router->post('/account-ratings/{id}/reply', [AccountRatingController::class, 'reply']);
+            $router->get('/admin/account-ratings', [AccountRatingController::class, 'index'], 'core.reviews.manage');
+            $router->post('/admin/account-ratings/{id}/hide', [AccountRatingController::class, 'hide'], 'core.reviews.manage');
+            $router->post('/admin/account-ratings/{id}/show', [AccountRatingController::class, 'show'], 'core.reviews.manage');
         }
         if ($modules->enabled('withdrawal')) {
             // The withdrawal form is public on purpose: it has to be reachable
@@ -448,6 +457,7 @@ final class Kernel
         }
         if ($app->modules->enabled('reviews')) {
             $app->addAdminMenu('core.admin.menu.reviews', '/admin/reviews', 'core.reviews.manage', 'moderation');
+                    $app->addAdminMenu('core.admin.menu.account_ratings', '/admin/account-ratings', 'core.reviews.manage', 'moderation');
         }
         if ($app->modules->enabled('reports')) {
             $app->addAdminMenu('core.admin.menu.reports', '/admin/reports', 'core.reports.manage', 'moderation');

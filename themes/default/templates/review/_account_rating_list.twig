@@ -1,0 +1,29 @@
+{# Published direct ratings of an account. Receives "account_ratings" and, only
+   where a reply can still be written, "can_reply_to" (a list of rating ids). #}
+{% if account_ratings and module('reviews') %}
+    <section class="reviews">
+        <h2>{{ trans('core.account_rating.list_title') }}</h2>
+        <p><small>{{ trans('core.account_rating.origin') }}</small></p>
+        {% for rating in account_ratings %}
+            <article class="review" lang="{{ rating.locale }}">
+                <p>
+                    <span role="img" aria-label="{{ trans('core.account_rating.stars', {rating: rating.rating}) }}"><span aria-hidden="true">{% for i in 1..5 %}{{ i <= rating.rating ? '★' : '☆' }}{% endfor %}</span></span>
+                    <small lang="{{ locale() }}">{{ rating.author ?: trans('core.account_rating.anonymous') }} · {{ rating.created_at|slice(0, 10) }}</small>
+                </p>
+                {% if rating.body %}<p>{{ rating.body|nl2br }}</p>{% endif %}
+                {% if rating.reply %}
+                    <p class="reply"><small lang="{{ locale() }}">{{ trans('core.account_rating.reply_by_rated') }}</small><br>{{ rating.reply|nl2br }}</p>
+                {% elseif can_reply_to is defined and rating.id in can_reply_to %}
+                    <form method="post" action="{{ url('/account-ratings/' ~ rating.id ~ '/reply') }}" class="stack-form wide">
+                        {{ csrf_field() }}
+                        <input type="hidden" name="return" value="{{ current_path() }}">
+                        <label for="rating_reply_{{ rating.id }}">{{ trans('core.account_rating.reply') }}</label>
+                        <textarea id="rating_reply_{{ rating.id }}" name="reply" rows="4" maxlength="2000" required></textarea>
+                        <small>{{ trans('core.account_rating.reply_hint') }}</small>
+                        <button type="submit">{{ trans('core.account_rating.reply_submit') }}</button>
+                    </form>
+                {% endif %}
+            </article>
+        {% endfor %}
+    </section>
+{% endif %}
