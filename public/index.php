@@ -16,6 +16,7 @@ if (PHP_SAPI === 'cli-server') {
 use Modulento\Core\Install\Installer;
 use Modulento\Core\Kernel;
 use Modulento\Core\NotConfiguredException;
+use Modulento\Core\Payment\Payments;
 
 $root = dirname(__DIR__);
 
@@ -45,9 +46,11 @@ header('Referrer-Policy: strict-origin-when-cross-origin');
 // form-action also covers where a submitted form is redirected to (in
 // Chromium-based browsers), and paying or connecting an account starts with
 // a form of this site that answers with a redirect to the payment service.
-// Hence their hosts - the same ones Payments accepts as a target.
+// Hence their hosts - the ones Payments itself accepts as a target, so there
+// is one place for them, not two that could drift apart.
+$paymentHosts = implode(' ', [...Payments::STRIPE_CHECKOUT_HOSTS, ...Payments::STRIPE_CONNECT_HOSTS, ...Payments::PAYPAL_HOSTS]);
 header("Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; frame-ancestors 'none'; base-uri 'self'; "
-    . "form-action 'self' https://checkout.stripe.com https://connect.stripe.com https://www.paypal.com https://www.sandbox.paypal.com");
+    . "form-action 'self' https://" . str_replace(' ', ' https://', $paymentHosts));
 if (!empty($_SERVER['HTTPS'])) {
     header('Strict-Transport-Security: max-age=31536000');
 }

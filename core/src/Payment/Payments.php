@@ -39,10 +39,14 @@ final class Payments
     /** These store API keys, which is only done encrypted. */
     public const NEEDS_ENCRYPTION = [self::PAYPAL, self::STRIPE];
 
-    /** Where a buyer or provider may be sent: nowhere but the services' own pages. */
-    private const STRIPE_CHECKOUT_HOSTS = ['checkout.stripe.com'];
-    private const STRIPE_CONNECT_HOSTS = ['connect.stripe.com'];
-    private const PAYPAL_HOSTS = ['www.paypal.com', 'www.sandbox.paypal.com'];
+    /**
+     * Where a buyer or provider may be sent: nowhere but the services' own pages.
+     * Public: public/index.php reads these too, for the CSP header's form-action,
+     * so that the allowed hosts are declared in one place only.
+     */
+    public const STRIPE_CHECKOUT_HOSTS = ['checkout.stripe.com'];
+    public const STRIPE_CONNECT_HOSTS = ['connect.stripe.com'];
+    public const PAYPAL_HOSTS = ['www.paypal.com', 'www.sandbox.paypal.com'];
 
     /** @var Closure[] */
     private array $stripeListeners = [];
