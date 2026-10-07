@@ -184,9 +184,15 @@ final class Router
         return '/' . ltrim(str_replace('\\', '/', (string) parse_url($referer, PHP_URL_PATH)), '/') . ($query ? '?' . $query : '');
     }
 
+    /**
+     * Whether the caller expects a plain failure instead of a browser page: jQuery's
+     * ajax() still sends X-Requested-With, but fetch() - what this core's own scripts
+     * use - never does, so a request declaring it wants JSON back counts the same way.
+     */
     private function isAjax(): bool
     {
-        return ($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'XMLHttpRequest';
+        return ($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'XMLHttpRequest'
+            || str_contains((string) ($_SERVER['HTTP_ACCEPT'] ?? ''), 'application/json');
     }
 
     private function fail(int $status, string $messageKey): void
