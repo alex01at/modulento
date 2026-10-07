@@ -1,0 +1,61 @@
+{% extends '@admin/layout.twig' %}
+
+{% block title %}{{ trans('core.admin.messages.title') }} – {{ site_name }}{% endblock %}
+
+{% block admin %}
+{% include '@admin/_page_header.twig' with {heading: trans('core.admin.messages.title')} only %}
+
+<section class="card-box">
+    <div class="card-head">
+        <p>{{ trans('core.admin.messages.intro') }}</p>
+    </div>
+
+    <nav class="tabs" aria-label="{{ trans('core.admin.layout.filter') }}">
+        {% for name in ['order', 'offer'] %}
+            <a href="{{ url('/admin/messages') }}?tab={{ name }}{{ flagged_only ? '&status=pending' }}" {{ tab == name ? 'aria-current="page"' }}>{{ trans('core.admin.messages.tab.' ~ name) }}</a>
+        {% endfor %}
+    </nav>
+    <nav class="tabs" aria-label="{{ trans('core.admin.layout.filter') }}">
+        <a href="{{ url('/admin/messages') }}?tab={{ tab }}" {{ not flagged_only ? 'aria-current="page"' }}>{{ trans('core.admin.messages.all') }}</a>
+        <a href="{{ url('/admin/messages') }}?tab={{ tab }}&status=pending" {{ flagged_only ? 'aria-current="page"' }}>{{ trans('core.admin.messages.flagged_only') }}</a>
+    </nav>
+
+    {% if messages is empty %}
+        <p class="empty">{{ trans('core.admin.messages.none') }}</p>
+    {% endif %}
+</section>
+
+{% for message in messages %}
+    <article class="card-box">
+        <div class="review-head">
+            <a href="{{ url(message.context_path) }}">{{ message.context }}</a> ·
+            <small>{{ message.sender }}, {{ message.created_at }} UTC</small>
+            {% if message.pending %}<span class="badge badge-pending">{{ trans('core.admin.messages.flagged_as', {word: message.flagged_word}) }}</span>{% endif %}
+            {% if message.status == 'hidden' %}<span class="badge badge-hidden">{{ trans('core.admin.messages.status.hidden') }}</span>{% endif %}
+        </div>
+        <p>{{ message.body|nl2br }}</p>
+
+        <div class="button-row">
+            {% if message.pending %}
+                <form method="post" action="{{ url('/admin/messages/' ~ tab ~ '/' ~ message.id ~ '/dismiss') }}" class="inline-form">
+                    {{ csrf_field() }}
+                    <button type="submit">{{ trans('core.admin.messages.dismiss') }}</button>
+                </form>
+            {% endif %}
+            {% if message.status == 'visible' %}
+                <form method="post" action="{{ url('/admin/messages/' ~ tab ~ '/' ~ message.id ~ '/hide') }}" class="inline-form">
+                    {{ csrf_field() }}
+                    <button type="submit" class="danger">{{ trans('core.admin.messages.hide') }}</button>
+                </form>
+            {% else %}
+                <form method="post" action="{{ url('/admin/messages/' ~ tab ~ '/' ~ message.id ~ '/show') }}" class="inline-form">
+                    {{ csrf_field() }}
+                    <button type="submit">{{ trans('core.admin.messages.show') }}</button>
+                </form>
+            {% endif %}
+        </div>
+    </article>
+{% endfor %}
+
+{% include '@admin/_pager.twig' with {path: '/admin/messages', page: page, pages: pages, extra: '&tab=' ~ tab ~ (flagged_only ? '&status=pending' : '')} only %}
+{% endblock %}

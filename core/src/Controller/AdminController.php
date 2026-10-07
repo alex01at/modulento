@@ -114,6 +114,11 @@ final class AdminController extends Controller
             $stats[] = ['id' => 'orders', 'label_key' => 'core.admin.menu.orders', 'path' => '/admin/orders',
                 'total' => array_sum($app->orders->counts()), 'pending' => null];
         }
+        if ($app->auth->can('core.messages.manage')) {
+            $stats[] = ['id' => 'messages', 'label_key' => 'core.admin.menu.messages', 'path' => '/admin/messages',
+                'total' => $app->orders->messageCount() + $app->offerMessages->messageCount(),
+                'pending' => $app->orders->flaggedMessageCount() + $app->offerMessages->flaggedCount()];
+        }
         if ($app->auth->can('core.media.manage')) {
             $stats[] = ['id' => 'media', 'label_key' => 'core.admin.menu.media', 'path' => '/admin/media',
                 'total' => $app->media->list(1, 1)['total'], 'pending' => null];

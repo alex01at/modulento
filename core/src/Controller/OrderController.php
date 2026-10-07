@@ -362,17 +362,17 @@ final class OrderController extends Controller
         $uploads = OrderFiles::uploads($_FILES['files'] ?? null);
         $fileProblem = OrderFiles::problem($uploads) ?? $app->orderFiles->quotaProblem($order['id'], $uploads);
 
-        // A message is text, files, or both.
+        // A message is text, files, or both. The word filter no longer
+        // refuses a message - it only flags it for an administrator; see
+        // Orders::addMessage() and AdminMessageController.
         if (($body === '' && $uploads === []) || mb_strlen($body) > 5000) {
             Session::flash('error', $this->trans('core.order.message.error'));
-        } elseif ($app->badWords->find($body) !== null) {
-            Session::flash('error', $this->trans('core.badword.found'));
         } elseif ($fileProblem !== null) {
             Session::flash('error', $this->trans($fileProblem, self::fileLimits()));
         } elseif ((new RateLimiter($app->db))->hit('order-message', (string) $accountId, 60, 3600)) {
             Session::flash('error', $this->trans('core.error.too_many_requests'));
         } else {
-            $messageId = $app->orders->addMessage($order['id'], $accountId, $role, $body);
+            $messageId = $app->orders->addMessage($order['id'], $accountId, $role, $body, $app->badWords->find($body));
             $app->orderFiles->store($order['id'], $accountId, $role, null, $messageId, $uploads);
             OrderNotifier::message($app, $order, $role, $body !== '' ? $body : $this->trans('core.order.file.sent_files', ['count' => count($uploads)]));
         }

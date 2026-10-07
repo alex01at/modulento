@@ -376,15 +376,111 @@ final class Orders
         return $applied;
     }
 
-    /** @return int the message's id */
-    public function addMessage(int $orderId, int $accountId, string $role, string $body): int
+    /**
+     * @param string|null $flaggedWord the word the word filter matched, if
+     *        any - the message is stored and delivered regardless; it is
+     *        never refused, only flagged for an administrator to decide
+     * @return int the message's id
+     */
+    public function addMessage(int $orderId, int $accountId, string $role, string $body, ?string $flaggedWord = null): int
     {
         $stmt = $this->db->prepare(
-            'INSERT INTO order_message (order_id, account_id, author_role, body, created_at) VALUES (:order, :account, :role, :body, :now)'
+            'INSERT INTO order_message (order_id, account_id, author_role, body, flagged_word, created_at) VALUES (:order, :account, :role, :body, :flagged, :now)'
         );
-        $stmt->execute(['order' => $orderId, 'account' => $accountId, 'role' => $role, 'body' => $body, 'now' => Clock::now()]);
+        $stmt->execute(['order' => $orderId, 'account' => $accountId, 'role' => $role, 'body' => $body, 'flagged' => $flaggedWord, 'now' => Clock::now()]);
 
         return (int) $this->db->lastInsertId();
+    }
+
+    /**
+     * Every order message, for the administration - the two parties never
+     * see this across orders, only their own order's thread.
+     *
+     * @return array{rows: array<int, array>, total: int}
+     */
+    public function listMessages(bool $flaggedOnly, int $page, int $perPage): array
+    {
+        $where = $flaggedOnly ? 'WHERE m.flagged_word IS NOT NULL AND m.decided_at IS NULL' : '';
+
+        $count = $this->db->query("SELECT COUNT(*) FROM order_message m {$where}");
+
+        $stmt = $this->db->prepare(
+            "SELECT m.*, o.offer_title, a.display_name, a.email
+             FROM order_message m JOIN orders o ON o.id = m.order_id LEFT JOIN account a ON a.id = m.account_id
+             {$where} ORDER BY m.id DESC LIMIT " . max(1, $perPage) . ' OFFSET ' . max(0, (min($page, 100000) - 1) * $perPage)
+        );
+        $stmt->execute();
+
+        return [
+            'rows' => array_map(fn (array $row) => $row + ['order_number' => sprintf('%06d', $row['order_id'])], $stmt->fetchAll()),
+            'total' => (int) $count->fetchColumn(),
+        ];
+    }
+
+    public function flaggedMessageCount(): int
+    {
+        return (int) $this->db->query('SELECT COUNT(*) FROM order_message WHERE flagged_word IS NOT NULL AND decided_at IS NULL')->fetchColumn();
+    }
+
+    public function messageCount(): int
+    {
+        return (int) $this->db->query('SELECT COUNT(*) FROM order_message')->fetchColumn();
+    }
+
+    /** @param string $status 'visible' or 'hidden' */
+    public function setMessageStatus(int $id, string $status, int $adminId): bool
+    {
+        if (!in_array($status, ['visible', 'hidden'], true)) {
+            return false;
+        }
+
+        $stmt = $this->db->prepare('UPDATE order_message SET status = :status, decided_at = :now, decided_by = :by WHERE id = :id');
+        $stmt->execute(['status' => $status, 'now' => Clock::now(), 'by' => $adminId, 'id' => $id]);
+
+        return $stmt->rowCount() === 1;
+    }
+
+    /** Clears the flag without changing whether the message is shown. */
+    public function dismissMessageFlag(int $id, int $adminId): bool
+    {
+        $stmt = $this->db->prepare('UPDATE order_message SET decided_at = :now, decided_by = :by WHERE id = :id');
+        $stmt->execute(['now' => Clock::now(), 'by' => $adminId, 'id' => $id]);
+
+        return $stmt->rowCount() === 1;
+    }
+
+    /**
+     * One row per order that has at least one message, with its latest
+     * message - for the account's own inbox (Controller\InboxController),
+     * never across accounts. "unread" compares that message against
+     * Support\MessageSeen's record the same way MessageSeen::unread() counts.
+     *
+     * @return array<int, array{order_id: int, order_number: string, offer_title: string, counterpart: string, body: string, status: string, created_at: string, unread: bool}>
+     */
+    public function inboxThreads(int $accountId, ?int $providerId): array
+    {
+        $stmt = $this->db->prepare(
+            'SELECT o.id AS order_id, o.offer_title, o.buyer_id, o.buyer_name, o.provider_name,
+                    m.body, m.status, m.created_at, m.id AS last_message_id,
+                    s.seen_id
+             FROM orders o
+             JOIN order_message m ON m.id = (SELECT MAX(id) FROM order_message WHERE order_id = o.id)
+             LEFT JOIN message_seen s ON s.account_id = :me1 AND s.scope = \'order\' AND s.ref_id = o.id AND s.sub_id = 0
+             WHERE o.buyer_id = :me2 OR o.provider_id = :provider
+             ORDER BY m.created_at DESC LIMIT 100'
+        );
+        $stmt->execute(['me1' => $accountId, 'me2' => $accountId, 'provider' => $providerId]);
+
+        return array_map(fn (array $row) => [
+            'order_id' => (int) $row['order_id'],
+            'order_number' => sprintf('%06d', $row['order_id']),
+            'offer_title' => $row['offer_title'],
+            'counterpart' => (int) $row['buyer_id'] === $accountId ? $row['provider_name'] : $row['buyer_name'],
+            'body' => $row['body'],
+            'status' => $row['status'],
+            'created_at' => $row['created_at'],
+            'unread' => (int) $row['last_message_id'] > (int) ($row['seen_id'] ?? 0),
+        ], $stmt->fetchAll());
     }
 
     /** Records that the order has been paid. Returns false if it already was. */

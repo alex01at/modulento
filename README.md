@@ -213,8 +213,17 @@ as links.
   told.
 - **Reports** (`core.reports.manage`): notices about content, decided with a
   reason. Reporters and the affected provider are told the outcome.
+- **Messages** (`core.messages.manage`): every order message and every offer
+  question/reply, in one place (two tabs) - not only reachable per order or
+  per offer. Dismiss a flag (content stays as it is) or hide a message (its
+  content is replaced by a notice for the two parties, never for an
+  administrator); showing it again undoes that.
 - **Word filter** (`core.settings.manage`): the words that messages, questions
-  to providers, order messages and reviews may not contain. The list ships with
+  to providers and reviews may not contain. For reviews and direct account
+  ratings a match still refuses the text outright. For order messages and
+  offer questions/replies it no longer refuses anything - the message is
+  always delivered, only flagged for the **Messages** page above to decide.
+  The list ships with
   the core (`core/data/badwords`) and applies until an administrator saves a
   list of their own. A saved list replaces the shipped one; **Restore the
   default list** brings it back. A word matches spellings with special
@@ -744,7 +753,7 @@ Available in every template:
 | `page_links('header' \| 'footer' \| role)` | Published pages for a menu, as `title`/`url`/`role`; `'footer'` ends with the links to the withdrawal form and the report form (`role` is `withdrawal` and `report`) |
 | `latest_offers(limit)` | The newest public offers as cards |
 | `editor()` | The editor's wording as JSON: `<textarea … data-editor="{{ editor() }}">` turns an HTML field of the administration into a simple editor (`themes/admin/assets/editor.js`); without JavaScript it stays a text field, and the server cleans the HTML either way |
-| `module(id)` | Whether an optional function of the core is on: `reviews`, `contact`, `withdrawal`, `reports`, `avatars`, `remember_login` - a theme hides what belongs to a module that is off |
+| `module(id)` | Whether an optional function of the core is on: `reviews`, `contact`, `withdrawal`, `reports`, `avatars`, `remember_login`, `subscriptions`, `inbox` - a theme hides what belongs to a module that is off |
 | `has_catalogue()` | Whether an extension adds a kind of offer; without one, hide the links to offers and providers |
 | `nav_links()` | Entries extensions add to the main menu, as `title`/`url`/`path` |
 | `account_links()` | Entries extensions add to the logged-in account's own navigation (`account/_nav.twig`), as `title`/`url` |
@@ -857,7 +866,12 @@ the picture from `account_avatar()` or the initial letter
 without scripts; `account-menu.js` closes it on Escape and on a click
 elsewhere. The theme's stylesheet places the menu. "My offers" (with a
 provider profile) and "Administration" (with `can('core.admin.access')`) stay
-in the header.
+in the header. With the `inbox` module on, an envelope link
+(`<a class="inbox-link">`, right before the account menu) leads to
+`/account/messages` and carries the `data-unread` badge - the markup
+`unread.js` polls (see "Available in every template", `poll_seconds()`);
+`[data-unread]` elements are handled generically, so a theme can place more
+than one.
 
 **The colour scheme.** An account chooses "automatic", "light" or "dark" in
 its settings; visitors are always "automatic". The layout writes a fixed

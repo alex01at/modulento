@@ -20,6 +20,7 @@ final class Modules
         'avatars' => 'core.module.avatars',
         'remember_login' => 'core.module.remember_login',
         'subscriptions' => 'core.module.subscriptions',
+        'inbox' => 'core.module.inbox',
     ];
 
     private const SETTING = 'core.modules_disabled';

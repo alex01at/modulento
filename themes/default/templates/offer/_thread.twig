@@ -1,11 +1,15 @@
 {# One thread of messages about an offer, oldest first. Receives "messages":
-   body, created_at, label (already translated: who wrote it) and mine. #}
+   body, created_at, label (already translated: who wrote it), mine and hidden. #}
 <ol class="thread-messages">
     {% for message in messages %}
         <li class="{{ message.mine ? 'is-mine' }}">
             <strong>{{ message.label }}</strong>
             <small>{{ message.created_at }} UTC</small>
-            <p>{{ message.body|nl2br }}</p>
+            {% if message.hidden %}
+                <p><small>{{ trans('core.message.hidden_notice') }}</small></p>
+            {% else %}
+                <p>{{ message.body|nl2br }}</p>
+            {% endif %}
         </li>
     {% endfor %}
 </ol>

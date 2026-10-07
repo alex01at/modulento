@@ -11,8 +11,6 @@
         {% else %}
             <span class="account-menu-picture" aria-hidden="true">{{ name|first|upper }}</span>
         {% endif %}
-        {# Filled in by unread.js, which asks the server for the count every few seconds. #}
-        <span class="unread-badge" hidden data-unread data-url="{{ url('/account/unread') }}" data-poll="{{ poll_seconds() }}" data-label="{{ trans('core.account.unread.label') }}"></span>
         <span class="visually-hidden">{{ trans('core.nav.account_menu') }}</span>
     </summary>
     <div class="account-menu-items">
