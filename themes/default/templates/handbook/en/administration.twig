@@ -1,0 +1,22 @@
+<p>Everything an operator does happens under <strong>Administration</strong> (<code>/admin</code>). The menu is divided into sections; which entries an account sees depends on its roles (see the chapter "Accounts, roles and permissions"). Under <strong>Profile settings → Layout of the administration</strong>, the same menu can be shown as a bar on top instead.</p>
+
+<p>Every page of the administration works the same way: the form on it is sent as a whole, a flash message above the content says what happened, and where a list is long it has pages. A row or a card with a link goes to its detail page.</p>
+
+<h2>The dashboard</h2>
+<p>The start page shows one card per area the account may manage: the number of items, and what waits for a decision. The "Updates" card shows how many components have a newer release. Below the cards are all areas as links.</p>
+
+<h2>The sections at a glance</h2>
+<table>
+    <thead><tr><th scope="col">Section</th><th scope="col">What happens there</th></tr></thead>
+    <tbody>
+        <tr><td>Content</td><td>Pages, media library, home page, offer page, design</td></tr>
+        <tr><td>Marketplace</td><td>Offers, categories, providers, orders, withdrawals, payment methods, subscriptions</td></tr>
+        <tr><td>Moderation</td><td>Reviews, reports, word filter</td></tr>
+        <tr><td>People</td><td>Accounts, roles</td></tr>
+        <tr><td>System</td><td>Settings, modules, themes, packages, extensions, tasks, updates, documentation, handbook</td></tr>
+    </tbody>
+</table>
+<p>The "Marketplace" section only appears while an extension that brings a catalogue is running; the same goes for entries such as offers or categories.</p>
+
+<h2>Permissions decide the menu, not roles by name</h2>
+<p>What an account sees in the menu follows its permissions, not its name. An account without <code>core.admin.access</code> never sees the administration at all, whatever else it may do. More on this in the chapter "Accounts, roles and permissions".</p>

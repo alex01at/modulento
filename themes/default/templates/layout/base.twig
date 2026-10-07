@@ -97,6 +97,7 @@
 
 <footer class="site-footer">
     <nav aria-label="{{ trans('core.nav.footer') }}">
+        <a href="{{ url('/handbook') }}">{{ trans('core.nav.handbook') }}</a>
         {% for link in page_links('footer') %}
             <a href="{{ link.url }}">{{ link.title }}</a>
         {% endfor %}

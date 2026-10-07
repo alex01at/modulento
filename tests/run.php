@@ -857,6 +857,22 @@ check('mail in the language of the request, link with prefix', $mail['subject'] 
 check('account remembers the language it registered in', $row('english@example.test')['locale'] === 'en');
 $pdo->exec("DELETE FROM account WHERE email = 'english@example.test'");
 
+// --- Handbook --------------------------------------------------------------
+$slugs = array_keys(Modulento\Core\Support\Handbook::CHAPTERS);
+check('handbook: fourteen chapters, in the order they are meant to be read', count($slugs) === 14 && $slugs[0] === 'intro' && end($slugs) === 'glossary');
+$r = $get('/handbook', null);
+check('handbook: the overview lists every chapter, in German by default', $r['status'] === 200 && substr_count($r['body'], '<a href="/handbook/') === 14 && str_contains($r['body'], 'Zahlungsarten für Bestellungen'));
+$r = $get('/en/handbook', null);
+check('handbook: the same overview in English', $r['status'] === 200 && str_contains($r['body'], '<h1>Handbook</h1>') && str_contains($r['body'], 'Payment methods for orders'));
+$r = $get('/handbook/intro', null);
+check('handbook: the first chapter has no "previous", only a "next"', $r['status'] === 200 && str_contains($r['body'], 'Dieses Handbuch richtet sich an den Betreiber') && !str_contains($r['body'], '&larr;') && str_contains($r['body'], 'href="/handbook/installation"'));
+$r = $get('/en/handbook/intro', null);
+check('handbook: the same chapter in English', $r['status'] === 200 && str_contains($r['body'], 'This handbook is written for the operator'));
+$r = $get('/handbook/glossary', null);
+check('handbook: the last chapter has a "previous", no "next"', $r['status'] === 200 && str_contains($r['body'], '&larr;') && !str_contains($r['body'], '&rarr;'));
+check('handbook: an unknown chapter is a 404, not an error', $get('/handbook/nope', null)['status'] === 404);
+check('handbook: linked from the footer of an ordinary page', str_contains($get('/', null)['body'], 'href="/handbook"'));
+
 $pdo->exec("UPDATE setting SET value = 'de' WHERE name = 'core.languages'");
 check('a disabled language is no prefix any more', $get('/en/login', null)['status'] === 404);
 check('with one language there is no language menu', !str_contains($get('/login', null)['body'], 'language-menu'));
@@ -3438,7 +3454,7 @@ check('admin layout: a section shows its entries as tiles in the content area', 
 // administration, and the pages - but no accounts, roles or settings.
 $pdo->exec("INSERT INTO role_permission VALUES (1, 'core.admin.access'), (1, 'core.pages.manage')");
 check('admin layout: a section without entries for the account does not exist', $get('/admin/section/people', 2)['status'] === 404 && $get('/admin/section/nope', 3)['status'] === 404);
-check('admin layout: a section shows only what the account may open', substr_count($get('/admin/section/system', 2)['body'], 'class="tile" href=') === 1 && str_contains($get('/admin/section/system', 2)['body'], 'href="/admin/docs"'));
+check('admin layout: a section shows only what the account may open', substr_count($get('/admin/section/system', 2)['body'], 'class="tile" href=') === 2 && str_contains($get('/admin/section/system', 2)['body'], 'href="/admin/docs"') && str_contains($get('/admin/section/system', 2)['body'], 'href="/handbook"'));
 $pdo->exec("DELETE FROM role_permission WHERE role_id = 1 AND permission IN ('core.admin.access', 'core.pages.manage')");
 check('admin layout: the tiles need the administration permission', $get('/admin/section/content', 1)['status'] === 403);
 $post('/account/admin-layout', ['admin_layout' => 'sidebar'], 3);

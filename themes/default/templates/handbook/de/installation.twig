@@ -1,0 +1,14 @@
+<p>Was gebraucht wird: PHP 8.3 oder neuer mit PDO und den üblichen Erweiterungen für Bilder und HTTP, eine MySQL- oder MariaDB-Datenbank, und eine Adresse, die über HTTPS erreichbar ist. Zahlungen sind optional; ohne sie läuft die Seite, nur kaufen kann niemand etwas.</p>
+
+<h2>In fünf Schritten</h2>
+<ol>
+    <li>Das Paket <code>modulento-&lt;version&gt;.zip</code> von der Releases-Seite laden und entpackt hochladen. Es enthält bereits <code>vendor/</code>, Composer wird also nicht gebraucht.</li>
+    <li>Das Wurzelverzeichnis der Domain auf den Ordner <code>public/</code> zeigen lassen. Wo das Hosting-Paneel das nicht erlaubt, wird in das Wurzelverzeichnis hochgeladen, wie es ist: Die <code>.htaccess</code> im obersten Ordner leitet jede Anfrage an <code>public/</code> weiter (Apache mit mod_rewrite).</li>
+    <li>Im Hosting-Paneel eine leere MySQL-/MariaDB-Datenbank anlegen.</li>
+    <li>Die Seite öffnen. Die Einrichtungsseite prüft die Voraussetzungen, fragt nach der Datenbank, einem Namen für die Seite und dem ersten Administrationskonto, richtet die Datenbank ein und schreibt <code>.env</code>. Danach ist sie nicht mehr erreichbar.</li>
+    <li>Geplante Aufgaben brauchen einen Anstoß jede Minute. <strong>Administration → Aufgaben</strong> zeigt beide Wege: eine geplante Aufgabe im Hosting-Paneel, die <code>php bin/cron.php</code> aufruft, oder - wo das Paneel nur Adressen aufrufen kann - eine geheime Adresse.</li>
+</ol>
+
+<h2>Wenn etwas nicht passt</h2>
+<p>Fehlt der Ordner <code>vendor/</code>, wurde der Quellcode statt eines Release-Pakets hochgeladen (zum Beispiel über GitHubs „Download ZIP“). Das Paket von der Releases-Seite ist das richtige.</p>
+<p>Die Einrichtungsseite ist nur erreichbar, solange noch keine Datenbankverbindung in <code>.env</code> steht. Ist die Einrichtung einmal abgeschlossen, führt kein Weg mehr zurück zu ihr - das ist Absicht, nicht ein Fehler.</p>

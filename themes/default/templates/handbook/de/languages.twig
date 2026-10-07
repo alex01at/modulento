@@ -1,0 +1,13 @@
+<p>Mehrsprachigkeit ist von Anfang an mitgedacht, nicht nachgerüstet. Welche Sprachen angeboten werden und welche die Standardsprache ist, steht unter <strong>Administration → Settings</strong>.</p>
+
+<h2>Die Sprache in der Adresse</h2>
+<p>Die Sprache ist Teil der Adresse: Die Standardsprache hat kein Kürzel (<code>/login</code>), jede andere trägt ihr Kürzel (<code>/en/login</code>). Jede Sprachfassung einer Seite kann einzeln verlinkt und von Suchmaschinen erfasst werden; Seiten melden sich gegenseitig über <code>hreflang</code>.</p>
+
+<h2>Wenn ein Text fehlt</h2>
+<p>Ein Text, der in einer Sprache fehlt, wird in der Standardsprache gezeigt, dann auf Englisch - damit auch eine noch unvollständige Sprachfassung benutzbar ist. Inhaltsseiten funktionieren ebenso: eine Sprache ohne eigenen Text zeigt den Text der Standardsprache.</p>
+
+<h2>Eigene Formulierungen</h2>
+<p>Die Oberflächentexte des Kerns kommen aus <code>core/lang/&lt;sprache&gt;.php</code>, jede Erweiterung bringt eigene in ihrem <code>lang/</code>-Ordner mit. Eine Datei <code>lang/&lt;sprache&gt;.php</code> direkt in der Installation wird zuletzt gelesen und kann jeden Text umformulieren oder eine Sprache vervollständigen. Ein Update rührt diesen Ordner nie an.</p>
+
+<h2>Konten merken sich ihre Sprache</h2>
+<p>Nach der Anmeldung landet ein Konto in seiner eigenen Sprache, und Mails in seinem Namen werden in dieser Sprache verschickt.</p>

@@ -1,0 +1,20 @@
+<p>This chapter is about paying for <strong>orders</strong> in the marketplace. Subscriptions are independent of this and follow a different rule - see the chapter "Subscriptions".</p>
+
+<h2>The basic rule</h2>
+<p>The money of an order always goes straight from the buyer to the provider. The platform never holds money and takes no fee. That is why each provider sets up their own payment account, under <strong>Account → Payments</strong>.</p>
+
+<h2>Switching on payment methods</h2>
+<p>Under <strong>Administration → Payment methods</strong>, the operator switches on which ways to pay are allowed at all:</p>
+<ul>
+    <li><strong>Bank transfer:</strong> the provider enters a bank account, and the buyer transfers straight into it.</li>
+    <li><strong>PayPal:</strong> the provider connects their own PayPal account.</li>
+    <li><strong>Stripe:</strong> the provider gets their own Stripe account, connected to the platform (Stripe Connect). For this the platform itself needs Stripe credentials, entered here.</li>
+</ul>
+<p>Test real payment services with your own sandbox credentials before switching them on.</p>
+
+<h2>Security</h2>
+<ul>
+    <li>Passwords are hashed, never stored as plain text.</li>
+    <li>Providers' payment details are encrypted with the key in <code>var/secret.key</code>. If that file is lost, the details have to be entered again - so it belongs in the backup (see the chapter "Operations").</li>
+    <li>Actions that could be abused are rate-limited: sending messages and questions, withdrawal and report forms, placing orders, starting payments, connecting payment accounts, resending verification mail.</li>
+</ul>

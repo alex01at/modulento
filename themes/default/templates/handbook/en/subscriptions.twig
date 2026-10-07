@@ -1,0 +1,24 @@
+<p>Subscriptions are something different from orders: here the <strong>operator</strong> sells plans directly, and the money goes to them, not to a provider. That is why this is a module of its own, which can be switched off, with its own payment setup.</p>
+
+<h2>Setup, step by step</h2>
+<ol>
+    <li><strong>Administration → Modules:</strong> check that "Subscriptions" is on.</li>
+    <li><strong>Administration → Subscriptions → Details for the invoices:</strong> name, address, VAT ID, VAT rate. Without these, nothing is sold.</li>
+    <li>On the same page, <strong>Bank account for transfers:</strong> the IBAN (and BIC) buyers pay into.</li>
+    <li>Under <strong>Payment methods:</strong> switch on bank transfer and/or Stripe, and for Stripe give the platform's own credentials.</li>
+    <li>Create a plan: name, key, price, currency, period, and the features it includes. A feature key can also be typed in by hand.</li>
+    <li>Test it yourself: order a plan with a test account, confirm the transfer under <strong>Open transfers</strong>, and check the invoice under <strong>Invoices</strong> and in the account's <strong>My subscription</strong>.</li>
+</ol>
+
+<h2>How a purchase runs</h2>
+<p>An account orders a plan at <code>/subscriptions</code>, giving a billing address on the way (which is kept for later orders), and chooses bank transfer or Stripe. With a transfer, the order page shows the bank details and a reference; the operator confirms the money by hand, and the plan is then unlocked for its period. With Stripe, payment runs through a Stripe checkout on the platform's own account; renewals, failed payments and the end of a subscription are handled automatically through a webhook.</p>
+<p>An early renewal by transfer extends from the end of the current period, not from the order date - so no days already paid for are lost.</p>
+
+<h2>Invoices</h2>
+<p>Every payment gets a running invoice number (<code>RE-year-number</code>), without gaps per year. Prices are gross; VAT is taken out of them. The invoice is mailed out as a link, and sits under "My subscription" and in the administration. Which details an invoice must carry where you operate, and whether the set VAT rate fits, should be checked by a tax adviser beforehand - the software only shows what is entered.</p>
+
+<h2>Actually gating a feature</h2>
+<p>A plan only lists features by name; what a feature actually unlocks is decided by the relevant extension. A route can require a feature as a condition, and a template can show a control only where a feature is unlocked. Whether and which features that affects in a particular installation depends on the extension used - the core does not prescribe that on its own.</p>
+
+<h2>Reminders</h2>
+<p>A week before a transfer subscription ends, one reminder mail goes out, once per period. A Stripe subscription, by contrast, renews on its own until it is ended in the account.</p>

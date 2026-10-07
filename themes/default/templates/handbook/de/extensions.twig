@@ -1,0 +1,18 @@
+<p>Eine Erweiterung bringt eine Funktion mit, ein Theme ändert das Aussehen. Beide sind reine Ordner, ohne Build-Schritt und ohne Composer.</p>
+
+<h2>Installieren</h2>
+<ol>
+    <li><strong>Aus einem Repository:</strong> Unter <strong>Administration → Packages</strong> <code>besitzer/name</code> eingeben, oder die Adresse des Repositorys auf GitHub. Installiert werden kann nur, was zu <code>PACKAGE_SOURCES</code> in <code>.env</code> passt; ohne diese Einstellung nur das, was vom Besitzer des Kern-Repositorys stammt.</li>
+    <li><strong>Aus einer Zip-Datei:</strong> die Zip-Datei eines Releases hochladen. Sie wird geprüft (sie muss ein Paket mit Manifest sein) und installiert, aber nicht automatisch aktualisiert.</li>
+</ol>
+<p>Ein Paket behält das Repository, aus dem es zuerst kam; ein anderes Repository kann seinen Namen nicht übernehmen.</p>
+
+<h2>Nur eine Erweiterung aktiv</h2>
+<p>Unter <strong>Administration → Extensions</strong> wird eine installierte Erweiterung ein- und ausgeschaltet. Es ist immer nur eine aktiv: Wer eine einschaltet, schaltet die bisher aktive automatisch aus. Ihre Tabellen und Daten bleiben dabei erhalten und sind sofort wieder da, wenn sie erneut eingeschaltet wird. Ein Theme folgt demselben Prinzip, nur eines ist jeweils aktiv.</p>
+<p>Die Migrationen einer Erweiterung laufen, sobald sie eingeschaltet wird.</p>
+
+<h2>Updates</h2>
+<p><strong>Administration → Updates</strong> ist die eine Stelle für alle Aktualisierungen: der Kern, jede installierte Erweiterung und jedes installierte Theme, mit installierter und neuester Version. <strong>Prüfen</strong> fragt jede Quelle einmal ab und merkt sich die Antworten; das Startpanel und diese Seite lesen nur diesen Stand, ein Seitenaufruf fragt also nie von sich aus bei GitHub nach. <strong>Aktualisieren</strong> installiert die neueste Version einer Komponente; beim Kern läuft danach automatisch der Migrationsschritt. Aus einer Zip-Datei installierte Pakete haben kein Repository, aus dem heraus aktualisiert werden könnte - hier wird die neue Zip-Datei erneut hochgeladen.</p>
+
+<h2>Eine eigene Erweiterung oder ein eigenes Theme bauen</h2>
+<p>Das ist eine andere Aufgabe als dieses Handbuch beschreibt: Sie richtet sich an Entwickler, nicht an Betreiber. Die technische Referenz - Dateistruktur, Twig-Variablen, die Schnittstellen, die eine Erweiterung nutzen kann - steht unter <strong>Administration → Documentation</strong> (<code>/admin/docs</code>).</p>
