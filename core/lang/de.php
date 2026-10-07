@@ -832,7 +832,7 @@ return [
     'core.offer.contact.login' => 'Melde dich an, um den Anbieter zu kontaktieren.',
     'core.offer.contact.own' => 'Das ist dein eigenes Angebot.',
     'core.offer.contact.sent' => 'Deine Nachricht wurde an den Anbieter geschickt.',
-    'core.offer.contact.error' => 'Die Nachricht braucht mindestens 20 und höchstens 3000 Zeichen.',
+    'core.offer.contact.error' => 'Die Nachricht braucht zwischen 1 und 3000 Zeichen.',
     'core.admin.settings.offer_approval' => 'Freigabe neuer Angebote',
     'core.admin.settings.offer_approval_required' => 'Nötig: ein Admin prüft jedes neue Angebot',
     'core.admin.settings.offer_approval_off' => 'Aus: Angebote sind sofort öffentlich',
@@ -1614,6 +1614,9 @@ return [
     'core.inbox.none' => 'Noch keine Nachrichten.',
     'core.inbox.type.order' => 'Bestellung',
     'core.inbox.type.offer' => 'Angebotsfrage',
+    'core.inbox.reply' => 'Antworten',
+    'core.inbox.reply_send' => 'Senden',
+    'core.inbox.open_full' => 'Ganze Unterhaltung öffnen',
 
     'core.module.notifications.name' => 'Benachrichtigungen',
     'core.module.notifications.description' => 'Glockensymbol im Header und eine Übersicht aller Benachrichtigungen (Bestellstatus, Entscheidungen, Nachrichten, überboten) auf einer Seite.',

@@ -832,7 +832,7 @@ return [
     'core.offer.contact.login' => 'Log in to contact the provider.',
     'core.offer.contact.own' => 'This is your own offer.',
     'core.offer.contact.sent' => 'Your message has been sent to the provider.',
-    'core.offer.contact.error' => 'The message needs at least 20 and at most 3000 characters.',
+    'core.offer.contact.error' => 'The message needs between 1 and 3000 characters.',
     'core.admin.settings.offer_approval' => 'Approval of new offers',
     'core.admin.settings.offer_approval_required' => 'Required: an administrator reviews every new offer',
     'core.admin.settings.offer_approval_off' => 'Off: offers are public at once',
@@ -1614,6 +1614,9 @@ return [
     'core.inbox.none' => 'No messages yet.',
     'core.inbox.type.order' => 'Order',
     'core.inbox.type.offer' => 'Offer question',
+    'core.inbox.reply' => 'Reply',
+    'core.inbox.reply_send' => 'Send',
+    'core.inbox.open_full' => 'Open the full conversation',
 
     'core.module.notifications.name' => 'Notifications',
     'core.module.notifications.description' => 'A bell icon in the header and an overview of every notification (order state, decisions, messages, outbid) on one page.',
