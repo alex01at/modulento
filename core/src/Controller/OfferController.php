@@ -365,6 +365,18 @@ final class OfferController extends Controller
             case 1:
                 $chosen = is_array($_POST['locales'] ?? null) ? array_filter($_POST['locales'], 'is_string') : [];
                 $values['locales'] = array_values(array_unique([$primary, ...array_intersect($app->locales->enabled(), $chosen)]));
+                if (!isset($values['id'])) {
+                    // Offers take room and an administrator's time; a profile
+                    // nobody has looked at yet gets only a few - checked here,
+                    // not at the final save, since the row exists from now on.
+                    $max = $provider['status'] === 'approved' ? self::MAX_OFFERS : self::MAX_OFFERS_UNAPPROVED;
+                    if ($app->offers->listAll((int) $provider['id'], null, 1, 1)['total'] >= $max) {
+                        Session::flash('error', $this->trans('core.offer.error.too_many', ['max' => $max]));
+                        $this->redirect('/account/offers');
+                        return;
+                    }
+                    $values['id'] = $app->offers->createDraft((int) $provider['id'], $type->id());
+                }
                 break;
             case 2:
                 $category = (int) ($_POST['category_id'] ?? 0);
@@ -389,6 +401,10 @@ final class OfferController extends Controller
             case 5:
                 // Whatever the offer's type asks for, under the names its form uses.
                 $values['type_fields'] = array_diff_key($_POST, array_flip(['type', 'wizard_step', '_csrf', 'category_id', 'text']));
+                break;
+            case 6:
+                // Images are uploaded straight to the offer through their own
+                // route; this step only asks to move on.
                 break;
         }
 
@@ -419,7 +435,7 @@ final class OfferController extends Controller
             return;
         }
 
-        $offer = isset($params['id']) ? $this->ownOffer($params) : null;
+        $offer = isset($params['id']) ? $this->ownOffer($params) : $this->wizardDraft((string) ($_POST['type'] ?? ''));
         if (isset($params['id']) && $offer === null) {
             return;
         }
@@ -457,10 +473,13 @@ final class OfferController extends Controller
         $id = $app->offers->save($offer['id'] ?? null, (int) $provider['id'], $typeId, $shared['category_id'], $shared['texts']);
         $app->offers->setPriceFrom($id, $type->save($id, $specific['values'], $app));
 
-        if ($offer === null) {
+        // The wizard's own route, whether or not it already created a draft
+        // row - an edit of an existing offer always has {id} in the route.
+        $fromWizard = !isset($params['id']);
+        if ($fromWizard) {
             Session::remove('offer_wizard');
         }
-        Session::flash('success', $this->trans($offer === null ? 'core.offer.saved_new' : 'core.offer.saved'));
+        Session::flash('success', $this->trans($fromWizard ? 'core.offer.saved_new' : 'core.offer.saved'));
         $this->redirect('/account/offers/' . $id);
     }
 
@@ -531,7 +550,7 @@ final class OfferController extends Controller
             'max' => OfferImages::MAX_PER_OFFER,
             'megabytes' => intdiv(OfferImages::MAX_BYTES, 1024 * 1024),
         ]));
-        $this->redirect('/account/offers/' . $offer['id']);
+        $this->redirect($this->safeReturn('/account/offers/' . $offer['id']));
     }
 
     public function deleteImage(array $params): void
@@ -542,7 +561,7 @@ final class OfferController extends Controller
         }
 
         $this->app->offerImages->delete($offer['id'], (int) $params['image']);
-        $this->redirect('/account/offers/' . $offer['id']);
+        $this->redirect($this->safeReturn('/account/offers/' . $offer['id']));
     }
 
     private function changeStatus(array $offer, string $status, string $messageKey): void
@@ -580,6 +599,16 @@ final class OfferController extends Controller
         return $offer;
     }
 
+    /** The draft row the wizard already created for this account and type, if any - quietly, unlike ownOffer(): a stale or missing session is not an error here, just "nothing yet". */
+    private function wizardDraft(string $typeId): ?array
+    {
+        $state = Session::get('offer_wizard');
+        $id = is_array($state) && ($state['type'] ?? null) === $typeId ? ($state['values']['id'] ?? null) : null;
+        $offer = is_int($id) ? $this->app->offers->find($id) : null;
+
+        return $offer !== null && $offer['account_id'] === $this->app->auth->account()['id'] ? $offer : null;
+    }
+
     private function typeLabel(string $typeId): string
     {
         $type = $this->app->offers->type($typeId);
@@ -587,8 +616,8 @@ final class OfferController extends Controller
         return $type !== null ? $this->trans($type->labelKey()) : $typeId;
     }
 
-    /** The steps of making a new offer: the languages, the category, the texts, the type's own fields, and a review. */
-    private const WIZARD_STEPS = 6;
+    /** The steps of making a new offer: the languages, the category, the texts, the type's own fields, images, and a review. */
+    private const WIZARD_STEPS = 7;
 
     /** @param array<string, mixed> $values what the steps so far have asked for */
     private function renderWizard(OfferType $type, int $step, array $values, array $errors): void
@@ -612,11 +641,22 @@ final class OfferController extends Controller
             'category_id' => (int) ($values['category_id'] ?? 0),
             'categories' => $app->categories->tree($primary),
             'category_name' => $this->categoryName((int) ($values['category_id'] ?? 0), $primary),
-            'type_data' => $step === 5 ? $type->formData(null, $values['type_fields'] ?? null, $app) : [],
+            'type_data' => $step === 5 ? $type->formData(null, $values['type_fields'] ?? null, $app, $selected) : [],
+            'offer' => $step === 6 && isset($values['id']) ? $this->imageOffer((int) $values['id']) : null,
+            'images_available' => OfferImages::available(),
+            'max_images' => OfferImages::MAX_PER_OFFER,
             // The answers as one form's fields, for the review: the last save reads them as any form.
             'answers' => $step === self::WIZARD_STEPS ? $this->answers($type->id(), $values) : [],
             'errors' => $errors,
         ]);
+    }
+
+    /** The wizard's draft offer, as the images partial needs it (id and its images, nothing else). */
+    private function imageOffer(int $id): ?array
+    {
+        $offer = $this->app->offers->find($id);
+
+        return $offer !== null ? ['id' => $offer['id'], 'images' => array_map([OfferImages::class, 'urls'], $offer['images'])] : null;
     }
 
     private function categoryName(int $id, string $locale): string

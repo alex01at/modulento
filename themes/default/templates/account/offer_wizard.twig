@@ -94,6 +94,16 @@
         <button type="submit">{{ trans('core.offer.wizard.next') }}</button>
     </form>
 
+{% elseif step == 6 %}
+    <p>{{ trans('core.offer.wizard.images_hint') }}</p>
+    {% include 'account/_offer_images.twig' with {return: url('/account/offers/new?type=' ~ type.id ~ '&step=6')} %}
+    <form method="post" action="{{ url('/account/offers/wizard') }}" class="stack-form">
+        {{ csrf_field() }}
+        <input type="hidden" name="type" value="{{ type.id }}">
+        <input type="hidden" name="wizard_step" value="6">
+        <button type="submit">{{ trans('core.offer.wizard.next') }}</button>
+    </form>
+
 {% else %}
     <h2>{{ trans('core.offer.wizard.review') }}</h2>
     <p>{{ trans('core.offer.wizard.review_hint') }}</p>

@@ -1239,20 +1239,28 @@ $wizardSteps = function (string $type, array $answers) use ($get, $post, $pdo): 
     $post('/account/offers/wizard', ['type' => $type, 'wizard_step' => 3, 'text' => ['de' => ['title' => 'Assistent-Titel', 'summary' => 'Kurz'], 'en' => ['title' => 'Wizard title', 'summary' => '']]], false);
     $post('/account/offers/wizard', ['type' => $type, 'wizard_step' => 4, 'text' => ['de' => ['description' => 'Beschreibung'], 'en' => ['description' => 'Description']]], false);
     $post('/account/offers/wizard', ['type' => $type, 'wizard_step' => 5] + $answers, false);
-    return $get('/account/offers/new?type=' . $type . '&step=6', false);
+    $post('/account/offers/wizard', ['type' => $type, 'wizard_step' => 6], false);
+    return $get('/account/offers/new?type=' . $type . '&step=7', false);
 };
 $r = $get('/account/offers/new?type=freelancer.service', 1);
-check('offer wizard: the first step asks for the languages, and the type\'s fields come at step five', $r['status'] === 200 && str_contains($r['body'], 'name="locales[]"') && str_contains($r['body'], 'Schritt 1 von 6'));
+check('offer wizard: the first step asks for the languages, and the type\'s fields come at step five', $r['status'] === 200 && str_contains($r['body'], 'name="locales[]"') && str_contains($r['body'], 'Schritt 1 von 7'));
 $r = $get('/account/offers/new?type=freelancer.service&step=5', false);
 check('offer wizard: the type\'s own fields are there at step five', $r['status'] === 200 && str_contains($r['body'], 'name="package[1][price]"') && str_contains($r['body'], 'Paket „Basis“'));
+check('offer wizard: step five only asks for the languages chosen at the start, not every site language', str_contains($r['body'], 'name="package[1][text][de][name]"') && !str_contains($r['body'], 'name="package[1][text][en][name]"'));
 $review = $wizardSteps('freelancer.service', ['package' => [1 => ['price' => '20', 'delivery_days' => '3']]]);
 check('offer wizard: the review shows what was entered, and its hidden fields carry the answers to the save', $review['status'] === 200 && str_contains($review['body'], 'Assistent-Titel') && str_contains($review['body'], 'name="text[de][title]"') && str_contains($review['body'], 'name="package[1][price]" value="20"'));
 $r = $get('/account/offers/new?type=freelancer.service&step=3', false);
 check('offer wizard: a language chosen at the start gets its own fields', str_contains($r['body'], 'name="text[en][title]"') && !str_contains($r['body'], 'name="text[fr]'));
+// Both posted outside the wizard (a fresh login resets its session), so
+// neither finds a draft to update - the count must stay exactly as it was,
+// whatever rows the wizard checks above already left behind.
+$offerCount = fn () => (int) $pdo->query('SELECT COUNT(*) FROM offer')->fetchColumn();
+$countBefore = $offerCount();
 $r = $post('/account/offers/new', ['package' => [1 => ['price' => 'viel', 'delivery_days' => '0']]] + $offerForm, 1);
-check('offer: the type\'s validation refuses, typed values stay', $offerRow() === false && str_contains($r['body'], 'Preis zwischen') && str_contains($r['body'], 'value="Ich gestalte dein Logo"') && str_contains($r['body'], 'value="viel"'));
+check('offer: the type\'s validation refuses, typed values stay', $offerCount() === $countBefore && str_contains($r['body'], 'Preis zwischen') && str_contains($r['body'], 'value="Ich gestalte dein Logo"') && str_contains($r['body'], 'value="viel"'));
+$countBefore = $offerCount();
 $r = $post('/account/offers/new', ['text' => ['de' => ['title' => '', 'summary' => 'x', 'description' => '']]] + $offerForm, 1);
-check('offer: needs a title', $offerRow() === false);
+check('offer: needs a title', $offerCount() === $countBefore);
 
 $post('/account/offers/new', $offerForm, 1);
 $offer = $offerRow();
@@ -1265,6 +1273,9 @@ foreach (['Zwei', 'Drei', 'Vier'] as $title) {
     $post('/account/offers/new', ['text' => ['de' => ['title' => 'Angebot ' . $title, 'summary' => '', 'description' => '']]] + $offerForm, 1);
 }
 check('offers: a profile that is not approved yet gets three, no more', $pdo->query('SELECT COUNT(*) FROM offer')->fetchColumn() == 3 && str_contains($_SESSION['_flash']['error'] ?? '', 'Höchstzahl von 3'));
+$get('/account/offers/new?type=freelancer.service', 1);
+$post('/account/offers/wizard', ['type' => 'freelancer.service', 'wizard_step' => 1, 'locales' => []], false);
+check('offer wizard: the quota is already checked at step one, not just at the final save', $pdo->query('SELECT COUNT(*) FROM offer')->fetchColumn() == 3 && str_contains($_SESSION['_flash']['error'] ?? '', 'Höchstzahl von 3'));
 $pdo->exec("UPDATE provider SET status = 'approved' WHERE account_id = 1");
 $pdo->exec("DELETE FROM offer WHERE id <> {$offerId}");
 check('offer: a draft is not public', $get('/offers/ich-gestalte-dein-logo', null)['status'] === 404 && !str_contains($get('/offers', null)['body'], 'Ich gestalte'));
@@ -1299,6 +1310,50 @@ check('image: the thumbnail is small', getimagesize("{$uploadDir}/{$image['name'
 $r = $get("/media/offers/{$offerId}/{$image['name']}_thumb.{$image['extension']}", null);
 check('image: served through the media route', $r['status'] === 200 && strlen($r['body']) > 100);
 check('image: only generated names are served', $get("/media/offers/{$offerId}/../../../.env", null)['status'] === 404 && $get("/media/offers/{$offerId}/x.php", null)['status'] === 404);
+
+// The wizard's own picture step: the row exists from step one onward - an
+// upload there goes through the same real route the edit page uses, lands
+// back on the same step, and the final save updates this very row.
+$get('/account/offers/new?type=freelancer.service', 1);
+$post('/account/offers/wizard', ['type' => 'freelancer.service', 'wizard_step' => 1, 'locales' => []], false);
+$draftId = (int) $offerRow()['id'];
+check('offer wizard: a draft row exists from step one onward, with no title yet', $pdo->query("SELECT status FROM offer WHERE id = {$draftId}")->fetchColumn() === 'draft'
+    && $pdo->query("SELECT COUNT(*) FROM offer_translation WHERE offer_id = {$draftId}")->fetchColumn() == 0);
+$_FILES = ['image' => ['tmp_name' => $makeImage(600, 400), 'error' => UPLOAD_ERR_OK, 'size' => 1000, 'name' => 'x.png', 'type' => 'image/png']];
+$post('/account/offers/' . $draftId . '/images', ['return' => '/account/offers/new?type=freelancer.service&step=6'], false);
+$_FILES = [];
+check('offer wizard: an image uploaded mid-wizard shows up back on the same step', $pdo->query("SELECT COUNT(*) FROM offer_image WHERE offer_id = {$draftId}")->fetchColumn() == 1
+    && str_contains($get('/account/offers/new?type=freelancer.service&step=6', false)['body'], '/account/offers/' . $draftId . '/images/'));
+$post('/account/offers/wizard', ['type' => 'freelancer.service', 'wizard_step' => 2, 'category_id' => $childId], false);
+$post('/account/offers/wizard', ['type' => 'freelancer.service', 'wizard_step' => 3, 'text' => ['de' => ['title' => 'Mit Bild', 'summary' => '']]], false);
+$post('/account/offers/wizard', ['type' => 'freelancer.service', 'wizard_step' => 4, 'text' => ['de' => ['description' => 'x']]], false);
+$post('/account/offers/wizard', ['type' => 'freelancer.service', 'wizard_step' => 5, 'package' => [1 => ['price' => '10', 'delivery_days' => '1']]], false);
+$post('/account/offers/wizard', ['type' => 'freelancer.service', 'wizard_step' => 6], false);
+$countBeforeFinalSave = $offerCount();
+$post('/account/offers/new', ['type' => 'freelancer.service', 'category_id' => (string) $childId,
+    'text' => ['de' => ['title' => 'Mit Bild', 'summary' => '']], 'package' => [1 => ['price' => '10', 'delivery_days' => '1']]], false);
+check('offer wizard: the final save updates the draft from step one instead of inserting a second row', $offerCount() === $countBeforeFinalSave
+    && $pdo->query("SELECT status FROM offer WHERE id = {$draftId}")->fetchColumn() === 'draft'
+    && $pdo->query("SELECT title FROM offer_translation WHERE offer_id = {$draftId} AND locale = 'de'")->fetchColumn() === 'Mit Bild'
+    && $pdo->query("SELECT COUNT(*) FROM offer_image WHERE offer_id = {$draftId}")->fetchColumn() == 1);
+
+// A draft a wizard never finished - no title was ever saved for it - is
+// cleaned up once it is old enough; one that was actually completed (even
+// if left as a draft on purpose) is not touched, whatever its age.
+$app = new Modulento\Core\App($config, $pdo);
+$abandonedId = $app->offers->createDraft($providerId, 'freelancer.service');
+$pdo->exec("UPDATE offer SET created_at = '2020-01-01 00:00:00' WHERE id = {$abandonedId}");
+$pdo->exec("UPDATE offer SET created_at = '2020-01-01 00:00:00' WHERE id = {$draftId}");
+check('offer wizard: an abandoned draft is found for cleanup, a completed one is not', $app->offers->abandonedDraftIds(7 * 86400) === [$abandonedId]);
+$app->offerImages->deleteAll($abandonedId);
+$app->offers->delete($abandonedId);
+check('offer wizard: cleanup removes the row and its pictures', $pdo->query("SELECT COUNT(*) FROM offer WHERE id = {$abandonedId}")->fetchColumn() == 0
+    && $pdo->query("SELECT COUNT(*) FROM offer WHERE id = {$draftId}")->fetchColumn() == 1);
+// Removes the files too, not just the row - a raw SQL delete would leave
+// the uploaded picture behind for a later offer to collide with.
+$app->offerImages->deleteAll($draftId);
+$app->offers->delete($draftId);
+
 $_FILES = ['avatar' => ['tmp_name' => $makeImage(300, 120), 'error' => UPLOAD_ERR_OK]];
 $post('/account/avatar', [], 2);
 $avatar = $pdo->query('SELECT * FROM account_avatar WHERE account_id = 2')->fetch();
@@ -2285,7 +2340,7 @@ $closeAuctions = function () use ($pdo, $config): int {
 };
 
 $r = $get('/account/offers/new?type=auction.lot', 1);
-check('auction: the lot\'s fields are asked for in the wizard, at step five', $r['status'] === 200 && str_contains($r['body'], 'Schritt 1 von 6') && str_contains($wizardSteps('auction.lot', ['start_price' => '10', 'step' => '', 'duration_days' => '3'])['body'], 'name="start_price"') && str_contains($get('/account/offers/new?type=auction.lot&step=5', false)['body'], 'name="duration_days"'));
+check('auction: the lot\'s fields are asked for in the wizard, at step five', $r['status'] === 200 && str_contains($r['body'], 'Schritt 1 von 7') && str_contains($wizardSteps('auction.lot', ['start_price' => '10', 'step' => '', 'duration_days' => '3'])['body'], 'name="start_price"') && str_contains($get('/account/offers/new?type=auction.lot&step=5', false)['body'], 'name="duration_days"'));
 $r = $post('/account/offers/new', ['start_price' => '0,50', 'duration_days' => '4'] + $lotForm, 1);
 check('auction: starting price and duration are checked', $lot() === false && str_contains($r['body'], 'Startpreis zwischen') && str_contains($r['body'], 'Laufzeit'));
 $post('/account/offers/new', $lotForm, 1);

@@ -338,6 +338,37 @@ final class Offers
         return $id;
     }
 
+    /** A bare row for a wizard to hang its progress - and uploaded images - on; texts and type-specific data come later, through save(). */
+    public function createDraft(int $providerId, string $type): int
+    {
+        $now = Clock::now();
+        $stmt = $this->db->prepare(
+            "INSERT INTO offer (provider_id, type, status, currency, created_at, updated_at)
+             VALUES (:provider, :type, 'draft', :currency, :now, :now2)"
+        );
+        $stmt->execute(['provider' => $providerId, 'type' => $type, 'currency' => $this->currency(), 'now' => $now, 'now2' => $now]);
+
+        return (int) $this->db->lastInsertId();
+    }
+
+    /**
+     * Drafts a wizard started but never finished - no offer_translation row
+     * was ever written for them, which save() always does together with the
+     * final step. Ready to be removed by a cleanup task.
+     *
+     * @return int[]
+     */
+    public function abandonedDraftIds(int $seconds): array
+    {
+        $stmt = $this->db->prepare(
+            "SELECT o.id FROM offer o WHERE o.status = 'draft' AND o.created_at < :before
+             AND NOT EXISTS (SELECT 1 FROM offer_translation t WHERE t.offer_id = o.id)"
+        );
+        $stmt->execute(['before' => Clock::now(-$seconds)]);
+
+        return array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN));
+    }
+
     public function setPriceFrom(int $id, ?int $minorUnits): void
     {
         $stmt = $this->db->prepare('UPDATE offer SET price_from = :price WHERE id = :id');

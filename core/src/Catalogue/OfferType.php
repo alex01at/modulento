@@ -35,9 +35,12 @@ interface OfferType
      * @param int|null $offerId null for a new offer
      * @param array<string, mixed>|null $typed the form as it was sent, when
      *        it is shown again after a failed validation
+     * @param string[]|null $locales restricts per-language fields to these
+     *        (the wizard's own step 1 choice); null means every site locale,
+     *        as when editing an offer that already exists
      * @return array<string, mixed>
      */
-    public function formData(?int $offerId, ?array $typed, App $app): array;
+    public function formData(?int $offerId, ?array $typed, App $app, ?array $locales = null): array;
 
     /**
      * Checks this type's part of the submitted form.
