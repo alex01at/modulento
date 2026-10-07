@@ -209,6 +209,28 @@ async def main():
               paste_result['area'] == '<p>Erster <b>fetter</b> Absatz.</p>Zweiter Absatz ohne Tag.'
               and paste_result['textarea'] == paste_result['area'] and not paste_result['ranScript'])
 
+        # 10. leaving a filled-in form unsaved is warned about; submitting it, or a search
+        # form, or the page before anything was typed, is not
+        await b.goto(BASE + '/admin/pages/new')
+        before = await b.eval("(() => { const e = new Event('beforeunload', {cancelable: true}); window.dispatchEvent(e); return e.defaultPrevented; })()")
+        await b.type_into('#title_de', 'Testseite')
+        after = await b.eval("(() => { const e = new Event('beforeunload', {cancelable: true}); window.dispatchEvent(e); return e.defaultPrevented; })()")
+        check('unsaved changes: a filled-in field warns before leaving, an untouched page does not', before is False and after is True)
+        submitted = await b.eval("""(() => {
+            const form = document.querySelector('#title_de').closest('form');
+            const submitEvent = new Event('submit', {bubbles: true, cancelable: true});
+            form.dispatchEvent(submitEvent);
+            submitEvent.preventDefault();
+            const e = new Event('beforeunload', {cancelable: true});
+            window.dispatchEvent(e);
+            return e.defaultPrevented;
+        })()""")
+        check('unsaved changes: submitting the form is leaving on purpose, no warning follows', submitted is False)
+        await b.goto(BASE + '/admin/accounts')
+        await b.type_into('.search-form input', 'xyz')
+        search = await b.eval("(() => { const e = new Event('beforeunload', {cancelable: true}); window.dispatchEvent(e); return e.defaultPrevented; })()")
+        check('unsaved changes: a search form (GET) never warns', search is False)
+
     finally:
         await b.close()
     failed = [n for n, ok in results if not ok]
