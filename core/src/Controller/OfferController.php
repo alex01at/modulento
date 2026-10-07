@@ -229,6 +229,7 @@ final class OfferController extends Controller
             'sender_email' => $account['email'],
             'message' => $message,
         ], $locale, $account['email']);
+        $app->notifications->create((int) $offer['account_id'], 'offer_message', 'core.notification.offer_message', ['title' => $text['title']], '/offers/' . $text['slug']);
 
         Session::flash('success', $this->trans('core.offer.contact.sent'));
         $this->redirect($path);
@@ -271,6 +272,7 @@ final class OfferController extends Controller
                     'provider' => $account['display_name'] ?: $offer['provider_name'],
                     'message' => $message,
                 ], $locale);
+                $app->notifications->create((int) $recipient['id'], 'offer_reply', 'core.notification.offer_reply', ['title' => $text['title']], '/offers/' . $text['slug']);
             }
             Session::flash('success', $this->trans('core.offer.contact.replied'));
         }

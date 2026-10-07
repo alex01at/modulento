@@ -753,7 +753,7 @@ Available in every template:
 | `page_links('header' \| 'footer' \| role)` | Published pages for a menu, as `title`/`url`/`role`; `'footer'` ends with the links to the withdrawal form and the report form (`role` is `withdrawal` and `report`) |
 | `latest_offers(limit)` | The newest public offers as cards |
 | `editor()` | The editor's wording as JSON: `<textarea … data-editor="{{ editor() }}">` turns an HTML field of the administration into a simple editor (`themes/admin/assets/editor.js`); without JavaScript it stays a text field, and the server cleans the HTML either way |
-| `module(id)` | Whether an optional function of the core is on: `reviews`, `contact`, `withdrawal`, `reports`, `avatars`, `remember_login`, `subscriptions`, `inbox` - a theme hides what belongs to a module that is off |
+| `module(id)` | Whether an optional function of the core is on: `reviews`, `contact`, `withdrawal`, `reports`, `avatars`, `remember_login`, `subscriptions`, `inbox`, `notifications` - a theme hides what belongs to a module that is off |
 | `has_catalogue()` | Whether an extension adds a kind of offer; without one, hide the links to offers and providers |
 | `nav_links()` | Entries extensions add to the main menu, as `title`/`url`/`path` |
 | `account_links()` | Entries extensions add to the logged-in account's own navigation (`account/_nav.twig`), as `title`/`url` |
@@ -869,9 +869,12 @@ provider profile) and "Administration" (with `can('core.admin.access')`) stay
 in the header. With the `inbox` module on, an envelope link
 (`<a class="inbox-link">`, right before the account menu) leads to
 `/account/messages` and carries the `data-unread` badge - the markup
-`unread.js` polls (see "Available in every template", `poll_seconds()`);
-`[data-unread]` elements are handled generically, so a theme can place more
-than one.
+`unread.js` polls (see "Available in every template", `poll_seconds()`).
+With the `notifications` module on, a second such link (bell, same
+`inbox-link` class) leads to `/account/notifications`, polling its own
+`data-unread` badge against `/account/notifications/unread` -
+`[data-unread]` elements are handled generically, so a theme can place as
+many as it wants.
 
 **The colour scheme.** An account chooses "automatic", "light" or "dark" in
 its settings; visitors are always "automatic". The layout writes a fixed
@@ -989,8 +992,12 @@ extensions/<id>/
 Core services an extension uses instead of SQL on core tables, all on the
 `App` object: `accounts` (find, create, change accounts), `tokens` (one-time
 links), `mailer` (`send(to, '@<id>/emails/x.txt.twig', data, locale)`),
-`settings`, `locales`, `pages`, `providers`, `offers`, `categories`,
-`offerImages`, `orders`, `roles`, `auth`, `events`, and `url()`.
+`notifications` (`create(accountId, type, messageKey, params, link)` - an
+in-app notice behind the header's bell, next to whatever e-mail the same
+moment already sends; a no-op while the `notifications` module is off, so
+nothing needs to check that itself), `settings`, `locales`, `pages`,
+`providers`, `offers`, `categories`, `offerImages`, `orders`, `roles`,
+`auth`, `events`, and `url()`.
 
 ### Creating an offer
 

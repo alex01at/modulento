@@ -216,6 +216,8 @@ $pdo->exec("CREATE TABLE account_identity_document (id INTEGER PRIMARY KEY, acco
     original_name TEXT, stored_name TEXT, size INTEGER, created_at TEXT)");
 $pdo->exec("CREATE TABLE account_billing_profile (account_id INTEGER PRIMARY KEY REFERENCES account (id) ON DELETE CASCADE,
     company_name TEXT, website TEXT, vat_id TEXT, tax_id TEXT, street TEXT, postal_code TEXT, city TEXT, country TEXT, updated_at TEXT)");
+$pdo->exec("CREATE TABLE notification (id INTEGER PRIMARY KEY, account_id INTEGER REFERENCES account (id) ON DELETE CASCADE,
+    type TEXT, message_key TEXT, params TEXT, link TEXT, read_at TEXT, created_at TEXT)");
 $pdo->exec("CREATE TABLE provider (id INTEGER PRIMARY KEY, account_id INTEGER UNIQUE REFERENCES account (id) ON DELETE CASCADE, type TEXT, status TEXT,
     status_note TEXT, name TEXT, slug TEXT UNIQUE, legal_name TEXT, street TEXT, postal_code TEXT, city TEXT, country TEXT, contact_email TEXT, phone TEXT,
     vat_id TEXT, tax_id TEXT, company_register TEXT, self_certified_at TEXT, details_changed_at TEXT, decided_at TEXT, decided_by INTEGER, created_at TEXT, updated_at TEXT,
@@ -1068,6 +1070,15 @@ use Modulento\Core\Account\IdentityVerification;
 // The Providers section above ends with "mueller-design" suspended; the
 // checks below need its public page back.
 $post('/admin/providers/' . $p['id'] . '/decide', ['decision' => 'approve'], 3);
+$lastNotification = fn () => $pdo->query('SELECT * FROM notification ORDER BY id DESC LIMIT 1')->fetch();
+check('notification: a provider decision notifies the provider, not the admin', $lastNotification()['account_id'] == 1 && $lastNotification()['type'] === 'provider_status'
+    && $lastNotification()['message_key'] === 'core.provider.status.approved'
+    && str_contains($get('/account/notifications', 1)['body'], 'Dein Profil ist freigegeben und öffentlich.'));
+check('notification: saving the own provider profile (no admin decision) does not notify', (function () use ($pdo, $post, $business) {
+    $before = (int) $pdo->query('SELECT COUNT(*) FROM notification')->fetchColumn();
+    $post('/account/provider', $business, 1);
+    return $pdo->query('SELECT COUNT(*) FROM notification')->fetchColumn() == $before;
+})());
 
 $accountRow = fn (int $id) => $pdo->query("SELECT * FROM account WHERE id = {$id}")->fetch();
 $identityDoc = fn (int $accountId) => $pdo->query("SELECT * FROM account_identity_document WHERE account_id = {$accountId}")->fetch();
@@ -1439,10 +1450,15 @@ $post('/admin/offers/' . $offerId . '/decide', ['decision' => 'reject', 'note' =
 check('offer: rejecting needs a reason', $offerRow()['status'] === 'pending');
 $post('/admin/offers/' . $offerId . '/decide', ['decision' => 'reject', 'note' => 'Bild fehlt'], 3);
 check('offer: rejected, provider is told why', $offerRow()['status'] === 'rejected' && lastMail($mailLog, 'plain@example.test')['subject'] === 'Dein Angebot „Ich gestalte dein Logo“ wurde nicht freigegeben');
+$lastNotification = fn () => $pdo->query('SELECT * FROM notification ORDER BY id DESC LIMIT 1')->fetch();
+check('notification: an admin decision about the offer notifies the provider, not the admin who decided', $lastNotification()['account_id'] == 1 && $lastNotification()['type'] === 'offer_status'
+    && str_contains($lastNotification()['params'], 'Abgelehnt'));
 $post('/account/offers/' . $offerId . '/submit', [], 1);
 $post('/admin/offers/' . $offerId . '/decide', ['decision' => 'approve'], 3);
 check('offer: resubmitted and approved, provider gets the public link', $offerRow()['status'] === 'published' && $offerRow()['published_at'] !== null
     && lastMail($mailLog, 'plain@example.test')['link'] === '/offers/ich-gestalte-dein-logo');
+check('notification: approval notifies the provider too, with a working link', $lastNotification()['account_id'] == 1 && str_contains($lastNotification()['params'], 'Veröffentlicht')
+    && str_contains($get('/account/notifications', 1)['body'], 'Ich gestalte dein Logo'));
 
 $r = $get('/offers/ich-gestalte-dein-logo', null);
 check('offer page: text escaped, packages, extra and requirements shown', $r['status'] === 200 && str_contains($r['body'], '&lt;script&gt;') && str_contains($r['body'], '<strong>Basis</strong>')
@@ -1860,6 +1876,7 @@ check('declining needs a reason', $orderRow($orderId)['state'] === 'placed');
 $act($orderId, 'accept', 1);
 check('accept: in progress, deadline cleared, buyer told', $orderRow($orderId)['state'] === 'in_progress' && $orderRow($orderId)['due_at'] === null
     && lastMail($mailLog, 'editor@example.test')['subject'] === 'Bestellung ' . sprintf('%06d', $orderId) . ': Auftrag angenommen');
+check('notification: an order state change notifies the buyer (who did not act), not the provider who did', $pdo->query('SELECT account_id, type FROM notification ORDER BY id DESC LIMIT 1')->fetch() == ['account_id' => 2, 'type' => 'order_state']);
 check('order page shows the delivery date', str_contains($get('/orders/' . $orderId, 2)['body'], 'zu liefern bis'));
 
 $post('/orders/' . $orderId . '/message', ['body' => "Hier sind die Farben:\n<b>blau</b>"], 2);
@@ -2070,8 +2087,10 @@ $post('/orders/' . $fileOrder . '/message', ['body' => 'Letzte Nachricht zur Bes
 $r = $get('/account/messages', 1);
 check('inbox: the newest order message leads the list, for the provider who has not seen it yet', $r['status'] === 200
     && $rowIsUnread($r['body'], 'Letzte Nachricht zur Bestellung, gerade eben.'));
+check('notification: a new order message also notifies via the bell (counts in both places, as decided)', $pdo->query('SELECT account_id, type FROM notification ORDER BY id DESC LIMIT 1')->fetch() == ['account_id' => 1, 'type' => 'order_message']);
 
 $post('/offers/ich-gestalte-dein-logo/contact', ['message' => 'Und noch eine ganz neue Frage, gerade erst gestellt.'], 2);
+check('notification: a new offer question notifies the provider via the bell too', $pdo->query('SELECT account_id, type FROM notification ORDER BY id DESC LIMIT 1')->fetch() == ['account_id' => 1, 'type' => 'offer_message']);
 // Both posts can land within the same wall-clock second; the test needs a
 // deterministic order, so the offer message is nudged one second later.
 $pdo->exec("UPDATE offer_message SET created_at = datetime(created_at, '+1 second') WHERE body = 'Und noch eine ganz neue Frage, gerade erst gestellt.'");
@@ -2085,6 +2104,15 @@ $r = $get('/account/messages', 1);
 check('inbox: opening the real order page marks its row read', !$rowIsUnread($r['body'], 'Letzte Nachricht zur Bestellung'));
 
 check('inbox: links to the real pages, where replying already works', str_contains($r['body'], 'href="/orders/' . $fileOrder . '"') && str_contains($r['body'], 'href="/offers/ich-gestalte-dein-logo'));
+
+// --- Notifications: the bell, counting independently from the inbox envelope ---
+check('notifications: the header carries the bell and its own unread badge, separate from the inbox one', str_contains($get('/account', 1)['body'], 'href="/account/notifications"') && str_contains($get('/account', 1)['body'], 'data-unread'));
+$unreadNotif = fn (int $account) => (int) (json_decode($get('/account/notifications/unread', $account)['body'], true)['count'] ?? -1);
+$before1 = $unreadNotif(1);
+check('notifications: at least the order message and the offer question above are pending for the provider', $before1 >= 2);
+$r = $get('/account/notifications', 1);
+check('notifications: the list shows both, rendered as readable text via trans()', str_contains($r['body'], 'Neue Nachricht zur Bestellung') && str_contains($r['body'], 'Neue Frage zu'));
+check('notifications: opening the page marks everything read, like the inbox does for its own pages', $unreadNotif(1) === 0);
 
 // --- Reviews -----------------------------------------------------------------------
 $review = fn (int $orderId) => $pdo->query("SELECT * FROM review WHERE order_id = {$orderId}")->fetch();
@@ -2296,6 +2324,7 @@ check('auction: a higher bid leads, the catalogue price follows', (int) $lot()['
     && (int) $offerRow("id = {$lotId}")['price_from'] === 1250 && $pdo->query('SELECT account_id FROM x_auction_bid ORDER BY id DESC')->fetchColumn() == 7);
 $mail = lastMail($mailLog, 'editor@example.test');
 check('auction: the outbid bidder gets a mail with the way back', $mail['subject'] === 'Du wurdest überboten: Alte Kamera' && $mail['link'] === '/offers/alte-kamera');
+check('notification: the outbid bidder is told in the bell too', $pdo->query('SELECT account_id, type, link FROM notification ORDER BY id DESC LIMIT 1')->fetch() == ['account_id' => 2, 'type' => 'auction_outbid', 'link' => '/offers/alte-kamera']);
 $r = $get('/offers/alte-kamera', 2);
 check('auction: the history shows amounts but no names', str_contains($r['body'], 'Aktuelles Gebot') && str_contains($r['body'], '12,50 €') && str_contains($r['body'], 'Bieter 2') && str_contains($r['body'], '2 Gebote')
     && !str_contains($r['body'], 'bidder@example.test') && str_contains($r['body'], 'value="13,50"'));
@@ -3456,11 +3485,16 @@ $payApp()->payments->saveStripeKeys('', '');
 // --- Modules: optional functions of the core ------------------------------------
 check('modules: the page needs the settings permission', $get('/admin/modules', 1)['status'] === 403 && $post('/admin/modules', ['modules' => []], 2)['status'] === 403);
 $r = $get('/admin/modules', 3);
-check('modules: everything is on until switched off', $r['status'] === 200 && substr_count($r['body'], 'name="modules[]"') === 8 && substr_count($r['body'], ' checked') === 8);
+check('modules: everything is on until switched off', $r['status'] === 200 && substr_count($r['body'], 'name="modules[]"') === 9 && substr_count($r['body'], ' checked') === 9);
 $post('/admin/modules', ['modules' => ['contact', 'avatars', 'nonsense', ['x']]], 3);
-check('modules: switched off is stored, unknown names are ignored', $pdo->query("SELECT value FROM setting WHERE name = 'core.modules_disabled'")->fetchColumn() === 'reviews,withdrawal,reports,remember_login,subscriptions,inbox');
+check('modules: switched off is stored, unknown names are ignored', $pdo->query("SELECT value FROM setting WHERE name = 'core.modules_disabled'")->fetchColumn() === 'reviews,withdrawal,reports,remember_login,subscriptions,inbox,notifications');
 check('modules: without inbox there is no envelope, no overview page, no unread polling, and no account-nav link', !str_contains($get('/account', 1)['body'], 'href="/account/messages"') && !str_contains($get('/account', 1)['body'], 'data-unread')
     && $get('/account/messages', 1)['status'] === 404 && $get('/account/unread', 1)['status'] === 404 && !str_contains($get('/account/settings', 1)['body'], 'href="/account/messages"'));
+check('modules: without notifications there is no bell, no overview page, no unread polling, and no account-nav link', !str_contains($get('/account', 1)['body'], 'href="/account/notifications"')
+    && $get('/account/notifications', 1)['status'] === 404 && $get('/account/notifications/unread', 1)['status'] === 404 && !str_contains($get('/account/settings', 1)['body'], 'href="/account/notifications"'));
+$notifCountBefore = (int) $pdo->query('SELECT COUNT(*) FROM notification')->fetchColumn();
+(new Modulento\Core\App($config, $pdo))->notifications->create(1, 'order_state', 'core.notification.order_state', ['number' => '000001', 'title' => 'x', 'event' => 'x'], '/orders/1');
+check('modules: switched off, the service writes nothing either - not just the routes', $pdo->query('SELECT COUNT(*) FROM notification')->fetchColumn() == $notifCountBefore);
 $pdo->exec("UPDATE extension SET enabled = 1 WHERE id = 'freelancer'");
 $home = $get('/', null)['body'];
 check('modules: without withdrawal and reports their footer links are gone', !str_contains($home, 'href="/withdrawal"') && !str_contains($home, '/report'));

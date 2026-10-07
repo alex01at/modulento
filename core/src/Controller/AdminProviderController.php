@@ -79,5 +79,7 @@ final class AdminProviderController extends Controller
             'profile_link' => $app->url('/account/provider', $locale, true),
             'public_link' => $app->url('/providers/' . $provider['slug'], $locale, true),
         ], $locale);
+        // Reuses the existing, already-written status sentence as the notification text.
+        $app->notifications->create((int) $provider['account_id'], 'provider_status', 'core.provider.status.' . $status, [], '/account/provider');
     }
 }

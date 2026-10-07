@@ -47,6 +47,11 @@ final class OrderNotifier
                 'note' => $note ?? '',
                 'link' => $app->url('/orders/' . $after['id'], $locale, true),
             ], $locale);
+            $app->notifications->create($recipient['id'], 'order_state', 'core.notification.order_state', [
+                'number' => $after['number'],
+                'title' => $after['offer_title'],
+                'event' => $app->translator->trans($labelKey, [], $locale),
+            ], '/orders/' . $after['id']);
         }
     }
 
@@ -64,6 +69,10 @@ final class OrderNotifier
                 'message' => $body,
                 'link' => $app->url('/orders/' . $order['id'], $recipient['locale'], true),
             ], $recipient['locale']);
+            $app->notifications->create($recipient['id'], 'order_message', 'core.notification.order_message', [
+                'number' => $order['number'],
+                'title' => $order['offer_title'],
+            ], '/orders/' . $order['id']);
         }
     }
 
@@ -88,7 +97,7 @@ final class OrderNotifier
         }
     }
 
-    /** @return array<string, array{email: string, locale: string}> "buyer" and "provider", as far as their accounts still exist */
+    /** @return array<string, array{id: int, email: string, locale: string}> "buyer" and "provider", as far as their accounts still exist */
     private static function recipients(App $app, array $order): array
     {
         $recipients = [];
@@ -96,12 +105,12 @@ final class OrderNotifier
 
         $buyer = $order['buyer_id'] !== null ? $app->accounts->findById($order['buyer_id']) : null;
         if ($buyer !== null && $buyer['status'] === 'active') {
-            $recipients['buyer'] = ['email' => $buyer['email'], 'locale' => $locale($buyer['locale'])];
+            $recipients['buyer'] = ['id' => (int) $buyer['id'], 'email' => $buyer['email'], 'locale' => $locale($buyer['locale'])];
         }
 
         $provider = $order['provider_id'] !== null ? $app->providers->find($order['provider_id']) : null;
         if ($provider !== null && $provider['account_status'] === 'active') {
-            $recipients['provider'] = ['email' => $provider['account_email'], 'locale' => $locale($provider['account_locale'])];
+            $recipients['provider'] = ['id' => (int) $provider['account_id'], 'email' => $provider['account_email'], 'locale' => $locale($provider['account_locale'])];
         }
 
         return $recipients;

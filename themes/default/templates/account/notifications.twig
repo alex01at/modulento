@@ -1,0 +1,32 @@
+{% extends 'layout/base.twig' %}
+
+{% block title %}{{ trans('core.notification.title') }} – {{ site_name }}{% endblock %}
+
+{% block content %}
+{% include 'account/_nav.twig' %}
+<h1>{{ trans('core.notification.title') }}</h1>
+<p>{{ trans('core.notification.intro') }}</p>
+
+{% if notifications is empty %}
+    <p class="empty">{{ trans('core.notification.none') }}</p>
+{% else %}
+    <ul class="inbox-list">
+        {% for notification in notifications %}
+            <li class="{{ notification.unread ? 'is-unread' }}">
+                <a href="{{ url(notification.link) }}">
+                    <p class="inbox-body">{{ trans(notification.message_key, notification.params) }}</p>
+                    <small>{{ notification.created_at }} UTC</small>
+                </a>
+            </li>
+        {% endfor %}
+    </ul>
+
+    {% if pages > 1 %}
+        <nav class="pager" aria-label="{{ trans('core.pager.label') }}">
+            {% if page > 1 %}<a href="{{ url('/account/notifications') }}?page={{ page - 1 }}" rel="prev">{{ trans('core.pager.previous') }}</a>{% endif %}
+            <span>{{ trans('core.pager.position', {page: page, pages: pages}) }}</span>
+            {% if page < pages %}<a href="{{ url('/account/notifications') }}?page={{ page + 1 }}" rel="next">{{ trans('core.pager.next') }}</a>{% endif %}
+        </nav>
+    {% endif %}
+{% endif %}
+{% endblock %}

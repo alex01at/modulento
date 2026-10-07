@@ -1614,4 +1614,16 @@ return [
     'core.inbox.none' => 'No messages yet.',
     'core.inbox.type.order' => 'Order',
     'core.inbox.type.offer' => 'Offer question',
+
+    'core.module.notifications.name' => 'Notifications',
+    'core.module.notifications.description' => 'A bell icon in the header and an overview of every notification (order state, decisions, messages, outbid) on one page.',
+    'core.notification.nav' => 'Notifications',
+    'core.notification.title' => 'Notifications',
+    'core.notification.intro' => 'What happened, newest first.',
+    'core.notification.none' => 'No notifications yet.',
+    'core.notification.order_state' => 'Order #{number} ({title}): {event}',
+    'core.notification.order_message' => 'New message on order #{number} ({title})',
+    'core.notification.offer_message' => 'New question on "{title}"',
+    'core.notification.offer_reply' => 'Reply to your question on "{title}"',
+    'core.notification.offer_status' => '"{title}": {status}',
 ];

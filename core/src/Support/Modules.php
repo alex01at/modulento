@@ -21,6 +21,7 @@ final class Modules
         'remember_login' => 'core.module.remember_login',
         'subscriptions' => 'core.module.subscriptions',
         'inbox' => 'core.module.inbox',
+        'notifications' => 'core.module.notifications',
     ];
 
     private const SETTING = 'core.modules_disabled';

@@ -97,6 +97,10 @@ final class AdminCatalogueController extends Controller
             'edit_link' => $app->url('/account/offers/' . $offer['id'], $locale, true),
             'public_link' => $app->url('/offers/' . ($text['slug'] ?? ''), $locale, true),
         ], $locale);
+        $app->notifications->create((int) $offer['account_id'], 'offer_status', 'core.notification.offer_status', [
+            'title' => $text['title'] ?? '',
+            'status' => $app->translator->trans('core.offer.status.' . $status, [], $locale),
+        ], '/account/offers/' . $offer['id']);
     }
 
     // --- Categories -----------------------------------------------------------
