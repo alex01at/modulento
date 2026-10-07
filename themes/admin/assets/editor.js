@@ -19,6 +19,81 @@
         ['html', null]
     ];
 
+    // Element => allowed attributes, kept when pasting - the same elements
+    // core/src/Support/HtmlSanitizer.php keeps when the field is saved, minus
+    // pictures (only the media library's picker inserts those, with a src the
+    // server accepts; any other img would silently vanish again on save).
+    var PASTE_ALLOWED = {
+        p: [], br: [], hr: [],
+        h2: [], h3: [], h4: [],
+        strong: [], b: [], em: [], i: [], u: [], small: [], sub: [], sup: [],
+        ul: [], ol: [], li: [],
+        blockquote: [], pre: [], code: [],
+        a: ['href'],
+        table: [], thead: [], tbody: [], tr: [], th: ['colspan', 'rowspan'], td: ['colspan', 'rowspan']
+    };
+
+    // Keeps only PASTE_ALLOWED elements and attributes; an element not on the
+    // list is unwrapped (its text and children stay, the tag itself goes) -
+    // the same rule the server applies, so a span or a div from Word or a web
+    // page loses its styling without losing its text.
+    function cleanPastedNode(node) {
+        Array.prototype.slice.call(node.childNodes).forEach(function (child) {
+            if (child.nodeType === Node.COMMENT_NODE) {
+                node.removeChild(child);
+                return;
+            }
+            if (child.nodeType !== Node.ELEMENT_NODE) {
+                return;
+            }
+
+            var name = child.nodeName.toLowerCase();
+            if (name === 'script' || name === 'style') {
+                node.removeChild(child);
+                return;
+            }
+
+            cleanPastedNode(child);
+
+            var allowed = PASTE_ALLOWED[name];
+            if (allowed === undefined) {
+                while (child.firstChild) {
+                    node.insertBefore(child.firstChild, child);
+                }
+                node.removeChild(child);
+                return;
+            }
+
+            Array.prototype.slice.call(child.attributes).forEach(function (attribute) {
+                if (allowed.indexOf(attribute.name.toLowerCase()) === -1) {
+                    child.removeAttribute(attribute.name);
+                }
+            });
+            if (name === 'a') {
+                var href = (child.getAttribute('href') || '').replace(/[\x00-\x20]+/g, '');
+                if (!/^(https?:\/\/|mailto:|tel:|\/(?!\/)|#)/i.test(href)) {
+                    child.removeAttribute('href');
+                }
+            }
+        });
+    }
+
+    function cleanPastedHtml(html) {
+        var holder = document.createElement('div');
+        holder.innerHTML = html;
+        cleanPastedNode(holder);
+        return holder.innerHTML;
+    }
+
+    // Plain text (no markup on the clipboard at all) still becomes paragraphs:
+    // a contenteditable area does not turn a bare newline into one on its own.
+    function plainTextToHtml(text) {
+        return text.split(/\r?\n\s*\r?\n/).map(function (paragraph) {
+            var escaped = paragraph.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            return '<p>' + escaped.replace(/\r?\n/g, '<br>') + '</p>';
+        }).join('');
+    }
+
     // The editors on this page by the id of their textarea.
     var editors = {};
 
@@ -94,11 +169,15 @@
             bar.appendChild(button);
         });
 
-        // Pasted text arrives without the formatting of where it came from.
+        // Pasted text keeps paragraphs and the formatting this field allows (the same
+        // elements HtmlSanitizer keeps on the server, so what is shown here matches
+        // what is saved); everything else - styles, classes, spans, pictures that are
+        // not from the media library - is removed, not just hidden.
         area.addEventListener('paste', function (event) {
             event.preventDefault();
-            var text = (event.clipboardData || window.clipboardData).getData('text/plain');
-            document.execCommand('insertText', false, text);
+            var clipboard = event.clipboardData || window.clipboardData;
+            var html = clipboard.getData('text/html');
+            document.execCommand('insertHTML', false, html ? cleanPastedHtml(html) : plainTextToHtml(clipboard.getData('text/plain')));
         });
         area.addEventListener('input', sync);
         textarea.form && textarea.form.addEventListener('submit', sync);
