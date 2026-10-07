@@ -419,6 +419,14 @@ check('an upload beyond the server limit is named as such, not as a failed secur
 unset($_SERVER['CONTENT_LENGTH'], $_SERVER['CONTENT_TYPE']);
 $r = request($pdo, $config, 'POST', '/save', 1, ['_csrf' => 'wrong']);
 check('POST with wrong CSRF token does not run', !$r['called']);
+// A request that declares it wants JSON back (fetch(), not jQuery's ajax()) must not get
+// a browser redirect it cannot follow as data: see Router::isAjax().
+$_SERVER['HTTP_ACCEPT'] = 'application/json';
+$r = request($pdo, $config, 'POST', '/save', 1, ['_csrf' => 'wrong']);
+check('a JSON request with a bad CSRF token gets a plain failure, not a redirect', !$r['called'] && $r['status'] === 403 && $r['body'] !== '');
+unset($_SERVER['HTTP_ACCEPT']);
+$r = request($pdo, $config, 'POST', '/save', 1, ['_csrf' => 'wrong']);
+check('the same request without declaring JSON gets the browser redirect instead', !$r['called'] && $r['status'] === 302 && $r['body'] === '');
 $r = request($pdo, $config, 'POST', '/save', 1, ['_csrf' => 'test-token']);
 check('POST with CSRF token runs', $r['called']);
 $r = request($pdo, $config, 'POST', '/save', 1, ['_csrf' => ['x']]);
