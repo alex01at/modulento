@@ -239,3 +239,14 @@ img.avatar { display: block; object-fit: cover; }
 .account-tab th, .account-tab td { padding: .45rem .4rem; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
 .account-tab .avatar, .account-tab img.avatar { border-radius: 50%; }
 
+
+/* The handbook: a numbered table of contents and a pager between chapters. */
+.handbook-toc { padding-left: 1.4rem; display: grid; gap: .5rem; }
+.handbook-chapter h2 { margin-top: 2rem; }
+.handbook-chapter table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+.handbook-chapter th, .handbook-chapter td { padding: .45rem .6rem; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+.handbook-chapter pre { padding: .75rem 1rem; border-radius: .5rem; background: var(--ground); border: 1px solid var(--line); overflow-x: auto; }
+.handbook-pager { display: flex; justify-content: space-between; gap: 1rem; margin-top: 2.5rem; padding-top: 1.25rem; border-top: 1px solid var(--line); }
+.handbook-chapter dl { display: grid; gap: .3rem 0; }
+.handbook-chapter dt { font-weight: 700; margin-top: 1rem; }
+.handbook-chapter dd { margin: 0 0 .4rem; color: var(--muted); }

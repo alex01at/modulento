@@ -1,0 +1,35 @@
+<h2>Was gesichert werden muss</h2>
+<p>Zusammen sichern: die Datenbank, der Ordner <code>var/uploads</code> (Angebotsbilder, Profilbilder, Branding, Mediathek, Bestelldateien), die Datei <code>var/secret.key</code> (sie entschlüsselt die gespeicherten Zahlungsdaten; ohne sie müssen diese neu eingegeben werden), und die Datei <code>.env</code> (Datenbankzugang und Update-Einstellungen). Eine Sicherung nur der Datenbank reicht nicht, um die Seite wiederherzustellen.</p>
+
+<h2>Geplante Aufgaben</h2>
+<p>Dinge wie das Schließen von Auktionen oder das Entfernen unbestätigter Konten laufen über einen Anstoß jede Minute. <strong>Administration → Tasks</strong> zeigt zwei Wege: eine geplante Aufgabe im Hosting-Paneel, die <code>php bin/cron.php</code> aufruft, oder - wo das Paneel nur Adressen aufrufen kann - eine geheime Adresse (<code>/cron/&lt;CRON_TOKEN&gt;</code>). Ohne einen solchen Anstoß läuft die Seite weiter, nur zeitgesteuerte Dinge passieren nicht.</p>
+
+<h2>Protokolle</h2>
+<p>Fehler werden in <code>var/log/php-error.log</code> geschrieben und nie Besuchern gezeigt. In der Entwicklungsumgebung (<code>APP_ENV="dev"</code> in <code>.env</code>) werden Fehler zusätzlich im Browser angezeigt, und der Twig-Zwischenspeicher ist aus. Für die laufende Seite gehört <code>prod</code> gesetzt.</p>
+
+<h2>Nachrichten</h2>
+<p>Angemeldete Browser fragen alle paar Sekunden nach neuen Nachrichten (das Intervall steht in den Einstellungen, 0 schaltet es ab). Das ist bewusst so gewählt, weil geteiltes Hosting keine dauerhafte Verbindung braucht. Nachrichten bleiben so oder so auf ihren Seiten erhalten.</p>
+
+<h2>Sicherheit, in Kürze</h2>
+<ul>
+    <li>Jedes Formular und jeder AJAX-Aufruf trägt ein Token (CSRF); ohne es wird eine Anfrage abgelehnt.</li>
+    <li>Die Content-Security-Policy erlaubt Skripte und Stile nur vom eigenen Ursprung der Seite. Kein eingebettetes Skript, kein eingebetteter Stil - ein Text kann also nie Code ausführen.</li>
+    <li>Texte, die Besucher schreiben, werden beim Eingang bereinigt (HTML ist auf einfache Formatierung und Links zur eigenen oder zu sicheren Adressen beschränkt). Bilder in Texten müssen aus der Mediathek kommen.</li>
+    <li>Das Anmelden als jemand anderes ist begrenzt und wird protokolliert (siehe das Kapitel „Konten, Rollen und Rechte“).</li>
+</ul>
+
+<h2>Fehlerbehebung</h2>
+<dl>
+    <dt>Eine Seite zeigt „500 - Internal error“</dt>
+    <dd><code>var/log/php-error.log</code> lesen. Die erste Zeile des neuesten Eintrags nennt Datei und Zeile.</dd>
+    <dt>Die Aktualisierung schlägt fehl</dt>
+    <dd>Auf der Updates-Seite nach einer Meldung schauen, dann ins Protokoll. Eine abgebrochene Aktualisierung wird dort als alter Versuch genannt - das ist nur eine Information, sie blockiert den nächsten Versuch nicht.</dd>
+    <dt>Geplante Aufgaben laufen nicht</dt>
+    <dd>Der Anstoß fehlt oder zeigt auf den falschen Pfad. Die Aufgabenseite zeigt, wann jede Aufgabe zuletzt gelaufen ist.</dd>
+    <dt>E-Mails kommen nicht an</dt>
+    <dd>Die Absenderadresse unter Settings prüfen, und das Mail-Protokoll. In der Entwicklungsumgebung landen Mails in <code>var/log/mail.log</code>.</dd>
+    <dt>Ein Theme sieht nach einer Änderung kaputt aus</dt>
+    <dd>Site-Theme und Administration sind getrennt. Ein kaputtes Site-Theme kann niemanden aussperren; unter Themes zurück auf das Standard-Theme wechseln.</dd>
+    <dt>Als jemand anderes angemeldet und findet den Weg nicht zurück</dt>
+    <dd>Der Balken oben auf jeder Seite trägt den Knopf „Beenden und zurück zur Administration“.</dd>
+</dl>

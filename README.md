@@ -35,6 +35,15 @@ Two rules shape everything:
 - **Every text exists per language.** Interface texts, e-mails and content
   pages; nothing visible is written into code or templates. See "Languages".
 
+For operators, **the handbook** (`/handbook`, in every offered language) covers
+the same ground as this section and the next in a connected, non-technical
+read - installation through day-to-day running. It ships with the core, as
+Twig files under `themes/default/templates/handbook/<locale>/`, one chapter
+per file, listed in `Modulento\Core\Support\Handbook::CHAPTERS`. It is a
+different document from `/admin/docs` (admin-only): the handbook is for running
+an installation, `/admin/docs` is the developer reference for building a theme
+or an extension.
+
 ## Installing
 
 **What you need:** PHP 8.3 or newer with PDO and the usual extensions for

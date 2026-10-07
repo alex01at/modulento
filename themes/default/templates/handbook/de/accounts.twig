@@ -1,0 +1,28 @@
+<h2>Konten</h2>
+<p>Unter <strong>Administration → Accounts</strong>: suchen, sperren und entsperren, als bestätigt markieren, ein Passwort zurücksetzen, Rollen ändern, löschen. Die Seite eines Kontos zeigt sein Protokoll.</p>
+<p><strong>Konto anlegen</strong> erstellt ein Konto für jemanden, mit oder ohne Passwort. Ohne eigenes Passwort bekommt die Person eine E-Mail mit einem Link, um selbst eines zu setzen.</p>
+
+<h2>Als dieses Konto anmelden</h2>
+<p>Mit dem Recht <code>core.accounts.impersonate</code> lässt sich die Seite so anzeigen, wie dieses Konto sie sieht - um herauszufinden, was die Person tatsächlich sieht. Oben auf jeder Seite bleibt dabei ein Balken, bis auf <strong>Beenden und zurück zur Administration</strong> geklickt wird. Während man als jemand anderes angemeldet ist, können Passwort, E-Mail-Adresse und das Konto selbst nicht geändert oder gelöscht werden. Administratoren können nicht auf diese Weise betreten werden, das eigene Konto auch nicht, und ein gesperrtes ebenfalls nicht. Jede Erstellung und jede Anmeldung dieser Art steht im Protokoll des Kontos.</p>
+
+<h2>Rollen</h2>
+<p>Unter <strong>Administration → Roles</strong>: Eine Rolle ist eine Menge von Rechten. Rechte sind wie das Menü gruppiert. Drei Vorlagen stehen bereit: Redakteur, Moderator und Support. Rollen zu vergeben vergibt damit auch Rechte, deshalb braucht das Ändern von Rollen selbst ein eigenes Recht. Die Administratorrolle kann nicht geändert oder gelöscht werden.</p>
+
+<h2>Rechte im Überblick</h2>
+<table>
+    <thead><tr><th scope="col">Recht</th><th scope="col">Was es erlaubt</th></tr></thead>
+    <tbody>
+        <tr><td><code>core.admin.access</code></td><td>die Administration überhaupt zu öffnen</td></tr>
+        <tr><td><code>core.pages.manage</code></td><td>Inhaltsseiten</td></tr>
+        <tr><td><code>core.media.manage</code></td><td>die Mediathek</td></tr>
+        <tr><td><code>core.offers.manage</code>, <code>core.categories.manage</code>, <code>core.providers.manage</code></td><td>den Katalog</td></tr>
+        <tr><td><code>core.orders.manage</code></td><td>Bestellungen und Widerrufe</td></tr>
+        <tr><td><code>core.reviews.manage</code>, <code>core.reports.manage</code></td><td>Moderation</td></tr>
+        <tr><td><code>core.accounts.manage</code>, <code>core.accounts.impersonate</code></td><td>Personen; als jemand anderes anmelden</td></tr>
+        <tr><td><code>core.roles.manage</code></td><td>Rollen</td></tr>
+        <tr><td><code>core.settings.manage</code></td><td>Einstellungen, Module, Zahlungsarten, Design, Start- und Angebotsseite, Wortfilter</td></tr>
+        <tr><td><code>core.themes.manage</code>, <code>core.packages.manage</code>, <code>core.extensions.manage</code></td><td>System</td></tr>
+        <tr><td><code>core.update.manage</code>, <code>core.tasks.view</code></td><td>Updates und Aufgaben</td></tr>
+    </tbody>
+</table>
+<p>Das erste Administrationskonto entsteht bei der Einrichtung und hält jedes Recht (<code>*</code>).</p>

@@ -29,6 +29,7 @@ use Modulento\Core\Controller\PackageController;
 use Modulento\Core\Controller\PageController;
 use Modulento\Core\Controller\PaymentController;
 use Modulento\Core\Controller\PaymentSettingsController;
+use Modulento\Core\Controller\HandbookController;
 use Modulento\Core\Controller\ProviderController;
 use Modulento\Core\Controller\RegistrationController;
 use Modulento\Core\Controller\ReviewController;
@@ -236,6 +237,10 @@ final class Kernel
 
         $router->get('/providers', [ProviderController::class, 'index'], Router::PUBLIC);
         $router->get('/providers/{slug}', [ProviderController::class, 'show'], Router::PUBLIC);
+
+        // The operator's manual: public, so it is there before anyone has an account.
+        $router->get('/handbook', [HandbookController::class, 'index'], Router::PUBLIC);
+        $router->get('/handbook/{slug}', [HandbookController::class, 'chapter'], Router::PUBLIC);
 
         $router->get('/admin', [AdminController::class, 'index'], 'core.admin.access');
         $router->get('/admin/docs', [AdminController::class, 'docs'], 'core.admin.access');
@@ -455,6 +460,7 @@ final class Kernel
         $app->addAdminMenu('core.admin.menu.extensions', '/admin/extensions', 'core.extensions.manage', 'system');
         $app->addAdminMenu('core.admin.menu.modules', '/admin/modules', 'core.settings.manage', 'system');
         $app->addAdminMenu('core.admin.menu.themes', '/admin/themes', 'core.themes.manage', 'system');
+        $app->addAdminMenu('core.admin.menu.handbook', '/handbook', 'core.admin.access', 'system');
         $app->addAdminMenu('core.admin.menu.packages', '/admin/packages', 'core.packages.manage', 'system');
         $app->addAdminMenu('core.admin.menu.tasks', '/admin/tasks', 'core.tasks.view', 'system');
         $app->addAdminMenu('core.admin.menu.updates', '/admin/updates', 'core.update.manage', 'system');

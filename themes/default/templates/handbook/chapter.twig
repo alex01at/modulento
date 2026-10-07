@@ -1,0 +1,23 @@
+{% extends 'layout/base.twig' %}
+
+{% block title %}{{ trans(title_key) }} – {{ trans('core.handbook.title') }} – {{ site_name }}{% endblock %}
+
+{% block content %}
+<div class="container narrow handbook-chapter">
+    <p><a href="{{ url('/handbook') }}">{{ trans('core.handbook.overview') }}</a></p>
+    <h1>{{ trans(title_key) }}</h1>
+
+    {% include body_templates %}
+
+    <nav class="handbook-pager" aria-label="{{ trans('core.handbook.title') }}">
+        {% if prev %}
+            <a href="{{ url('/handbook/' ~ prev.slug) }}">&larr; {{ trans(prev.title_key) }}</a>
+        {% else %}
+            <span></span>
+        {% endif %}
+        {% if next %}
+            <a href="{{ url('/handbook/' ~ next.slug) }}">{{ trans(next.title_key) }} &rarr;</a>
+        {% endif %}
+    </nav>
+</div>
+{% endblock %}

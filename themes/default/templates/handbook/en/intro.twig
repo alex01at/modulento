@@ -1,0 +1,17 @@
+<p>Modulento is a lean core for platforms where people offer, order and pay for things: a marketplace for services, an auction house, a catalogue with an order form behind it - depending on which extension is running. The core itself brings what practically every such platform needs: accounts, pages, an administration area, payment methods, multiple languages and an extension system. What makes one particular platform what it is - its kinds of offer, its order flow, a payment method of its own - comes from exactly one <strong>extension</strong>, which is switched on. Only one is active at a time.</p>
+
+<p>This handbook is written for the operator: whoever installs the software, sets it up and keeps it running. Anyone who wants to build a theme or an extension of their own instead will find the technical reference under <strong>Administration → Documentation</strong> (<code>/admin/docs</code>) - it has the folder layout, the Twig variables and the interfaces an extension can use.</p>
+
+<h2>What the core brings</h2>
+<ul>
+    <li><strong>Accounts</strong> with roles and permissions, registration, login, password reset, data export and deletion.</li>
+    <li><strong>Pages</strong> for content, plus a home page and, where a catalogue extension is running, an offer page, both edited right on the spot - a click on a text makes it editable.</li>
+    <li>An <strong>administration area</strong> with moderation, reports, an overview of scheduled tasks, and its own log of what an administrator changed on an account.</li>
+    <li><strong>Payment methods</strong> for orders (bank transfer, PayPal, Stripe) - the money always goes straight from the buyer to the provider, the platform holds none of it and takes no fee.</li>
+    <li><strong>Subscriptions</strong> as a module of their own, which can be switched off: the operator sells plans directly, with invoices and VAT.</li>
+    <li><strong>Multiple languages</strong>, built in from the start: the language is part of the address, and every translation has a fallback.</li>
+    <li>The <strong>extension system</strong> itself: packages are installed from a GitHub repository or by upload, with no SSH and no Composer needed.</li>
+</ul>
+
+<h2>How this handbook is organised</h2>
+<p>The chapters follow an operator's path: from installing, through the first settings, to day-to-day running. Anyone who already has an installation can jump straight to the chapter they need - each chapter stands on its own.</p>

@@ -1,0 +1,13 @@
+<p>Multiple languages are built in from the start, not added on later. Which languages are offered, and which is the default one, is set under <strong>Administration → Settings</strong>.</p>
+
+<h2>The language in the address</h2>
+<p>The language is part of the address: the default language has no code (<code>/login</code>), every other one carries its code (<code>/en/login</code>). Each language version of a page can be linked and indexed on its own; pages announce each other through <code>hreflang</code>.</p>
+
+<h2>When a text is missing</h2>
+<p>A text missing in one language is shown in the default language, then in English - so that even an unfinished language pack is usable. Content pages work the same way: a language with no text of its own shows the default language's text.</p>
+
+<h2>Wording of your own</h2>
+<p>The core's interface texts come from <code>core/lang/&lt;language&gt;.php</code>, and each extension brings its own in its <code>lang/</code> folder. A file <code>lang/&lt;language&gt;.php</code> right in the installation is read last and can reword any text or complete a language. An update never touches that folder.</p>
+
+<h2>Accounts remember their language</h2>
+<p>After signing in, an account lands in its own language, and mail sent on its behalf uses that language too.</p>

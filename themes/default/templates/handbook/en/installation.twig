@@ -1,0 +1,14 @@
+<p>What is needed: PHP 8.3 or newer with PDO and the usual extensions for images and HTTP, a MySQL or MariaDB database, and an address reachable over HTTPS. Payments are optional; without them the site runs, and nothing can be bought.</p>
+
+<h2>In five steps</h2>
+<ol>
+    <li>Take <code>modulento-&lt;version&gt;.zip</code> from the releases page and upload its unpacked content. It already contains <code>vendor/</code>, so Composer is not needed.</li>
+    <li>Point the domain's document root at the <code>public/</code> folder. Where the hosting panel does not allow that, upload into the document root as it is: the <code>.htaccess</code> in the top folder passes every request on to <code>public/</code> (Apache with mod_rewrite).</li>
+    <li>Create an empty MySQL/MariaDB database in the hosting panel.</li>
+    <li>Open the site. The setup page checks the requirements, asks for the database, a site name and the first administration account, sets up the database and writes <code>.env</code>. After that it is no longer reachable.</li>
+    <li>Scheduled tasks need a trigger every minute. <strong>Administration → Tasks</strong> shows both ways: a scheduled task in the hosting panel that runs <code>php bin/cron.php</code>, or - where the panel can only call addresses - a secret URL.</li>
+</ol>
+
+<h2>When something does not fit</h2>
+<p>If the folder <code>vendor/</code> is missing, the source code was uploaded instead of a release package (for example through GitHub's "Download ZIP"). The package from the releases page is the right one.</p>
+<p>The setup page is only reachable while no database connection is in <code>.env</code> yet. Once setup is complete, there is no way back to it - that is by design, not a bug.</p>

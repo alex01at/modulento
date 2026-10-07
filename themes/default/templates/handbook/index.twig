@@ -1,0 +1,17 @@
+{% extends 'layout/base.twig' %}
+
+{% block title %}{{ trans('core.handbook.title') }} – {{ site_name }}{% endblock %}
+{% block meta_description %}{{ trans('core.handbook.intro') }}{% endblock %}
+
+{% block content %}
+<div class="container narrow">
+    <h1>{{ trans('core.handbook.title') }}</h1>
+    <p class="lead">{{ trans('core.handbook.intro') }}</p>
+
+    <ol class="handbook-toc">
+        {% for chapter in chapters %}
+            <li><a href="{{ url('/handbook/' ~ chapter.slug) }}">{{ trans(chapter.title_key) }}</a></li>
+        {% endfor %}
+    </ol>
+</div>
+{% endblock %}

@@ -1,0 +1,35 @@
+<h2>What to keep safe</h2>
+<p>Back up together: the database, the folder <code>var/uploads</code> (offer pictures, avatars, branding, media library, order files), the file <code>var/secret.key</code> (it decrypts the stored payment credentials; without it, those have to be entered again), and the file <code>.env</code> (database access and the update settings). A backup of the database alone is not enough to restore the site.</p>
+
+<h2>Scheduled tasks</h2>
+<p>Things like closing auctions or removing unverified accounts run through a trigger every minute. <strong>Administration → Tasks</strong> shows two ways: a scheduled task in the hosting panel that runs <code>php bin/cron.php</code>, or - where the panel can only call addresses - a secret URL (<code>/cron/&lt;CRON_TOKEN&gt;</code>). Without such a trigger the site keeps running, only time-based things do not happen.</p>
+
+<h2>Logs</h2>
+<p>Errors are written to <code>var/log/php-error.log</code> and never shown to visitors. In the development environment (<code>APP_ENV="dev"</code> in <code>.env</code>), errors are also shown in the browser, and the Twig cache is off. The live site needs <code>prod</code> set.</p>
+
+<h2>Messages</h2>
+<p>Signed-in browsers ask for new messages every few seconds (the interval is in the settings, 0 switches it off). This is a deliberate choice, because shared hosting needs no permanent connection. Messages stay on their pages either way.</p>
+
+<h2>Security, in short</h2>
+<ul>
+    <li>Every form and every AJAX call carries a token (CSRF); a request without one is refused.</li>
+    <li>The content security policy allows scripts and styles from the site's own origin only. No inline script, no inline style - a text can never run code.</li>
+    <li>Texts visitors write are cleaned on the way in (HTML is limited to simple formatting and links to the site's own or to secure addresses). Pictures in texts must come from the media library.</li>
+    <li>Signing in as someone else is limited and logged (see the chapter "Accounts, roles and permissions").</li>
+</ul>
+
+<h2>Troubleshooting</h2>
+<dl>
+    <dt>A page shows "500 - Internal error"</dt>
+    <dd>Read <code>var/log/php-error.log</code>. The first line of the newest entry names the file and the line.</dd>
+    <dt>An update fails</dt>
+    <dd>Check the Updates page for a message, then the log. An update that was cut off is named there as a stale attempt - that notice is information only, it does not block the next attempt.</dd>
+    <dt>Scheduled tasks do not run</dt>
+    <dd>The trigger is missing or points to the wrong path. The Tasks page shows when each task last ran.</dd>
+    <dt>E-mail does not arrive</dt>
+    <dd>Check the sender address under Settings, and the mail log. In development, mail is written to <code>var/log/mail.log</code>.</dd>
+    <dt>A theme looks broken after a change</dt>
+    <dd>The site theme and the administration are separate. A broken site theme can never lock anyone out; switch back to the default theme under Themes.</dd>
+    <dt>Signed in as someone else and cannot find the way back</dt>
+    <dd>The bar at the top of every page has the button "End and back to the administration".</dd>
+</dl>

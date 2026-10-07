@@ -1,0 +1,24 @@
+<p>Abos sind etwas anderes als Bestellungen: Hier verkauft der <strong>Betreiber selbst</strong> Pläne, und das Geld geht an ihn, nicht an einen Anbieter. Deshalb ist das ein eigenes, abschaltbares Modul mit eigener Zahlungseinrichtung.</p>
+
+<h2>Einrichtung Schritt für Schritt</h2>
+<ol>
+    <li><strong>Administration → Modules:</strong> prüfen, dass „Abos“ eingeschaltet ist.</li>
+    <li><strong>Administration → Subscriptions → Angaben für die Rechnungen:</strong> Name, Anschrift, USt-IdNr., Umsatzsteuersatz. Ohne diese Angaben wird nichts verkauft.</li>
+    <li>Auf derselben Seite, <strong>Bankverbindung für Überweisungen:</strong> IBAN (und BIC) des Kontos, auf das Käufer überweisen.</li>
+    <li>Unter <strong>Payment methods:</strong> Überweisung und/oder Stripe einschalten, bei Stripe die Zugangsdaten der Plattform eintragen.</li>
+    <li>Einen Plan anlegen: Name, Kennung, Preis, Währung, Laufzeit, die Funktionen, die er enthält. Eine Funktionskennung lässt sich auch von Hand eintragen.</li>
+    <li>Selbst testen: mit einem Testkonto einen Plan bestellen, die Überweisung unter <strong>Offene Überweisungen</strong> bestätigen, und die Rechnung unter <strong>Rechnungen</strong> sowie im Konto unter <strong>Mein Abo</strong> prüfen.</li>
+</ol>
+
+<h2>Wie ein Kauf abläuft</h2>
+<p>Ein Konto bestellt einen Plan unter <code>/subscriptions</code>, gibt dabei eine Rechnungsanschrift an (die für spätere Bestellungen gespeichert bleibt), und wählt Überweisung oder Stripe. Bei Überweisung zeigt die Bestellseite Bankdaten und einen Verwendungszweck; der Betreiber bestätigt den Geldeingang von Hand, danach ist der Plan für seine Laufzeit freigeschaltet. Bei Stripe läuft die Zahlung über ein Stripe-Checkout auf dem eigenen Konto der Plattform; Verlängerungen, fehlgeschlagene Zahlungen und das Ende eines Abos laufen automatisch über einen Webhook.</p>
+<p>Eine frühzeitige Verlängerung per Überweisung verlängert ab dem bisherigen Laufzeitende, nicht ab dem Bestelldatum - es gehen also keine bereits bezahlten Tage verloren.</p>
+
+<h2>Rechnungen</h2>
+<p>Jede Zahlung bekommt eine fortlaufende Rechnungsnummer (<code>RE-Jahr-Nummer</code>), ohne Lücken je Jahr. Die Preise sind Bruttopreise, die Umsatzsteuer wird herausgerechnet. Die Rechnung geht per E-Mail als Link heraus und steht unter „Mein Abo“ und in der Administration. Welche Angaben eine Rechnung bei dir enthalten muss, und ob der eingestellte Steuersatz passt, sollte vorher ein Steuerberater prüfen - das Programm bildet nur ab, was eingetragen wird.</p>
+
+<h2>Funktionen wirklich sperren</h2>
+<p>Ein Plan listet Funktionen nur als Namen; was eine Funktion tatsächlich freischaltet, entscheidet die jeweilige Erweiterung. Eine Route kann als Voraussetzung eine Funktion verlangen, eine Vorlage kann einen Bedienteil nur zeigen, wenn eine Funktion freigeschaltet ist. Ob und welche Funktionen das in einer bestimmten Installation tatsächlich betrifft, hängt von der eingesetzten Erweiterung ab - das ist nichts, was der Kern von sich aus vorgibt.</p>
+
+<h2>Erinnerung</h2>
+<p>Eine Woche vor dem Ende eines Überweisungs-Abos geht eine Erinnerungsmail heraus, je Laufzeit nur einmal. Ein Stripe-Abo verlängert sich dagegen von selbst, bis es im Konto beendet wird.</p>

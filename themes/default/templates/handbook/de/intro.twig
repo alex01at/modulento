@@ -1,0 +1,17 @@
+<p>Modulento ist ein schlanker Kern für Plattformen, auf denen Menschen etwas anbieten, bestellen und bezahlen: ein Marktplatz für Dienstleistungen, ein Auktionshaus, ein Katalog mit einem Bestellformular dahinter - je nachdem, welche Erweiterung läuft. Der Kern selbst bringt mit, was praktisch jede dieser Plattformen braucht: Konten, Seiten, einen Adminbereich, Zahlungsarten, Mehrsprachigkeit und ein Erweiterungssystem. Was eine bestimmte Plattform ausmacht - Angebotstypen, Bestellabläufe, eine eigene Zahlungsart - kommt aus genau einer <strong>Erweiterung</strong>, die eingeschaltet ist. Es ist immer nur eine aktiv.</p>
+
+<p>Dieses Handbuch richtet sich an den Betreiber: an wen, der die Software installiert, einrichtet und am Laufen hält. Wer stattdessen ein eigenes Theme oder eine eigene Erweiterung bauen will, findet die technische Referenz unter <strong>Administration → Dokumentation</strong> (<code>/admin/docs</code>) - dort stehen Dateistruktur, Twig-Variablen und die Schnittstellen, die eine Erweiterung nutzen kann.</p>
+
+<h2>Was der Kern mitbringt</h2>
+<ul>
+    <li><strong>Konten</strong> mit Rollen und Rechten, Registrierung, Login, Passwort-Reset, Datenexport und -löschung.</li>
+    <li><strong>Seiten</strong> zum Pflegen von Inhalten, dazu eine Startseite und (wenn eine Katalog-Erweiterung läuft) eine Angebotsseite, die direkt im Browser bearbeitet werden - ein Klick auf einen Text macht ihn bearbeitbar.</li>
+    <li>Einen <strong>Adminbereich</strong> mit Moderation, Berichten, einer Aufgabenübersicht und einem eigenen Protokoll dessen, was ein Administrator an Konten geändert hat.</li>
+    <li><strong>Zahlungsarten</strong> für Bestellungen (Überweisung, PayPal, Stripe) - das Geld geht dabei immer direkt vom Käufer zum Anbieter, die Plattform verwahrt nichts und nimmt keine Gebühr.</li>
+    <li><strong>Abos</strong> als eigenes, abschaltbares Modul: Der Betreiber verkauft selbst Pläne, mit Rechnungen und Umsatzsteuer.</li>
+    <li>Eine <strong>Mehrsprachigkeit</strong>, die von Anfang an mitgedacht ist: die Sprache steht in der Adresse, jede Übersetzung hat eine Rückfalloption.</li>
+    <li>Das <strong>Erweiterungssystem</strong> selbst: Pakete werden aus einem GitHub-Repository oder per Hochladen installiert, ohne SSH und ohne Composer.</li>
+</ul>
+
+<h2>Wie dieses Handbuch aufgebaut ist</h2>
+<p>Die Kapitel folgen dem Weg eines Betreibers: von der Installation über die ersten Einstellungen bis zum laufenden Betrieb. Wer schon eine Installation hat, kann direkt zu dem Kapitel springen, das gerade gebraucht wird - jedes Kapitel steht für sich.</p>

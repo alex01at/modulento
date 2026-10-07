@@ -1,0 +1,20 @@
+<p>Dieses Kapitel betrifft das Bezahlen von <strong>Bestellungen</strong> im Marktplatz. Abos sind davon unabhängig und folgen einer anderen Regel - siehe das Kapitel „Abos“.</p>
+
+<h2>Die Grundregel</h2>
+<p>Das Geld einer Bestellung geht immer direkt vom Käufer zum Anbieter. Die Plattform verwahrt nie Geld und nimmt keine Gebühr. Deshalb richtet jeder Anbieter sein eigenes Zahlungskonto selbst ein, unter <strong>Konto → Payments</strong>.</p>
+
+<h2>Zahlungsarten einschalten</h2>
+<p>Unter <strong>Administration → Payment methods</strong> schaltet der Betreiber ein, welche Zahlungsarten überhaupt erlaubt sind:</p>
+<ul>
+    <li><strong>Überweisung:</strong> Der Anbieter hinterlegt seine Bankverbindung, der Käufer überweist direkt dorthin.</li>
+    <li><strong>PayPal:</strong> Der Anbieter verbindet sein eigenes PayPal-Konto.</li>
+    <li><strong>Stripe:</strong> Der Anbieter bekommt ein eigenes, mit der Plattform verbundenes Stripe-Konto (Stripe Connect). Dafür braucht die Plattform selbst Stripe-Zugangsdaten, die hier eingetragen werden.</li>
+</ul>
+<p>Echte Zahlungsdienste vor dem Einschalten mit eigenen Testzugangsdaten (Sandbox) prüfen.</p>
+
+<h2>Sicherheit</h2>
+<ul>
+    <li>Passwörter werden gehasht gespeichert, nie im Klartext.</li>
+    <li>Die Zahlungsdaten der Anbieter sind mit dem Schlüssel in <code>var/secret.key</code> verschlüsselt. Geht diese Datei verloren, müssen die Daten neu eingegeben werden - deshalb gehört sie zur Datensicherung (siehe das Kapitel „Betrieb“).</li>
+    <li>Vorgänge, die missbraucht werden könnten, sind begrenzt: Nachrichten und Fragen senden, Widerrufs- und Meldeformulare, Bestellungen aufgeben, Zahlungen starten, Zahlungskonten verbinden, Bestätigungsmails erneut anfordern.</li>
+</ul>

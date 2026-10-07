@@ -1,0 +1,18 @@
+<p>An extension adds a feature, a theme changes the look. Both are plain folders, with no build step and no Composer.</p>
+
+<h2>Installing</h2>
+<ol>
+    <li><strong>From a repository:</strong> under <strong>Administration → Packages</strong>, type <code>owner/name</code> or the address of the repository on GitHub. Only what matches <code>PACKAGE_SOURCES</code> in <code>.env</code> can be installed; without that setting, only what comes from the owner of the core's own repository.</li>
+    <li><strong>From a zip file:</strong> upload the zip file of a release. It is checked (it must be a package with a manifest) and installed, but not updated automatically.</li>
+</ol>
+<p>A package keeps the repository it first came from; another repository cannot take its name.</p>
+
+<h2>Only one extension active</h2>
+<p>Under <strong>Administration → Extensions</strong>, an installed extension is switched on and off. Only one is active at a time: switching one on automatically switches the previously active one off. Its tables and data stay, and are there again at once once it is switched on again. A theme follows the same principle, only one active at a time.</p>
+<p>An extension's migrations run as soon as it is switched on.</p>
+
+<h2>Updates</h2>
+<p><strong>Administration → Updates</strong> is the one place for every update: the core, each installed extension and each installed theme, with the installed and the newest version. <strong>Check</strong> asks every source once and remembers the answers; the dashboard and this page only read that record, so opening a page never asks GitHub on its own. <strong>Update</strong> installs the newest release of one component; for the core, the migration step then runs by itself. Packages installed from a zip file have no repository to update from - upload the new zip again instead.</p>
+
+<h2>Building an extension or a theme of your own</h2>
+<p>That is a different task from what this handbook describes: it is written for developers, not operators. The technical reference - folder layout, Twig variables, the interfaces an extension can use - is under <strong>Administration → Documentation</strong> (<code>/admin/docs</code>).</p>
