@@ -192,6 +192,23 @@ async def main():
         await b.goto(BASE + '/admin/subscriptions')
         check('subscriptions: the administration shows the bank account and the invoice details', 'Bankverbindung für Überweisungen' in (await b.eval('document.body.innerText')) and 'Angaben für die Rechnungen' in (await b.eval('document.body.innerText')))
 
+        # 9. pasting into a page's text editor keeps the formatting it allows, strips the rest
+        await b.goto(BASE + '/admin/pages/new')
+        paste_result = await b.eval(r"""(() => {
+            const area = document.querySelector('.editor-area');
+            const textarea = document.querySelector('#body_de');
+            area.focus();
+            const dt = new DataTransfer();
+            dt.setData('text/html', '<p style="color:red">Erster <b>fetter</b> <span class="x">Absatz</span>.</p>'
+                + '<script>window.pasteRanXSS = true<\/script><div>Zweiter Absatz ohne Tag.<\/div>'
+                + '<img src="https://evil.example/x.png">');
+            area.dispatchEvent(new ClipboardEvent('paste', {clipboardData: dt, bubbles: true, cancelable: true}));
+            return {area: area.innerHTML, textarea: textarea.value, ranScript: window.pasteRanXSS === true};
+        })()""")
+        check('editor: a paste keeps paragraphs and allowed formatting, drops style/class/script/foreign pictures',
+              paste_result['area'] == '<p>Erster <b>fetter</b> Absatz.</p>Zweiter Absatz ohne Tag.'
+              and paste_result['textarea'] == paste_result['area'] and not paste_result['ranScript'])
+
     finally:
         await b.close()
     failed = [n for n, ok in results if not ok]
