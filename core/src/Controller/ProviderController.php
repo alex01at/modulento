@@ -7,7 +7,9 @@ namespace Modulento\Core\Controller;
 use Modulento\Core\Catalogue\OfferView;
 use Modulento\Core\Event\ProviderStatusChanged;
 use Modulento\Core\Provider\ProviderView;
+use Modulento\Core\Review\AccountRatingView;
 use Modulento\Core\Review\ReviewView;
+use Modulento\Core\Review\Reviews;
 use Modulento\Core\Support\Countries;
 use Modulento\Core\Support\Session;
 
@@ -73,11 +75,15 @@ final class ProviderController extends Controller
         }
 
         $offers = $this->app->offers->listPublic(['provider_id' => (int) $provider['id']], $this->app->translator->locale(), 1, 48);
+        // The account behind the profile - a direct rating rates that account, not the provider row.
+        $ratedAccount = $this->app->accounts->findById((int) $provider['account_id']);
 
         $this->render('provider/show.twig', [
             'provider' => ProviderView::of($provider, $this->app),
             'offers' => OfferView::cards($offers['rows'], $this->app),
             'reviews' => ReviewView::all($this->app->reviews->listPublic('provider', (int) $provider['id'], 1, 20)['rows']),
+            'account_rating' => Reviews::summary($ratedAccount ?? []),
+            'account_ratings' => AccountRatingView::all($this->app->accountRatings->listPublic((int) $provider['account_id'], 1, 20)['rows']),
         ]);
     }
 

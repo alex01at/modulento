@@ -202,6 +202,9 @@ as links.
 
 - **Reviews** (`core.reviews.manage`): hide a review with a reason; the author
   is told.
+- **Account ratings** (`core.reviews.manage`, part of the `reviews` module):
+  hide a direct rating of one account by another with a reason; the rater is
+  told.
 - **Reports** (`core.reports.manage`): notices about content, decided with a
   reason. Reporters and the affected provider are told the outcome.
 - **Word filter** (`core.settings.manage`): the words that messages, questions
@@ -695,8 +698,10 @@ Templates of the site theme, with the variables they receive:
 | `withdrawal/done.twig` | `email`, `received_at` (UTC) |
 | `report/form.twig` | `url`, `category`, `explanation`, `name`, `email`, `categories`, `limits`, `errors`; keep the hidden `website` field, the statement of good faith and the note on what happens with a notice |
 | `report/done.twig` | `email`, `received_at` (UTC) |
-| `review/_rating.twig` | `rating` (`count`, `average`): stars with a text alternative |
+| `review/_rating.twig` | `rating` (`count`, `average`): stars with a text alternative - reused for an account's direct-rating average too |
 | `review/_list.twig` | `reviews`: `author` (empty for "a buyer"), `rating`, `body`, `locale`, `created_at`, `reply`; keep the note on where reviews come from |
+| `review/_account_rating_list.twig` | `account_ratings`: `author` (empty for "an account"), `rating`, `body`, `locale`, `created_at`, `reply`; optional `can_reply_to` (rating ids still open for a reply) |
+| `account/ratings.twig` | the logged-in account's own "about me": `account_ratings` (every status, including hidden with its reason), `can_reply_to`, `page`, `pages` |
 | `provider/index.twig` | `providers`, `page`, `pages` |
 | `provider/show.twig` | `provider`: `name`, `path`, `type`, `headline`, `description` (plain text), `city`, `country`, `legal` (only for a business); block `offers` for extensions |
 | `emails/*.txt.twig` | blocks `subject` and `body`; plain text, not HTML-escaped |
@@ -705,7 +710,8 @@ E-mails are theme templates too: `verify_email`, `reset_password`,
 `already_registered`, `change_email`, `password_changed`, `provider_approved`,
 `provider_rejected`, `provider_suspended`, `account_blocked`, `offer_published`,
 `offer_rejected`, `offer_contact`, `order_update`, `order_message`, `order_paid`, `review_new`,
-`review_reply`, `review_hidden`, `withdrawal_receipt`, `withdrawal_provider`,
+`review_reply`, `review_hidden`, `account_rating_new`, `account_rating_reply`, `account_rating_hidden`,
+`withdrawal_receipt`, `withdrawal_provider`,
 `withdrawal_platform`, `report_receipt`, `report_platform`, `report_decision`. With `APP_ENV="dev"`
 nothing is sent; mails are appended to `var/log/mail.log`.
 
@@ -1030,6 +1036,20 @@ Reviews (`$app->reviews`) belong to the core: one per order, by its buyer,
 with one public reply by the provider. Offers and providers carry the number
 and sum of their published ratings, so lists show and sort by them. An
 administrator can hide a review with a reason, which the author receives.
+
+Account ratings (`$app->accountRatings`) are a second, independent rating:
+one account's opinion of another account directly, not of one order. They
+live in their own table (`account_rating`, one row per rater/rated pair) and
+their own columns on `account` (`rating_count`, `rating_sum`), separate from
+a review's order and provider. Who may rate whom is decided by
+`AccountRatings::canRate()` alone, not by a database constraint: today it
+requires a real order between the two accounts, in either direction (buyer
+and the account behind a provider profile), which is why the order page is
+the only place that offers the form. A context with its own notion of a
+genuine encounter - a dating extension, say - can call `create()` directly
+after checking eligibility its own way, without any change to this table or
+service. One public reply, hiding with a reason, GDPR export/anonymise and
+mail notifications all work exactly as they do for reviews.
 
 The withdrawal form (`/withdrawal`, linked in the footer of every page and on
 the buyer's order page) lets a buyer declare a withdrawal without logging in:

@@ -270,6 +270,11 @@ $pdo->exec("ALTER TABLE offer ADD COLUMN rating_count INTEGER NOT NULL DEFAULT 0
 $pdo->exec("ALTER TABLE offer ADD COLUMN rating_sum INTEGER NOT NULL DEFAULT 0");
 $pdo->exec("ALTER TABLE provider ADD COLUMN rating_count INTEGER NOT NULL DEFAULT 0");
 $pdo->exec("ALTER TABLE provider ADD COLUMN rating_sum INTEGER NOT NULL DEFAULT 0");
+$pdo->exec("ALTER TABLE account ADD COLUMN rating_count INTEGER NOT NULL DEFAULT 0");
+$pdo->exec("ALTER TABLE account ADD COLUMN rating_sum INTEGER NOT NULL DEFAULT 0");
+$pdo->exec("CREATE TABLE account_rating (id INTEGER PRIMARY KEY, rater_id INTEGER REFERENCES account (id) ON DELETE SET NULL, rater_name TEXT,
+    rated_id INTEGER REFERENCES account (id) ON DELETE CASCADE, rating INTEGER, body TEXT, locale TEXT, status TEXT DEFAULT 'published',
+    status_note TEXT, reply TEXT, replied_at TEXT, created_at TEXT, UNIQUE (rater_id, rated_id))");
 $pdo->exec("CREATE TABLE package (kind TEXT, id TEXT, repo TEXT, version TEXT, installed_at TEXT, PRIMARY KEY (kind, id))");
 $pdo->exec("PRAGMA foreign_keys = ON");
 $pdo->exec("CREATE TABLE role (id INTEGER PRIMARY KEY, name TEXT)");
@@ -1858,10 +1863,60 @@ check('hidden review: its author sees that it is hidden', str_contains($get('/or
 $post('/admin/reviews/' . $lowId . '/show', [], 3);
 check('showing it again restores the numbers', $review($fileOrder)['status'] === 'published' && $ratingOf('offer', $offerId) === '2/7');
 
+// --- Direct account ratings ---------------------------------------------------------
+// Account 1 is the provider behind $providerId, account 2 is the buyer of $orderId/$fileOrder -
+// a real order connects them, so AccountRatings::canRate() allows them to rate each other directly.
+$accountRating = fn (int $raterId, int $ratedId) => $pdo->query("SELECT * FROM account_rating WHERE rater_id = {$raterId} AND rated_id = {$ratedId}")->fetch();
+
+check('order page offers to rate the account on the other side of the order', str_contains($get('/orders/' . $orderId, 2)['body'], '/accounts/1/rating"') && str_contains($get('/orders/' . $orderId, 1)['body'], '/accounts/2/rating"'));
+$post('/accounts/3/rating', ['rating' => '5', 'body' => 'x'], 2);
+check('an account with no real order between them cannot be rated', $accountRating(2, 3) === false);
+$post('/accounts/2/rating', ['rating' => '5', 'body' => 'x'], 2);
+check('rating oneself is refused', $accountRating(2, 2) === false);
+$post('/accounts/1/rating', ['rating' => '6', 'body' => ''], 2);
+$post('/accounts/1/rating', ['rating' => '0', 'body' => ''], 2);
+check('a rating outside 1 to 5 is refused', $accountRating(2, 1) === false);
+
+$post('/accounts/1/rating', ['rating' => '5', 'body' => "Sehr zuverlässig!\n<script>alert(1)</script>"], 2);
+check('account rating: stored with the rater\'s display name, counted for the rated account', $accountRating(2, 1)['rating'] == 5 && $accountRating(2, 1)['rater_name'] === 'Erika M.' && $ratingOf('account', 1) === '1/5');
+check('the rated account is told', lastMail($mailLog, 'plain@example.test')['subject'] === 'Jemand hat dich direkt bewertet');
+check('order page no longer offers the form once rated; the own rating shows instead, escaped', !str_contains($get('/orders/' . $orderId, 2)['body'], '/accounts/1/rating"') && str_contains($get('/orders/' . $orderId, 2)['body'], '&lt;script&gt;alert(1)&lt;/script&gt;'));
+$post('/accounts/1/rating', ['rating' => '1', 'body' => 'doch nicht'], 2);
+check('an account is rated once', $accountRating(2, 1)['rating'] == 5);
+
+$post('/accounts/2/rating', ['rating' => '4', 'body' => 'Netter Kontakt'], 1);
+check('the other side can rate back, independently of the first rating', $accountRating(1, 2)['rating'] == 4 && $ratingOf('account', 2) === '1/4');
+
+check('provider page shows the direct rating of the account behind it, escaped', str_contains($get('/providers/mueller-design', null)['body'], '5,0 von 5 Sternen aus 1 Bewertung') && str_contains($get('/providers/mueller-design', null)['body'], '&lt;script&gt;alert(1)&lt;/script&gt;'));
+check('the account/ratings page lets the rated account answer a rating that has none yet', str_contains($get('/account/ratings', 2)['body'], '/account-ratings/' . $accountRating(1, 2)['id'] . '/reply"'));
+
+$ratingId = (int) $accountRating(2, 1)['id'];
+check('order page offers to reply to a rating received, not yet replied', str_contains($get('/orders/' . $orderId, 1)['body'], '/account-ratings/' . $ratingId . '/reply"'));
+$post('/account-ratings/' . $ratingId . '/reply', ['reply' => 'Danke!'], 2);
+check('only the rated account replies', $accountRating(2, 1)['reply'] === null);
+$post('/account-ratings/' . $ratingId . '/reply', ['reply' => ''], 1);
+check('an empty reply is refused', $accountRating(2, 1)['reply'] === null);
+$post('/account-ratings/' . $ratingId . '/reply', ['reply' => 'Danke, gern wieder!'], 1);
+check('the rated account replies; the rater is told', $accountRating(2, 1)['reply'] === 'Danke, gern wieder!' && lastMail($mailLog, 'editor@example.test')['subject'] === 'Antwort auf deine Bewertung');
+$post('/account-ratings/' . $ratingId . '/reply', ['reply' => 'Noch was'], 1);
+check('the reply cannot be replaced', $accountRating(2, 1)['reply'] === 'Danke, gern wieder!');
+
+check('account rating moderation needs its permission', $get('/admin/account-ratings', 2)['status'] === 403 && $get('/admin/account-ratings', 3)['status'] === 200);
+$post('/admin/account-ratings/' . $ratingId . '/hide', ['note' => ''], 3);
+check('hiding a rating needs a reason', $accountRating(2, 1)['status'] === 'published');
+$post('/admin/account-ratings/' . $ratingId . '/hide', ['note' => 'Beleidigung'], 3);
+check('hidden rating: gone from public pages and from the numbers, rater told why', $accountRating(2, 1)['status'] === 'hidden' && $ratingOf('account', 1) === '0/0' && lastMail($mailLog, 'editor@example.test')['subject'] === 'Deine Bewertung wurde ausgeblendet');
+check('hidden rating: still visible to the rated account on their own page, with the reason', str_contains($get('/account/ratings', 1)['body'], 'ausgeblendet'));
+$post('/admin/account-ratings/' . $ratingId . '/show', [], 3);
+check('showing a rating again restores the numbers', $accountRating(2, 1)['status'] === 'published' && $ratingOf('account', 1) === '1/5');
+
 $export = json_decode($get('/account/export', 2)['body'], true);
 check('export lists the reviews the account wrote', count($export['reviews'] ?? []) === 2);
+check('export lists the direct ratings the account gave and received', count($export['account_ratings_given'] ?? []) === 1 && count($export['account_ratings_received'] ?? []) === 1);
 (new Modulento\Core\Review\Reviews($pdo, $words()))->anonymise(2);
 check('a deleted account\'s reviews stay without the name', $review($orderId)['author_name'] === '' && str_contains($get('/offers/ich-gestalte-dein-logo', null)['body'], 'Ein Käufer'));
+(new Modulento\Core\Review\AccountRatings($pdo, $words()))->anonymise(2);
+check('a deleted account\'s direct ratings stay without the name', $accountRating(2, 1)['rater_name'] === '' && str_contains($get('/providers/mueller-design', null)['body'], 'Ein Konto'));
 
 $pdo->exec("UPDATE extension SET enabled = 0 WHERE id = 'freelancer'");
 check('order of a disabled extension: still readable, no actions', $get('/orders/' . $orderId, 2)['status'] === 200 && str_contains($get('/orders/' . $orderId, 2)['body'], 'Unbekannter Status'));

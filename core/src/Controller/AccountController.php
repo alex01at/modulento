@@ -328,6 +328,14 @@ final class AccountController extends Controller
         if ($reviews !== []) {
             $export->add('reviews', $reviews);
         }
+        $ratingsGiven = $this->app->accountRatings->byAuthor($this->accountId());
+        if ($ratingsGiven !== []) {
+            $export->add('account_ratings_given', $ratingsGiven);
+        }
+        $ratingsReceived = $this->app->accountRatings->byRated($this->accountId());
+        if ($ratingsReceived !== []) {
+            $export->add('account_ratings_received', $ratingsReceived);
+        }
         $withdrawals = $this->app->withdrawals->byAccount($this->accountId());
         if ($withdrawals !== []) {
             $export->add('withdrawals', $withdrawals);
