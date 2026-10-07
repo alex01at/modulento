@@ -80,37 +80,9 @@
     <button type="submit">{{ trans('core.account.save') }}</button>
 </form>
 
-{% if offer %}
-    <section>
-        <h2>{{ trans('core.offer.image.title') }}</h2>
-        {% if not images_available %}
-            <p>{{ trans('core.offer.image.error.unavailable') }}</p>
-        {% else %}
-            {% if offer.images %}
-                <ul class="card-list">
-                    {% for image in offer.images %}
-                        <li>
-                            <img src="{{ image.thumb }}" alt="{{ trans('core.offer.image.number', {number: loop.index}) }}">
-                            <form method="post" action="{{ url('/account/offers/' ~ offer.id ~ '/images/' ~ image.id ~ '/delete') }}">
-                                {{ csrf_field() }}
-                                <button type="submit" class="link-button">{{ trans('core.offer.image.delete') }}</button>
-                            </form>
-                        </li>
-                    {% endfor %}
-                </ul>
-            {% endif %}
-            {% if offer.images|length < max_images %}
-                <form method="post" action="{{ url('/account/offers/' ~ offer.id ~ '/images') }}" enctype="multipart/form-data" class="stack-form">
-                    {{ csrf_field() }}
-                    <label for="image">{{ trans('core.offer.image.add') }}</label>
-                    <input id="image" name="image" type="file" accept="image/jpeg,image/png,image/webp" required>
-                    <small>{{ trans('core.offer.image.hint', {max: max_images}) }}</small>
-                    <button type="submit">{{ trans('core.offer.image.upload') }}</button>
-                </form>
-            {% endif %}
-        {% endif %}
-    </section>
+{% include 'account/_offer_images.twig' %}
 
+{% if offer %}
     <section>
         <h2>{{ trans('core.offer.action.delete') }}</h2>
         <form method="post" action="{{ url('/account/offers/' ~ offer.id ~ '/delete') }}">
@@ -118,7 +90,5 @@
             <button type="submit" class="danger">{{ trans('core.offer.action.delete') }}</button>
         </form>
     </section>
-{% else %}
-    <p><small>{{ trans('core.offer.image.after_save') }}</small></p>
 {% endif %}
 {% endblock %}

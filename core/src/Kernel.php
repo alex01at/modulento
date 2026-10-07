@@ -524,6 +524,15 @@ final class Kernel
         // "Fast responder" is the only badge that needs a figure nobody
         // else keeps; "top rated" reads the rating columns live.
         $app->scheduler->register('core.badges-recompute', 60, fn (App $app) => $app->badges->recomputeResponseTimes($app));
+        // Offer rows a wizard created but nobody ever finished (no title was
+        // ever saved for them) - the same images-then-row order as deleting
+        // an offer by hand (OfferController::delete()).
+        $app->scheduler->register('core.offer-draft-cleanup', 60, function (App $app): void {
+            foreach ($app->offers->abandonedDraftIds(7 * 86400) as $id) {
+                $app->offerImages->deleteAll($id);
+                $app->offers->delete($id);
+            }
+        });
     }
 
     /**
