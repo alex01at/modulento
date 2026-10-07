@@ -6,6 +6,7 @@ namespace Modulento\Core\Controller;
 
 use Modulento\Core\Account\Accounts;
 use Modulento\Core\Account\Avatars;
+use Modulento\Core\Account\IdentityVerification;
 use Modulento\Core\Account\LoginTokens;
 use Modulento\Core\Account\Preferences;
 use Modulento\Core\Catalogue\OfferView;
@@ -13,6 +14,7 @@ use Modulento\Core\Account\Tokens;
 use Modulento\Core\Account\AccountRemoval;
 use Modulento\Core\Event\AccountExport;
 use Modulento\Core\Review\Reviews;
+use Modulento\Core\Support\Countries;
 use Modulento\Core\Support\PasswordPolicy;
 use Modulento\Core\Support\RateLimiter;
 use Modulento\Core\Support\Session;
@@ -98,6 +100,36 @@ final class AccountController extends Controller
         $this->back('success', 'core.account.avatar.deleted');
     }
 
+    public function submitIdentity(array $params): void
+    {
+        if ((new RateLimiter($this->app->db))->hit('identity', (string) $this->accountId(), 10, 3600)) {
+            $this->back('error', 'core.error.too_many_requests');
+            return;
+        }
+
+        $uploads = IdentityVerification::uploads(is_array($_FILES['documents'] ?? null) ? $_FILES['documents'] : null);
+        $problem = IdentityVerification::problem($uploads);
+        if ($problem !== null) {
+            $this->back('error', $problem, ['max' => IdentityVerification::MAX_FILES, 'megabytes' => intdiv(IdentityVerification::MAX_BYTES, 1024 * 1024)]);
+            return;
+        }
+
+        $this->app->identityVerification->submit($this->accountId(), $uploads);
+        $this->back('success', 'core.account.identity.submitted');
+    }
+
+    public function updateBilling(array $params): void
+    {
+        $result = $this->app->billingProfile->validate($_POST);
+        if ($result['errors'] !== []) {
+            $this->back('error', $result['errors'][0]);
+            return;
+        }
+
+        $this->app->billingProfile->save($this->accountId(), $result['values']);
+        $this->back('success', 'core.account.billing.saved');
+    }
+
     /** How many messages wait for the account; the page asks every few seconds (see unread.js). */
     public function unread(array $params): void
     {
@@ -126,6 +158,13 @@ final class AccountController extends Controller
                 'current' => $device['current'],
             ], $this->app->loginTokens->devices($this->accountId())),
             'remember_days' => intdiv(LoginTokens::TTL_SECONDS, 86400),
+            'identity' => $this->app->identityVerification->status($this->accountId()) + [
+                'documents' => $this->app->identityVerification->documents($this->accountId()),
+                'max_files' => IdentityVerification::MAX_FILES,
+                'megabytes' => intdiv(IdentityVerification::MAX_BYTES, 1024 * 1024),
+            ],
+            'billing' => $this->app->billingProfile->find($this->accountId()),
+            'countries' => Countries::CODES,
         ]);
     }
 
@@ -310,13 +349,23 @@ final class AccountController extends Controller
         }
         $provider = $this->app->providers->findByAccount($this->accountId());
         if ($provider !== null) {
-            unset($provider['account_email'], $provider['account_status'], $provider['account_locale'], $provider['decided_by'], $provider['changed_since_decision']);
+            unset($provider['account_email'], $provider['account_status'], $provider['account_locale'], $provider['account_identity_status'], $provider['decided_by'], $provider['changed_since_decision']);
             $export->add('provider', $provider);
             // Bank details and account ids at payment services; API keys are left out.
             $payments = $this->app->payments->export((int) $provider['id']);
             if ($payments !== []) {
                 $export->add('payment_methods', $payments);
             }
+        }
+        $identity = $this->app->identityVerification->status($this->accountId());
+        if (($identity['status'] ?? 'none') !== 'none') {
+            // The documents themselves are never exported, only the status.
+            $export->add('identity_verification', $identity);
+        }
+        $billing = $this->app->billingProfile->find($this->accountId());
+        if ($billing !== null) {
+            unset($billing['account_id']);
+            $export->add('billing_profile', $billing);
         }
         $orders = $this->app->orders->list('buyer', $this->accountId(), null, 1, 100000)['rows'];
         if ($orders !== []) {

@@ -84,6 +84,11 @@ final class ProviderController extends Controller
             'reviews' => ReviewView::all($this->app->reviews->listPublic('provider', (int) $provider['id'], 1, 20)['rows']),
             'account_rating' => Reviews::summary($ratedAccount ?? []),
             'account_ratings' => AccountRatingView::all($this->app->accountRatings->listPublic((int) $provider['account_id'], 1, 20)['rows']),
+            // Templates extensions want shown on this provider's profile, e.g. a freelancer's skills and portfolio.
+            'extension_blocks' => array_map(
+                fn (array $section) => ['template' => $section['template'], 'data' => ($section['data'])($provider, $this->app)],
+                $this->app->providerSections()
+            ),
         ]);
     }
 

@@ -33,7 +33,7 @@
                 <tbody>
                 {% for provider in providers %}
                     <tr>
-                        <th scope="row"><a href="{{ url('/admin/providers/' ~ provider.id) }}">{{ provider.name }}</a></th>
+                        <th scope="row"><a href="{{ url('/admin/providers/' ~ provider.id) }}">{{ provider.name }}</a>{% if provider.account_identity_status == 'verified' %} <span class="badge badge-verified" title="{{ trans('core.account.identity.verified_badge') }}">✓</span>{% endif %}</th>
                         <td>{{ trans('core.provider.type.' ~ provider.type) }}</td>
                         <td>{{ provider.account_email }}</td>
                         <td>

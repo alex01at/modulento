@@ -74,6 +74,27 @@
                 <small>{{ trans('core.admin.settings.currency_hint') }}</small>
             </div>
         </div>
+
+        <h3>{{ trans('core.admin.settings.badges') }}</h3>
+        <p><small>{{ trans('core.admin.settings.badges_hint') }}</small></p>
+        <div class="field-grid">
+            <div class="field">
+                <label for="badge_top_rated_min_average">{{ trans('core.admin.settings.badge_top_rated_min_average') }}</label>
+                <input id="badge_top_rated_min_average" name="badge_top_rated_min_average" type="number" min="1" max="5" step="0.1" value="{{ settings.badge_top_rated_min_average }}">
+            </div>
+            <div class="field">
+                <label for="badge_top_rated_min_count">{{ trans('core.admin.settings.badge_top_rated_min_count') }}</label>
+                <input id="badge_top_rated_min_count" name="badge_top_rated_min_count" type="number" min="1" max="1000" step="1" value="{{ settings.badge_top_rated_min_count }}">
+            </div>
+            <div class="field">
+                <label for="badge_fast_responder_max_minutes">{{ trans('core.admin.settings.badge_fast_responder_max_minutes') }}</label>
+                <input id="badge_fast_responder_max_minutes" name="badge_fast_responder_max_minutes" type="number" min="1" max="100000" step="1" value="{{ settings.badge_fast_responder_max_minutes }}">
+            </div>
+            <div class="field">
+                <label for="badge_fast_responder_min_sample">{{ trans('core.admin.settings.badge_fast_responder_min_sample') }}</label>
+                <input id="badge_fast_responder_min_sample" name="badge_fast_responder_min_sample" type="number" min="1" max="1000" step="1" value="{{ settings.badge_fast_responder_min_sample }}">
+            </div>
+        </div>
     </section>
 
     <fieldset class="card-box" id="languages" {{ tab != 'languages' ? 'hidden' }}>

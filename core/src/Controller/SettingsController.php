@@ -28,6 +28,10 @@ final class SettingsController extends Controller
                 'currency' => $app->offers->currency(),
                 'meta_description' => $app->settings->get('core.meta_description'),
                 'poll_seconds' => (int) $app->settings->get('core.poll_seconds', '60'),
+                'badge_top_rated_min_average' => $app->badges->topRatedMinAverage(),
+                'badge_top_rated_min_count' => $app->badges->topRatedMinCount(),
+                'badge_fast_responder_max_minutes' => $app->badges->fastResponderMaxMinutes(),
+                'badge_fast_responder_min_sample' => $app->badges->fastResponderMinSample(),
             ],
             'available_locales' => $app->locales->available(),
             'enabled_locales' => $app->locales->enabled(),
@@ -83,6 +87,11 @@ final class SettingsController extends Controller
         if (preg_match('/^[A-Z]{3}$/', $currency) === 1) {
             $app->settings->set('core.currency', $currency);
         }
+
+        $app->settings->set('core.badge.top_rated.min_average', (string) max(1, min(5, (float) str_replace(',', '.', (string) ($_POST['badge_top_rated_min_average'] ?? '4.5')))));
+        $app->settings->set('core.badge.top_rated.min_count', (string) max(1, min(1000, (int) ($_POST['badge_top_rated_min_count'] ?? 5))));
+        $app->settings->set('core.badge.fast_responder.max_minutes', (string) max(1, min(100000, (int) ($_POST['badge_fast_responder_max_minutes'] ?? 120))));
+        $app->settings->set('core.badge.fast_responder.min_sample', (string) max(1, min(1000, (int) ($_POST['badge_fast_responder_min_sample'] ?? 5))));
 
         // The administrator's own language may just have been switched off,
         // or the default - and with it every address - may have changed.

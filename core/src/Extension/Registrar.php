@@ -101,6 +101,27 @@ final class Registrar
     }
 
     /**
+     * A section on a provider's public profile, e.g. a freelancer's skills
+     * and portfolio. The template is one of this extension's
+     * ("@id/provider.twig"); a theme may override it like any other. $data
+     * gets the raw provider row and runs only when that provider's page is
+     * shown; return an empty array to show nothing for a provider who has
+     * not filled anything in.
+     *
+     * @param Closure(array<string, mixed>, App): array<string, mixed> $data
+     */
+    public function providerSection(string $template, Closure $data): void
+    {
+        $this->app->addProviderSection($template, $data);
+    }
+
+    /** An entry in the logged-in account's own navigation, e.g. a profile page the extension adds. */
+    public function accountLink(string $labelKey, string $path): void
+    {
+        $this->app->addAccountLink($labelKey, $path);
+    }
+
+    /**
      * @param string $group the section of the menu: "content", "marketplace",
      *        "moderation", "people", "system"; anything else, or nothing,
      *        puts the entry under "more"

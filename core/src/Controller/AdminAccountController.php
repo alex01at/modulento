@@ -126,6 +126,7 @@ final class AdminAccountController extends Controller
             'is_last_admin' => $this->app->accounts->isLastAdmin((int) $account['id']),
             'can_impersonate' => $this->app->auth->can('core.accounts.impersonate') && (int) $account['id'] !== $this->app->auth->account()['id'],
             'activity' => $this->app->adminLog->forTarget((int) $account['id']),
+            'identity_documents' => $this->app->identityVerification->documents((int) $account['id']),
         ]);
     }
 
@@ -173,6 +174,46 @@ final class AdminAccountController extends Controller
         }
 
         $this->redirect('/admin/accounts');
+    }
+
+    public function identityFile(array $params): void
+    {
+        $file = $this->app->identityVerification->find((int) $params['id'], (int) $params['file']);
+        if ($file === null) {
+            $this->notFound();
+            return;
+        }
+
+        OrderController::sendFile($file);
+    }
+
+    public function decideIdentity(array $params): void
+    {
+        $account = $this->app->accounts->findById((int) $params['id']);
+        if ($account === null) {
+            $this->redirect('/admin/accounts');
+            return;
+        }
+
+        $decision = (string) ($_POST['decision'] ?? '');
+        $status = $decision === 'verify' ? 'verified' : ($decision === 'reject' ? 'rejected' : null);
+        $note = trim((string) ($_POST['note'] ?? ''));
+
+        if ($status === null || ($status === 'rejected' && $note === '')) {
+            $this->back($account, 'error', 'core.admin.accounts.identity.error.decision');
+            return;
+        }
+
+        $this->app->identityVerification->setStatus((int) $account['id'], $status, $note, (int) $this->app->auth->account()['id']);
+        $locale = $this->localeOf($account);
+        $this->app->mailer->send(
+            $account['email'],
+            $status === 'verified' ? 'emails/identity_verified.txt.twig' : 'emails/identity_rejected.txt.twig',
+            ['note' => $note !== '' ? $note : null],
+            $locale
+        );
+
+        $this->back($account, 'success', $status === 'verified' ? 'core.admin.accounts.identity.verified' : 'core.admin.accounts.identity.rejected');
     }
 
     /** An administrator never sets or sees a password; the owner gets a link to choose one. */
@@ -270,6 +311,12 @@ final class AdminAccountController extends Controller
     {
         Session::flash($type, $this->trans($messageKey));
         $this->redirect('/admin/accounts/' . $account['id']);
+    }
+
+    private function notFound(): void
+    {
+        http_response_code(404);
+        $this->render('error.twig', ['status' => 404, 'message_key' => 'core.error.not_found']);
     }
 
     // --- Roles ---------------------------------------------------------

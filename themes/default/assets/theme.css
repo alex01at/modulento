@@ -163,6 +163,18 @@ a.button { display: inline-block; margin-top: .5rem; padding: .45rem .8rem; bord
 .files { list-style: none; padding: 0; margin: .25rem 0; }
 .files li::before { content: "📎 "; }
 
+.badge { display: inline-block; padding: .15rem .5rem; border-radius: var(--radius); font-size: .85em; background: var(--surface); color: var(--muted); }
+.badge-verified { background: var(--accent); color: var(--on-accent); }
+.badge-earned, .badge-skill { border: 1px solid var(--line); }
+.badge-availability-available { background: var(--success); color: #fff; }
+.badge-availability-busy { background: var(--surface); color: var(--muted); }
+.badge-availability-paused { border: 1px solid var(--line); }
+
+.portfolio-grid { display: flex; flex-wrap: wrap; gap: 1rem; padding: 0; list-style: none; }
+.portfolio-grid figure { margin: 0; width: 180px; }
+.portfolio-grid img { display: block; width: 100%; height: auto; border-radius: var(--radius); }
+.portfolio-grid figcaption { font-size: .9em; color: var(--muted); }
+
 .rating { color: var(--rating); white-space: nowrap; }
 .rating small { color: var(--muted); }
 .review { padding: .75rem 0; border-top: 1px solid var(--line); }

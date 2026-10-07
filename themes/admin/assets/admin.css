@@ -353,6 +353,8 @@ td form { display: flex; justify-content: flex-end; }
 .badge-pending, .badge-changed, .badge-running { background: var(--warning-soft); color: var(--warning); }
 .badge-rejected, .badge-suspended, .badge-blocked, .badge-hidden, .badge-failed, .badge-incompatible { background: var(--error-soft); color: var(--error); }
 .badge-draft, .badge-paused, .badge-disabled, .badge-unpaid { background: var(--neutral-soft); color: var(--neutral); }
+.badge-verified { background: var(--primary-soft); color: var(--primary); }
+.badge-none, .badge-earned { background: var(--neutral-soft); color: var(--neutral); }
 
 .status-line { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem .75rem; }
 .status-line p { flex-basis: 100%; margin: 0; }

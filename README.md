@@ -187,7 +187,9 @@ as links.
   filed under, in every language.
 - **Providers** (`core.providers.manage`): approve, reject or suspend provider
   profiles. Changes to the legal details of an approved provider are flagged
-  for review while the profile stays public.
+  for review while the profile stays public. A verified identity (see
+  **Accounts** below) and earned badges (**Settings → Catalogue**) show next
+  to the provider's name, both here and on the public profile.
 - **Orders** (`core.orders.manage`): every order with its state history,
   messages, attachments and payments. Orders can be moved on by hand where the
   order flow allows it.
@@ -197,6 +199,10 @@ as links.
   for bank transfer, PayPal and Stripe. Each provider sets up their own account
   details; the platform never holds the money. Test the real payment services
   with your own sandbox credentials before enabling them.
+- **Billing profile**: a buyer's own company name, website, VAT/tax number and
+  billing address, under **Account → Settings → Profile**. Entirely optional,
+  separate from the provider profile, and not wired into anything else yet -
+  it is the account's own record, not an automatic invoice.
 
 ### Moderation
 
@@ -220,6 +226,18 @@ as links.
 - **Accounts** (`core.accounts.manage`): search, block and unblock, mark as
   verified, send a password reset, change roles, delete. The page of an account
   shows its log.
+- **Identity verification** (`core.accounts.manage`, on the account's own
+  page): an account can upload an ID or another official document under
+  **Account → Settings → Security**; verify or reject it here, with a note
+  told to the account on rejection. A verified identity shows as a blue
+  checkmark next to the account's provider profile, if it has one. Documents
+  are stored outside the web root and are never public - only this page
+  offers a download, and only to an administrator.
+- **Profile badges** (`core.settings.manage`, thresholds under **Settings →
+  Catalogue**): "Top rated" and "Fast responder" are awarded automatically on
+  a provider's public profile once its rating average/count, respectively its
+  average first-response time, cross the thresholds set there. Nothing here
+  lets an administrator define a new kind of badge.
 - **Create account**: an account for someone, with or without a password. Without
   one, the person gets an e-mail with a link to set their own password.
 - **Sign in as this user** (`core.accounts.impersonate`): shows the website as
@@ -729,9 +747,11 @@ Available in every template:
 | `module(id)` | Whether an optional function of the core is on: `reviews`, `contact`, `withdrawal`, `reports`, `avatars`, `remember_login` - a theme hides what belongs to a module that is off |
 | `has_catalogue()` | Whether an extension adds a kind of offer; without one, hide the links to offers and providers |
 | `nav_links()` | Entries extensions add to the main menu, as `title`/`url`/`path` |
+| `account_links()` | Entries extensions add to the logged-in account's own navigation (`account/_nav.twig`), as `title`/`url` |
 | `home_sections()` | What extensions want shown on the home page: `{% for section in home_sections() %}{% include section.template with section.data %}{% endfor %}` |
 | `categories()` | The category tree with `name`, `path`, `children` and `offer_count` |
 | `top_providers(limit)` | Public providers, best rated first, as shown on `provider/show.twig` |
+| `extension_blocks` (only on `provider/show.twig`) | What `providerSection()` added for this provider, already resolved for it (unlike `home_sections()`, this needs the specific provider, so it is a template variable, not a global function): `{% for block in extension_blocks %}{% include block.template with block.data %}{% endfor %}` |
 | `registration_open()` | Whether new accounts can be created |
 | `provider_status()` | Status of the logged-in account's provider profile, or null without one |
 | `account_avatar()` | Path of the logged-in account's profile picture, or null without one (or without an account) |
@@ -944,6 +964,8 @@ extensions/<id>/
 | `adminMenu(labelKey, path, permission, group)` | An entry in the administration menu, in one of its sections: `content`, `marketplace`, `moderation`, `people`, `system`, or `more` (the default) |
 | `navigation(labelKey, path)` | An entry in the site's main menu |
 | `homeSection(template, data)` | A template of the extension included on the home page; `data` is an optional `Closure(App): array` that supplies its variables |
+| `providerSection(template, data)` | A template of the extension included on a provider's public profile, e.g. a freelancer's skills and portfolio; `data` is a `Closure(array $provider, App $app): array` that gets the provider row and supplies the template's variables. Return `[]` to show nothing for a provider who has not filled anything in |
+| `accountLink(labelKey, path)` | An entry in the logged-in account's own navigation (`account/_nav.twig`), e.g. a link to a profile page the extension adds |
 | `listen(EventClass, fn ($event, App $app) => ...)` | React to a core or extension event |
 | `task(name, everyMinutes, fn (App $app) => ...)` | Scheduled work, run by `bin/cron.php` |
 | `offerType(OfferType)` | A kind of offer for the catalogue, see below |
@@ -1284,8 +1306,9 @@ Version 1 consists of:
 
 - `Modulento\Core\Extension\Extension` with `register(Registrar)`, and
   `extension.json` with `id`, `name`, `version`, `api`, `namespace`
-- the `Registrar` methods `routes`, `permission`, `adminMenu`, `navigation`, `homeSection`, `listen`,
-  `task`, `offerType`, `orderFlow`, `paymentMethod`, and its `manifest`
+- the `Registrar` methods `routes`, `permission`, `adminMenu`, `navigation`, `homeSection`,
+  `providerSection`, `accountLink`, `listen`, `task`, `offerType`, `orderFlow`, `paymentMethod`,
+  and its `manifest`
 - the interfaces `Modulento\Core\Catalogue\OfferType`,
   `Modulento\Core\Order\OrderFlow` and `Modulento\Core\Order\PaymentMethod`,
   including the keys of the arrays they return (states, transitions,

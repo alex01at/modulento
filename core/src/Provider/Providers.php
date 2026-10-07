@@ -102,7 +102,7 @@ final class Providers
         $count->execute($params);
 
         $stmt = $this->db->prepare(
-            "SELECT p.*, a.email AS account_email, a.status AS account_status
+            "SELECT p.*, a.email AS account_email, a.status AS account_status, a.identity_status AS account_identity_status
              FROM provider p JOIN account a ON a.id = p.account_id {$whereSql}
              ORDER BY p.name, p.id LIMIT " . max(1, $perPage) . ' OFFSET ' . max(0, (min($page, 100000) - 1) * $perPage)
         );
@@ -120,7 +120,7 @@ final class Providers
     public function top(int $limit): array
     {
         $stmt = $this->db->prepare(
-            "SELECT p.*, a.email AS account_email, a.status AS account_status
+            "SELECT p.*, a.email AS account_email, a.status AS account_status, a.identity_status AS account_identity_status
              FROM provider p JOIN account a ON a.id = p.account_id
              WHERE p.status = 'approved' AND a.status = 'active'
              ORDER BY (p.rating_count = 0), (CASE WHEN p.rating_count > 0 THEN p.rating_sum * 1.0 / p.rating_count ELSE 0 END) DESC,
@@ -332,7 +332,7 @@ final class Providers
     private function one(string $condition, int|string $value): ?array
     {
         $stmt = $this->db->prepare(
-            "SELECT p.*, a.email AS account_email, a.status AS account_status, a.locale AS account_locale
+            "SELECT p.*, a.email AS account_email, a.status AS account_status, a.locale AS account_locale, a.identity_status AS account_identity_status
              FROM provider p JOIN account a ON a.id = p.account_id WHERE {$condition}"
         );
         $stmt->execute(['value' => $value]);

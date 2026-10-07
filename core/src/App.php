@@ -6,6 +6,8 @@ namespace Modulento\Core;
 
 use Modulento\Core\Account\Accounts;
 use Modulento\Core\Account\Avatars;
+use Modulento\Core\Account\BillingProfile;
+use Modulento\Core\Account\IdentityVerification;
 use Modulento\Core\Support\AdminLog;
 use Modulento\Core\Support\BadWords;
 use Modulento\Core\Support\Design;
@@ -34,6 +36,7 @@ use Modulento\Core\Payment\Payments;
 use Modulento\Core\Payment\PaypalPayment;
 use Modulento\Core\Payment\StripePayment;
 use Modulento\Core\Payment\TransferPayment;
+use Modulento\Core\Provider\Badges;
 use Modulento\Core\Provider\Providers;
 use Modulento\Core\Review\AccountRatings;
 use Modulento\Core\Review\Reviews;
@@ -112,6 +115,9 @@ final class App
     public readonly AccountRatings $accountRatings;
     public readonly Packages $packages;
     public readonly Payments $payments;
+    public readonly IdentityVerification $identityVerification;
+    public readonly BillingProfile $billingProfile;
+    public readonly Badges $badges;
 
     /** The request path without its language prefix - what routes are matched against. */
     public string $path = '/';
@@ -132,6 +138,10 @@ final class App
     private array $navigation = [];
     /** @var array<int, array{template: string, data: ?\Closure}> */
     private array $homeSections = [];
+    /** @var array<int, array{template: string, data: \Closure}> */
+    private array $providerSections = [];
+    /** @var array<int, array{label_key: string, path: string}> */
+    private array $accountLinks = [];
     /** @var array<string, string> permission name => label key */
     private array $permissions = [];
 
@@ -205,6 +215,9 @@ final class App
         $this->media = new Library($db, ($config['app']['uploads'] ?? $config['app']['root'] . '/var/uploads') . '/media');
         $this->preferences = new Preferences($db);
         $this->accounts = new Accounts($db);
+        $this->identityVerification = new IdentityVerification($db, ($config['app']['uploads'] ?? $config['app']['root'] . '/var/uploads') . '/identity');
+        $this->billingProfile = new BillingProfile($db);
+        $this->badges = new Badges($db, $this->settings);
         $this->tokens = new Tokens($db);
         $this->loginTokens = new LoginTokens($db);
         $this->mailer = new Mailer($this);
@@ -287,6 +300,36 @@ final class App
             fn (array $section) => ['template' => $section['template'], 'data' => $section['data'] !== null ? ($section['data'])($this) : []],
             $this->homeSections
         );
+    }
+
+    /**
+     * A template an extension wants shown on a provider's public profile -
+     * e.g. a freelancer's skills and portfolio. $data gets the raw provider
+     * row and runs only when a provider page is shown.
+     *
+     * @param \Closure(array<string, mixed>, App): array<string, mixed> $data
+     */
+    public function addProviderSection(string $template, \Closure $data): void
+    {
+        $this->providerSections[] = ['template' => $template, 'data' => $data];
+    }
+
+    /** @return array<int, array{template: string, data: \Closure}> unresolved - the caller supplies the provider */
+    public function providerSections(): array
+    {
+        return $this->providerSections;
+    }
+
+    /** A link an extension adds to the account area, e.g. to a profile page of its own. */
+    public function addAccountLink(string $labelKey, string $path): void
+    {
+        $this->accountLinks[] = ['label_key' => $labelKey, 'path' => $path];
+    }
+
+    /** @return array<int, array{label_key: string, path: string}> */
+    public function accountLinks(): array
+    {
+        return $this->accountLinks;
     }
 
     public function addPermission(string $name, string $labelKey): void

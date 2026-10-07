@@ -189,6 +189,8 @@ final class Kernel
         $router->post('/account/delete', [AccountController::class, 'delete']);
         $router->get('/account/provider', [ProviderController::class, 'edit']);
         $router->post('/account/provider', [ProviderController::class, 'save']);
+        $router->post('/account/identity', [AccountController::class, 'submitIdentity']);
+        $router->post('/account/billing', [AccountController::class, 'updateBilling']);
 
         $router->get('/account/payments', [PaymentSettingsController::class, 'index']);
         $router->post('/account/payments/transfer', [PaymentSettingsController::class, 'saveTransfer']);
@@ -388,6 +390,8 @@ final class Kernel
         $router->post('/admin/accounts/{id}/block', [AdminAccountController::class, 'block'], 'core.accounts.manage');
         $router->post('/admin/accounts/{id}/unblock', [AdminAccountController::class, 'unblock'], 'core.accounts.manage');
         $router->post('/admin/accounts/{id}/verify', [AdminAccountController::class, 'verify'], 'core.accounts.manage');
+        $router->get('/admin/accounts/{id}/identity/files/{file}', [AdminAccountController::class, 'identityFile'], 'core.accounts.manage');
+        $router->post('/admin/accounts/{id}/identity/decide', [AdminAccountController::class, 'decideIdentity'], 'core.accounts.manage');
         $router->post('/admin/accounts/{id}/reset', [AdminAccountController::class, 'sendReset'], 'core.accounts.manage');
         $router->post('/admin/accounts/{id}/delete', [AdminAccountController::class, 'delete'], 'core.accounts.manage');
         $router->post('/admin/accounts/{id}/roles', [AdminAccountController::class, 'setRoles'], 'core.roles.manage');
@@ -491,6 +495,9 @@ final class Kernel
             $app->loginTokens->purgeExpired();
             $app->accounts->deleteUnverifiedOlderThan(7 * 86400);
         });
+        // "Fast responder" is the only badge that needs a figure nobody
+        // else keeps; "top rated" reads the rating columns live.
+        $app->scheduler->register('core.badges-recompute', 60, fn (App $app) => $app->badges->recomputeResponseTimes($app));
     }
 
     /**

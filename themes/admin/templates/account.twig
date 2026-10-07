@@ -44,6 +44,36 @@
 
     <div>
         <section class="card-box">
+            <h2>{{ trans('core.account.identity.title') }}</h2>
+            <p><span class="badge badge-{{ target.identity_status }}">{{ trans('core.account.identity.status.' ~ target.identity_status) }}</span>
+                {% if target.identity_decided_at %}<small>({{ target.identity_decided_at }} UTC)</small>{% endif %}</p>
+            {% if target.identity_note %}<p>{{ target.identity_note }}</p>{% endif %}
+            {% if identity_documents %}
+                <ul class="plain-list">
+                    {% for document in identity_documents %}
+                        <li><a href="{{ url('/admin/accounts/' ~ target.id ~ '/identity/files/' ~ document.id) }}">{{ document.name }}</a> <small>({{ (document.size / 1024)|round }} KB, {{ document.created_at }} UTC)</small></li>
+                    {% endfor %}
+                </ul>
+                {% if target.identity_status == 'pending' %}
+                    <form method="post" action="{{ url('/admin/accounts/' ~ target.id ~ '/identity/decide') }}" class="stack-form wide">
+                        {{ csrf_field() }}
+                        <div class="field">
+                            <label for="identity_note">{{ trans('core.admin.accounts.identity.note') }}</label>
+                            <textarea id="identity_note" name="note" rows="3"></textarea>
+                            <small>{{ trans('core.admin.accounts.identity.note_hint') }}</small>
+                        </div>
+                        <div class="button-row">
+                            <button type="submit" name="decision" value="verify">{{ trans('core.admin.accounts.identity.verify') }}</button>
+                            <button type="submit" name="decision" value="reject" class="danger">{{ trans('core.admin.accounts.identity.reject') }}</button>
+                        </div>
+                    </form>
+                {% endif %}
+            {% else %}
+                <p class="empty">{{ trans('core.account.identity.none') }}</p>
+            {% endif %}
+        </section>
+
+        <section class="card-box">
             <h2>{{ trans('core.admin.accounts.actions') }}</h2>
             <div class="button-row">
             {% if not target.email_verified_at %}

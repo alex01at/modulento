@@ -29,6 +29,8 @@ final class ProviderView
             'city' => $provider['city'],
             'country' => $provider['country'],
             'rating' => Reviews::summary($provider),
+            'verified' => ($provider['account_identity_status'] ?? null) === 'verified',
+            'badges' => $app->badges->active($provider),
             'legal' => $isBusiness ? [
                 'legal_name' => $provider['legal_name'],
                 'street' => $provider['street'],

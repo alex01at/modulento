@@ -59,6 +59,41 @@
         </form>
     </section>
 
+    <section>
+        <h2>{{ trans('core.account.billing.title') }}</h2>
+        <p><small>{{ trans('core.account.billing.hint') }}</small></p>
+        <form method="post" action="{{ url('/account/billing') }}" class="stack-form">
+            {{ csrf_field() }}
+            <input type="hidden" name="tab" value="profile">
+            <label for="company_name">{{ trans('core.account.billing.field.company_name') }}</label>
+            <input id="company_name" name="company_name" value="{{ billing.company_name ?? '' }}" maxlength="150" autocomplete="organization">
+
+            <label for="website">{{ trans('core.account.billing.field.website') }}</label>
+            <input id="website" name="website" type="url" value="{{ billing.website ?? '' }}" maxlength="255" autocomplete="url">
+
+            <label for="vat_id">{{ trans('core.account.billing.field.vat_id') }}</label>
+            <input id="vat_id" name="vat_id" value="{{ billing.vat_id ?? '' }}" maxlength="20">
+            <label for="tax_id">{{ trans('core.account.billing.field.tax_id') }}</label>
+            <input id="tax_id" name="tax_id" value="{{ billing.tax_id ?? '' }}" maxlength="50">
+
+            <label for="billing_street">{{ trans('core.provider.field.street') }}</label>
+            <input id="billing_street" name="street" value="{{ billing.street ?? '' }}" maxlength="200" autocomplete="street-address">
+            <label for="billing_postal_code">{{ trans('core.provider.field.postal_code') }}</label>
+            <input id="billing_postal_code" name="postal_code" value="{{ billing.postal_code ?? '' }}" maxlength="20" autocomplete="postal-code">
+            <label for="billing_city">{{ trans('core.provider.field.city') }}</label>
+            <input id="billing_city" name="city" value="{{ billing.city ?? '' }}" maxlength="100" autocomplete="address-level2">
+            <label for="billing_country">{{ trans('core.provider.field.country') }}</label>
+            <select id="billing_country" name="country" autocomplete="country">
+                <option value=""></option>
+                {% for code in countries %}
+                    <option value="{{ code }}" {{ billing and billing.country == code ? 'selected' }}>{{ trans('core.country.' ~ code) }}</option>
+                {% endfor %}
+            </select>
+
+            <button type="submit">{{ trans('core.account.save') }}</button>
+        </form>
+    </section>
+
     {% if is_admin %}
     <section>
         <h2>{{ trans('core.account.admin_layout.title') }}</h2>
@@ -115,6 +150,30 @@
 
             <button type="submit">{{ trans('core.account.password.submit') }}</button>
         </form>
+    </section>
+
+    <section>
+        <h2>{{ trans('core.account.identity.title') }}</h2>
+        <p>{{ trans('core.account.identity.intro') }}</p>
+        <p><span class="badge badge-{{ identity.status }}">{{ trans('core.account.identity.status.' ~ identity.status) }}</span></p>
+        {% if identity.status == 'rejected' and identity.note %}<p>{{ identity.note }}</p>{% endif %}
+        {% if identity.documents %}
+            <ul class="plain-list">
+                {% for document in identity.documents %}
+                    <li>{{ document.name }} <small>({{ document.created_at }} UTC)</small></li>
+                {% endfor %}
+            </ul>
+        {% endif %}
+        {% if identity.status != 'pending' and identity.status != 'verified' %}
+            <form method="post" action="{{ url('/account/identity') }}" enctype="multipart/form-data" class="stack-form">
+                {{ csrf_field() }}
+                <input type="hidden" name="tab" value="security">
+                <label for="documents">{{ trans('core.account.identity.field.documents') }}</label>
+                <input id="documents" name="documents[]" type="file" accept="application/pdf,image/jpeg,image/png,image/webp" multiple required>
+                <small>{{ trans('core.account.identity.field.documents_hint', {max: identity.max_files, megabytes: identity.megabytes}) }}</small>
+                <button type="submit">{{ trans('core.account.identity.submit') }}</button>
+            </form>
+        {% endif %}
     </section>
 
     {% if module('remember_login') %}

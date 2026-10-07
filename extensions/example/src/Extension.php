@@ -32,6 +32,11 @@ final class Extension implements ExtensionContract
         $registrar->adminMenu('example.admin.menu', '/admin/example', 'example.logins.view');
         $registrar->navigation('example.nav', '/example');
         $registrar->homeSection('@example/home.twig', fn (App $app): array => ['site' => $app->siteName()]);
+        $registrar->accountLink('example.account_link', '/example');
+        $registrar->providerSection('@example/provider.twig', fn (array $provider, App $app): array => [
+            'site' => $app->siteName(),
+            'provider_name' => $provider['name'],
+        ]);
 
         $registrar->listen(AccountLoggedIn::class, function (AccountLoggedIn $event, App $app): void {
             $stmt = $app->db->prepare('INSERT INTO x_example_login (account_id, logged_in_at) VALUES (:id, :now)');

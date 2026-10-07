@@ -296,6 +296,11 @@ final class View
             fn (array $link) => ['title' => $app->translator->trans($link['label_key']), 'url' => $app->url($link['path']), 'path' => $link['path']],
             $app->navigation()
         )));
+        // Entries extensions add to the logged-in account's own navigation.
+        $this->twig->addFunction(new TwigFunction('account_links', fn () => array_map(
+            fn (array $link) => ['title' => $app->translator->trans($link['label_key']), 'url' => $app->url($link['path'])],
+            $app->accountLinks()
+        )));
         // Templates extensions want included on the home page.
         $this->twig->addFunction(new TwigFunction('home_sections', fn () => $app->homeSections()));
         $this->twig->addFunction(new TwigFunction('registration_open', fn () => $app->settings->get('core.registration', 'open') === 'open'));

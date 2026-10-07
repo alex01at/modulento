@@ -13,4 +13,6 @@ return [
     'example.logins.none' => 'Nobody has logged in since this extension was enabled.',
     'example.nav' => 'Example',
     'example.home.title' => 'From the example extension',
+    'example.account_link' => 'Example account link',
+    'example.provider.title' => 'From the example profile block',
 ];
