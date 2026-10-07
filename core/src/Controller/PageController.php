@@ -113,7 +113,9 @@ final class PageController extends Controller
             return;
         }
 
-        Session::flash('success', $this->trans('core.admin.pages.saved'));
+        // A new page defaults to "draft" on the form (no option is marked as
+        // chosen), which is easy to save without noticing - say which one it is.
+        Session::flash('success', $this->trans($fields['status'] === 'published' ? 'core.admin.pages.saved_published' : 'core.admin.pages.saved_draft'));
         $this->redirect('/admin/pages/' . $result['id']);
     }
 

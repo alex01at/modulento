@@ -905,6 +905,19 @@ $r = $get('/en/impressum', null);
 check('pages: a language without its own text shows the default one, marked as German', $r['status'] === 200 && str_contains($r['body'], '<article lang="de">') && str_contains($r['body'], '<html lang="en">'));
 check('pages: legal page is in the footer of every language', str_contains($r['body'], '<a href="/en/impressum">Impressum</a>'));
 
+// A form for a new page marks no status option as chosen, so a browser that
+// submits it unchanged sends none at all - the exact way an operator who never
+// touched the dropdown saves a page. It must land as a draft, said as such.
+$post('/admin/pages/new', ['role' => 'privacy', 'in_footer' => '1', 'text' => ['de' => $text('Datenschutz')]], 3);
+check('pages: a new page with no status field chosen is a draft, not silently published', $pdo->query("SELECT status FROM page WHERE role = 'privacy'")->fetchColumn() === 'draft'
+    && ($_SESSION['_flash']['success'] ?? '') === 'Die Seite wurde als Entwurf gespeichert und ist noch nicht veröffentlicht.'
+    && !str_contains($get('/', null)['body'], 'Datenschutz'));
+$privacyId = $pdo->query("SELECT id FROM page WHERE role = 'privacy'")->fetchColumn();
+$post('/admin/pages/' . $privacyId, ['status' => 'published', 'role' => 'privacy', 'in_footer' => '1', 'text' => ['de' => $text('Datenschutz')]], 3);
+check('pages: published, the flash says so and the page shows in the footer', ($_SESSION['_flash']['success'] ?? '') === 'Die Seite wurde gespeichert und ist veröffentlicht.'
+    && str_contains($get('/', null)['body'], '<a href="/datenschutz">Datenschutz</a>'));
+$pdo->exec("DELETE FROM page WHERE role = 'privacy'");
+
 $post('/admin/pages/' . $imprint['page_id'], ['status' => 'published', 'role' => 'imprint', 'text' => ['de' => $text('Impressum', '<p>Angaben</p>', 'impressum'), 'en' => $text('Imprint', '<p>Details</p>')]], 3);
 $r = $get('/en/imprint', null);
 check('pages: translated text and slug', $r['status'] === 200 && str_contains($r['body'], '<h1>Imprint</h1>') && str_contains($r['body'], '<article lang="en">'));
