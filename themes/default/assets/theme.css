@@ -239,11 +239,23 @@ img.avatar { display: block; object-fit: cover; }
 .inbox-link { position: relative; display: inline-flex; align-items: center; font-size: 1.3rem; line-height: 1; text-decoration: none; }
 .unread-badge { position: absolute; top: -.35rem; right: -.45rem; min-width: 1.25rem; height: 1.25rem; padding: 0 .3rem; border-radius: 999px; background: #b3211d; color: #fff; font-size: .7rem; font-weight: 700; line-height: 1.25rem; text-align: center; }
 
-/* The inbox: one row per conversation, newest activity first. */
-.inbox-list { display: grid; gap: .6rem; padding: 0; margin: 0 0 1rem; list-style: none; }
-.inbox-list li { padding: .6rem .8rem; border: 1px solid var(--line); border-radius: .4rem; }
-.inbox-list li.is-unread { border-color: var(--accent); background: var(--surface); }
-.inbox-list .inbox-body { margin: .3rem 0 0; color: var(--muted); }
+/* The inbox: one row per conversation, newest activity first. Clicking a
+   row opens it in place (a <details> element - works without scripts);
+   the reply form posts to the same route the full order/offer page uses. */
+.inbox-list { padding: 0; margin: 0 0 1rem; list-style: none; border: 1px solid var(--line); border-radius: .4rem; overflow: hidden; }
+.inbox-list li { border-bottom: 1px solid var(--line); }
+.inbox-list li:last-child { border-bottom: none; }
+.inbox-list summary { display: grid; grid-template-columns: minmax(10rem, 16rem) 1fr auto; align-items: baseline; gap: 1rem; padding: .7rem 1rem; cursor: pointer; list-style: none; }
+.inbox-list summary::-webkit-details-marker { display: none; }
+.inbox-list summary:hover { background: var(--surface); }
+.inbox-list .sender { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.inbox-list .subject-preview { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
+.inbox-list .preview-text { color: var(--muted); }
+.inbox-list .date { color: var(--muted); font-size: .85em; white-space: nowrap; }
+.inbox-list li.is-unread summary { font-weight: 600; background: var(--surface); }
+.inbox-list li.is-unread .subject-preview { color: var(--text); }
+.inbox-list .thread-detail { padding: 0 1rem 1rem; border-top: 1px solid var(--line); }
+.inbox-list .thread-detail .thread-messages { margin-top: 1rem; }
 
 /* The account settings: each tab is a grid of cards, one column on a phone. */
 .account-tab { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr)); gap: 1.25rem; align-items: start; margin-top: 1.25rem; }

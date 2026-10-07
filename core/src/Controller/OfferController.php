@@ -204,14 +204,14 @@ final class OfferController extends Controller
         $message = trim(str_replace("\r\n", "\n", (string) ($_POST['message'] ?? '')));
         $path = '/offers/' . $params['slug'];
 
-        if ($account['id'] === $offer['account_id'] || mb_strlen($message) < 20 || mb_strlen($message) > 3000) {
+        if ($account['id'] === $offer['account_id'] || mb_strlen($message) < 1 || mb_strlen($message) > 3000) {
             Session::flash('error', $this->trans('core.offer.contact.error'));
-            $this->redirect($path);
+            $this->redirect($this->safeReturn($path));
             return;
         }
         if ((new RateLimiter($app->db))->hit('offer-contact', (string) $account['id'], 5, 3600)) {
             Session::flash('error', $this->trans('core.error.too_many_requests'));
-            $this->redirect($path);
+            $this->redirect($this->safeReturn($path));
             return;
         }
 
@@ -232,7 +232,7 @@ final class OfferController extends Controller
         $app->notifications->create((int) $offer['account_id'], 'offer_message', 'core.notification.offer_message', ['title' => $text['title']], '/offers/' . $text['slug']);
 
         Session::flash('success', $this->trans('core.offer.contact.sent'));
-        $this->redirect($path);
+        $this->redirect($this->safeReturn($path));
     }
 
     /** The provider answers in the thread of one visitor; the visitor gets an e-mail. */
@@ -252,7 +252,7 @@ final class OfferController extends Controller
 
         if ($account['id'] !== $offer['account_id'] || $app->offerMessages->thread($offer['id'], $asker) === []) {
             Session::flash('error', $this->trans('core.offer.contact.error'));
-            $this->redirect($path);
+            $this->redirect($this->safeReturn($path));
             return;
         }
         if (mb_strlen($message) < 1 || mb_strlen($message) > 3000) {
@@ -277,7 +277,7 @@ final class OfferController extends Controller
             Session::flash('success', $this->trans('core.offer.contact.replied'));
         }
 
-        $this->redirect($path);
+        $this->redirect($this->safeReturn($path));
     }
 
     // --- The provider's own offers ------------------------------------------

@@ -24,7 +24,7 @@
         <form method="post" action="{{ url(offer.path ~ '/contact') }}" class="stack-form wide">
             {{ csrf_field() }}
             <label for="message">{{ trans('core.offer.contact.message') }}</label>
-            <textarea id="message" name="message" rows="6" minlength="20" maxlength="3000" required></textarea>
+            <textarea id="message" name="message" rows="6" maxlength="3000" required></textarea>
             <small>{{ trans('core.offer.contact.hint') }}</small>
             <button type="submit">{{ trans('core.offer.contact.submit') }}</button>
         </form>

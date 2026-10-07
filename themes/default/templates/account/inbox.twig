@@ -13,11 +13,41 @@
     <ul class="inbox-list">
         {% for thread in threads %}
             <li class="{{ thread.unread ? 'is-unread' }}">
-                <a href="{{ url(thread.path) }}">
-                    <strong>{{ thread.counterpart }}</strong> ·
-                    <small>{{ trans('core.inbox.type.' ~ thread.type) }} · {{ thread.context }} · {{ thread.created_at }} UTC</small>
-                    <p class="inbox-body">{{ thread.hidden ? trans('core.message.hidden_notice') : thread.body }}</p>
-                </a>
+                <details>
+                    <summary class="inbox-row">
+                        <span class="sender">{{ thread.counterpart }}</span>
+                        <span class="subject-preview">
+                            <small>{{ trans('core.inbox.type.' ~ thread.type) }}</small> · {{ thread.context }}
+                            <span class="preview-text">— {{ thread.hidden ? trans('core.message.hidden_notice') : thread.body }}</span>
+                        </span>
+                        <span class="date">{{ thread.created_at }} UTC</span>
+                    </summary>
+
+                    <div class="thread-detail">
+                        <ol class="thread-messages">
+                            {% for message in thread.messages %}
+                                <li class="{{ message.mine ? 'is-mine' }}">
+                                    <strong>{{ message.label }}</strong>
+                                    <small>{{ message.created_at }} UTC</small>
+                                    {% if message.hidden %}
+                                        <p><small>{{ trans('core.message.hidden_notice') }}</small></p>
+                                    {% else %}
+                                        <p>{{ message.body|nl2br }}</p>
+                                    {% endif %}
+                                </li>
+                            {% endfor %}
+                        </ol>
+
+                        <form method="post" action="{{ url(thread.reply_action) }}" class="stack-form wide">
+                            {{ csrf_field() }}
+                            <input type="hidden" name="return" value="{{ url('/account/messages') }}">
+                            <label for="reply-{{ loop.index }}">{{ trans('core.inbox.reply') }}</label>
+                            <textarea id="reply-{{ loop.index }}" name="{{ thread.reply_field }}" rows="3" maxlength="3000" required></textarea>
+                            <button type="submit">{{ trans('core.inbox.reply_send') }}</button>
+                        </form>
+                        <p><small><a href="{{ url(thread.path) }}">{{ trans('core.inbox.open_full') }}</a></small></p>
+                    </div>
+                </details>
             </li>
         {% endfor %}
     </ul>

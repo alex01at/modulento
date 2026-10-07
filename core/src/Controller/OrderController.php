@@ -377,7 +377,7 @@ final class OrderController extends Controller
             OrderNotifier::message($app, $order, $role, $body !== '' ? $body : $this->trans('core.order.file.sent_files', ['count' => count($uploads)]));
         }
 
-        $this->redirect('/orders/' . $order['id']);
+        $this->redirect($this->safeReturn('/orders/' . $order['id']));
     }
 
     /** The provider confirms having received a payment that did not go through the platform. */

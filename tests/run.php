@@ -1479,9 +1479,11 @@ check('offer: editing keeps it published and its address; a translation gets its
 
 $post('/offers/ich-gestalte-dein-logo/contact', ['message' => 'Hallo, ich hätte gern ein Logo für mein Café.'], null);
 check('contact: needs a login', lastMail($mailLog, 'plain@example.test')['subject'] !== 'Anfrage zu deinem Angebot „Ich gestalte dein Logo“');
-$post('/offers/ich-gestalte-dein-logo/contact', ['message' => 'zu kurz'], 2);
+$post('/offers/ich-gestalte-dein-logo/contact', ['message' => '   '], 2);
 $post('/offers/ich-gestalte-dein-logo/contact', ['message' => 'Hallo, ich hätte gern ein Logo für mein Café.'], 1);
-check('contact: too short and to oneself send nothing', lastMail($mailLog, 'plain@example.test')['subject'] !== 'Anfrage zu deinem Angebot „Ich gestalte dein Logo“');
+check('contact: an empty message and writing to oneself send nothing', lastMail($mailLog, 'plain@example.test')['subject'] !== 'Anfrage zu deinem Angebot „Ich gestalte dein Logo“');
+$post('/offers/ich-gestalte-dein-logo/contact', ['message' => 'ok'], 2);
+check('contact: a short message like "ok" is accepted - no minimum length anymore', lastMail($mailLog, 'plain@example.test')['subject'] === 'Anfrage zu deinem Angebot „Ich gestalte dein Logo“');
 $post('/offers/ich-gestalte-dein-logo/contact', ['message' => 'Hallo, ich hätte gern ein Logo für mein Café.'], 2);
 $mails = (string) file_get_contents($mailLog);
 check('contact: the provider gets the message with the sender as reply address', lastMail($mailLog, 'plain@example.test')['subject'] === 'Anfrage zu deinem Angebot „Ich gestalte dein Logo“'
@@ -2104,6 +2106,16 @@ $r = $get('/account/messages', 1);
 check('inbox: opening the real order page marks its row read', !$rowIsUnread($r['body'], 'Letzte Nachricht zur Bestellung'));
 
 check('inbox: links to the real pages, where replying already works', str_contains($r['body'], 'href="/orders/' . $fileOrder . '"') && str_contains($r['body'], 'href="/offers/ich-gestalte-dein-logo'));
+
+check('inbox: each row opens in place with its full history and a reply form posting to the same route the real page uses', str_contains($r['body'], '<details>')
+    && str_contains($r['body'], 'action="/orders/' . $fileOrder . '/message"') && str_contains($r['body'], 'action="/offers/ich-gestalte-dein-logo/contact/2"')
+    && str_contains($r['body'], 'name="return" value="/account/messages"') && str_contains($r['body'], 'Letzte Nachricht zur Bestellung, gerade eben.'));
+
+$post('/orders/' . $fileOrder . '/message', ['body' => 'Antwort direkt aus dem Postfach.', 'return' => '/account/messages'], 1);
+check('inbox: replying inline works through the real endpoint and shows up back in the inbox',
+    str_contains($get('/account/messages', 1)['body'], 'Antwort direkt aus dem Postfach.'));
+$post('/offers/ich-gestalte-dein-logo/contact/2', ['message' => 'ok passt', 'return' => '/account/messages'], 1);
+check('inbox: a short reply like "ok passt" (under the old 20-character minimum) goes through the inline form too', str_contains($get('/account/messages', 1)['body'], 'ok passt'));
 
 // --- Notifications: the bell, counting independently from the inbox envelope ---
 check('notifications: the header carries the bell and its own unread badge, separate from the inbox one', str_contains($get('/account', 1)['body'], 'href="/account/notifications"') && str_contains($get('/account', 1)['body'], 'data-unread'));
