@@ -1614,4 +1614,16 @@ return [
     'core.inbox.none' => 'Noch keine Nachrichten.',
     'core.inbox.type.order' => 'Bestellung',
     'core.inbox.type.offer' => 'Angebotsfrage',
+
+    'core.module.notifications.name' => 'Benachrichtigungen',
+    'core.module.notifications.description' => 'Glockensymbol im Header und eine Übersicht aller Benachrichtigungen (Bestellstatus, Entscheidungen, Nachrichten, überboten) auf einer Seite.',
+    'core.notification.nav' => 'Benachrichtigungen',
+    'core.notification.title' => 'Benachrichtigungen',
+    'core.notification.intro' => 'Was sich getan hat, neueste zuerst.',
+    'core.notification.none' => 'Noch keine Benachrichtigungen.',
+    'core.notification.order_state' => 'Bestellung #{number} ({title}): {event}',
+    'core.notification.order_message' => 'Neue Nachricht zur Bestellung #{number} ({title})',
+    'core.notification.offer_message' => 'Neue Frage zu „{title}"',
+    'core.notification.offer_reply' => 'Antwort auf deine Frage zu „{title}"',
+    'core.notification.offer_status' => '„{title}": {status}',
 ];

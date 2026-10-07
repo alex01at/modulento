@@ -24,6 +24,7 @@ use Modulento\Core\Controller\AuthController;
 use Modulento\Core\Controller\CronController;
 use Modulento\Core\Controller\HomeController;
 use Modulento\Core\Controller\InboxController;
+use Modulento\Core\Controller\NotificationController;
 use Modulento\Core\Controller\MediaController;
 use Modulento\Core\Controller\OfferController;
 use Modulento\Core\Controller\OrderController;
@@ -272,6 +273,14 @@ final class Kernel
             $router->get('/account/messages', [InboxController::class, 'index']);
             $router->get('/account/unread', [AccountController::class, 'unread']);
         }
+        // The bell: an overview of what happened, written at the points
+        // that already tell the account something by e-mail - see
+        // Notification\Notifications. Switched off writes nothing either
+        // (the check lives in the service, not at each call site).
+        if ($modules->enabled('notifications')) {
+            $router->get('/account/notifications', [NotificationController::class, 'index']);
+            $router->get('/account/notifications/unread', [NotificationController::class, 'unread']);
+        }
         // Plans and grants: the administration of the subscriptions module only.
         if ($modules->enabled('subscriptions')) {
             $router->get('/admin/subscriptions', [AdminSubscriptionController::class, 'index'], 'core.settings.manage');
@@ -510,6 +519,7 @@ final class Kernel
             $app->tokens->purgeExpired();
             $app->loginTokens->purgeExpired();
             $app->accounts->deleteUnverifiedOlderThan(7 * 86400);
+            $app->notifications->purgeRead(90);
         });
         // "Fast responder" is the only badge that needs a figure nobody
         // else keeps; "top rated" reads the rating columns live.

@@ -85,6 +85,12 @@
                     <span class="unread-badge" hidden data-unread data-url="{{ url('/account/unread') }}" data-poll="{{ poll_seconds() }}" data-label="{{ trans('core.account.unread.label') }}"></span>
                 </a>
             {% endif %}
+            {% if module('notifications') %}
+                <a class="inbox-link" href="{{ url('/account/notifications') }}" aria-label="{{ trans('core.notification.nav') }}">
+                    <span aria-hidden="true">🔔</span>
+                    <span class="unread-badge" hidden data-unread data-url="{{ url('/account/notifications/unread') }}" data-poll="{{ poll_seconds() }}" data-label="{{ trans('core.account.unread.label') }}"></span>
+                </a>
+            {% endif %}
             {% include 'layout/_account_menu.twig' %}
         {% else %}
             <a href="{{ url('/login') }}">{{ trans('core.nav.login') }}</a>

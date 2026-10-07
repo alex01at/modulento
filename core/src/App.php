@@ -27,6 +27,7 @@ use Modulento\Core\Catalogue\Offers;
 use Modulento\Core\Content\Pages;
 use Modulento\Core\Extension\ExtensionManager;
 use Modulento\Core\Media\Library;
+use Modulento\Core\Notification\Notifications;
 use Modulento\Core\Order\OrderFiles;
 use Modulento\Core\Order\Orders;
 use Modulento\Core\Order\Withdrawals;
@@ -118,6 +119,7 @@ final class App
     public readonly IdentityVerification $identityVerification;
     public readonly BillingProfile $billingProfile;
     public readonly Badges $badges;
+    public readonly Notifications $notifications;
 
     /** The request path without its language prefix - what routes are matched against. */
     public string $path = '/';
@@ -178,6 +180,7 @@ final class App
         $this->withdrawals = new Withdrawals($db);
         $this->reports = new Reports($db);
         $this->modules = new Modules($this->settings);
+        $this->notifications = new Notifications($db, $this->modules);
         $this->subscriptions = new Subscriptions($db, $this->modules);
         $this->invoices = new Invoices($db, $this->settings);
         // Mails and links are resolved when they are used: the mailer is built further down.
