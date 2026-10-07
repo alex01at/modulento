@@ -44,6 +44,8 @@
             {% for message in order.messages %}
                 <div class="message">
                     <small>{{ message.author_role == 'buyer' ? order.buyer_name : order.provider_name }} · {{ message.created_at }} UTC</small>
+                    {% if message.flagged_word %}<span class="badge badge-pending">{{ trans('core.admin.messages.flagged') }}</span>{% endif %}
+                    {% if message.status == 'hidden' %}<span class="badge badge-hidden">{{ trans('core.admin.messages.status.hidden') }}</span>{% endif %}
                     <p>{{ message.body|nl2br }}
                         {% for file in files.messages[message.id] ?? [] %}
                             <br><a href="{{ url('/admin/orders/' ~ order.id ~ '/files/' ~ file.id) }}" download>{{ file.name }}</a> <small>({{ (file.size / 1024)|round(0, 'ceil') }} KB)</small>

@@ -15,6 +15,7 @@ use Modulento\Core\Controller\AdminSubscriptionController;
 use Modulento\Core\Controller\SubscriptionController;
 use Modulento\Core\Controller\DesignController;
 use Modulento\Core\Controller\AdminMediaController;
+use Modulento\Core\Controller\AdminMessageController;
 use Modulento\Core\Controller\AdminOrderController;
 use Modulento\Core\Controller\AdminPaymentController;
 use Modulento\Core\Controller\AdminProviderController;
@@ -22,6 +23,7 @@ use Modulento\Core\Controller\AssetController;
 use Modulento\Core\Controller\AuthController;
 use Modulento\Core\Controller\CronController;
 use Modulento\Core\Controller\HomeController;
+use Modulento\Core\Controller\InboxController;
 use Modulento\Core\Controller\MediaController;
 use Modulento\Core\Controller\OfferController;
 use Modulento\Core\Controller\OrderController;
@@ -177,7 +179,6 @@ final class Kernel
 
         $router->get('/account', [AccountController::class, 'dashboard']);
         $router->get('/account/settings', [AccountController::class, 'index']);
-        $router->get('/account/unread', [AccountController::class, 'unread']);
         $router->post('/account/stop-impersonating', [AccountController::class, 'stopImpersonating']);
         $router->post('/account/profile', [AccountController::class, 'updateProfile']);
         $router->post('/account/appearance', [AccountController::class, 'updateAppearance']);
@@ -264,6 +265,12 @@ final class Kernel
         }
         if ($modules->enabled('remember_login')) {
             $router->post('/account/sessions/revoke', [AccountController::class, 'revokeSessions']);
+        }
+        // The Postfach overview and its unread count - switched off, the
+        // messages themselves (on their order or offer page) are unaffected.
+        if ($modules->enabled('inbox')) {
+            $router->get('/account/messages', [InboxController::class, 'index']);
+            $router->get('/account/unread', [AccountController::class, 'unread']);
         }
         // Plans and grants: the administration of the subscriptions module only.
         if ($modules->enabled('subscriptions')) {
@@ -364,6 +371,13 @@ final class Kernel
         $router->post('/admin/orders/{id}/transition', [AdminOrderController::class, 'transition'], 'core.orders.manage');
         $router->get('/admin/orders/{id}/files/{file}', [AdminOrderController::class, 'download'], 'core.orders.manage');
 
+        // Every message on the platform - order messages and offer
+        // questions, each in their own tab; see AdminMessageController.
+        $router->get('/admin/messages', [AdminMessageController::class, 'index'], 'core.messages.manage');
+        $router->post('/admin/messages/{kind}/{id}/hide', [AdminMessageController::class, 'hide'], 'core.messages.manage');
+        $router->post('/admin/messages/{kind}/{id}/show', [AdminMessageController::class, 'show'], 'core.messages.manage');
+        $router->post('/admin/messages/{kind}/{id}/dismiss', [AdminMessageController::class, 'dismiss'], 'core.messages.manage');
+
 
 
 
@@ -429,6 +443,7 @@ final class Kernel
         $app->addPermission('core.pages.manage', 'core.permission.pages_manage');
         $app->addPermission('core.media.manage', 'core.permission.media_manage');
         $app->addPermission('core.orders.manage', 'core.permission.orders_manage');
+        $app->addPermission('core.messages.manage', 'core.permission.messages_manage');
         if ($app->modules->enabled('reviews')) {
             $app->addPermission('core.reviews.manage', 'core.permission.reviews_manage');
         }
@@ -456,6 +471,7 @@ final class Kernel
         $app->addAdminMenu('core.admin.menu.design', '/admin/design', 'core.settings.manage', 'system');
         $app->addAdminMenu('core.admin.menu.badwords', '/admin/badwords', 'core.settings.manage', 'moderation');
         $app->addAdminMenu('core.admin.menu.orders', '/admin/orders', 'core.orders.manage', 'marketplace');
+        $app->addAdminMenu('core.admin.menu.messages', '/admin/messages', 'core.messages.manage', 'moderation');
         if ($app->modules->enabled('withdrawal')) {
             $app->addAdminMenu('core.admin.menu.withdrawals', '/admin/withdrawals', 'core.orders.manage', 'marketplace');
         }

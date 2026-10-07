@@ -1,6 +1,9 @@
 {# The pages of the logged-in account, shown on top of each of them. #}
 <nav class="account-nav" aria-label="{{ trans('core.nav.account') }}">
     <a href="{{ url('/account') }}">{{ trans('core.dashboard.title') }}</a>
+    {% if module('inbox') %}
+        <a href="{{ url('/account/messages') }}">{{ trans('core.inbox.title') }}</a>
+    {% endif %}
     {% if has_catalogue() or provider_status() %}
         <a href="{{ url('/account/orders') }}">{{ trans('core.order.list.buyer') }}</a>
     {% endif %}

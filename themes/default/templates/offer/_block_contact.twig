@@ -4,7 +4,7 @@
     {% if offer.is_own %}
         <p>{{ trans('core.offer.contact.own') }}</p>
         {% for thread in messages.threads %}
-            <div class="thread">
+            <div class="thread" id="thread-{{ thread.asker_id }}">
                 <h3>{{ trans('core.offer.contact.thread', {name: thread.asker_name}) }}</h3>
                 {% include 'offer/_thread.twig' with {messages: thread.messages} only %}
                 <form method="post" action="{{ url(offer.path ~ '/contact/' ~ thread.asker_id) }}" class="stack-form wide">

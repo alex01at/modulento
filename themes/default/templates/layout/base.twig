@@ -78,6 +78,13 @@
                 <a href="{{ url('/account/offers') }}">{{ trans('core.offer.mine.title') }}</a>
             {% endif %}
             <a href="{{ url('/account') }}">{{ trans('core.nav.dashboard') }}</a>
+            {% if module('inbox') %}
+                <a class="inbox-link" href="{{ url('/account/messages') }}" aria-label="{{ trans('core.inbox.nav') }}">
+                    <span aria-hidden="true">✉</span>
+                    {# Filled in by unread.js, which asks the server for the count every few seconds. #}
+                    <span class="unread-badge" hidden data-unread data-url="{{ url('/account/unread') }}" data-poll="{{ poll_seconds() }}" data-label="{{ trans('core.account.unread.label') }}"></span>
+                </a>
+            {% endif %}
             {% include 'layout/_account_menu.twig' %}
         {% else %}
             <a href="{{ url('/login') }}">{{ trans('core.nav.login') }}</a>

@@ -1,0 +1,33 @@
+{% extends 'layout/base.twig' %}
+
+{% block title %}{{ trans('core.inbox.title') }} – {{ site_name }}{% endblock %}
+
+{% block content %}
+{% include 'account/_nav.twig' %}
+<h1>{{ trans('core.inbox.title') }}</h1>
+<p>{{ trans('core.inbox.intro') }}</p>
+
+{% if threads is empty %}
+    <p class="empty">{{ trans('core.inbox.none') }}</p>
+{% else %}
+    <ul class="inbox-list">
+        {% for thread in threads %}
+            <li class="{{ thread.unread ? 'is-unread' }}">
+                <a href="{{ url(thread.path) }}">
+                    <strong>{{ thread.counterpart }}</strong> ·
+                    <small>{{ trans('core.inbox.type.' ~ thread.type) }} · {{ thread.context }} · {{ thread.created_at }} UTC</small>
+                    <p class="inbox-body">{{ thread.hidden ? trans('core.message.hidden_notice') : thread.body }}</p>
+                </a>
+            </li>
+        {% endfor %}
+    </ul>
+
+    {% if pages > 1 %}
+        <nav class="pager" aria-label="{{ trans('core.pager.label') }}">
+            {% if page > 1 %}<a href="{{ url('/account/messages') }}?page={{ page - 1 }}" rel="prev">{{ trans('core.pager.previous') }}</a>{% endif %}
+            <span>{{ trans('core.pager.position', {page: page, pages: pages}) }}</span>
+            {% if page < pages %}<a href="{{ url('/account/messages') }}?page={{ page + 1 }}" rel="next">{{ trans('core.pager.next') }}</a>{% endif %}
+        </nav>
+    {% endif %}
+{% endif %}
+{% endblock %}

@@ -172,7 +172,7 @@ final class OfferController extends Controller
         ];
     }
 
-    /** @return list<array{body: string, created_at: string, label: string, mine: bool}> */
+    /** @return list<array{body: string, created_at: string, label: string, mine: bool, hidden: bool}> */
     private function messageViews(array $rows, int $viewer, int $provider): array
     {
         return array_map(fn (array $row) => [
@@ -184,6 +184,9 @@ final class OfferController extends Controller
                 default => 'core.offer.contact.asker',
             }),
             'mine' => (int) $row['author_id'] === $viewer,
+            // Hidden by an administrator - see AdminMessageController; the
+            // content still exists, just not shown to the two parties.
+            'hidden' => ($row['status'] ?? 'visible') === 'hidden',
         ], $rows);
     }
 
@@ -206,19 +209,16 @@ final class OfferController extends Controller
             $this->redirect($path);
             return;
         }
-        if ($app->badWords->find($message) !== null) {
-            Session::flash('error', $this->trans('core.badword.found'));
-            $this->redirect($path);
-            return;
-        }
         if ((new RateLimiter($app->db))->hit('offer-contact', (string) $account['id'], 5, 3600)) {
             Session::flash('error', $this->trans('core.error.too_many_requests'));
             $this->redirect($path);
             return;
         }
 
-        // Kept on the site as well: the provider answers in the thread, and the e-mail tells them.
-        $app->offerMessages->add($offer['id'], $account['id'], $account['id'], $message);
+        // Kept on the site as well: the provider answers in the thread, and
+        // the e-mail tells them. The word filter no longer refuses this -
+        // it only flags it for an administrator to decide.
+        $app->offerMessages->add($offer['id'], $account['id'], $account['id'], $message, $app->badWords->find($message));
         $locale = $app->locales->isEnabled($offer['account_locale']) ? $offer['account_locale'] : $app->locales->default();
         $text = $app->offers->text($offer, $locale);
 
@@ -256,12 +256,11 @@ final class OfferController extends Controller
         }
         if (mb_strlen($message) < 1 || mb_strlen($message) > 3000) {
             Session::flash('error', $this->trans('core.offer.contact.reply_error'));
-        } elseif ($app->badWords->find($message) !== null) {
-            Session::flash('error', $this->trans('core.badword.found'));
         } elseif ((new RateLimiter($app->db))->hit('offer-reply', (string) $account['id'], 60, 3600)) {
             Session::flash('error', $this->trans('core.error.too_many_requests'));
         } else {
-            $app->offerMessages->add($offer['id'], $asker, $account['id'], $message);
+            // The word filter no longer refuses this - it only flags it.
+            $app->offerMessages->add($offer['id'], $asker, $account['id'], $message, $app->badWords->find($message));
             $recipient = $app->accounts->findById($asker);
             if ($recipient !== null) {
                 $locale = $app->locales->isEnabled($recipient['locale']) ? $recipient['locale'] : $app->locales->default();

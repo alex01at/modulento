@@ -254,7 +254,7 @@ $pdo->exec("CREATE TABLE order_item (id INTEGER PRIMARY KEY, order_id INTEGER RE
 $pdo->exec("CREATE TABLE order_event (id INTEGER PRIMARY KEY, order_id INTEGER REFERENCES orders (id) ON DELETE CASCADE, transition TEXT, from_state TEXT, to_state TEXT,
     actor_id INTEGER REFERENCES account (id) ON DELETE SET NULL, actor_role TEXT, note TEXT, created_at TEXT)");
 $pdo->exec("CREATE TABLE order_message (id INTEGER PRIMARY KEY, order_id INTEGER REFERENCES orders (id) ON DELETE CASCADE, account_id INTEGER REFERENCES account (id) ON DELETE SET NULL,
-    author_role TEXT, body TEXT, created_at TEXT)");
+    author_role TEXT, body TEXT, flagged_word TEXT, status TEXT NOT NULL DEFAULT 'visible', decided_at TEXT, decided_by INTEGER REFERENCES account (id) ON DELETE SET NULL, created_at TEXT)");
 $pdo->exec("CREATE TABLE order_file (id INTEGER PRIMARY KEY, order_id INTEGER REFERENCES orders (id) ON DELETE CASCADE, event_id INTEGER REFERENCES order_event (id) ON DELETE CASCADE,
     message_id INTEGER REFERENCES order_message (id) ON DELETE CASCADE, account_id INTEGER REFERENCES account (id) ON DELETE SET NULL, author_role TEXT, original_name TEXT, stored_name TEXT, size INTEGER, created_at TEXT)");
 $pdo->exec("CREATE TABLE review (id INTEGER PRIMARY KEY, order_id INTEGER UNIQUE REFERENCES orders (id) ON DELETE CASCADE, offer_id INTEGER REFERENCES offer (id) ON DELETE SET NULL,
@@ -270,7 +270,8 @@ $pdo->exec("CREATE TABLE order_payment (id INTEGER PRIMARY KEY, order_id INTEGER
 $pdo->exec("ALTER TABLE report ADD COLUMN offer_id INTEGER");
 $pdo->exec("ALTER TABLE report ADD COLUMN provider_id INTEGER");
 $pdo->exec("CREATE TABLE account_avatar (account_id INTEGER PRIMARY KEY REFERENCES account (id) ON DELETE CASCADE, name TEXT, extension TEXT, created_at TEXT)");
-$pdo->exec("CREATE TABLE offer_message (id INTEGER PRIMARY KEY, offer_id INTEGER REFERENCES offer (id) ON DELETE CASCADE, asker_id INTEGER REFERENCES account (id) ON DELETE CASCADE, author_id INTEGER REFERENCES account (id) ON DELETE SET NULL, body TEXT, created_at TEXT)");
+$pdo->exec("CREATE TABLE offer_message (id INTEGER PRIMARY KEY, offer_id INTEGER REFERENCES offer (id) ON DELETE CASCADE, asker_id INTEGER REFERENCES account (id) ON DELETE CASCADE, author_id INTEGER REFERENCES account (id) ON DELETE SET NULL, body TEXT,
+    flagged_word TEXT, status TEXT NOT NULL DEFAULT 'visible', decided_at TEXT, decided_by INTEGER REFERENCES account (id) ON DELETE SET NULL, created_at TEXT)");
 $pdo->exec("CREATE TABLE message_seen (account_id INTEGER REFERENCES account (id) ON DELETE CASCADE, scope TEXT, ref_id INTEGER, sub_id INTEGER DEFAULT 0, seen_id INTEGER, PRIMARY KEY (account_id, scope, ref_id, sub_id))");
 $pdo->exec("CREATE TABLE admin_log (id INTEGER PRIMARY KEY, created_at TEXT, actor_id INTEGER REFERENCES account (id) ON DELETE SET NULL, action TEXT, target_id INTEGER REFERENCES account (id) ON DELETE SET NULL, detail TEXT NOT NULL DEFAULT '')");
 $pdo->exec("CREATE TABLE media (id INTEGER PRIMARY KEY, file TEXT UNIQUE, title TEXT, width INTEGER, height INTEGER, bytes INTEGER, created_at TEXT)");
@@ -1479,11 +1480,14 @@ check('badwords: listed words are found, in any case, with stretched letters and
     && $words()->find('Arschlochkerl') === 'arsch' && $words()->find('Das Classic-Auto ist schön, danke.') === null
     && $words()->find('class assist glass') === null);
 $count = fn () => (int) $pdo->query('SELECT COUNT(*) FROM offer_message')->fetchColumn();
+$lastOfferMessage = fn () => $pdo->query('SELECT * FROM offer_message ORDER BY id DESC LIMIT 1')->fetch();
 $before = $count();
 $post('/offers/ich-gestalte-dein-logo/contact', ['message' => 'Du bist ein verdammter Arschloch, das ist klar.'], 2);
-check('badwords: a refused message is not kept and says why', $count() === $before && str_contains($_SESSION['_flash']['error'] ?? '', 'beleidigende'));
+check('badwords: the word filter no longer refuses a message - it is kept, flagged, delivered by e-mail as usual', $count() === $before + 1
+    && $lastOfferMessage()['flagged_word'] === 'arschloch' && $lastOfferMessage()['status'] === 'visible'
+    && lastMail($mailLog, 'plain@example.test')['subject'] === 'Anfrage zu deinem Angebot „Ich gestalte dein Logo“');
 $post('/offers/ich-gestalte-dein-logo/contact', ['message' => 'Dazu hätte ich gern eine Visitenkarte im gleichen Stil.'], 2);
-check('contact: the message is kept in the thread as well as sent by e-mail', $count() === $before + 1
+check('contact: the message is kept in the thread as well as sent by e-mail', $count() === $before + 2 && $lastOfferMessage()['flagged_word'] === null
     && lastMail($mailLog, 'plain@example.test')['subject'] === 'Anfrage zu deinem Angebot „Ich gestalte dein Logo“');
 $rr = $get('/offers/ich-gestalte-dein-logo', 2);
 check('conversations: the visitor sees their own thread', str_contains($rr['body'], 'Dazu hätte ich gern eine Visitenkarte') && str_contains($rr['body'], 'Du'));
@@ -1497,9 +1501,11 @@ check('reply: the visitor cannot answer, nothing is kept', $count() === $before)
 $post('/offers/ich-gestalte-dein-logo/contact/99', ['message' => 'Antwort an niemanden.'], 1);
 check('reply: a visitor without a thread gets no reply', $count() === $before);
 $post('/offers/ich-gestalte-dein-logo/contact/2', ['message' => 'So ein Idiot-Anbieter, du Hurensohn.'], 1);
-check('reply: the word filter applies to answers too', $count() === $before);
+check('reply: the word filter flags an answer instead of refusing it, still delivered', $count() === $before + 1
+    && $lastOfferMessage()['flagged_word'] !== null && $lastOfferMessage()['status'] === 'visible'
+    && lastMail($mailLog, 'editor@example.test')['subject'] === 'Antwort zu deinem Angebot „Ich gestalte dein Logo“');
 $post('/offers/ich-gestalte-dein-logo/contact/2', ['message' => 'Gern, ich schicke dir Entwürfe für die Karte.'], 1);
-check('reply: the provider\'s answer is kept and the visitor gets an e-mail', $count() === $before + 1
+check('reply: the provider\'s answer is kept and the visitor gets an e-mail', $count() === $before + 2
     && $pdo->query('SELECT COUNT(*) FROM offer_message WHERE author_id = 1 AND asker_id = 2')->fetchColumn() >= 1
     && lastMail($mailLog, 'editor@example.test')['subject'] === 'Antwort zu deinem Angebot „Ich gestalte dein Logo“');
 
@@ -1999,6 +2005,86 @@ check('a message can consist of a file alone; the other side is told', $pdo->que
 $post('/orders/' . $fileOrder . '/message', ['body' => ''], 1);
 check('a message with neither text nor file is refused', $pdo->query("SELECT COUNT(*) FROM order_message WHERE order_id = {$fileOrder}")->fetchColumn() == 1);
 $act($fileOrder, 'accept_delivery', 2);
+
+// --- Message moderation: every message visible to the administration, the word filter flags instead of blocking ---
+$orderMessage = fn (int $id) => $pdo->query("SELECT * FROM order_message WHERE id = {$id}")->fetch();
+
+check('messages administration needs its permission', $get('/admin/messages', 2)['status'] === 403);
+
+$beforeOrderMessages = (int) $pdo->query('SELECT COUNT(*) FROM order_message')->fetchColumn();
+$post('/orders/' . $fileOrder . '/message', ['body' => 'Du bist echt ein Arschloch, das muss mal gesagt werden.'], 2);
+$flaggedOrderMsgId = (int) $pdo->query('SELECT id FROM order_message ORDER BY id DESC LIMIT 1')->fetchColumn();
+check('order message: the word filter flags instead of refusing, the message is delivered as usual', $pdo->query('SELECT COUNT(*) FROM order_message')->fetchColumn() == $beforeOrderMessages + 1
+    && $orderMessage($flaggedOrderMsgId)['flagged_word'] === 'arschloch' && $orderMessage($flaggedOrderMsgId)['status'] === 'visible'
+    && lastMail($mailLog, 'plain@example.test')['subject'] === 'Neue Nachricht zur Bestellung ' . sprintf('%06d', $fileOrder));
+
+$r = $get('/admin/messages', 3);
+check('messages administration: order tab is the default, shows the flagged message with its order', $r['status'] === 200
+    && str_contains($r['body'], 'Arschloch') && str_contains($r['body'], 'Markiert') && str_contains($r['body'], '/admin/orders/' . $fileOrder));
+$r = $get('/admin/messages?status=pending', 3);
+check('messages administration: "flagged only" filters down to it', str_contains($r['body'], 'Arschloch'));
+$r = $get('/admin/messages?tab=offer', 3);
+check('messages administration: the offer tab shows the earlier flagged offer question, not order messages', str_contains($r['body'], 'Arschloch') && !str_contains($r['body'], '/admin/orders/' . $fileOrder));
+
+$post('/admin/messages/order/' . $flaggedOrderMsgId . '/dismiss', [], 2);
+check('dismissing needs the permission', $orderMessage($flaggedOrderMsgId)['decided_at'] === null);
+$post('/admin/messages/order/' . $flaggedOrderMsgId . '/dismiss', [], 3);
+check('dismissing clears the flag, content and visibility stay as they are', $orderMessage($flaggedOrderMsgId)['decided_at'] !== null && $orderMessage($flaggedOrderMsgId)['status'] === 'visible'
+    && !str_contains($get('/admin/messages?status=pending', 3)['body'], 'Arschloch')
+    && str_contains($get('/orders/' . $fileOrder, 2)['body'], 'Arschloch'));
+
+$post('/admin/messages/order/' . $flaggedOrderMsgId . '/hide', [], 3);
+check('hiding removes the content from both parties, not from the administration', $orderMessage($flaggedOrderMsgId)['status'] === 'hidden'
+    && !str_contains($get('/orders/' . $fileOrder, 1)['body'], 'Arschloch') && !str_contains($get('/orders/' . $fileOrder, 2)['body'], 'Arschloch')
+    && str_contains($get('/orders/' . $fileOrder, 2)['body'], 'ausgeblendet')
+    && str_contains($get('/admin/orders/' . $fileOrder, 3)['body'], 'Arschloch') && str_contains($get('/admin/messages', 3)['body'], 'Arschloch'));
+$post('/admin/messages/order/' . $flaggedOrderMsgId . '/show', [], 3);
+check('showing again brings the content back for both parties', $orderMessage($flaggedOrderMsgId)['status'] === 'visible' && str_contains($get('/orders/' . $fileOrder, 2)['body'], 'Arschloch'));
+
+$offerMessage = fn (int $id) => $pdo->query("SELECT * FROM offer_message WHERE id = {$id}")->fetch();
+$flaggedOfferMsgId = (int) $pdo->query("SELECT id FROM offer_message WHERE flagged_word IS NOT NULL ORDER BY id LIMIT 1")->fetchColumn();
+$post('/admin/messages/offer/' . $flaggedOfferMsgId . '/hide', [], 3);
+check('hiding an offer question removes it from the thread for both the asker and the provider', $offerMessage($flaggedOfferMsgId)['status'] === 'hidden'
+    && str_contains($get('/offers/ich-gestalte-dein-logo', 2)['body'], 'ausgeblendet') && !str_contains($get('/offers/ich-gestalte-dein-logo', 2)['body'], 'verdammter Arschloch')
+    && str_contains($get('/offers/ich-gestalte-dein-logo', 1)['body'], 'ausgeblendet'));
+$post('/admin/messages/offer/' . $flaggedOfferMsgId . '/dismiss', [], 3);
+check('dismissing an already-hidden offer question just clears the flag, it stays hidden', $offerMessage($flaggedOfferMsgId)['status'] === 'hidden' && $offerMessage($flaggedOfferMsgId)['decided_at'] !== null);
+
+$total = $app->orders->messageCount() + $app->offerMessages->messageCount();
+$r = $get('/admin', 3);
+check('dashboard: the messages card shows the combined total and links to the flagged filter', str_contains($r['body'], '>' . $total . '<') && str_contains($r['body'], 'href="/admin/messages?status=pending"'));
+
+// --- The inbox: every conversation of the account, mixed and sorted by latest activity ---
+check('inbox: the header carries the envelope link and its unread badge', str_contains($get('/account', 1)['body'], 'href="/account/messages"') && str_contains($get('/account', 1)['body'], 'data-unread'));
+
+/** Whether the <li> that contains $marker carries the "is-unread" class - not just any earlier row. */
+$rowIsUnread = function (string $body, string $marker): bool {
+    $pos = strpos($body, $marker);
+    $liPos = strrpos(substr($body, 0, $pos), '<li class="');
+    $tagEnd = strpos($body, '>', $liPos);
+
+    return str_contains(substr($body, $liPos, $tagEnd - $liPos), 'is-unread');
+};
+
+$post('/orders/' . $fileOrder . '/message', ['body' => 'Letzte Nachricht zur Bestellung, gerade eben.'], 2);
+$r = $get('/account/messages', 1);
+check('inbox: the newest order message leads the list, for the provider who has not seen it yet', $r['status'] === 200
+    && $rowIsUnread($r['body'], 'Letzte Nachricht zur Bestellung, gerade eben.'));
+
+$post('/offers/ich-gestalte-dein-logo/contact', ['message' => 'Und noch eine ganz neue Frage, gerade erst gestellt.'], 2);
+// Both posts can land within the same wall-clock second; the test needs a
+// deterministic order, so the offer message is nudged one second later.
+$pdo->exec("UPDATE offer_message SET created_at = datetime(created_at, '+1 second') WHERE body = 'Und noch eine ganz neue Frage, gerade erst gestellt.'");
+$r = $get('/account/messages', 1);
+$posOffer = strpos($r['body'], 'Und noch eine ganz neue Frage');
+$posOrder = strpos($r['body'], 'Letzte Nachricht zur Bestellung');
+check('inbox: order and offer conversations are mixed by recency, not grouped by type', $posOffer !== false && $posOrder !== false && $posOffer < $posOrder);
+
+$get('/orders/' . $fileOrder, 1);
+$r = $get('/account/messages', 1);
+check('inbox: opening the real order page marks its row read', !$rowIsUnread($r['body'], 'Letzte Nachricht zur Bestellung'));
+
+check('inbox: links to the real pages, where replying already works', str_contains($r['body'], 'href="/orders/' . $fileOrder . '"') && str_contains($r['body'], 'href="/offers/ich-gestalte-dein-logo'));
 
 // --- Reviews -----------------------------------------------------------------------
 $review = fn (int $orderId) => $pdo->query("SELECT * FROM review WHERE order_id = {$orderId}")->fetch();
@@ -3370,9 +3456,11 @@ $payApp()->payments->saveStripeKeys('', '');
 // --- Modules: optional functions of the core ------------------------------------
 check('modules: the page needs the settings permission', $get('/admin/modules', 1)['status'] === 403 && $post('/admin/modules', ['modules' => []], 2)['status'] === 403);
 $r = $get('/admin/modules', 3);
-check('modules: everything is on until switched off', $r['status'] === 200 && substr_count($r['body'], 'name="modules[]"') === 7 && substr_count($r['body'], ' checked') === 7);
+check('modules: everything is on until switched off', $r['status'] === 200 && substr_count($r['body'], 'name="modules[]"') === 8 && substr_count($r['body'], ' checked') === 8);
 $post('/admin/modules', ['modules' => ['contact', 'avatars', 'nonsense', ['x']]], 3);
-check('modules: switched off is stored, unknown names are ignored', $pdo->query("SELECT value FROM setting WHERE name = 'core.modules_disabled'")->fetchColumn() === 'reviews,withdrawal,reports,remember_login,subscriptions');
+check('modules: switched off is stored, unknown names are ignored', $pdo->query("SELECT value FROM setting WHERE name = 'core.modules_disabled'")->fetchColumn() === 'reviews,withdrawal,reports,remember_login,subscriptions,inbox');
+check('modules: without inbox there is no envelope, no overview page, no unread polling, and no account-nav link', !str_contains($get('/account', 1)['body'], 'href="/account/messages"') && !str_contains($get('/account', 1)['body'], 'data-unread')
+    && $get('/account/messages', 1)['status'] === 404 && $get('/account/unread', 1)['status'] === 404 && !str_contains($get('/account/settings', 1)['body'], 'href="/account/messages"'));
 $pdo->exec("UPDATE extension SET enabled = 1 WHERE id = 'freelancer'");
 $home = $get('/', null)['body'];
 check('modules: without withdrawal and reports their footer links are gone', !str_contains($home, 'href="/withdrawal"') && !str_contains($home, '/report'));
