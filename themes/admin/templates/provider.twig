@@ -13,6 +13,7 @@
                 <table class="details">
                     <tr><th scope="row">{{ trans('core.provider.field.type') }}</th><td>{{ trans('core.provider.type.' ~ provider.type) }}</td></tr>
                     <tr><th scope="row">{{ trans('core.login.email') }}</th><td><a href="{{ url('/admin/accounts/' ~ provider.account_id) }}">{{ provider.account_email }}</a>{% if provider.account_status != 'active' %} ({{ trans('core.admin.accounts.status.blocked') }}){% endif %}</td></tr>
+                    <tr><th scope="row">{{ trans('core.account.identity.title') }}</th><td>{% if provider.account_identity_status == 'verified' %}<span class="badge badge-verified">✓ {{ trans('core.account.identity.status.verified') }}</span>{% else %}<a href="{{ url('/admin/accounts/' ~ provider.account_id) }}">{{ trans('core.account.identity.status.' ~ provider.account_identity_status) }}</a>{% endif %}</td></tr>
                     <tr><th scope="row">{{ trans('core.provider.field.legal_name') }}</th><td>{{ provider.legal_name }}</td></tr>
                     <tr><th scope="row">{{ trans('core.provider.field.street') }}</th><td>{{ provider.street }}, {{ provider.postal_code }} {{ provider.city }}, {{ trans('core.country.' ~ provider.country) }}</td></tr>
                     <tr><th scope="row">{{ trans('core.provider.field.contact_email') }}</th><td>{{ provider.contact_email }}</td></tr>

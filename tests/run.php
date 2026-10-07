@@ -210,10 +210,16 @@ $pdo = new PDO('sqlite::memory:', null, null, [
     PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
 ]);
 $pdo->exec("CREATE TABLE account (id INTEGER PRIMARY KEY, email TEXT UNIQUE, display_name TEXT, password_hash TEXT, status TEXT,
-    status_note TEXT, email_verified_at TEXT, terms_accepted_at TEXT, locale TEXT, created_at TEXT, last_login_at TEXT)");
+    status_note TEXT, identity_status TEXT NOT NULL DEFAULT 'none', identity_note TEXT, identity_decided_at TEXT, identity_decided_by INTEGER,
+    email_verified_at TEXT, terms_accepted_at TEXT, locale TEXT, created_at TEXT, last_login_at TEXT)");
+$pdo->exec("CREATE TABLE account_identity_document (id INTEGER PRIMARY KEY, account_id INTEGER REFERENCES account (id) ON DELETE CASCADE,
+    original_name TEXT, stored_name TEXT, size INTEGER, created_at TEXT)");
+$pdo->exec("CREATE TABLE account_billing_profile (account_id INTEGER PRIMARY KEY REFERENCES account (id) ON DELETE CASCADE,
+    company_name TEXT, website TEXT, vat_id TEXT, tax_id TEXT, street TEXT, postal_code TEXT, city TEXT, country TEXT, updated_at TEXT)");
 $pdo->exec("CREATE TABLE provider (id INTEGER PRIMARY KEY, account_id INTEGER UNIQUE REFERENCES account (id) ON DELETE CASCADE, type TEXT, status TEXT,
     status_note TEXT, name TEXT, slug TEXT UNIQUE, legal_name TEXT, street TEXT, postal_code TEXT, city TEXT, country TEXT, contact_email TEXT, phone TEXT,
-    vat_id TEXT, tax_id TEXT, company_register TEXT, self_certified_at TEXT, details_changed_at TEXT, decided_at TEXT, decided_by INTEGER, created_at TEXT, updated_at TEXT)");
+    vat_id TEXT, tax_id TEXT, company_register TEXT, self_certified_at TEXT, details_changed_at TEXT, decided_at TEXT, decided_by INTEGER, created_at TEXT, updated_at TEXT,
+    avg_response_minutes INTEGER, response_sample_count INTEGER NOT NULL DEFAULT 0)");
 $pdo->exec("CREATE TABLE provider_translation (provider_id INTEGER REFERENCES provider (id) ON DELETE CASCADE, locale TEXT, headline TEXT, description TEXT, PRIMARY KEY (provider_id, locale))");
 $pdo->exec("CREATE TABLE page (id INTEGER PRIMARY KEY, status TEXT, role TEXT UNIQUE, in_header INTEGER, in_footer INTEGER, position INTEGER, created_at TEXT, updated_at TEXT)");
 $pdo->exec("CREATE TABLE page_translation (page_id INTEGER REFERENCES page (id) ON DELETE CASCADE, locale TEXT, title TEXT, slug TEXT,
@@ -235,6 +241,11 @@ $pdo->exec("CREATE TABLE x_freelancer_package_translation (package_id INTEGER RE
 $pdo->exec("CREATE TABLE x_freelancer_extra (id INTEGER PRIMARY KEY, offer_id INTEGER REFERENCES offer (id) ON DELETE CASCADE, position INTEGER, price INTEGER, extra_days INTEGER)");
 $pdo->exec("CREATE TABLE x_freelancer_extra_translation (extra_id INTEGER REFERENCES x_freelancer_extra (id) ON DELETE CASCADE, locale TEXT, title TEXT, PRIMARY KEY (extra_id, locale))");
 $pdo->exec("CREATE TABLE x_freelancer_requirement (offer_id INTEGER REFERENCES offer (id) ON DELETE CASCADE, locale TEXT, text TEXT, PRIMARY KEY (offer_id, locale))");
+$pdo->exec("CREATE TABLE x_freelancer_profile (provider_id INTEGER PRIMARY KEY REFERENCES provider (id) ON DELETE CASCADE, hourly_rate INTEGER, availability TEXT NOT NULL DEFAULT 'available', updated_at TEXT)");
+$pdo->exec("CREATE TABLE x_freelancer_profile_translation (provider_id INTEGER REFERENCES x_freelancer_profile (provider_id) ON DELETE CASCADE, locale TEXT, bio TEXT, PRIMARY KEY (provider_id, locale))");
+$pdo->exec("CREATE TABLE x_freelancer_skill (id INTEGER PRIMARY KEY, provider_id INTEGER REFERENCES provider (id) ON DELETE CASCADE, name TEXT, position INTEGER, UNIQUE (provider_id, name))");
+$pdo->exec("CREATE TABLE x_freelancer_portfolio_item (id INTEGER PRIMARY KEY, provider_id INTEGER REFERENCES provider (id) ON DELETE CASCADE, position INTEGER, image_name TEXT, created_at TEXT)");
+$pdo->exec("CREATE TABLE x_freelancer_portfolio_translation (item_id INTEGER REFERENCES x_freelancer_portfolio_item (id) ON DELETE CASCADE, locale TEXT, title TEXT, description TEXT, PRIMARY KEY (item_id, locale))");
 $pdo->exec("CREATE TABLE orders (id INTEGER PRIMARY KEY, buyer_id INTEGER REFERENCES account (id) ON DELETE SET NULL, provider_id INTEGER REFERENCES provider (id) ON DELETE SET NULL,
     offer_id INTEGER REFERENCES offer (id) ON DELETE SET NULL, flow TEXT, state TEXT, previous_state TEXT, state_actor TEXT, buyer_name TEXT, provider_name TEXT, offer_title TEXT,
     total INTEGER, currency TEXT, locale TEXT, payment_method TEXT, payment_state TEXT DEFAULT 'unpaid', paid_at TEXT, data TEXT, due_at TEXT, due_transition TEXT,
@@ -1050,6 +1061,123 @@ $pdo->exec("UPDATE account SET status = 'active' WHERE id = 2");
 $export = json_decode($get('/account/export', 2)['body'], true);
 check('export contains the provider profile', ($export['provider']['city'] ?? '') === 'München' && !isset($export['provider']['account_email']));
 
+// --- Identity verification -----------------------------------------------------
+use Modulento\Core\Account\IdentityVerification;
+
+// The Providers section above ends with "mueller-design" suspended; the
+// checks below need its public page back.
+$post('/admin/providers/' . $p['id'] . '/decide', ['decision' => 'approve'], 3);
+
+$accountRow = fn (int $id) => $pdo->query("SELECT * FROM account WHERE id = {$id}")->fetch();
+$identityDoc = fn (int $accountId) => $pdo->query("SELECT * FROM account_identity_document WHERE account_id = {$accountId}")->fetch();
+/** $_FILES for the "documents[]" field, from file name => content. */
+$docField = function (array $contents): array {
+    $field = ['name' => [], 'tmp_name' => [], 'error' => [], 'size' => []];
+    foreach ($contents as $fileName => $content) {
+        $tmp = tempnam(sys_get_temp_dir(), 'id');
+        file_put_contents($tmp, $content);
+        $field['name'][] = $fileName;
+        $field['tmp_name'][] = $tmp;
+        $field['error'][] = UPLOAD_ERR_OK;
+        $field['size'][] = strlen($content);
+    }
+
+    return ['documents' => $field];
+};
+$withDocs = function (array $contents, callable $request) use ($docField) {
+    $_FILES = $docField($contents);
+    $result = $request();
+    $_FILES = [];
+
+    return $result;
+};
+
+check('identity: nothing submitted yet', $accountRow(1)['identity_status'] === 'none' && str_contains($get('/account/settings?tab=security', 1)['body'], 'Noch nicht eingereicht'));
+
+$withDocs(['virus.exe' => 'MZ'], fn () => $post('/account/identity', [], 1));
+check('identity: a forbidden file type is refused', $accountRow(1)['identity_status'] === 'none' && $identityDoc(1) === false);
+
+$withDocs(array_combine(array_map(fn ($i) => "a{$i}.pdf", range(1, 4)), array_fill(0, 4, '%PDF')), fn () => $post('/account/identity', [], 1));
+check('identity: more than ' . IdentityVerification::MAX_FILES . ' files at once is refused', $identityDoc(1) === false);
+
+$withDocs(['Ausweis.pdf' => '%PDF-1.4 Ausweisdaten'], fn () => $post('/account/identity', [], 1));
+$doc = $identityDoc(1);
+check('identity: stored under a random name, original name kept, status pending', $doc !== false && preg_match('/^[a-f0-9]{32}$/', $doc['stored_name']) === 1
+    && $doc['original_name'] === 'Ausweis.pdf' && $accountRow(1)['identity_status'] === 'pending'
+    && is_file($config['app']['uploads'] . '/identity/1/' . $doc['stored_name']));
+
+check('identity administration needs its permission', $get('/admin/accounts/1/identity/files/' . $doc['id'], 2)['status'] === 403);
+check('identity document: only an administrator downloads it, content matches', $get('/admin/accounts/1/identity/files/' . $doc['id'], 3)['body'] === '%PDF-1.4 Ausweisdaten'
+    && $get('/admin/accounts/1/identity/files/' . $doc['id'], 1)['status'] === 403);
+check('identity document: a wrong account or id is not reachable', $get('/admin/accounts/2/identity/files/' . $doc['id'], 3)['status'] === 404
+    && $get('/admin/accounts/1/identity/files/999999', 3)['status'] === 404);
+
+$post('/admin/accounts/1/identity/decide', ['decision' => 'reject', 'note' => ''], 3);
+check('identity: a rejection needs a note', $accountRow(1)['identity_status'] === 'pending');
+$post('/admin/accounts/1/identity/decide', ['decision' => 'reject', 'note' => 'Bild zu unscharf'], 3);
+check('identity: rejected with a note, owner is told', $accountRow(1)['identity_status'] === 'rejected' && $accountRow(1)['identity_note'] === 'Bild zu unscharf'
+    && lastMail($mailLog, 'plain@example.test')['subject'] === 'Dein Identitätsnachweis wurde abgelehnt');
+
+$withDocs(['Ausweis2.pdf' => '%PDF-1.4 neu'], fn () => $post('/account/identity', [], 1));
+check('identity: resubmitting after a rejection asks for review again', $accountRow(1)['identity_status'] === 'pending' && $accountRow(1)['identity_note'] === null);
+
+$post('/admin/accounts/1/identity/decide', ['decision' => 'verify'], 3);
+check('identity: verified, owner is told', $accountRow(1)['identity_status'] === 'verified'
+    && lastMail($mailLog, 'plain@example.test')['subject'] === 'Deine Identität wurde bestätigt');
+check('identity: a verified account shows the blue checkmark on its public provider profile', str_contains($get('/providers/mueller-design', null)['body'], 'badge-verified'));
+
+$identityExport = json_decode($get('/account/export', 1)['body'], true);
+check('identity: export carries only the status, never the documents', ($identityExport['identity_verification']['status'] ?? '') === 'verified' && !isset($identityExport['identity_verification']['documents']));
+
+// --- Billing profile -----------------------------------------------------------
+$billing = fn (int $accountId) => $pdo->query("SELECT * FROM account_billing_profile WHERE account_id = {$accountId}")->fetch();
+
+check('billing profile: nothing by default', $billing(2) === false);
+$post('/account/billing', ['company_name' => 'Design Werk', 'website' => 'not a url', 'vat_id' => '123', 'country' => 'AT'], 2);
+check('billing profile: an invalid website or VAT ID is refused', $billing(2) === false);
+$post('/account/billing', ['company_name' => 'Design Werk GmbH', 'website' => 'https://design-werk.test', 'vat_id' => 'atu 1234-5678', 'tax_id' => '12/3456',
+    'street' => 'Weg 2', 'postal_code' => '80331', 'city' => 'München', 'country' => 'de'], 2);
+$b = $billing(2);
+check('billing profile: saved, VAT ID normalised, independent from the provider profile', $b !== false && $b['company_name'] === 'Design Werk GmbH' && $b['vat_id'] === 'ATU12345678' && $b['country'] === 'DE');
+$post('/account/billing', ['company_name' => 'Design Werk GmbH 2', 'vat_id' => 'ATU12345678', 'country' => 'DE'], 2);
+check('billing profile: can be updated', $billing(2)['company_name'] === 'Design Werk GmbH 2');
+
+$billingExport = json_decode($get('/account/export', 2)['body'], true);
+check('billing profile: included in the export, an account without one has no section', ($billingExport['billing_profile']['company_name'] ?? '') === 'Design Werk GmbH 2' && !isset($identityExport['billing_profile']));
+
+// --- Profile badges -------------------------------------------------------------
+$settings = ['site_name' => 'Testseite', 'mail_from' => 'noreply@example.test', 'registration' => 'open', 'default_locale' => 'de', 'locales' => ['de', 'en']];
+check('badge thresholds: default values shown', str_contains($get('/admin/settings?tab=catalogue', 3)['body'], 'value="4.5"') && str_contains($get('/admin/settings?tab=catalogue', 3)['body'], 'value="5"'));
+$post('/admin/settings', $settings + ['badge_top_rated_min_average' => '3', 'badge_top_rated_min_count' => '2', 'badge_fast_responder_max_minutes' => '60', 'badge_fast_responder_min_sample' => '1'], 3);
+check('badge thresholds: saved', $pdo->query("SELECT value FROM setting WHERE name = 'core.badge.top_rated.min_average'")->fetchColumn() === '3'
+    && $pdo->query("SELECT value FROM setting WHERE name = 'core.badge.fast_responder.min_sample'")->fetchColumn() === '1');
+
+$pdo->exec('UPDATE provider SET rating_count = 2, rating_sum = 10 WHERE account_id = 1');
+check('badge: "top rated" appears once the thresholds are crossed', str_contains($get('/providers/mueller-design', null)['body'], 'Top bewertet'));
+$pdo->exec('UPDATE provider SET rating_count = 2, rating_sum = 4 WHERE account_id = 1');
+check('badge: disappears below the threshold', !str_contains($get('/providers/mueller-design', null)['body'], 'Top bewertet'));
+
+// A synthetic offer-question thread: the provider answers 45 minutes after being asked.
+$providerId = (int) $pdo->query('SELECT id FROM provider WHERE account_id = 1')->fetchColumn();
+$pdo->exec("INSERT INTO offer (provider_id, type, status, currency, created_at, updated_at) VALUES ({$providerId}, 'freelancer.service', 'published', 'EUR', '2026-01-01 00:00:00', '2026-01-01 00:00:00')");
+$badgeOfferId = (int) $pdo->lastInsertId();
+$pdo->exec("INSERT INTO offer_message (offer_id, asker_id, author_id, body, created_at) VALUES ({$badgeOfferId}, 2, 2, 'Frage', '2026-01-02 10:00:00')");
+$pdo->exec("INSERT INTO offer_message (offer_id, asker_id, author_id, body, created_at) VALUES ({$badgeOfferId}, 2, 1, 'Antwort', '2026-01-02 10:45:00')");
+$testApp = new Modulento\Core\App($config, $pdo);
+$testApp->badges->recomputeResponseTimes($testApp);
+check('badges: recomputeResponseTimes() reads the gap between a question and the provider\'s first reply', $pdo->query("SELECT avg_response_minutes, response_sample_count FROM provider WHERE id = {$providerId}")->fetch() == ['avg_response_minutes' => 45, 'response_sample_count' => 1]);
+check('badge: "fast responder" appears once the figure is computed and within the threshold', str_contains($get('/providers/mueller-design', null)['body'], 'Schnelle Antwortzeit'));
+$pdo->exec("DELETE FROM offer WHERE id = {$badgeOfferId}");
+$pdo->exec("UPDATE provider SET avg_response_minutes = NULL, response_sample_count = 0, rating_count = 0, rating_sum = 0 WHERE id = {$providerId}");
+$post('/admin/settings', $settings + ['badge_top_rated_min_average' => '4.5', 'badge_top_rated_min_count' => '5', 'badge_fast_responder_max_minutes' => '120', 'badge_fast_responder_min_sample' => '5'], 3);
+
+// --- The two generic extension hooks: a block on the provider page, a link in the account nav ---
+$pdo->exec("UPDATE extension SET enabled = 1 WHERE id = 'example'");
+check('providerSection(): the extension\'s block is rendered on the public provider page', str_contains($get('/providers/mueller-design', null)['body'], 'Vom Beispiel-Profilblock') && str_contains($get('/providers/mueller-design', null)['body'], 'Müller Design'));
+check('accountLink(): the extension\'s link is in the account navigation', str_contains($get('/account/settings', 1)['body'], 'Beispiel-Konto-Link'));
+$pdo->exec("UPDATE extension SET enabled = 0 WHERE id = 'example'");
+check('disabled again: neither shows up', !str_contains($get('/providers/mueller-design', null)['body'], 'Vom Beispiel-Profilblock') && !str_contains($get('/account/settings', 1)['body'], 'Beispiel-Konto-Link'));
+
 // --- Catalogue: categories, offers, the freelancer extension -----------------
 check('money: typed amounts', Money::parse('49') === 4900 && Money::parse('49,9') === 4990 && Money::parse('1.234,50') === 123450 && Money::parse('1,234.50') === 123450
     && Money::parse('abc') === null && Money::parse('-5') === null && Money::parse('1.2.3') === null && Money::input(4990, 'de') === '49,90');
@@ -1177,6 +1305,65 @@ check('avatar: a new picture replaces the old file', !is_file($avatarFile) && $p
 $_FILES = [];
 $post('/account/avatar/delete', [], 2);
 check('avatar: removing deletes row and file', $pdo->query('SELECT COUNT(*) FROM account_avatar')->fetchColumn() == 0 && count(glob($config['app']['uploads'] . '/avatars/*')) === 0 && !str_contains($get('/account', 2)['body'], '/media/avatars/'));
+
+// --- The freelancer extension's own profile: rate, availability, bio, skills, portfolio ---
+use Modulento\Freelancer\PortfolioImages;
+
+check('freelancer profile: without a provider, the page sends you to create one', $get('/freelancer/profile', 3)['body'] === '' && ($_SESSION['_flash']['error'] ?? '') !== '');
+check('freelancer profile: the account nav carries the link', str_contains($get('/account/settings', 1)['body'], 'href="/freelancer/profile"'));
+check('freelancer profile: an empty form at first', $get('/freelancer/profile', 1)['status'] === 200 && $pdo->query("SELECT COUNT(*) FROM x_freelancer_profile WHERE provider_id = {$providerId}")->fetchColumn() == 0);
+
+$r = $post('/freelancer/profile', ['hourly_rate' => 'viel', 'availability' => 'available'], 1);
+check('freelancer profile: an invalid hourly rate is refused', $pdo->query("SELECT COUNT(*) FROM x_freelancer_profile WHERE provider_id = {$providerId}")->fetchColumn() == 0);
+
+$post('/freelancer/profile', [
+    'hourly_rate' => '65,50', 'availability' => 'busy', 'skills' => "PHP\nTwig, CSS\nPHP",
+    'bio' => ['de' => 'Ich baue seit zehn Jahren Websites.', 'en' => 'Building websites for ten years.'],
+], 1);
+$profileRow = fn () => $pdo->query("SELECT * FROM x_freelancer_profile WHERE provider_id = {$providerId}")->fetch();
+check('freelancer profile: saved, rate in minor units, skills trimmed and deduplicated', $profileRow() !== false && (int) $profileRow()['hourly_rate'] === 6550 && $profileRow()['availability'] === 'busy'
+    && $pdo->query("SELECT name FROM x_freelancer_skill WHERE provider_id = {$providerId} ORDER BY position")->fetchAll(PDO::FETCH_COLUMN) === ['PHP', 'Twig', 'CSS']);
+check('freelancer profile: bio stored per language', $pdo->query("SELECT bio FROM x_freelancer_profile_translation WHERE provider_id = {$providerId} AND locale = 'de'")->fetchColumn() === 'Ich baue seit zehn Jahren Websites.');
+
+$r = $get('/providers/mueller-design', null);
+check('freelancer profile: shown as a block on the public provider page', str_contains($r['body'], 'Ausgelastet') && str_contains($r['body'], 'Ich baue seit zehn Jahren Websites.')
+    && str_contains($r['body'], 'PHP') && str_contains($r['body'], '65,50'));
+
+$portfolioDir = $config['app']['uploads'] . '/freelancer-portfolio';
+$post('/freelancer/profile/portfolio', [], 1);
+check('portfolio: a request with no file is just refused', $pdo->query('SELECT COUNT(*) FROM x_freelancer_portfolio_item')->fetchColumn() == 0);
+
+$_FILES = ['image' => ['tmp_name' => $makeImage(1600, 800), 'error' => UPLOAD_ERR_OK]];
+$post('/freelancer/profile/portfolio', ['text' => ['de' => ['title' => 'Referenzprojekt']]], 1);
+$_FILES = [];
+$item = $pdo->query('SELECT * FROM x_freelancer_portfolio_item')->fetch();
+check('portfolio: stored re-encoded under the account\'s own folder, title kept', $item !== false && preg_match('/^[0-9a-f]{32}\.(webp|jpg)$/', $item['image_name']) === 1
+    && is_file("{$portfolioDir}/1/{$item['image_name']}") && $pdo->query("SELECT title FROM x_freelancer_portfolio_translation WHERE item_id = {$item['id']} AND locale = 'de'")->fetchColumn() === 'Referenzprojekt');
+$portfolioUrls = PortfolioImages::urls($item, 1);
+check('portfolio: the picture is served through the extension\'s own public route', $get($portfolioUrls['thumb'], null)['status'] === 200 && strlen($get($portfolioUrls['thumb'], null)['body']) > 50);
+check('portfolio: shown on the public provider page and in the account\'s own form', str_contains($get('/providers/mueller-design', null)['body'], 'Referenzprojekt') && str_contains($get('/freelancer/profile', 1)['body'], 'Referenzprojekt'));
+
+for ($i = $pdo->query('SELECT COUNT(*) FROM x_freelancer_portfolio_item')->fetchColumn(); $i < PortfolioImages::MAX_PER_PROVIDER; $i++) {
+    $pdo->exec("INSERT INTO x_freelancer_portfolio_item (provider_id, position, image_name, created_at) VALUES ({$providerId}, {$i}, '" . bin2hex(random_bytes(16)) . ".jpg', '2026-01-01 00:00:00')");
+}
+check('portfolio: filled up to the limit', $pdo->query('SELECT COUNT(*) FROM x_freelancer_portfolio_item')->fetchColumn() == PortfolioImages::MAX_PER_PROVIDER);
+$_FILES = ['image' => ['tmp_name' => $makeImage(100, 100), 'error' => UPLOAD_ERR_OK]];
+$countBefore = $pdo->query('SELECT COUNT(*) FROM x_freelancer_portfolio_item')->fetchColumn();
+$post('/freelancer/profile/portfolio', [], 1);
+$_FILES = [];
+check('portfolio: beyond the limit, nothing more is stored', $pdo->query('SELECT COUNT(*) FROM x_freelancer_portfolio_item')->fetchColumn() == $countBefore);
+$pdo->exec("DELETE FROM x_freelancer_portfolio_item WHERE id != {$item['id']}");
+
+$post('/freelancer/profile/portfolio/' . $item['id'] . '/delete', [], 1);
+check('portfolio: deleting removes the row and the files', $pdo->query('SELECT COUNT(*) FROM x_freelancer_portfolio_item')->fetchColumn() == 0 && !is_file("{$portfolioDir}/1/{$item['image_name']}"));
+
+$_FILES = ['image' => ['tmp_name' => $makeImage(200, 200), 'error' => UPLOAD_ERR_OK]];
+$post('/freelancer/profile/portfolio', [], 1);
+$_FILES = [];
+$lastItem = $pdo->query('SELECT * FROM x_freelancer_portfolio_item')->fetch();
+(new PortfolioImages($pdo, $portfolioDir))->deleteAllForAccount(1);
+check('portfolio: AccountDeleted cleanup removes every file of the account, even after its provider row is gone', !is_file("{$portfolioDir}/1/{$lastItem['image_name']}") && count(glob("{$portfolioDir}/1/*")) === 0);
+$pdo->exec("DELETE FROM x_freelancer_portfolio_item WHERE id = {$lastItem['id']}");
 
 // --- Branding: a logo and favicon of the site's own, and the default meta description ---
 $brand = function (string $kind, $image, int $as = 3) use ($post) {

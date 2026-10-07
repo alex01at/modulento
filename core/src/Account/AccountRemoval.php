@@ -24,6 +24,7 @@ final class AccountRemoval
         }
 
         $app->avatars->delete($accountId);
+        $app->identityVerification->deleteFiles($accountId);
 
         // Reviews and direct ratings stay with what they were written about, without the name.
         $app->reviews->anonymise($accountId);

@@ -18,5 +18,8 @@
     {% if module('reviews') %}
         <a href="{{ url('/account/ratings') }}">{{ trans('core.account_rating.nav') }}</a>
     {% endif %}
+    {% for link in account_links() %}
+        <a href="{{ link.url }}">{{ link.title }}</a>
+    {% endfor %}
     <a href="{{ url('/account/settings') }}">{{ trans('core.account.settings') }}</a>
 </nav>
