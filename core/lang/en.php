@@ -1597,6 +1597,10 @@ return [
     'core.admin.settings.badge_fast_responder_min_sample' => '"Fast responder" from number of replies',
     'core.badge.top_rated' => 'Top rated',
     'core.badge.fast_responder' => 'Fast responder',
+    'core.provider.featured_badge' => 'Featured provider',
+    'core.subscriptions.feature.auto_approve' => 'New offers are published at once, without review',
+    'core.subscriptions.feature.featured_badge' => '"Featured provider" badge on the profile and on offers',
+    'core.subscriptions.feature.priority_placement' => 'Offers come first in listings and on the home page',
 
     'core.permission.messages_manage' => 'Manage messages',
     'core.permission.messages_manage.hint' => 'See every order message and offer question, dismiss flags or hide flagged messages.',

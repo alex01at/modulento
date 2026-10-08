@@ -505,6 +505,12 @@ final class Kernel
         $app->addAdminMenu('core.admin.menu.updates', '/admin/updates', 'core.update.manage', 'system');
         $app->addAdminMenu('core.admin.docs.title', '/admin/docs', 'core.admin.access', 'system');
 
+        // Core's own sellable features, the same mechanism an extension uses
+        // (Registrar::declareFeature()) - a plan can include any of these.
+        $app->subscriptions->declareFeature('core.offer.auto_approve', 'core.subscriptions.feature.auto_approve');
+        $app->subscriptions->declareFeature('core.provider.featured_badge', 'core.subscriptions.feature.featured_badge');
+        $app->subscriptions->declareFeature('core.catalogue.priority_placement', 'core.subscriptions.feature.priority_placement');
+
         $app->scheduler->register(
             'core.rate-limit-cleanup',
             60,

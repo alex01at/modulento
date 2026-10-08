@@ -13,7 +13,7 @@ final class OfferView
     /**
      * For lists: one card per offer.
      *
-     * @return array{id: int, title: string, summary: string, path: string, price_from: ?int, currency: string, thumb: ?string, provider_name: string, provider_path: string, type: string, rating: array{count: int, average: ?float}}
+     * @return array{id: int, title: string, summary: string, path: string, price_from: ?int, currency: string, thumb: ?string, provider_name: string, provider_path: string, provider_featured: bool, type: string, rating: array{count: int, average: ?float}}
      */
     public static function card(array $offer, App $app): array
     {
@@ -30,6 +30,7 @@ final class OfferView
             'thumb' => $image !== null ? OfferImages::urls($image)['thumb'] : null,
             'provider_name' => $offer['provider_name'],
             'provider_path' => '/providers/' . $offer['provider_slug'],
+            'provider_featured' => $app->subscriptions->grants($offer['account_id'], 'core.provider.featured_badge'),
             'type' => $offer['type'],
             'rating' => Reviews::summary($offer),
         ];

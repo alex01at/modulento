@@ -31,6 +31,9 @@ final class ProviderView
             'rating' => Reviews::summary($provider),
             'verified' => ($provider['account_identity_status'] ?? null) === 'verified',
             'badges' => $app->badges->active($provider),
+            // A plan's own badge, kept apart from the earned ones above -
+            // bought, not earned, so it never pretends to be a rating signal.
+            'featured' => $app->subscriptions->grants($provider['account_id'], 'core.provider.featured_badge'),
             'legal' => $isBusiness ? [
                 'legal_name' => $provider['legal_name'],
                 'street' => $provider['street'],

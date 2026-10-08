@@ -12,6 +12,7 @@
         {% for provider in providers %}
             <li>
                 <a href="{{ url(provider.path) }}"><strong>{{ provider.name }}</strong></a>
+                {% if provider.featured %}<span class="badge badge-earned">{{ trans('core.provider.featured_badge') }}</span>{% endif %}
                 <small>{{ trans('core.provider.type.' ~ provider.type) }} · {{ provider.city }}, {{ trans('core.country.' ~ provider.country) }}</small>
                 {% if provider.headline %}<p>{{ provider.headline }}</p>{% endif %}
             </li>

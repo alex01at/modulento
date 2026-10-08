@@ -252,11 +252,58 @@ final class Subscriptions
         return $current === null ? 0 : $current['max_images_per_offer'];
     }
 
+    /**
+     * Every account whose plan currently grants a feature - for a listing
+     * that wants to place them first, not just answer "may this one account".
+     * Empty with the module off, same as allows().
+     *
+     * @return int[]
+     */
+    public function accountIdsWithFeature(string $feature): array
+    {
+        if (!$this->modules->enabled('subscriptions')) {
+            return [];
+        }
+
+        $stmt = $this->db->prepare(
+            "SELECT s.account_id, p.features FROM subscription s JOIN subscription_plan p ON p.id = s.plan_id
+             WHERE s.status IN ('trialing', 'active', 'past_due') AND (s.period_end IS NULL OR s.period_end > :now)"
+        );
+        $stmt->execute(['now' => Clock::now()]);
+
+        $ids = [];
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            if (in_array($feature, $this->features($row['features']), true)) {
+                $ids[] = (int) $row['account_id'];
+            }
+        }
+
+        return array_values(array_unique($ids));
+    }
+
     /** Whether the account may use the feature. Switched off, the module allows everything. */
     public function allows(int $accountId, string $feature): bool
     {
         if (!$this->modules->enabled('subscriptions')) {
             return true;
+        }
+
+        $current = $this->current($accountId);
+
+        return $current !== null && in_array($feature, $current['features'], true);
+    }
+
+    /**
+     * Whether the account's plan grants it a bonus on top of what everyone
+     * already has - the opposite default of allows(): switched off, the
+     * module grants nothing, since there is no plan to have granted it.
+     * Use this for a privilege (skip review, a badge, better placement);
+     * use allows() for a feature that is closed without a plan.
+     */
+    public function grants(int $accountId, string $feature): bool
+    {
+        if (!$this->modules->enabled('subscriptions')) {
+            return false;
         }
 
         $current = $this->current($accountId);

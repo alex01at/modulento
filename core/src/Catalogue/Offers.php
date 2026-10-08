@@ -131,7 +131,8 @@ final class Offers
      * @param array{search?: string, category_ids?: int[], provider_id?: int, sort?: string} $filter
      * @return array{rows: array<int, array>, total: int}
      */
-    public function listPublic(array $filter, string $locale, int $page, int $perPage): array
+    /** @param int[] $priorityAccountIds providers whose offers come first, within whatever sort was chosen */
+    public function listPublic(array $filter, string $locale, int $page, int $perPage, array $priorityAccountIds = []): array
     {
         $where = [self::PUBLIC_WHERE];
         $params = [];
@@ -173,6 +174,12 @@ final class Offers
         $whereSql = implode(' AND ', $where);
         $count = $this->db->prepare('SELECT COUNT(*) ' . self::FROM . " WHERE {$whereSql}");
         $count->execute($params);
+
+        // Added only now: the count above has nothing to do with order, and
+        // its $params must not gain placeholders it never asked for.
+        if ($priorityAccountIds !== []) {
+            $order = '(p.account_id IN (' . $this->placeholders('pri', $priorityAccountIds, $params) . ')) DESC, ' . $order;
+        }
 
         $stmt = $this->db->prepare(
             'SELECT o.*, p.account_id, p.name AS provider_name, p.slug AS provider_slug, p.status AS provider_status,

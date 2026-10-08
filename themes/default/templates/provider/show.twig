@@ -11,8 +11,9 @@
     <h1>{{ provider.name }}{% if provider.verified %} <span class="badge badge-verified" title="{{ trans('core.account.identity.verified_badge') }}">✓</span>{% endif %}</h1>
     <p><small>{{ trans('core.provider.type.' ~ provider.type) }} · {{ provider.city }}, {{ trans('core.country.' ~ provider.country) }}</small></p>
 
-    {% if provider.badges %}
+    {% if provider.badges or provider.featured %}
         <p>
+            {% if provider.featured %}<span class="badge badge-earned">{{ trans('core.provider.featured_badge') }}</span>{% endif %}
             {% for badge in provider.badges %}
                 <span class="badge badge-earned">{{ trans('core.badge.' ~ badge) }}</span>
             {% endfor %}

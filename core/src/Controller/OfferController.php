@@ -70,7 +70,7 @@ final class OfferController extends Controller
             'search' => $search,
             'sort' => $sort,
             'category_ids' => $category !== null ? $this->app->categories->withChildren($category['id']) : [],
-        ], $locale, $page, self::PER_PAGE);
+        ], $locale, $page, self::PER_PAGE, $this->app->subscriptions->accountIdsWithFeature('core.catalogue.priority_placement'));
 
         $this->render('offer/index.twig', [
             'offers' => OfferView::cards($list['rows'], $this->app),
@@ -495,7 +495,8 @@ final class OfferController extends Controller
             return;
         }
 
-        $status = $this->app->offers->approvalRequired() ? 'pending' : 'published';
+        $needsReview = $this->app->offers->approvalRequired() && !$this->app->subscriptions->grants($offer['account_id'], 'core.offer.auto_approve');
+        $status = $needsReview ? 'pending' : 'published';
         $this->changeStatus($offer, $status, $status === 'pending' ? 'core.offer.submitted' : 'core.offer.published');
     }
 
