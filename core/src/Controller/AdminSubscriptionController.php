@@ -76,13 +76,16 @@ final class AdminSubscriptionController extends Controller
             return;
         }
 
-        // The features this plan has, the ones extensions declare, and any key a plan has kept.
+        // Declared features (core's or an extension's own, fixed keys) as checkboxes;
+        // whatever key a plan kept beyond those is the admin's own, free-typed one,
+        // shown as an editable row - renaming it is just changing its text.
         $declared = $app->subscriptions->declaredFeatures();
-        $keys = array_values(array_unique([...array_keys($declared), ...$plan['features']]));
+        $custom = array_values(array_diff($plan['features'], array_keys($declared)));
         $this->render('@admin/subscription_plan.twig', [
             'plan' => $plan,
             'price' => Money::input($plan['price_cents'], $app->translator->locale()),
-            'features' => array_map(fn (string $key) => ['key' => $key, 'label_key' => $declared[$key] ?? null], $keys),
+            'features' => array_map(fn (string $key, string $labelKey) => ['key' => $key, 'label_key' => $labelKey], array_keys($declared), $declared),
+            'custom_features' => $custom,
             'periods' => [1, 3, 6, 12],
             // Every offer type an installed extension registered, for one limit field each.
             'offer_types' => array_map(fn ($type) => ['id' => $type->id(), 'label_key' => $type->labelKey()], $app->offers->types()),
@@ -94,10 +97,15 @@ final class AdminSubscriptionController extends Controller
         $app = $this->app;
         $id = (int) $params['id'];
         $price = Money::parse((string) ($_POST['price'] ?? ''));
-        // The boxes ticked, and any keys typed in by hand.
+        // The boxes ticked, plus each non-empty row of the admin's own
+        // keys - a row's whole value is replaced by what it reads now, so
+        // editing a row is renaming, and clearing it is removing.
         $features = array_values(array_filter(is_array($_POST['features'] ?? null) ? $_POST['features'] : [], 'is_string'));
-        $typed = preg_split('/[\s,]+/', (string) ($_POST['new_features'] ?? ''), -1, PREG_SPLIT_NO_EMPTY) ?: [];
-        $features = array_values(array_unique([...$features, ...$typed]));
+        $custom = array_values(array_filter(array_map(
+            fn ($v) => trim((string) $v),
+            is_array($_POST['custom_features'] ?? null) ? $_POST['custom_features'] : []
+        ), fn (string $v) => $v !== ''));
+        $features = array_values(array_unique([...$features, ...$custom]));
         // A blank field leaves that type out - offerLimit() then reads it as
         // no limit, not as 0; only a typed number restricts it.
         $offerLimits = [];

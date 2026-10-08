@@ -47,10 +47,11 @@
             addFeature(box.dataset.label || box.value, false);
             any = true;
         });
-        var typed = form.querySelector('#plan-new-features').value.split(/[\s,]+/).filter(Boolean);
-        typed.forEach(function (key) {
-            addFeature(key, false);
-            any = true;
+        form.querySelectorAll('.custom-feature').forEach(function (input) {
+            if (input.value.trim() !== '') {
+                addFeature(input.value.trim(), false);
+                any = true;
+            }
         });
         form.querySelectorAll('[name^="offer_limits"]').forEach(function (input) {
             if (input.value.trim() !== '') {

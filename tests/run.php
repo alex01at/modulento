@@ -1860,10 +1860,12 @@ check('subscriptions: an account sees its own subscription page', $accountPage['
 $adminEdit = $get('/admin/subscriptions/plans/' . $subPlan, 3);
 check('subscriptions admin: the plan page shows the features, and needs the permission', $adminEdit['status'] === 200 && str_contains($adminEdit['body'], 'abo.test.one') && $get('/admin/subscriptions/plans/' . $subPlan, 1)['status'] === 403 && $get('/admin/subscriptions/plans/999999', 3)['status'] === 404);
 check('subscriptions admin: the plan page has a limit field per offer type', str_contains($adminEdit['body'], 'name="offer_limits[freelancer.service]"') && str_contains($adminEdit['body'], 'name="max_images_per_offer"'));
-$post('/admin/subscriptions/plans/' . $subPlan, ['name' => 'Testabo neu', 'price' => '12,50', 'currency' => 'EUR', 'period_months' => 3, 'features' => ['abo.test.one'], 'new_features' => 'abo.typed, abo.test.two', 'active' => '1',
+$post('/admin/subscriptions/plans/' . $subPlan, ['name' => 'Testabo neu', 'price' => '12,50', 'currency' => 'EUR', 'period_months' => 3, 'custom_features' => ['abo.test.one', 'abo.typed', 'abo.test.two'], 'active' => '1',
     'offer_limits' => ['freelancer.service' => '4', 'auction.lot' => ''], 'max_images_per_offer' => '6'], 3);
 $changedByForm = $subs->plan($subPlan);
-check('subscriptions admin: the form saves the plan with ticked and typed features', $changedByForm['name'] === 'Testabo neu' && $changedByForm['price_cents'] === 1250 && $changedByForm['features'] === ['abo.test.one', 'abo.typed', 'abo.test.two']);
+check('subscriptions admin: the form saves the plan with its own, free-typed features - one row each', $changedByForm['name'] === 'Testabo neu' && $changedByForm['price_cents'] === 1250 && $changedByForm['features'] === ['abo.test.one', 'abo.typed', 'abo.test.two']);
+$post('/admin/subscriptions/plans/' . $subPlan, ['name' => 'Testabo neu', 'price' => '12,50', 'currency' => 'EUR', 'period_months' => 3, 'custom_features' => ['abo.renamed', '', 'abo.test.two'], 'active' => '1'], 3);
+check('subscriptions admin: editing a row renames it, clearing one removes it', $subs->plan($subPlan)['features'] === ['abo.renamed', 'abo.test.two']);
 check('subscriptions admin: the form saves the new limits too - a blank field leaves that type unlimited', $changedByForm['offer_limits'] === ['freelancer.service' => 4] && $changedByForm['max_images_per_offer'] === 6);
 $subModules->save(array_values(array_diff(array_keys(Modulento\Core\Support\Modules::ALL), ['subscriptions'])));
 check('subscriptions: switched off, the overview and the account page are gone', $get('/subscriptions', null)['status'] === 404 && $get('/account/subscription', 2)['status'] === 404);
