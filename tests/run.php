@@ -1759,6 +1759,51 @@ $quotaApp->offers->delete($quotaOfferId);
 $pdo->exec("DELETE FROM subscription WHERE plan_id = $quotaPlan");
 $pdo->exec("DELETE FROM subscription_plan WHERE id = $quotaPlan");
 
+// Three bonuses a plan can grant on top of the baseline: skip review, a
+// badge, and placed first - the opposite default of allows(): nobody gets
+// a bonus just because the module happens to be off (grants(), not allows()).
+check('subscriptions: grants() is false without the module, false without a plan - unlike allows()', !$subs->grants($quotaId, 'core.offer.auto_approve')
+    && (function () use ($subModules, $subs, $quotaId) {
+        $subModules->save(array_keys(Modulento\Core\Support\Modules::ALL));
+        $r = !$subs->grants($quotaId, 'core.offer.auto_approve');
+        return $r;
+    })());
+$bonusPlan = $subs->createPlan('abo-bonus', 'Bonusplan', 500, 'EUR', 1, ['core.offer.auto_approve', 'core.provider.featured_badge', 'core.catalogue.priority_placement']);
+$subs->updatePlan($bonusPlan, 'Bonusplan', 500, 'EUR', 1, ['core.offer.auto_approve', 'core.provider.featured_badge', 'core.catalogue.priority_placement'], true, ['freelancer.service' => 1], null);
+$subs->assign($quotaId, $bonusPlan);
+check('subscriptions: grants() is true once a plan with that feature is active', $subs->grants($quotaId, 'core.offer.auto_approve') && $subs->grants($quotaId, 'core.provider.featured_badge'));
+check('subscriptions: accountIdsWithFeature() finds it for placement, without needing one account id to ask about', in_array($quotaId, $subs->accountIdsWithFeature('core.catalogue.priority_placement'), true));
+
+$get('/account/offers/new?type=freelancer.service', $quotaId);
+$post('/account/offers/wizard', ['type' => 'freelancer.service', 'wizard_step' => 1, 'locales' => []], false);
+$post('/account/offers/wizard', ['type' => 'freelancer.service', 'wizard_step' => 2, 'category_id' => $childId], false);
+$post('/account/offers/wizard', ['type' => 'freelancer.service', 'wizard_step' => 3, 'text' => ['de' => ['title' => 'Bonus-Angebot', 'summary' => '']]], false);
+$post('/account/offers/wizard', ['type' => 'freelancer.service', 'wizard_step' => 4, 'text' => ['de' => ['description' => 'x']]], false);
+$post('/account/offers/wizard', ['type' => 'freelancer.service', 'wizard_step' => 5, 'package' => [1 => ['price' => '10', 'delivery_days' => '1']]], false);
+$post('/account/offers/wizard', ['type' => 'freelancer.service', 'wizard_step' => 6], false);
+$post('/account/offers/new', ['type' => 'freelancer.service', 'category_id' => (string) $childId,
+    'text' => ['de' => ['title' => 'Bonus-Angebot', 'summary' => '']], 'package' => [1 => ['price' => '10', 'delivery_days' => '1']]], false);
+$bonusOfferId = (int) $pdo->query("SELECT id FROM offer WHERE provider_id = (SELECT id FROM provider WHERE account_id = $quotaId) ORDER BY id DESC LIMIT 1")->fetchColumn();
+$post('/account/offers/' . $bonusOfferId . '/submit', [], false);
+check('offer auto-approve: published at once, no admin decision needed', $pdo->query("SELECT status FROM offer WHERE id = {$bonusOfferId}")->fetchColumn() === 'published');
+
+$providerSlug = $pdo->query("SELECT slug FROM provider WHERE account_id = $quotaId")->fetchColumn();
+check('provider: the plan\'s own badge shows on the profile, kept apart from earned badges', str_contains($get('/providers/' . $providerSlug, null)['body'], 'Empfohlener Anbieter'));
+check('catalogue: the plan\'s badge shows on its offer cards too', str_contains($get('/offers', null)['body'], 'Empfohlener Anbieter'));
+
+$ratingSorted = $get('/offers?sort=rating', null)['body'];
+$bonusPos = strpos($ratingSorted, 'Bonus-Angebot');
+$otherPos = strpos($ratingSorted, 'Ich gestalte dein Logo');
+check('catalogue: priority placement puts an unrated featured offer ahead of a rated one, only under this plan', $bonusPos !== false && $otherPos !== false && $bonusPos < $otherPos);
+
+$subs->assign($quotaId, null);
+$pdo->exec("DELETE FROM subscription WHERE plan_id = $bonusPlan");
+$pdo->exec("DELETE FROM subscription_plan WHERE id = $bonusPlan");
+$bonusApp = new Modulento\Core\App($config, $pdo);
+$bonusApp->offerImages->deleteAll($bonusOfferId);
+$bonusApp->offers->delete($bonusOfferId);
+check('catalogue: without the plan, no more badge and no more boost', !str_contains($get('/providers/' . $providerSlug, null)['body'], 'Empfohlener Anbieter'));
+
 $subModules->save(array_values(array_diff(array_keys(Modulento\Core\Support\Modules::ALL), ['subscriptions'])));
 check('subscriptions: switched off, every feature is open to everyone', !$subModules->enabled('subscriptions') && $subs->allows($subAccount, 'abo.test.one') && $subs->allows(999999, 'abo.other'));
 $subModules->save(array_keys(Modulento\Core\Support\Modules::ALL));

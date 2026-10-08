@@ -142,7 +142,7 @@ final class View
         }));
         // The newest public offers as cards, e.g. for the home page.
         $this->twig->addFunction(new TwigFunction('latest_offers', function (int $limit = 6) use ($app): array {
-            $list = $app->offers->listPublic([], $app->translator->locale(), 1, max(1, min(48, $limit)));
+            $list = $app->offers->listPublic([], $app->translator->locale(), 1, max(1, min(48, $limit)), $app->subscriptions->accountIdsWithFeature('core.catalogue.priority_placement'));
 
             return OfferView::cards($list['rows'], $app);
         }));

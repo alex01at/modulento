@@ -1597,6 +1597,10 @@ return [
     'core.admin.settings.badge_fast_responder_min_sample' => '„Schnelle Antwortzeit“ ab Anzahl Antworten',
     'core.badge.top_rated' => 'Top bewertet',
     'core.badge.fast_responder' => 'Schnelle Antwortzeit',
+    'core.provider.featured_badge' => 'Empfohlener Anbieter',
+    'core.subscriptions.feature.auto_approve' => 'Neue Angebote ohne Prüfung sofort veröffentlichen',
+    'core.subscriptions.feature.featured_badge' => '„Empfohlener Anbieter“-Abzeichen auf Profil und Angeboten',
+    'core.subscriptions.feature.priority_placement' => 'Angebote zuerst in Liste und Startseite',
 
     'core.permission.messages_manage' => 'Nachrichten verwalten',
     'core.permission.messages_manage.hint' => 'Alle Bestellnachrichten und Angebotsfragen einsehen, markierte Nachrichten quittieren oder ausblenden.',
