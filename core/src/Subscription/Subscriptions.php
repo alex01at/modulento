@@ -184,6 +184,19 @@ final class Subscriptions
         ], $rows);
     }
 
+    /** How many accounts have each plan right now - plan id => count, plans with none left out. */
+    public function subscriberCounts(): array
+    {
+        $stmt = $this->db->prepare(
+            "SELECT plan_id, COUNT(*) AS n FROM subscription
+             WHERE status IN ('trialing', 'active', 'past_due') AND (period_end IS NULL OR period_end > :now)
+             GROUP BY plan_id"
+        );
+        $stmt->execute(['now' => Clock::now()]);
+
+        return array_map('intval', $stmt->fetchAll(PDO::FETCH_KEY_PAIR));
+    }
+
     /** The subscription that counts for the account now, or null. */
     public function current(int $accountId): ?array
     {

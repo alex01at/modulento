@@ -21,6 +21,8 @@ final class AdminSubscriptionController extends Controller
         $app = $this->app;
         $this->render('@admin/subscriptions.twig', [
             'plans' => $app->subscriptions->plans(),
+            'subscriber_counts' => $app->subscriptions->subscriberCounts(),
+            'offer_types' => array_map(fn ($type) => ['id' => $type->id(), 'label_key' => $type->labelKey()], $app->offers->types()),
             'recent' => $app->subscriptions->recent(50),
             'periods' => [1, 3, 6, 12],
             'bank' => $app->subscriptionBilling->bank(),
