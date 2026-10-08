@@ -5,6 +5,7 @@
 {% block content %}
 <h1>{{ trans('core.requests.title') }}</h1>
 <p class="lead">{{ trans('core.requests.intro') }}</p>
+<p><a class="button" href="{{ url('/account/requests/new') }}">{{ trans('core.request.new') }}</a></p>
 
 {% if categories %}
     <form method="get" action="{{ url('/requests') }}" class="filter-row">

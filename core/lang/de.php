@@ -1651,7 +1651,8 @@ return [
     'core.notification.request_status' => '„{title}": {status}',
     'core.notification.request_declined' => 'Eine andere Bewerbung wurde für „{title}" angenommen',
 
-    'core.module.requests' => 'Anfragen',
+    'core.module.requests.name' => 'Anfragen',
+    'core.module.requests.description' => 'Auftraggeber können eine Anfrage veröffentlichen, auf die sich Anbieter mit einem eigenen Preisvorschlag bewerben.',
     'core.permission.requests_manage' => 'Anfragen verwalten',
     'core.admin.menu.requests' => 'Anfragen',
     'core.nav.requests' => 'Anfragen',
