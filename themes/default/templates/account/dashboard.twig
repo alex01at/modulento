@@ -42,8 +42,12 @@
                     <li><a href="{{ url('/account/payments') }}">{{ trans('core.payment.settings.title') }}</a></li>
                 {% endif %}
                 {% if module('requests') %}
-                    <li><a href="{{ url('/account/requests') }}">{{ trans('core.request.mine.title') }}</a></li>
-                    {% if provider %}<li><a href="{{ url('/account/applications') }}">{{ trans('core.request.applications.mine_title') }}</a></li>{% endif %}
+                    {% if provider %}
+                        <li><a href="{{ url('/requests') }}">{{ trans('core.request.open.title') }}</a></li>
+                        <li><a href="{{ url('/account/applications') }}">{{ trans('core.request.applications.mine_title') }}</a></li>
+                    {% else %}
+                        <li><a href="{{ url('/account/requests') }}">{{ trans('core.request.mine.title') }}</a></li>
+                    {% endif %}
                 {% endif %}
                 <li><a href="{{ url('/account/settings') }}">{{ trans('core.account.settings') }}</a></li>
                 {% if has_catalogue() %}<li><a href="{{ url('/offers') }}">{{ trans('core.dashboard.browse') }}</a></li>{% endif %}

@@ -537,6 +537,9 @@ final class Kernel
         $app->subscriptions->declareFeature('core.offer.auto_approve', 'core.subscriptions.feature.auto_approve');
         $app->subscriptions->declareFeature('core.provider.featured_badge', 'core.subscriptions.feature.featured_badge');
         $app->subscriptions->declareFeature('core.catalogue.priority_placement', 'core.subscriptions.feature.priority_placement');
+        if ($app->modules->enabled('requests')) {
+            $app->subscriptions->declareFeature('core.request.notify', 'core.subscriptions.feature.request_notify');
+        }
 
         $app->scheduler->register(
             'core.rate-limit-cleanup',

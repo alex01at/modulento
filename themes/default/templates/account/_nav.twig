@@ -19,9 +19,11 @@
         <a href="{{ url('/account/provider') }}">{{ trans('core.provider.create') }}</a>
     {% endif %}
     {% if module('requests') %}
-        <a href="{{ url('/account/requests') }}">{{ trans('core.request.mine.title') }}</a>
         {% if provider_status() %}
+            <a href="{{ url('/requests') }}">{{ trans('core.request.open.title') }}</a>
             <a href="{{ url('/account/applications') }}">{{ trans('core.request.applications.mine_title') }}</a>
+        {% else %}
+            <a href="{{ url('/account/requests') }}">{{ trans('core.request.mine.title') }}</a>
         {% endif %}
     {% endif %}
     {% if module('subscriptions') %}

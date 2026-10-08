@@ -70,6 +70,9 @@ final class AdminRequestController extends Controller
 
         $this->app->requests->setStatus($request['id'], $status, $status === 'rejected' ? $note : null, $this->app->auth->account()['id']);
         self::announce($this->app, $request, $status, $note);
+        if ($status === 'published') {
+            self::notifySubscribers($this->app, $request);
+        }
 
         Session::flash('success', $this->trans('core.admin.requests.decided.' . $status));
         $this->redirect('/admin/requests/' . $request['id']);
@@ -90,5 +93,26 @@ final class AdminRequestController extends Controller
             'title' => $request['title'],
             'status' => $app->translator->trans('core.request.status.' . $status, [], $locale),
         ], '/account/requests/' . $request['id']);
+    }
+
+    /**
+     * A subscription bonus: an approved provider whose plan grants
+     * core.request.notify hears about a newly published request right
+     * away, instead of finding it by browsing - a head start on applying.
+     */
+    public static function notifySubscribers(App $app, array $request): void
+    {
+        foreach ($app->subscriptions->accountIdsWithFeature('core.request.notify') as $accountId) {
+            if ($accountId === (int) $request['account_id']) {
+                continue;
+            }
+            $provider = $app->providers->findByAccount($accountId);
+            if ($provider === null || $provider['status'] !== 'approved') {
+                continue;
+            }
+            $app->notifications->create($accountId, 'request_new', 'core.notification.request_new', [
+                'title' => $request['title'],
+            ], '/requests/' . $request['slug']);
+        }
     }
 }

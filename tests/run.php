@@ -2606,6 +2606,11 @@ $post('/admin/providers/' . $provider(9)['id'] . '/decide', ['decision' => 'appr
 $providerAId = (int) $provider(1)['id'];
 $providerBId = (int) $provider(9)['id'];
 $post('/admin/pages/new', ['status' => 'published', 'role' => 'terms', 'text' => ['de' => $text('AGB')]], 3);
+check('requests: an approved provider sees "open requests" in the account nav, a plain account sees "my requests"',
+    str_contains($get('/account/settings', 1)['body'], 'Offene Anfragen') && !str_contains($get('/account/settings', 1)['body'], 'Meine Anfragen')
+    && str_contains($get('/account/settings', 8)['body'], 'Meine Anfragen') && !str_contains($get('/account/settings', 8)['body'], 'Offene Anfragen')
+    && str_contains($get('/account', 1)['body'], 'Offene Anfragen') && !str_contains($get('/account', 1)['body'], 'Meine Anfragen')
+    && str_contains($get('/account', 8)['body'], 'Meine Anfragen') && !str_contains($get('/account', 8)['body'], 'Offene Anfragen'));
 
 $requestRow = fn (string $where = '1 = 1') => $pdo->query("SELECT * FROM request WHERE {$where} ORDER BY id DESC")->fetch();
 $applicationRow = fn (string $where = '1 = 1') => $pdo->query("SELECT * FROM request_application WHERE {$where} ORDER BY id DESC")->fetch();
@@ -2621,6 +2626,7 @@ $request = $requestRow();
 check('request: created pending while approval is required, with its budget converted to minor units and a slug', $request !== false && $request['status'] === 'pending'
     && $request['slug'] === 'website-fuer-fotostudio' && (int) $request['budget_min'] === 30000 && (int) $request['budget_max'] === 60000 && $request['currency'] === 'EUR');
 $requestId = (int) $request['id'];
+check('requests: the admin dashboard has a tile with the pending count', str_contains($get('/admin', 3)['body'], 'href="/admin/requests"') && str_contains($get('/admin', 3)['body'], 'href="/admin/requests?status=pending"'));
 check('request: a pending request is not public', $get('/requests/website-fuer-fotostudio', null)['status'] === 404 && !str_contains($get('/requests', null)['body'], 'Website für Fotostudio'));
 check('request: someone else cannot edit, delete or see the applications of it', $get('/account/requests/' . $requestId . '/edit', 9)['status'] === 404
     && $post('/account/requests/' . $requestId . '/delete', [], 9)['status'] === 404 && $get('/account/requests/' . $requestId . '/applications', 9)['status'] === 404);
@@ -2638,6 +2644,7 @@ $post('/admin/requests/' . $requestId . '/decide', ['decision' => 'approve'], 3)
 check('request: approved, owner told, now public with the budget range and an apply form', $requestRow()['status'] === 'published'
     && lastMail($mailLog, 'requester@example.test')['subject'] === 'Deine Anfrage „Website für Fotostudio“ ist freigegeben'
     && str_contains($get('/requests/website-fuer-fotostudio', null)['body'], 'Website für Fotostudio') && str_contains($get('/requests', null)['body'], 'Website für Fotostudio'));
+check('requests: the admin dashboard tile has no pending badge once nothing waits', !str_contains($get('/admin', 3)['body'], 'href="/admin/requests?status=pending"'));
 $r = $get('/requests/website-fuer-fotostudio', 1);
 check('request: a provider sees the apply form, the owner does not, a visitor is sent to log in', str_contains($r['body'], 'name="price"')
     && !str_contains($get('/requests/website-fuer-fotostudio', 8)['body'], 'name="price"') && str_contains($get('/requests/website-fuer-fotostudio', null)['body'], 'Melde dich an'));
@@ -2706,9 +2713,23 @@ $review = $pdo->query("SELECT * FROM review WHERE order_id = {$orderId}")->fetch
 check('request: a review is stored with the provider, but no offer, behind it', $review !== false && (int) $review['provider_id'] === $providerBId && $review['offer_id'] === null
     && (int) $pdo->query("SELECT rating_count FROM provider WHERE id = {$providerBId}")->fetchColumn() === 1);
 
+// A subscription bonus: a provider whose plan grants core.request.notify
+// hears about a newly published request at once, another provider without
+// that plan does not. Subscriptions are off by default for the rest of the
+// suite's sake - switched on just for this check, then off again.
+$subModules->save(array_keys(Modulento\Core\Support\Modules::ALL));
+$notifyPlan = $subs->createPlan('abo-request-notify', 'Anfragen-Alarm', 300, 'EUR', 1, ['core.request.notify']);
+$subs->assign(9, $notifyPlan);
 $post('/admin/settings', $settings + ['request_approval' => 'off'], 3);
 $post('/account/requests/new', ['category_id' => (string) $requestCatId, 'title' => 'Logo gesucht', 'description' => 'Ein einfaches Logo bitte.'], 8);
 check('request: with approval switched off, a new request is public at once', $requestRow()['status'] === 'published' && $requestRow()['published_at'] !== null);
+check('request: a subscribed provider with the notify feature hears about it at once, one without the plan does not',
+    $pdo->query("SELECT COUNT(*) FROM notification WHERE type = 'request_new' AND account_id = 9")->fetchColumn() == 1
+    && $pdo->query("SELECT COUNT(*) FROM notification WHERE type = 'request_new' AND account_id = 1")->fetchColumn() == 0);
+$subs->assign(9, null);
+$pdo->exec("DELETE FROM subscription WHERE plan_id = {$notifyPlan}");
+$pdo->exec("DELETE FROM subscription_plan WHERE id = {$notifyPlan}");
+$subModules->save(array_values(array_diff(array_keys(Modulento\Core\Support\Modules::ALL), ['subscriptions'])));
 $post('/admin/settings', $settings + ['request_approval' => 'required'], 3);
 $post('/account/requests/' . (int) $requestRow()['id'] . '/delete', [], 8);
 $pdo->exec('DELETE FROM request');

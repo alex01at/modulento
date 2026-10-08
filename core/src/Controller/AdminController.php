@@ -110,6 +110,11 @@ final class AdminController extends Controller
             $stats[] = ['id' => 'offers', 'label_key' => 'core.admin.menu.offers', 'path' => '/admin/offers',
                 'total' => array_sum($counts), 'pending' => $counts['pending'] ?? 0];
         }
+        if ($app->modules->enabled('requests') && $app->auth->can('core.requests.manage')) {
+            $counts = $app->requests->counts();
+            $stats[] = ['id' => 'requests', 'label_key' => 'core.admin.menu.requests', 'path' => '/admin/requests',
+                'total' => array_sum($counts), 'pending' => $counts['pending'] ?? 0];
+        }
         if ($app->auth->can('core.orders.manage')) {
             $stats[] = ['id' => 'orders', 'label_key' => 'core.admin.menu.orders', 'path' => '/admin/orders',
                 'total' => array_sum($app->orders->counts()), 'pending' => null];
