@@ -1,0 +1,32 @@
+{% extends 'layout/base.twig' %}
+
+{% block title %}{{ trans('core.request.applications.mine_title') }} – {{ site_name }}{% endblock %}
+
+{% block content %}
+{% include 'account/_nav.twig' %}
+<h1>{{ trans('core.request.applications.mine_title') }}</h1>
+
+{% if applications is empty %}
+    <p>{{ trans('core.request.applications.mine_none') }}</p>
+{% else %}
+    <ul class="card-list">
+        {% for application in applications %}
+            <li>
+                {% if application.request_status == 'published' %}
+                    <a href="{{ url('/requests/' ~ application.request_slug) }}"><strong>{{ application.request_title }}</strong></a>
+                {% else %}
+                    <strong>{{ application.request_title }}</strong>
+                {% endif %}
+                <span class="price">{{ money(application.price, application.request_currency) }}</span>
+                <small>{{ trans('core.request.applications.status.' ~ application.status) }}</small>
+                {% if application.status == 'submitted' %}
+                    <form method="post" action="{{ url('/account/applications/' ~ application.id ~ '/withdraw') }}" class="inline-form">
+                        {{ csrf_field() }}
+                        <button type="submit" class="link-button">{{ trans('core.request.applications.withdraw') }}</button>
+                    </form>
+                {% endif %}
+            </li>
+        {% endfor %}
+    </ul>
+{% endif %}
+{% endblock %}

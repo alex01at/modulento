@@ -18,6 +18,12 @@
     {% elseif has_catalogue() %}
         <a href="{{ url('/account/provider') }}">{{ trans('core.provider.create') }}</a>
     {% endif %}
+    {% if module('requests') %}
+        <a href="{{ url('/account/requests') }}">{{ trans('core.request.mine.title') }}</a>
+        {% if provider_status() %}
+            <a href="{{ url('/account/applications') }}">{{ trans('core.request.applications.mine_title') }}</a>
+        {% endif %}
+    {% endif %}
     {% if module('subscriptions') %}
         <a href="{{ url('/account/subscription') }}">{{ trans('core.account.subscription.nav') }}</a>
     {% endif %}

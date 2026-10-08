@@ -64,6 +64,9 @@
             <a href="{{ url('/offers') }}">{{ trans('core.nav.offers') }}</a>
             <a href="{{ url('/providers') }}">{{ trans('core.nav.providers') }}</a>
         {% endif %}
+        {% if module('requests') %}
+            <a href="{{ url('/requests') }}">{{ trans('core.nav.requests') }}</a>
+        {% endif %}
         {% if module('subscriptions') %}
             <a href="{{ url('/subscriptions') }}">{{ trans('core.subscriptions.nav') }}</a>
         {% endif %}

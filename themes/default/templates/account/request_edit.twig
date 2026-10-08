@@ -1,0 +1,61 @@
+{% extends 'layout/base.twig' %}
+
+{% block title %}{{ request ? trans('core.request.edit') : trans('core.request.new') }} – {{ site_name }}{% endblock %}
+
+{% block content %}
+{% include 'account/_nav.twig' %}
+<p><a href="{{ url('/account/requests') }}">{{ trans('core.request.mine.title') }}</a></p>
+<h1>{{ request ? trans('core.request.edit') : trans('core.request.new') }}</h1>
+
+{% if request %}
+    <p class="flash">{{ trans('core.request.status_long.' ~ request.status) }}
+        {% if request.status_note %}<br>{{ trans('core.provider.status_note') }} {{ request.status_note }}{% endif %}
+    </p>
+{% else %}
+    <p>{{ trans(approval_required ? 'core.request.intro_approval' : 'core.request.intro') }}</p>
+{% endif %}
+
+{% for error in errors %}
+    <p class="flash flash-error" role="alert">{{ error }}</p>
+{% endfor %}
+
+<form method="post" action="{{ url(request ? '/account/requests/' ~ request.id : '/account/requests/new') }}" class="stack-form wide">
+    {{ csrf_field() }}
+    <label for="title">{{ trans('core.request.field.title') }}</label>
+    <input id="title" name="title" value="{{ values.title ?? '' }}" maxlength="150" required>
+    <label for="category_id">{{ trans('core.offer.field.category') }}</label>
+    <select id="category_id" name="category_id" required>
+        <option value=""></option>
+        {% for top in categories %}
+            <option value="{{ top.id }}" {{ top.id == (values.category_id ?? 0) ? 'selected' }}>{{ top.name }}</option>
+            {% for child in top.children %}
+                <option value="{{ child.id }}" {{ child.id == (values.category_id ?? 0) ? 'selected' }}>– {{ child.name }}</option>
+            {% endfor %}
+        {% endfor %}
+    </select>
+    <label for="description">{{ trans('core.request.field.description') }}</label>
+    <textarea id="description" name="description" rows="10" maxlength="5000" required>{{ values.description ?? '' }}</textarea>
+    <label for="budget_min">{{ trans('core.request.field.budget_min') }} ({{ currency }})</label>
+    <input id="budget_min" name="budget_min" inputmode="decimal" value="{{ values.budget_min ?? '' }}">
+    <label for="budget_max">{{ trans('core.request.field.budget_max') }} ({{ currency }})</label>
+    <input id="budget_max" name="budget_max" inputmode="decimal" value="{{ values.budget_max ?? '' }}">
+    <small>{{ trans('core.request.field.budget_hint') }}</small>
+    <label for="needed_by">{{ trans('core.request.field.needed_by') }}</label>
+    <input id="needed_by" name="needed_by" type="date" value="{{ values.needed_by ?? '' }}">
+    <button type="submit">{{ trans('core.request.save') }}</button>
+</form>
+
+{% if request %}
+    <section>
+        <h2>{{ trans('core.request.delete.title') }}</h2>
+        {% if request.order_id %}
+            <p>{{ trans('core.request.delete.fulfilled_hint') }}</p>
+        {% else %}
+            <form method="post" action="{{ url('/account/requests/' ~ request.id ~ '/delete') }}">
+                {{ csrf_field() }}
+                <button type="submit" class="danger">{{ trans('core.request.delete.submit') }}</button>
+            </form>
+        {% endif %}
+    </section>
+{% endif %}
+{% endblock %}

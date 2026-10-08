@@ -1,0 +1,4 @@
+{# What RequestFlow knows about this order: where it came from. Receives flow_data. #}
+{% if flow_data.request_path %}
+    <p><small>{{ trans('core.request.order_origin') }} <a href="{{ url(flow_data.request_path) }}">{{ flow_data.request_title }}</a></small></p>
+{% endif %}

@@ -1,0 +1,37 @@
+{% extends 'layout/base.twig' %}
+
+{% block title %}{{ trans('core.request.accept.title') }} – {{ site_name }}{% endblock %}
+
+{% block content %}
+{% include 'account/_nav.twig' %}
+<h1>{{ trans('core.request.accept.title') }}</h1>
+<p>{{ trans('core.request.accept.intro', {provider: application.provider_name, price: money(application.price, request.currency)}) }}</p>
+
+{% for error in errors %}
+    <p class="flash flash-error" role="alert">{{ error }}</p>
+{% endfor %}
+
+{% if methods is empty %}
+    <p class="flash flash-error">{{ trans('core.order.error.no_payment_method') }}</p>
+{% else %}
+    <form method="post" action="{{ url('/account/requests/' ~ request.id ~ '/applications/' ~ application.id ~ '/accept') }}" class="stack-form">
+        {{ csrf_field() }}
+        <fieldset>
+            <legend>{{ trans('core.order.payment') }}</legend>
+            {% for method in methods %}
+                <label class="checkbox">
+                    <input type="radio" name="payment_method" value="{{ method.id }}" {{ method.id == payment_method or (payment_method is null and loop.first) ? 'checked' }} required>
+                    <span>{{ trans(method.label_key) }}</span>
+                </label>
+            {% endfor %}
+        </fieldset>
+        {% if terms %}
+            <label class="checkbox">
+                <input type="checkbox" name="accept_terms" value="1" required>
+                <span>{{ trans('core.register.accept') }} <a href="{{ url(terms.path) }}" target="_blank" rel="noopener">{{ terms.title }}</a></span>
+            </label>
+        {% endif %}
+        <button type="submit">{{ trans('core.request.accept.submit') }}</button>
+    </form>
+{% endif %}
+{% endblock %}

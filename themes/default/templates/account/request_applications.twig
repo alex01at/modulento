@@ -1,0 +1,35 @@
+{% extends 'layout/base.twig' %}
+
+{% block title %}{{ trans('core.request.applications.title') }} – {{ request.title }} – {{ site_name }}{% endblock %}
+
+{% block content %}
+{% include 'account/_nav.twig' %}
+<p><a href="{{ url('/account/requests') }}">{{ trans('core.request.mine.title') }}</a></p>
+<h1>{{ trans('core.request.applications.title') }}</h1>
+<p class="muted">{{ request.title }}</p>
+
+{% if request.order_id %}
+    <p class="flash flash-success">{{ trans('core.request.applications.fulfilled') }} <a href="{{ url('/orders/' ~ request.order_id) }}">{{ trans('core.order.view') }}</a></p>
+{% endif %}
+
+{% if applications is empty %}
+    <p>{{ trans('core.request.applications.none') }}</p>
+{% else %}
+    <ul class="card-list">
+        {% for application in applications %}
+            <li>
+                <a href="{{ url('/providers/' ~ application.provider_slug) }}"><strong>{{ application.provider_name }}</strong></a>
+                <span class="price">{{ money(application.price, request.currency) }}</span>
+                {% if application.delivery_days %}<small>{{ trans('core.request.apply.delivery_days_value', {count: application.delivery_days}) }}</small>{% endif %}
+                <p>{{ application.message|nl2br }}</p>
+                <small>{{ trans('core.request.applications.status.' ~ application.status) }}</small>
+                {% if application.status == 'submitted' and not request.order_id %}
+                    <form method="get" action="{{ url('/account/requests/' ~ request.id ~ '/applications/' ~ application.id ~ '/accept') }}" class="inline-form">
+                        <button type="submit">{{ trans('core.request.applications.accept') }}</button>
+                    </form>
+                {% endif %}
+            </li>
+        {% endfor %}
+    </ul>
+{% endif %}
+{% endblock %}

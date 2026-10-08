@@ -22,6 +22,7 @@ final class Modules
         'subscriptions' => 'core.module.subscriptions',
         'inbox' => 'core.module.inbox',
         'notifications' => 'core.module.notifications',
+        'requests' => 'core.module.requests',
     ];
 
     private const SETTING = 'core.modules_disabled';
