@@ -264,6 +264,12 @@ $pdo->exec("CREATE TABLE order_message (id INTEGER PRIMARY KEY, order_id INTEGER
     author_role TEXT, body TEXT, flagged_word TEXT, status TEXT NOT NULL DEFAULT 'visible', decided_at TEXT, decided_by INTEGER REFERENCES account (id) ON DELETE SET NULL, created_at TEXT)");
 $pdo->exec("CREATE TABLE order_file (id INTEGER PRIMARY KEY, order_id INTEGER REFERENCES orders (id) ON DELETE CASCADE, event_id INTEGER REFERENCES order_event (id) ON DELETE CASCADE,
     message_id INTEGER REFERENCES order_message (id) ON DELETE CASCADE, account_id INTEGER REFERENCES account (id) ON DELETE SET NULL, author_role TEXT, original_name TEXT, stored_name TEXT, size INTEGER, created_at TEXT)");
+$pdo->exec("CREATE TABLE request (id INTEGER PRIMARY KEY, account_id INTEGER REFERENCES account (id) ON DELETE CASCADE, category_id INTEGER REFERENCES category (id) ON DELETE SET NULL,
+    title TEXT, slug TEXT UNIQUE, description TEXT, budget_min INTEGER, budget_max INTEGER, currency TEXT, needed_by TEXT,
+    status TEXT NOT NULL DEFAULT 'pending', status_note TEXT, decided_at TEXT, decided_by INTEGER, accepted_application_id INTEGER,
+    order_id INTEGER REFERENCES orders (id) ON DELETE SET NULL, published_at TEXT, created_at TEXT, updated_at TEXT)");
+$pdo->exec("CREATE TABLE request_application (id INTEGER PRIMARY KEY, request_id INTEGER REFERENCES request (id) ON DELETE CASCADE, provider_id INTEGER REFERENCES provider (id) ON DELETE CASCADE,
+    price INTEGER, delivery_days INTEGER, message TEXT, status TEXT NOT NULL DEFAULT 'submitted', created_at TEXT, updated_at TEXT, UNIQUE (request_id, provider_id))");
 $pdo->exec("CREATE TABLE review (id INTEGER PRIMARY KEY, order_id INTEGER UNIQUE REFERENCES orders (id) ON DELETE CASCADE, offer_id INTEGER REFERENCES offer (id) ON DELETE SET NULL,
     provider_id INTEGER REFERENCES provider (id) ON DELETE CASCADE, author_id INTEGER REFERENCES account (id) ON DELETE SET NULL, author_name TEXT, rating INTEGER, body TEXT, locale TEXT,
     status TEXT DEFAULT 'published', status_note TEXT, reply TEXT, replied_at TEXT, created_at TEXT)");
@@ -2590,6 +2596,129 @@ $pdo->exec("UPDATE extension SET enabled = 0 WHERE id = 'auction'");
 $pdo->exec('DELETE FROM page');
 $pdo->exec("DELETE FROM rate_limit_attempt");
 
+// --- Requests: a buyer describes what they need, providers apply with their own price ---
+$post('/admin/categories/new', ['text' => $name('Webdesign')], 3);
+$requestCatId = (int) $pdo->query("SELECT category_id FROM category_translation WHERE slug = 'webdesign'")->fetchColumn();
+$insertAccount->execute([8, 'requester@example.test', $testHash, 'active']);
+$insertAccount->execute([9, 'provider9@example.test', $testHash, 'active']);
+$post('/account/provider', ['type' => 'private', 'name' => 'Neunter Anbieter', 'street' => 'Weg 9', 'postal_code' => '1010', 'city' => 'Wien', 'country' => 'AT'], 9);
+$post('/admin/providers/' . $provider(9)['id'] . '/decide', ['decision' => 'approve'], 3);
+$providerAId = (int) $provider(1)['id'];
+$providerBId = (int) $provider(9)['id'];
+$post('/admin/pages/new', ['status' => 'published', 'role' => 'terms', 'text' => ['de' => $text('AGB')]], 3);
+
+$requestRow = fn (string $where = '1 = 1') => $pdo->query("SELECT * FROM request WHERE {$where} ORDER BY id DESC")->fetch();
+$applicationRow = fn (string $where = '1 = 1') => $pdo->query("SELECT * FROM request_application WHERE {$where} ORDER BY id DESC")->fetch();
+$requestForm = ['category_id' => (string) $requestCatId, 'title' => 'Website für Fotostudio', 'description' => 'Ich brauche eine kleine Website mit Galerie.', 'budget_min' => '300', 'budget_max' => '600', 'needed_by' => '2026-12-01'];
+
+check('requests: the module is on by default, with its own nav link and admin menu', str_contains($get('/', null)['body'], 'href="/requests"') && str_contains($get('/admin', 3)['body'], 'href="/admin/requests"'));
+check('request: needs a login to create one', $get('/account/requests/new', null)['body'] === '');
+$post('/account/requests/new', ['title' => '', 'description' => '', 'category_id' => '0'] + $requestForm, 8);
+check('request: needs a title, description and category', $requestRow() === false);
+
+$post('/account/requests/new', $requestForm, 8);
+$request = $requestRow();
+check('request: created pending while approval is required, with its budget converted to minor units and a slug', $request !== false && $request['status'] === 'pending'
+    && $request['slug'] === 'website-fuer-fotostudio' && (int) $request['budget_min'] === 30000 && (int) $request['budget_max'] === 60000 && $request['currency'] === 'EUR');
+$requestId = (int) $request['id'];
+check('request: a pending request is not public', $get('/requests/website-fuer-fotostudio', null)['status'] === 404 && !str_contains($get('/requests', null)['body'], 'Website für Fotostudio'));
+check('request: someone else cannot edit, delete or see the applications of it', $get('/account/requests/' . $requestId . '/edit', 9)['status'] === 404
+    && $post('/account/requests/' . $requestId . '/delete', [], 9)['status'] === 404 && $get('/account/requests/' . $requestId . '/applications', 9)['status'] === 404);
+
+$post('/admin/requests/' . $requestId . '/decide', ['decision' => 'reject', 'note' => ''], 3);
+check('request: rejecting needs a reason', $requestRow()['status'] === 'pending');
+$post('/admin/requests/' . $requestId . '/decide', ['decision' => 'reject', 'note' => 'Zu wenig Details'], 3);
+$mail = lastMail($mailLog, 'requester@example.test');
+check('request: rejected with a reason, owner told by mail and in the edit page', $requestRow()['status'] === 'rejected' && $requestRow()['status_note'] === 'Zu wenig Details'
+    && $mail['subject'] === 'Deine Anfrage „Website für Fotostudio“ wurde nicht freigegeben' && str_contains($get('/account/requests/' . $requestId . '/edit', 8)['body'], 'Zu wenig Details'));
+
+$post('/account/requests/' . $requestId, $requestForm, 8);
+check('request: saving a corrected, rejected request resubmits it for review', $requestRow()['status'] === 'pending' && $requestRow()['status_note'] === null);
+$post('/admin/requests/' . $requestId . '/decide', ['decision' => 'approve'], 3);
+check('request: approved, owner told, now public with the budget range and an apply form', $requestRow()['status'] === 'published'
+    && lastMail($mailLog, 'requester@example.test')['subject'] === 'Deine Anfrage „Website für Fotostudio“ ist freigegeben'
+    && str_contains($get('/requests/website-fuer-fotostudio', null)['body'], 'Website für Fotostudio') && str_contains($get('/requests', null)['body'], 'Website für Fotostudio'));
+$r = $get('/requests/website-fuer-fotostudio', 1);
+check('request: a provider sees the apply form, the owner does not, a visitor is sent to log in', str_contains($r['body'], 'name="price"')
+    && !str_contains($get('/requests/website-fuer-fotostudio', 8)['body'], 'name="price"') && str_contains($get('/requests/website-fuer-fotostudio', null)['body'], 'Melde dich an'));
+$apply = fn (string $price, int $as, string $message = 'Ich würde das gerne machen.') => $post('/requests/website-fuer-fotostudio/apply', ['price' => $price, 'delivery_days' => '5', 'message' => $message], $as);
+check('request: applying needs a provider profile', $apply('400', 8)['status'] === 302 && ($_SESSION['_flash']['error'] ?? '') !== '' && $applicationRow() === false);
+$post('/account/requests/new', ['category_id' => (string) $requestCatId, 'title' => 'Eigene Anfrage', 'description' => 'Eine Anfrage vom Anbieter selbst.'] + ['budget_min' => '', 'budget_max' => '', 'needed_by' => ''], 1);
+$ownRequestId = (int) $requestRow()['id'];
+$post('/admin/requests/' . $ownRequestId . '/decide', ['decision' => 'approve'], 3);
+$ownSlug = $requestRow()['slug'];
+check('request: a provider cannot apply to their own request', $post('/' . 'requests/' . $ownSlug . '/apply', ['price' => '100', 'delivery_days' => '1', 'message' => 'x'], 1)['status'] === 302
+    && $applicationRow("request_id = {$ownRequestId}") === false);
+$post('/account/requests/' . $ownRequestId . '/delete', [], 1);
+$apply('abc', 1);
+check('request: the price has to be a real amount', $applicationRow() === false);
+$apply('450', 1, 'Ich mache gerne eine schlanke Website.');
+$appA = $applicationRow();
+check('request: the first application is stored, submitted, the owner is told', $appA !== false && $appA['status'] === 'submitted' && (int) $appA['price'] === 45000
+    && (int) $appA['provider_id'] === $providerAId && $pdo->query('SELECT COUNT(*) FROM notification')->fetchColumn() > 0);
+$appAId = (int) $appA['id'];
+$apply('500', 9, 'Mit CMS und Blog.');
+$appB = $applicationRow();
+$appBId = (int) $appB['id'];
+check('request: a second provider\'s application does not touch the first', (int) $appB['provider_id'] === $providerBId && $appAId !== $appBId && $pdo->query('SELECT COUNT(*) FROM request_application')->fetchColumn() == 2);
+$apply('480', 1, 'Doch lieber mit Blog, neuer Preis.');
+check('request: a second application from the same provider replaces the first instead of adding a row', $pdo->query('SELECT COUNT(*) FROM request_application')->fetchColumn() == 2
+    && (int) $applicationRow("id = {$appAId}")['price'] === 48000);
+
+$r = $get('/account/requests/' . $requestId . '/applications', 8);
+check('request: the owner sees both applications with their own price, nobody else\'s application is hidden from them', str_contains($r['body'], '480,00') && str_contains($r['body'], '500,00'));
+$r = $get('/account/applications', 9);
+check('request: a provider sees their own application in "my applications", with the request\'s currency', str_contains($r['body'], '500,00') && str_contains($r['body'], 'Website für Fotostudio'));
+check('request: a provider cannot see another provider\'s application to withdraw it', $post('/account/applications/' . $appAId . '/withdraw', [], 9)['status'] === 302 && $applicationRow("id = {$appAId}")['status'] === 'submitted');
+
+$ordersBefore = $lastOrder();
+check('request: accepting needs to be the owner, and the application must still be open', $get('/account/requests/' . $requestId . '/applications/' . $appBId . '/accept', 1)['status'] === 404
+    && $get('/account/requests/' . $requestId . '/applications/999999/accept', 8)['status'] === 404);
+$r = $get('/account/requests/' . $requestId . '/applications/' . $appBId . '/accept', 8);
+check('request: the confirmation page shows the provider, the price and a terms checkbox', str_contains($r['body'], '500,00') && str_contains($r['body'], 'name="accept_terms"'));
+$post('/account/requests/' . $requestId . '/applications/' . $appBId . '/accept', [], 8);
+check('request: terms must be accepted to go through', $lastOrder() === $ordersBefore && $requestRow()['status'] === 'published');
+$post('/account/requests/' . $requestId . '/applications/' . $appBId . '/accept', ['accept_terms' => '1'], 8);
+$orderId = $lastOrder();
+$order = $orderRow($orderId);
+check('request: accepting creates one real order at the application\'s own price, with the one available payment method chosen automatically', $orderId > $ordersBefore
+    && (int) $order['buyer_id'] === 8 && (int) $order['provider_id'] === $providerBId && (int) $order['total'] === 50000 && $order['currency'] === 'EUR'
+    && $order['flow'] === 'core.request' && $order['state'] === 'in_progress' && $order['payment_method'] === 'core.offline' && $order['terms_accepted_at'] !== null
+    && $pdo->query("SELECT label || ':' || quantity || ':' || unit_price FROM order_item WHERE order_id = {$orderId}")->fetchColumn() === 'Website für Fotostudio:1:50000');
+check('request: the accepted application is accepted, the other is declined, the request is fulfilled and points at the order', $applicationRow("id = {$appBId}")['status'] === 'accepted'
+    && $applicationRow("id = {$appAId}")['status'] === 'declined' && $requestRow()['status'] === 'fulfilled' && (int) $requestRow()['order_id'] === $orderId
+    && (int) $requestRow()['accepted_application_id'] === $appBId);
+check('request: the declined provider is notified in-app, exactly once', (int) $pdo->query("SELECT account_id FROM notification WHERE type = 'request_declined' ORDER BY id DESC LIMIT 1")->fetchColumn() === 1
+    && $pdo->query("SELECT COUNT(*) FROM notification WHERE type = 'request_declined'")->fetchColumn() == 1);
+check('request: a fulfilled request leaves public view and no longer takes applications, but is not deleted', $get('/requests/website-fuer-fotostudio', 1)['status'] === 404
+    && !str_contains($get('/requests', null)['body'], 'Website für Fotostudio') && $apply('999', 1)['status'] === 404
+    && $post('/account/requests/' . $requestId . '/delete', [], 8)['status'] === 302 && $requestRow() !== false);
+
+$r = $get('/orders/' . $orderId, 8);
+check('request: the order page links back to the request it came from', str_contains($r['body'], 'website-fuer-fotostudio') && str_contains($r['body'], 'Website für Fotostudio'));
+check('request: the generic order routes carry the flow onward - no request-specific code was needed for this', $act($orderId, 'deliver', 9, 'Fertig, bitte ansehen.')['status'] === 302 && $orderRow($orderId)['state'] === 'delivered');
+$act($orderId, 'accept_delivery', 9);
+check('request: only the buyer accepts the delivery', $orderRow($orderId)['state'] === 'delivered');
+$act($orderId, 'accept_delivery', 8);
+check('request: completed, and open for a review despite having no catalogue offer behind it', $orderRow($orderId)['state'] === 'completed' && str_contains($get('/orders/' . $orderId, 8)['body'], 'name="rating"'));
+$post('/orders/' . $orderId . '/review', ['rating' => '5', 'body' => 'Alles bestens, danke!'], 8);
+$review = $pdo->query("SELECT * FROM review WHERE order_id = {$orderId}")->fetch();
+check('request: a review is stored with the provider, but no offer, behind it', $review !== false && (int) $review['provider_id'] === $providerBId && $review['offer_id'] === null
+    && (int) $pdo->query("SELECT rating_count FROM provider WHERE id = {$providerBId}")->fetchColumn() === 1);
+
+$post('/admin/settings', $settings + ['request_approval' => 'off'], 3);
+$post('/account/requests/new', ['category_id' => (string) $requestCatId, 'title' => 'Logo gesucht', 'description' => 'Ein einfaches Logo bitte.'], 8);
+check('request: with approval switched off, a new request is public at once', $requestRow()['status'] === 'published' && $requestRow()['published_at'] !== null);
+$post('/admin/settings', $settings + ['request_approval' => 'required'], 3);
+$post('/account/requests/' . (int) $requestRow()['id'] . '/delete', [], 8);
+$pdo->exec('DELETE FROM request');
+$pdo->exec('DELETE FROM request_application');
+$pdo->exec("DELETE FROM orders WHERE id = {$orderId}");
+$pdo->exec("DELETE FROM category WHERE id = {$requestCatId}");
+$pdo->exec('DELETE FROM account WHERE id IN (8, 9)');
+$pdo->exec('DELETE FROM page');
+$pdo->exec("DELETE FROM rate_limit_attempt");
+
 // --- Accounts and roles in the administration --------------------------------
 check('account administration needs its permission', $get('/admin/accounts', 2)['status'] === 403);
 $r = $get('/admin/accounts?q=plain', 3);
@@ -3659,9 +3788,9 @@ $subModules->save(array_values(array_diff(array_keys(Modulento\Core\Support\Modu
 $subModules->save(array_keys(Modulento\Core\Support\Modules::ALL));
 check('modules: the page needs the settings permission', $get('/admin/modules', 1)['status'] === 403 && $post('/admin/modules', ['modules' => []], 2)['status'] === 403);
 $r = $get('/admin/modules', 3);
-check('modules: everything is on until switched off', $r['status'] === 200 && substr_count($r['body'], 'name="modules[]"') === 9 && substr_count($r['body'], ' checked') === 9);
+check('modules: everything is on until switched off', $r['status'] === 200 && substr_count($r['body'], 'name="modules[]"') === 10 && substr_count($r['body'], ' checked') === 10);
 $post('/admin/modules', ['modules' => ['contact', 'avatars', 'nonsense', ['x']]], 3);
-check('modules: switched off is stored, unknown names are ignored', $pdo->query("SELECT value FROM setting WHERE name = 'core.modules_disabled'")->fetchColumn() === 'reviews,withdrawal,reports,remember_login,subscriptions,inbox,notifications');
+check('modules: switched off is stored, unknown names are ignored', $pdo->query("SELECT value FROM setting WHERE name = 'core.modules_disabled'")->fetchColumn() === 'reviews,withdrawal,reports,remember_login,subscriptions,inbox,notifications,requests');
 check('modules: without inbox there is no envelope, no overview page, no unread polling, and no account-nav link', !str_contains($get('/account', 1)['body'], 'href="/account/messages"') && !str_contains($get('/account', 1)['body'], 'data-unread')
     && $get('/account/messages', 1)['status'] === 404 && $get('/account/unread', 1)['status'] === 404 && !str_contains($get('/account/settings', 1)['body'], 'href="/account/messages"'));
 check('modules: without notifications there is no bell, no overview page, no unread polling, and no account-nav link', !str_contains($get('/account', 1)['body'], 'href="/account/notifications"')
@@ -3683,6 +3812,8 @@ check('modules: and a ticked box from an old form remembers nothing', $pdo->quer
 check('modules: what is still on works', str_contains($get('/account/settings', 1)['body'], 'action="/account/avatar"'));
 $post('/admin/modules', ['modules' => []], 3);
 check('modules: everything can be off at once', $get('/account/settings', 1)['status'] === 200 && !str_contains($get('/account/settings', 1)['body'], 'action="/account/avatar"') && $post('/account/avatar', [], 1)['status'] === 404);
+check('modules: without requests its routes and nav links are gone too', $get('/requests', null)['status'] === 404 && $get('/account/requests', 1)['status'] === 404 && $get('/admin/requests', 3)['status'] === 404
+    && !str_contains($get('/', null)['body'], 'href="/requests"') && !str_contains($get('/admin', 3)['body'], 'href="/admin/requests"'));
 $post('/admin/modules', ['modules' => array_keys(Modulento\Core\Support\Modules::ALL)], 3);
 check('modules: switched on again, everything is back', str_contains($get('/', null)['body'], 'href="/withdrawal"') && $get('/report', null)['status'] === 200 && str_contains($get('/login', null)['body'], 'name="remember"'));
 $pdo->exec("UPDATE extension SET enabled = 0 WHERE id = 'freelancer'");

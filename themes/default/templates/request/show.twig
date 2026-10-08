@@ -1,0 +1,45 @@
+{% extends 'layout/base.twig' %}
+
+{% block title %}{{ request.title }} – {{ site_name }}{% endblock %}
+
+{% block content %}
+<h1>{{ request.title }}</h1>
+<p class="muted">
+    {% if category %}{{ category.name }} · {% endif %}{{ trans('core.request.posted_on', {date: request.created_at|slice(0, 10)}) }}
+    {% if request.needed_by %} · {{ trans('core.request.needed_by', {date: request.needed_by}) }}{% endif %}
+</p>
+{% if request.budget_min is not null or request.budget_max is not null %}
+    <p><strong>{{ trans('core.request.budget') }}:</strong>
+        {{ trans('core.request.budget_range', {min: request.budget_min is not null ? money(request.budget_min, request.currency) : '?', max: request.budget_max is not null ? money(request.budget_max, request.currency) : '?'}) }}
+    </p>
+{% endif %}
+
+<p>{{ request.description|nl2br }}</p>
+
+{% if own %}
+    <p><a href="{{ url('/account/requests/' ~ request.id ~ '/edit') }}">{{ trans('core.request.edit') }}</a>
+        · <a href="{{ url('/account/requests/' ~ request.id ~ '/applications') }}">{{ trans('core.request.applications.title') }}</a></p>
+{% elseif provider %}
+    {% if already_applied %}
+        <p class="flash flash-success">{{ trans('core.request.apply.already') }}</p>
+    {% else %}
+        <section>
+            <h2>{{ trans('core.request.apply.title') }}</h2>
+            <form method="post" action="{{ url('/requests/' ~ request.slug ~ '/apply') }}" class="stack-form">
+                {{ csrf_field() }}
+                <label for="price">{{ trans('core.request.apply.price') }} ({{ request.currency }})</label>
+                <input id="price" name="price" inputmode="decimal" required>
+                <label for="delivery_days">{{ trans('core.request.apply.delivery_days') }}</label>
+                <input id="delivery_days" name="delivery_days" type="number" min="1" max="365">
+                <label for="message">{{ trans('core.request.apply.message') }}</label>
+                <textarea id="message" name="message" rows="5" maxlength="3000" required></textarea>
+                <button type="submit">{{ trans('core.request.apply.submit') }}</button>
+            </form>
+        </section>
+    {% endif %}
+{% elseif account %}
+    <p><a href="{{ url('/account/provider') }}">{{ trans('core.offer.needs_provider') }}</a></p>
+{% else %}
+    <p><a href="{{ url('/login') }}">{{ trans('core.request.apply.login') }}</a></p>
+{% endif %}
+{% endblock %}

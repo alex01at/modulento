@@ -375,7 +375,8 @@ td form { display: flex; justify-content: flex-end; }
 .badge-approved, .badge-published, .badge-active, .badge-enabled, .badge-ok, .badge-paid { background: var(--success-soft); color: var(--success); }
 .badge-pending, .badge-changed, .badge-running { background: var(--warning-soft); color: var(--warning); }
 .badge-rejected, .badge-suspended, .badge-blocked, .badge-hidden, .badge-failed, .badge-incompatible { background: var(--error-soft); color: var(--error); }
-.badge-draft, .badge-paused, .badge-disabled, .badge-unpaid { background: var(--neutral-soft); color: var(--neutral); }
+.badge-draft, .badge-paused, .badge-disabled, .badge-unpaid, .badge-closed { background: var(--neutral-soft); color: var(--neutral); }
+.badge-fulfilled { background: var(--success-soft); color: var(--success); }
 .badge-verified { background: var(--primary-soft); color: var(--primary); }
 .badge-none, .badge-earned { background: var(--neutral-soft); color: var(--neutral); }
 

@@ -1,0 +1,70 @@
+{% extends '@admin/layout.twig' %}
+
+{% block title %}{{ trans('core.admin.requests.title') }} – {{ site_name }}{% endblock %}
+
+{% block admin %}
+{% include '@admin/_page_header.twig' with {heading: request.title, crumbs: [{label: trans('core.admin.requests.title'), path: '/admin/requests'}]} only %}
+
+<div class="split">
+    <div>
+        <section class="card-box">
+            <h2>{{ trans('core.admin.layout.details') }}</h2>
+            <div class="table-wrap">
+                <table class="details">
+                    <tr><th scope="row">{{ trans('core.admin.requests.account') }}</th><td>{{ request.account_email }}</td></tr>
+                    <tr><th scope="row">{{ trans('core.offer.field.category') }}</th><td>{{ request.category ? request.category.name : '–' }}</td></tr>
+                    <tr><th scope="row">{{ trans('core.request.budget') }}</th><td>{{ request.budget_min is not null or request.budget_max is not null ? trans('core.request.budget_range', {min: request.budget_min is not null ? money(request.budget_min, request.currency) : '?', max: request.budget_max is not null ? money(request.budget_max, request.currency) : '?'}) : '–' }}</td></tr>
+                    <tr><th scope="row">{{ trans('core.admin.providers.created') }}</th><td>{{ request.created_at }} UTC</td></tr>
+                </table>
+            </div>
+            <p>{{ request.description|nl2br }}</p>
+        </section>
+
+        <section class="card-box">
+            <h2>{{ trans('core.request.applications.title') }} ({{ applications|length }})</h2>
+            {% if applications is empty %}
+                <p class="empty">{{ trans('core.request.applications.none') }}</p>
+            {% else %}
+                <ul class="card-list">
+                    {% for application in applications %}
+                        <li>
+                            {{ application.provider_name }} – {{ money(application.price, request.currency) }}
+                            <small>{{ trans('core.request.applications.status.' ~ application.status) }}</small>
+                        </li>
+                    {% endfor %}
+                </ul>
+            {% endif %}
+        </section>
+    </div>
+
+    <div>
+        <section class="card-box">
+            <h2>{{ trans('core.offer.field.status') }}</h2>
+            <div class="status-line">
+                <span class="badge badge-{{ request.status }}">{{ trans('core.request.status.' ~ request.status) }}</span>
+                {% if request.decided_at %}<small>({{ request.decided_at }} UTC)</small>{% endif %}
+                {% if request.status_note %}<p>{{ trans('core.provider.status_note') }} {{ request.status_note }}</p>{% endif %}
+                {% if request.changed_since_decision %}<p><span class="badge badge-changed">{{ trans('core.admin.offers.changed') }}</span></p>{% endif %}
+            </div>
+        </section>
+
+        {% if request.status in ['pending', 'rejected'] %}
+            <section class="card-box">
+                <h2>{{ trans('core.admin.providers.decision') }}</h2>
+                <form method="post" action="{{ url('/admin/requests/' ~ request.id ~ '/decide') }}" class="stack-form wide">
+                    {{ csrf_field() }}
+                    <div class="field">
+                        <label for="note">{{ trans('core.admin.providers.note') }}</label>
+                        <textarea id="note" name="note" rows="4"></textarea>
+                        <small>{{ trans('core.admin.offers.note_hint') }}</small>
+                    </div>
+                    <div class="button-row">
+                        <button type="submit" name="decision" value="approve">{{ trans('core.admin.offers.approve') }}</button>
+                        <button type="submit" name="decision" value="reject" class="danger">{{ trans('core.admin.providers.reject') }}</button>
+                    </div>
+                </form>
+            </section>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

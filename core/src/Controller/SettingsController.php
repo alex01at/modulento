@@ -25,6 +25,7 @@ final class SettingsController extends Controller
                 'registration' => $app->settings->get('core.registration', 'open'),
                 'provider_approval' => $app->providers->approvalRequired() ? 'required' : 'off',
                 'offer_approval' => $app->offers->approvalRequired() ? 'required' : 'off',
+                'request_approval' => $app->requests->approvalRequired() ? 'required' : 'off',
                 'currency' => $app->offers->currency(),
                 'meta_description' => $app->settings->get('core.meta_description'),
                 'poll_seconds' => (int) $app->settings->get('core.poll_seconds', '60'),
@@ -78,6 +79,15 @@ final class SettingsController extends Controller
         if ($offerApprovalRequired !== $app->offers->approvalRequired()) {
             foreach ($app->offers->setApprovalRequired($offerApprovalRequired) as $offerId) {
                 AdminCatalogueController::announce($app, ['status' => 'pending'] + $app->offers->find($offerId), 'published');
+            }
+        }
+
+        if ($app->modules->enabled('requests')) {
+            $requestApprovalRequired = ($_POST['request_approval'] ?? '') !== 'off';
+            if ($requestApprovalRequired !== $app->requests->approvalRequired()) {
+                foreach ($app->requests->setApprovalRequired($requestApprovalRequired) as $requestId) {
+                    AdminRequestController::announce($app, ['status' => 'pending'] + $app->requests->find($requestId), 'published');
+                }
             }
         }
 

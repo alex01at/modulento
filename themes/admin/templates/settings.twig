@@ -68,6 +68,16 @@
                 </select>
                 <small>{{ trans('core.admin.settings.offer_approval_hint') }}</small>
             </div>
+            {% if module('requests') %}
+                <div class="field">
+                    <label for="request_approval">{{ trans('core.admin.settings.request_approval') }}</label>
+                    <select id="request_approval" name="request_approval">
+                        <option value="required" {{ settings.request_approval == 'required' ? 'selected' }}>{{ trans('core.admin.settings.offer_approval_required') }}</option>
+                        <option value="off" {{ settings.request_approval == 'off' ? 'selected' }}>{{ trans('core.admin.settings.offer_approval_off') }}</option>
+                    </select>
+                    <small>{{ trans('core.admin.settings.request_approval_hint') }}</small>
+                </div>
+            {% endif %}
             <div class="field">
                 <label for="currency">{{ trans('core.admin.settings.currency') }}</label>
                 <input id="currency" name="currency" value="{{ settings.currency }}" maxlength="3" pattern="[A-Za-z]{3}" required>

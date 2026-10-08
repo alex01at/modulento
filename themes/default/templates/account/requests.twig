@@ -1,0 +1,31 @@
+{% extends 'layout/base.twig' %}
+
+{% block title %}{{ trans('core.request.mine.title') }} – {{ site_name }}{% endblock %}
+
+{% block content %}
+{% include 'account/_nav.twig' %}
+<h1>{{ trans('core.request.mine.title') }}</h1>
+<p><a href="{{ url('/account/requests/new') }}">{{ trans('core.request.new') }}</a></p>
+
+{% if requests is empty %}
+    <p>{{ trans('core.request.mine.none') }}</p>
+{% else %}
+    <ul class="card-list">
+        {% for request in requests %}
+            <li>
+                <a href="{{ url('/account/requests/' ~ request.id ~ '/edit') }}"><strong>{{ request.title }}</strong></a>
+                <small>{{ trans('core.request.status.' ~ request.status) }}</small>
+                <p><a href="{{ url('/account/requests/' ~ request.id ~ '/applications') }}">{{ trans('core.request.applications.title') }}</a></p>
+            </li>
+        {% endfor %}
+    </ul>
+
+    {% if pages > 1 %}
+        <nav class="pager" aria-label="{{ trans('core.pager.label') }}">
+            {% if page > 1 %}<a href="{{ url('/account/requests') }}?page={{ page - 1 }}" rel="prev">{{ trans('core.pager.previous') }}</a>{% endif %}
+            <span>{{ trans('core.pager.position', {page: page, pages: pages}) }}</span>
+            {% if page < pages %}<a href="{{ url('/account/requests') }}?page={{ page + 1 }}" rel="next">{{ trans('core.pager.next') }}</a>{% endif %}
+        </nav>
+    {% endif %}
+{% endif %}
+{% endblock %}

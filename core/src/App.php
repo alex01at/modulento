@@ -32,6 +32,9 @@ use Modulento\Core\Order\OrderFiles;
 use Modulento\Core\Order\Orders;
 use Modulento\Core\Order\Withdrawals;
 use Modulento\Core\Report\Reports;
+use Modulento\Core\Request\RequestApplications;
+use Modulento\Core\Request\RequestFlow;
+use Modulento\Core\Request\Requests;
 use Modulento\Core\Package\Packages;
 use Modulento\Core\Payment\Payments;
 use Modulento\Core\Payment\PaypalPayment;
@@ -120,6 +123,8 @@ final class App
     public readonly BillingProfile $billingProfile;
     public readonly Badges $badges;
     public readonly Notifications $notifications;
+    public readonly Requests $requests;
+    public readonly RequestApplications $requestApplications;
 
     /** The request path without its language prefix - what routes are matched against. */
     public string $path = '/';
@@ -166,6 +171,11 @@ final class App
         $this->categories = new Categories($db, $this->locales);
         $this->offers = new Offers($db, $this->settings, $this->locales);
         $this->orders = new Orders($db);
+        $this->requests = new Requests($db, $this->settings);
+        $this->requestApplications = new RequestApplications($db);
+        // Core's own order flow, registered the same direct way as the
+        // payment methods just below - not through an extension's Registrar.
+        $this->orders->registerFlow(new RequestFlow());
         $this->payments = new Payments(
             $db,
             $this->settings,

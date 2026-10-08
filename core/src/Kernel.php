@@ -19,6 +19,7 @@ use Modulento\Core\Controller\AdminMessageController;
 use Modulento\Core\Controller\AdminOrderController;
 use Modulento\Core\Controller\AdminPaymentController;
 use Modulento\Core\Controller\AdminProviderController;
+use Modulento\Core\Controller\AdminRequestController;
 use Modulento\Core\Controller\AssetController;
 use Modulento\Core\Controller\AuthController;
 use Modulento\Core\Controller\CronController;
@@ -35,6 +36,7 @@ use Modulento\Core\Controller\PaymentSettingsController;
 use Modulento\Core\Controller\HandbookController;
 use Modulento\Core\Controller\ProviderController;
 use Modulento\Core\Controller\RegistrationController;
+use Modulento\Core\Controller\RequestController;
 use Modulento\Core\Controller\AccountRatingController;
 use Modulento\Core\Controller\ReviewController;
 use Modulento\Core\Controller\SettingsController;
@@ -281,6 +283,27 @@ final class Kernel
             $router->get('/account/notifications', [NotificationController::class, 'index']);
             $router->get('/account/notifications/unread', [NotificationController::class, 'unread']);
         }
+        // Requests: a buyer describes what they need, providers apply, one
+        // gets accepted and becomes a real order (Request\RequestFlow).
+        if ($modules->enabled('requests')) {
+            $router->get('/requests', [RequestController::class, 'index'], Router::PUBLIC);
+            $router->get('/requests/{slug}', [RequestController::class, 'show'], Router::PUBLIC);
+            $router->post('/requests/{slug}/apply', [RequestController::class, 'apply']);
+            $router->get('/account/requests', [RequestController::class, 'mine']);
+            $router->get('/account/requests/new', [RequestController::class, 'create']);
+            $router->post('/account/requests/new', [RequestController::class, 'save']);
+            $router->get('/account/requests/{id}/edit', [RequestController::class, 'edit']);
+            $router->post('/account/requests/{id}', [RequestController::class, 'save']);
+            $router->post('/account/requests/{id}/delete', [RequestController::class, 'delete']);
+            $router->get('/account/requests/{id}/applications', [RequestController::class, 'applications']);
+            $router->get('/account/requests/{id}/applications/{appId}/accept', [RequestController::class, 'confirmAccept']);
+            $router->post('/account/requests/{id}/applications/{appId}/accept', [RequestController::class, 'accept']);
+            $router->get('/account/applications', [RequestController::class, 'myApplications']);
+            $router->post('/account/applications/{id}/withdraw', [RequestController::class, 'withdraw']);
+            $router->get('/admin/requests', [AdminRequestController::class, 'index'], 'core.requests.manage');
+            $router->get('/admin/requests/{id}', [AdminRequestController::class, 'request'], 'core.requests.manage');
+            $router->post('/admin/requests/{id}/decide', [AdminRequestController::class, 'decide'], 'core.requests.manage');
+        }
         // Plans and grants: the administration of the subscriptions module only.
         if ($modules->enabled('subscriptions')) {
             $router->get('/admin/subscriptions', [AdminSubscriptionController::class, 'index'], 'core.settings.manage');
@@ -460,6 +483,7 @@ final class Kernel
             $app->addPermission('core.reports.manage', 'core.permission.reports_manage');
         }
         $app->addPermission('core.offers.manage', 'core.permission.offers_manage');
+        $app->addPermission('core.requests.manage', 'core.permission.requests_manage');
         $app->addPermission('core.categories.manage', 'core.permission.categories_manage');
         $app->addPermission('core.providers.manage', 'core.permission.providers_manage');
         $app->addPermission('core.accounts.manage', 'core.permission.accounts_manage');
@@ -475,6 +499,9 @@ final class Kernel
         $app->addAdminMenu('core.admin.menu.home', '/admin/home', 'core.settings.manage', 'content');
         if ($app->modules->enabled('subscriptions')) {
             $app->addAdminMenu('core.admin.menu.subscriptions', '/admin/subscriptions', 'core.settings.manage', 'marketplace');
+        }
+        if ($app->modules->enabled('requests')) {
+            $app->addAdminMenu('core.admin.menu.requests', '/admin/requests', 'core.requests.manage', 'moderation');
         }
         $app->addAdminMenu('core.admin.menu.offer_page', '/admin/offer-page', 'core.settings.manage', 'content');
         $app->addAdminMenu('core.admin.menu.design', '/admin/design', 'core.settings.manage', 'system');

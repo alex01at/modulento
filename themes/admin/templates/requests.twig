@@ -1,0 +1,47 @@
+{% extends '@admin/layout.twig' %}
+
+{% block title %}{{ trans('core.admin.requests.title') }} – {{ site_name }}{% endblock %}
+
+{% block admin %}
+{% include '@admin/_page_header.twig' with {heading: trans('core.admin.requests.title')} only %}
+
+<section class="card-box">
+    <div class="card-head">
+        <p>{{ trans(approval_required ? 'core.admin.requests.approval_on' : 'core.admin.requests.approval_off') }}</p>
+    </div>
+
+    <nav class="tabs" aria-label="{{ trans('core.admin.layout.filter') }}">
+        <a href="{{ url('/admin/requests') }}" {{ status is null ? 'aria-current="page"' }}>{{ trans('core.admin.requests.all') }}</a>
+        {% for name, count in counts %}
+            <a href="{{ url('/admin/requests') }}?status={{ name }}" {{ status == name ? 'aria-current="page"' }}>{{ trans('core.request.status.' ~ name) }} ({{ count }})</a>
+        {% endfor %}
+    </nav>
+
+    {% if requests is empty %}
+        <p class="empty">{{ trans('core.admin.requests.none') }}</p>
+    {% else %}
+        <div class="table-wrap">
+            <table>
+                <thead>
+                <tr>
+                    <th scope="col">{{ trans('core.request.field.title') }}</th>
+                    <th scope="col">{{ trans('core.admin.requests.account') }}</th>
+                    <th scope="col">{{ trans('core.offer.field.status') }}</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for request in requests %}
+                    <tr>
+                        <th scope="row"><a href="{{ url('/admin/requests/' ~ request.id) }}">{{ request.title }}</a></th>
+                        <td>{{ request.account_email }}</td>
+                        <td><span class="badge badge-{{ request.status }}">{{ trans('core.request.status.' ~ request.status) }}</span></td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        {% include '@admin/_pager.twig' with {path: '/admin/requests', page: page, pages: pages, extra: status ? '&status=' ~ status : ''} only %}
+    {% endif %}
+</section>
+{% endblock %}

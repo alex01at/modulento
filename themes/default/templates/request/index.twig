@@ -1,0 +1,50 @@
+{% extends 'layout/base.twig' %}
+
+{% block title %}{{ trans('core.requests.title') }} – {{ site_name }}{% endblock %}
+
+{% block content %}
+<h1>{{ trans('core.requests.title') }}</h1>
+<p class="lead">{{ trans('core.requests.intro') }}</p>
+
+{% if categories %}
+    <form method="get" action="{{ url('/requests') }}" class="filter-row">
+        <label class="visually-hidden" for="category">{{ trans('core.offer.field.category') }}</label>
+        <select id="category" name="category">
+            <option value="">{{ trans('core.offers.all') }}</option>
+            {% for top in categories %}
+                <option value="{{ top.id }}" {{ category_id == top.id ? 'selected' }}>{{ top.name }}</option>
+                {% for child in top.children %}
+                    <option value="{{ child.id }}" {{ category_id == child.id ? 'selected' }}>– {{ child.name }}</option>
+                {% endfor %}
+            {% endfor %}
+        </select>
+        <button type="submit">{{ trans('core.offers.search_submit') }}</button>
+    </form>
+{% endif %}
+
+{% if requests is empty %}
+    <p>{{ trans('core.requests.none') }}</p>
+{% else %}
+    <p><small>{{ trans(total == 1 ? 'core.requests.total_one' : 'core.requests.total', {count: total}) }}</small></p>
+    <ul class="card-list">
+        {% for request in requests %}
+            <li>
+                <a href="{{ url(request.path) }}"><strong>{{ request.title }}</strong></a>
+                {% if request.category_name %}<small>{{ request.category_name }}</small>{% endif %}
+                <p>{{ request.snippet }}</p>
+                {% if request.budget_min is not null or request.budget_max is not null %}
+                    <small>{{ trans('core.request.budget_range', {min: request.budget_min is not null ? money(request.budget_min, request.currency) : '?', max: request.budget_max is not null ? money(request.budget_max, request.currency) : '?'}) }}</small>
+                {% endif %}
+            </li>
+        {% endfor %}
+    </ul>
+
+    {% if pages > 1 %}
+        <nav class="pager" aria-label="{{ trans('core.pager.label') }}">
+            {% if page > 1 %}<a href="{{ url('/requests') }}?page={{ page - 1 }}{{ category_id ? '&category=' ~ category_id }}" rel="prev">{{ trans('core.pager.previous') }}</a>{% endif %}
+            <span>{{ trans('core.pager.position', {page: page, pages: pages}) }}</span>
+            {% if page < pages %}<a href="{{ url('/requests') }}?page={{ page + 1 }}{{ category_id ? '&category=' ~ category_id }}" rel="next">{{ trans('core.pager.next') }}</a>{% endif %}
+        </nav>
+    {% endif %}
+{% endif %}
+{% endblock %}
