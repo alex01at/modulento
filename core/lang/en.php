@@ -1651,7 +1651,8 @@ return [
     'core.notification.request_status' => '"{title}": {status}',
     'core.notification.request_declined' => 'Another application was accepted for "{title}"',
 
-    'core.module.requests' => 'Requests',
+    'core.module.requests.name' => 'Requests',
+    'core.module.requests.description' => 'Clients can publish a request that providers apply to with their own price.',
     'core.permission.requests_manage' => 'Manage requests',
     'core.admin.menu.requests' => 'Requests',
     'core.nav.requests' => 'Requests',
