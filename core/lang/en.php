@@ -1602,6 +1602,7 @@ return [
     'core.subscriptions.feature.auto_approve' => 'New offers are published at once, without review',
     'core.subscriptions.feature.featured_badge' => '"Featured provider" badge on the profile and on offers',
     'core.subscriptions.feature.priority_placement' => 'Offers come first in listings and on the home page',
+    'core.subscriptions.feature.request_notify' => 'Instant notification on every new request',
 
     'core.permission.messages_manage' => 'Manage messages',
     'core.permission.messages_manage.hint' => 'See every order message and offer question, dismiss flags or hide flagged messages.',
@@ -1650,6 +1651,7 @@ return [
     'core.notification.request_application' => 'New application on "{title}"',
     'core.notification.request_status' => '"{title}": {status}',
     'core.notification.request_declined' => 'Another application was accepted for "{title}"',
+    'core.notification.request_new' => 'New request: "{title}"',
 
     'core.module.requests.name' => 'Requests',
     'core.module.requests.description' => 'Clients can publish a request that providers apply to with their own price.',
@@ -1708,6 +1710,7 @@ return [
     'core.request.budget_range' => '{min} – {max}',
 
     'core.request.mine.title' => 'My requests',
+    'core.request.open.title' => 'Open requests',
     'core.request.mine.none' => 'You have not posted a request yet.',
 
     'core.request.apply.title' => 'Apply',

@@ -139,6 +139,7 @@ final class RequestController extends Controller
             return;
         }
 
+        $published = false;
         if ($existing === null) {
             if ($app->requests->listAll($accountId, null, 1, 1)['total'] >= self::MAX_OPEN) {
                 Session::flash('error', $this->trans('core.request.error.too_many', ['max' => self::MAX_OPEN]));
@@ -146,6 +147,7 @@ final class RequestController extends Controller
                 return;
             }
             $id = $app->requests->create($accountId, $result['category_id'], $result['title'], $result['description'], $result['budget_min'], $result['budget_max'], $result['needed_by']);
+            $published = !$app->requests->approvalRequired();
         } else {
             $app->requests->update($existing['id'], $result['category_id'], $result['title'], $result['description'], $result['budget_min'], $result['budget_max'], $result['needed_by']);
             $id = $existing['id'];
@@ -153,8 +155,12 @@ final class RequestController extends Controller
             // saving it again - there is no separate wizard or submit step
             // here, unlike an offer's draft/submit.
             if ($existing['status'] === 'rejected') {
-                $app->requests->setStatus($id, $app->requests->approvalRequired() ? 'pending' : 'published', null, null);
+                $published = !$app->requests->approvalRequired();
+                $app->requests->setStatus($id, $published ? 'published' : 'pending', null, null);
             }
+        }
+        if ($published) {
+            AdminRequestController::notifySubscribers($app, $app->requests->find($id));
         }
 
         Session::flash('success', $this->trans($existing === null ? 'core.request.saved_new' : 'core.request.saved'));

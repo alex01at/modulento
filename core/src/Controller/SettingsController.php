@@ -86,7 +86,9 @@ final class SettingsController extends Controller
             $requestApprovalRequired = ($_POST['request_approval'] ?? '') !== 'off';
             if ($requestApprovalRequired !== $app->requests->approvalRequired()) {
                 foreach ($app->requests->setApprovalRequired($requestApprovalRequired) as $requestId) {
-                    AdminRequestController::announce($app, ['status' => 'pending'] + $app->requests->find($requestId), 'published');
+                    $published = $app->requests->find($requestId);
+                    AdminRequestController::announce($app, ['status' => 'pending'] + $published, 'published');
+                    AdminRequestController::notifySubscribers($app, $published);
                 }
             }
         }

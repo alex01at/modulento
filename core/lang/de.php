@@ -1602,6 +1602,7 @@ return [
     'core.subscriptions.feature.auto_approve' => 'Neue Angebote ohne Prüfung sofort veröffentlichen',
     'core.subscriptions.feature.featured_badge' => '„Empfohlener Anbieter“-Abzeichen auf Profil und Angeboten',
     'core.subscriptions.feature.priority_placement' => 'Angebote zuerst in Liste und Startseite',
+    'core.subscriptions.feature.request_notify' => 'Sofortige Benachrichtigung bei jeder neuen Anfrage',
 
     'core.permission.messages_manage' => 'Nachrichten verwalten',
     'core.permission.messages_manage.hint' => 'Alle Bestellnachrichten und Angebotsfragen einsehen, markierte Nachrichten quittieren oder ausblenden.',
@@ -1647,9 +1648,10 @@ return [
     'core.notification.offer_message' => 'Neue Frage zu „{title}"',
     'core.notification.offer_reply' => 'Antwort auf deine Frage zu „{title}"',
     'core.notification.offer_status' => '„{title}": {status}',
-    'core.notification.request_application' => 'Neue Bewerbung auf „{title}"',
-    'core.notification.request_status' => '„{title}": {status}',
-    'core.notification.request_declined' => 'Eine andere Bewerbung wurde für „{title}" angenommen',
+    'core.notification.request_application' => 'Neue Bewerbung auf „{title}“',
+    'core.notification.request_status' => '„{title}“: {status}',
+    'core.notification.request_declined' => 'Eine andere Bewerbung wurde für „{title}“ angenommen',
+    'core.notification.request_new' => 'Neue Anfrage: „{title}“',
 
     'core.module.requests.name' => 'Anfragen',
     'core.module.requests.description' => 'Auftraggeber können eine Anfrage veröffentlichen, auf die sich Anbieter mit einem eigenen Preisvorschlag bewerben.',
@@ -1708,6 +1710,7 @@ return [
     'core.request.budget_range' => '{min} – {max}',
 
     'core.request.mine.title' => 'Meine Anfragen',
+    'core.request.open.title' => 'Offene Anfragen',
     'core.request.mine.none' => 'Du hast noch keine Anfrage gestellt.',
 
     'core.request.apply.title' => 'Bewerben',
