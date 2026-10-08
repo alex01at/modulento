@@ -19,24 +19,37 @@
 
     <h2>{{ trans('core.admin.subscriptions.plans.title') }}</h2>
     {% if plans %}
-        <table>
-            <thead>
-            <tr>
-                <th scope="col">{{ trans('core.admin.subscriptions.plans.name') }}</th>
-                <th scope="col">{{ trans('core.admin.subscriptions.plans.price') }}</th>
-                <th scope="col">{{ trans('core.admin.subscriptions.plans.features') }}</th>
-            </tr>
-            </thead>
-            <tbody>
+        <ul class="columns plan-grid">
             {% for plan in plans %}
-                <tr>
-                    <td><a href="{{ url('/admin/subscriptions/plans/' ~ plan.id) }}"><strong>{{ plan.name }}</strong></a> <small>{{ plan.slug }}</small>{% if not plan.active %} <span class="badge badge-disabled">{{ trans('core.admin.subscriptions.plans.inactive') }}</span>{% endif %}</td>
-                    <td>{{ money(plan.price_cents, plan.currency) }} / {{ trans(plan.period_months == 1 ? 'core.admin.subscriptions.plans.months_one' : 'core.admin.subscriptions.plans.months', {count: plan.period_months}) }}</td>
-                    <td>{{ plan.features|join(', ') ?: '–' }}</td>
-                </tr>
+                <li class="card-box plan-card">
+                    <div class="card-head">
+                        <div>
+                            <strong class="card-title"><a href="{{ url('/admin/subscriptions/plans/' ~ plan.id) }}">{{ plan.name }}</a></strong>
+                            <small>{{ plan.slug }}</small>
+                        </div>
+                        <span class="badge {{ plan.active ? 'badge-active' : 'badge-disabled' }}">{{ trans(plan.active ? 'core.admin.subscriptions.plans.active_badge' : 'core.admin.subscriptions.plans.inactive') }}</span>
+                    </div>
+                    <p class="price">{{ money(plan.price_cents, plan.currency) }} <small>/ {{ trans(plan.period_months == 1 ? 'core.admin.subscriptions.plans.months_one' : 'core.admin.subscriptions.plans.months', {count: plan.period_months}) }}</small></p>
+                    <p class="muted">{{ trans(subscriber_counts[plan.id] is defined and subscriber_counts[plan.id] == 1 ? 'core.admin.subscriptions.plans.subscribers_one' : 'core.admin.subscriptions.plans.subscribers', {count: subscriber_counts[plan.id] ?? 0}) }}</p>
+                    {% if plan.features %}
+                        <p class="muted">{{ trans('core.admin.subscriptions.plans.features') }}: {{ plan.features|join(', ') }}</p>
+                    {% endif %}
+                    {% set limitParts = [] %}
+                    {% for type in offer_types %}
+                        {% if plan.offer_limits[type.id] is defined %}
+                            {% set limitParts = limitParts|merge([trans(type.label_key) ~ ': ' ~ plan.offer_limits[type.id]]) %}
+                        {% endif %}
+                    {% endfor %}
+                    {% if plan.max_images_per_offer is not null %}
+                        {% set limitParts = limitParts|merge([trans('core.admin.subscriptions.plan.max_images') ~ ': ' ~ plan.max_images_per_offer]) %}
+                    {% endif %}
+                    {% if limitParts %}
+                        <p class="muted">{{ trans('core.admin.subscriptions.plan.limits') }}: {{ limitParts|join(' · ') }}</p>
+                    {% endif %}
+                    <p><a href="{{ url('/admin/subscriptions/plans/' ~ plan.id) }}">{{ trans('core.admin.subscriptions.plans.edit') }}</a></p>
+                </li>
             {% endfor %}
-            </tbody>
-        </table>
+        </ul>
     {% else %}
         <p>{{ trans('core.admin.subscriptions.plans.none') }}</p>
     {% endif %}

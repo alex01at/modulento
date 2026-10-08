@@ -5,12 +5,13 @@
 {% block admin %}
 {% include '@admin/_page_header.twig' with {heading: plan.name, crumbs: [{label: trans('core.admin.subscriptions.title'), path: '/admin/subscriptions'}]} only %}
 
+<div class="split">
 <section class="card-box">
     <div class="card-head">
         <p>{{ trans('core.admin.subscriptions.plan.intro') }}</p>
         <p><small>{{ trans('core.admin.subscriptions.plans.form.slug') }}: <code>{{ plan.slug }}</code></small></p>
     </div>
-    <form method="post" action="{{ url('/admin/subscriptions/plans/' ~ plan.id) }}" class="stack-form">
+    <form method="post" action="{{ url('/admin/subscriptions/plans/' ~ plan.id) }}" class="stack-form" id="plan-form">
         {{ csrf_field() }}
         <label for="plan-name">{{ trans('core.admin.subscriptions.plans.form.name') }}</label>
         <input id="plan-name" name="name" value="{{ plan.name }}" maxlength="100" required>
@@ -21,7 +22,7 @@
         <label for="plan-period">{{ trans('core.admin.subscriptions.plans.form.period') }}</label>
         <select id="plan-period" name="period_months">
             {% for months in periods %}
-                <option value="{{ months }}" {{ months == plan.period_months ? 'selected' }}>{{ trans(months == 1 ? 'core.admin.subscriptions.plans.months_one' : 'core.admin.subscriptions.plans.months', {count: months}) }}</option>
+                <option value="{{ months }}" data-label="{{ trans(months == 1 ? 'core.admin.subscriptions.plans.months_one' : 'core.admin.subscriptions.plans.months', {count: months}) }}" {{ months == plan.period_months ? 'selected' }}>{{ trans(months == 1 ? 'core.admin.subscriptions.plans.months_one' : 'core.admin.subscriptions.plans.months', {count: months}) }}</option>
             {% endfor %}
         </select>
 
@@ -32,7 +33,7 @@
             {% endif %}
             {% for feature in features %}
                 <label class="checkbox">
-                    <input type="checkbox" name="features[]" value="{{ feature.key }}" {{ feature.key in plan.features ? 'checked' }}>
+                    <input type="checkbox" name="features[]" value="{{ feature.key }}" data-label="{{ feature.label_key ? trans(feature.label_key) : feature.key }}" {{ feature.key in plan.features ? 'checked' }}>
                     <span>{% if feature.label_key %}{{ trans(feature.label_key) }} <small>{{ feature.key }}</small>{% else %}{{ feature.key }}{% endif %}</span>
                 </label>
             {% endfor %}
@@ -46,7 +47,7 @@
             <p><small>{{ trans('core.admin.subscriptions.plan.limits_hint') }}</small></p>
             {% for type in offer_types %}
                 <label for="plan-limit-{{ type.id }}">{{ trans(type.label_key) }}</label>
-                <input id="plan-limit-{{ type.id }}" name="offer_limits[{{ type.id }}]" type="number" min="0" value="{{ plan.offer_limits[type.id] ?? '' }}">
+                <input id="plan-limit-{{ type.id }}" name="offer_limits[{{ type.id }}]" type="number" min="0" data-label="{{ trans(type.label_key) }}" value="{{ plan.offer_limits[type.id] ?? '' }}">
             {% endfor %}
             <label for="plan-max-images">{{ trans('core.admin.subscriptions.plan.max_images') }}</label>
             <input id="plan-max-images" name="max_images_per_offer" type="number" min="0" value="{{ plan.max_images_per_offer ?? '' }}">
@@ -60,6 +61,22 @@
         <button type="submit">{{ trans('core.admin.subscriptions.plan.save') }}</button>
     </form>
 </section>
+
+<aside class="card-box plan-preview" aria-live="polite">
+    <div class="card-head">
+        <h2>{{ trans('core.admin.subscriptions.plan.preview') }}</h2>
+    </div>
+    <p><small>{{ trans('core.admin.subscriptions.plan.preview_hint') }}</small></p>
+    <div class="plan-card">
+        <div class="card-head">
+            <strong class="card-title" id="preview-name" data-placeholder="{{ trans('core.admin.subscriptions.plan.preview_unnamed') }}"></strong>
+            <span class="badge" id="preview-badge" data-active="{{ trans('core.admin.subscriptions.plans.active_badge') }}" data-inactive="{{ trans('core.admin.subscriptions.plans.inactive') }}"></span>
+        </div>
+        <p class="price" id="preview-price"></p>
+        <ul id="preview-features" class="plan-preview-list" data-none-label="{{ trans('core.admin.subscriptions.plan.preview_empty') }}" data-images-label="{{ trans('core.admin.subscriptions.plan.preview_images') }}"></ul>
+    </div>
+</aside>
+</div>
 
 <section class="card-box">
     <h2>{{ trans('core.admin.subscriptions.plan.delete.title') }}</h2>

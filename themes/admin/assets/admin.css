@@ -233,6 +233,29 @@ img { max-width: 100%; height: auto; border-radius: 6px; }
 
 .split { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 0 1.5rem; align-items: start; }
 .columns { display: grid; grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr)); gap: 0 1.5rem; align-items: start; }
+/* Used sparingly across the admin, not just here - a plain label/amount
+   with no dedicated rule of its own yet. */
+.muted { color: var(--muted); }
+.card-title { font-size: 1.0625rem; }
+.card-title a { color: inherit; text-decoration: none; }
+.card-title a:hover { text-decoration: underline; }
+.price { color: var(--heading); }
+
+.plan-grid { list-style: none; margin: 0 0 1.5rem; padding: 0; gap: 1.5rem; }
+.plan-card { margin-bottom: 0; }
+.plan-card .card-head { margin-bottom: .75rem; }
+.plan-card .price { margin: 0 0 .5rem; font-size: 1.25rem; font-weight: 700; }
+.plan-card .price small { font-size: .8125rem; font-weight: 400; color: var(--muted); }
+
+.plan-preview { position: sticky; top: 1.5rem; background: var(--bg); }
+.plan-preview .plan-card { background: var(--card); border-radius: var(--radius); padding: 1.25rem; box-shadow: var(--shadow); }
+.plan-preview-list { list-style: none; margin: .5rem 0 0; padding: 0; display: flex; flex-direction: column; gap: .4rem; font-size: .9375rem; }
+.plan-preview-list li::before { content: "✓ "; color: var(--success); font-weight: 700; }
+.plan-preview-list li.is-muted { color: var(--muted); }
+.plan-preview-list li.is-muted::before { content: ""; }
+@media (max-width: 64rem) {
+    .plan-preview { position: static; }
+}
 
 /* --- Dashboard ---------------------------------------------------------- */
 .stats { display: grid; grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr)); gap: 1.5rem; margin: 0 0 1.5rem; padding: 0; list-style: none; }
