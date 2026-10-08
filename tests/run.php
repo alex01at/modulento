@@ -218,6 +218,11 @@ $pdo->exec("CREATE TABLE account_billing_profile (account_id INTEGER PRIMARY KEY
     company_name TEXT, website TEXT, vat_id TEXT, tax_id TEXT, street TEXT, postal_code TEXT, city TEXT, country TEXT, updated_at TEXT)");
 $pdo->exec("CREATE TABLE notification (id INTEGER PRIMARY KEY, account_id INTEGER REFERENCES account (id) ON DELETE CASCADE,
     type TEXT, message_key TEXT, params TEXT, link TEXT, read_at TEXT, created_at TEXT)");
+// Created this early (not just where the rest of migration 022 is mirrored,
+// further down) because OfferController now consults a plan's limits on
+// every offer wizard request, not only on the subscriptions tests' own pages.
+$pdo->exec("CREATE TABLE subscription_plan (id INTEGER PRIMARY KEY, slug TEXT UNIQUE, name TEXT, price_cents INTEGER, currency TEXT, period_months INTEGER, features TEXT NOT NULL DEFAULT '', offer_limits TEXT NOT NULL DEFAULT '{}', max_images_per_offer INTEGER NULL, active INTEGER NOT NULL DEFAULT 1)");
+$pdo->exec("CREATE TABLE subscription (id INTEGER PRIMARY KEY, account_id INTEGER REFERENCES account (id) ON DELETE CASCADE, plan_id INTEGER REFERENCES subscription_plan (id), status TEXT, period_end TEXT, provider_ref TEXT NULL, reminded_for TEXT NULL, created_at TEXT, updated_at TEXT)");
 $pdo->exec("CREATE TABLE provider (id INTEGER PRIMARY KEY, account_id INTEGER UNIQUE REFERENCES account (id) ON DELETE CASCADE, type TEXT, status TEXT,
     status_note TEXT, name TEXT, slug TEXT UNIQUE, legal_name TEXT, street TEXT, postal_code TEXT, city TEXT, country TEXT, contact_email TEXT, phone TEXT,
     vat_id TEXT, tax_id TEXT, company_register TEXT, self_certified_at TEXT, details_changed_at TEXT, decided_at TEXT, decided_by INTEGER, created_at TEXT, updated_at TEXT,
@@ -296,7 +301,9 @@ $pdo->exec("CREATE TABLE role_permission (role_id INTEGER REFERENCES role (id) O
 $pdo->exec("CREATE TABLE account_role (account_id INTEGER REFERENCES account (id) ON DELETE CASCADE, role_id INTEGER REFERENCES role (id) ON DELETE CASCADE)");
 $pdo->exec("CREATE TABLE extension (id TEXT PRIMARY KEY, version TEXT, enabled INTEGER)");
 $pdo->exec("CREATE TABLE setting (name TEXT PRIMARY KEY, value TEXT)");
-$pdo->exec("INSERT INTO setting VALUES ('core.languages', 'de,en'), ('core.default_language', 'de')");
+// Mirrors what a fresh install's own installer now does: every module on
+// except subscriptions, so a plain site keeps making offers without plans.
+$pdo->exec("INSERT INTO setting VALUES ('core.languages', 'de,en'), ('core.default_language', 'de'), ('core.modules_disabled', 'subscriptions')");
 $testHash = password_hash('correct horse battery', PASSWORD_BCRYPT, ['cost' => 4]);
 $insertAccount = $pdo->prepare("INSERT INTO account (id, email, password_hash, status, email_verified_at, locale, created_at) VALUES (?, ?, ?, ?, '2026-01-01 00:00:00', 'de', '2026-01-01 00:00:00')");
 foreach ([[1, 'plain@example.test', 'active'], [2, 'editor@example.test', 'active'], [3, 'admin@example.test', 'active'], [4, 'blocked@example.test', 'blocked']] as [$id, $email, $status]) {
@@ -1684,11 +1691,13 @@ check('order: the listed order wins, unknown and repeated ids are ignored', $ids
 check('order: a list left out keeps every block', count(Modulento\Core\Content\HomeLayout::ordered($three, [])) === 3);
 
 // Subscriptions: plans, what an account may use, and the module that switches all of it off.
+// Off by default for the rest of the suite (see the setting inserted at the
+// very start) - on here, since this whole section is about it.
 $subModules = new Modulento\Core\Support\Modules(new Modulento\Core\Support\Settings($pdo));
+$subModules->save(array_keys(Modulento\Core\Support\Modules::ALL));
 $subs = new Modulento\Core\Subscription\Subscriptions($pdo, $subModules);
-// The tables of migration 022, in SQLite's words.
-$pdo->exec("CREATE TABLE subscription_plan (id INTEGER PRIMARY KEY, slug TEXT UNIQUE, name TEXT, price_cents INTEGER, currency TEXT, period_months INTEGER, features TEXT NOT NULL DEFAULT '', active INTEGER NOT NULL DEFAULT 1)");
-$pdo->exec("CREATE TABLE subscription (id INTEGER PRIMARY KEY, account_id INTEGER REFERENCES account (id) ON DELETE CASCADE, plan_id INTEGER REFERENCES subscription_plan (id), status TEXT, period_end TEXT, provider_ref TEXT NULL, reminded_for TEXT NULL, created_at TEXT, updated_at TEXT)");
+// subscription_plan and subscription themselves are created much earlier
+// (see the comment there) - the rest of migration 022 onward follows here.
 $pdo->exec("CREATE TABLE subscription_order (id INTEGER PRIMARY KEY, account_id INTEGER REFERENCES account (id) ON DELETE CASCADE, plan_id INTEGER REFERENCES subscription_plan (id), method TEXT, status TEXT, reference TEXT UNIQUE, amount_cents INTEGER, currency TEXT, stripe_session TEXT NULL, created_at TEXT, paid_at TEXT NULL)");
 $pdo->exec("CREATE TABLE subscription_billing_address (account_id INTEGER PRIMARY KEY REFERENCES account (id) ON DELETE CASCADE, name TEXT, street TEXT, postal_code TEXT, city TEXT, country TEXT, updated_at TEXT)");
 $pdo->exec("CREATE TABLE subscription_invoice (id INTEGER PRIMARY KEY, number TEXT UNIQUE, year INTEGER, seq INTEGER, source_ref TEXT UNIQUE, account_id INTEGER NULL REFERENCES account (id) ON DELETE SET NULL, plan_name TEXT, months INTEGER, currency TEXT, net_cents INTEGER, tax_rate INTEGER, tax_cents INTEGER, gross_cents INTEGER, buyer_name TEXT, buyer_street TEXT, buyer_postal_code TEXT, buyer_city TEXT, buyer_country TEXT, issuer TEXT, issued_at TEXT, UNIQUE (year, seq))");
@@ -1714,6 +1723,42 @@ $subs->assign($subAccount, $subPlan, Modulento\Core\Support\Clock::now(3600));
 check('subscriptions: a plan within its period grants its features', $subs->allows($subAccount, 'abo.test.one'));
 $subs->assign($subAccount, null);
 check('subscriptions: removing the plan cancels it and keeps the history', $subs->current($subAccount) === null && (int) $pdo->query("SELECT COUNT(*) FROM subscription WHERE account_id = $subAccount AND status = 'canceled'")->fetchColumn() >= 3);
+
+// The first restriction a plan actually enforces: how many offers of a type,
+// and how many pictures per offer - checked through the real wizard/upload
+// routes, not just the service, since OfferController works out the number.
+$quotaId = $accounts->create('abo-quota@example.test', $pw, 'de', verified: true);
+$post('/account/provider', $private, $quotaId);
+$pdo->exec("UPDATE provider SET status = 'approved' WHERE account_id = $quotaId");
+$get('/account/offers/new?type=freelancer.service', $quotaId);
+$post('/account/offers/wizard', ['type' => 'freelancer.service', 'wizard_step' => 1, 'locales' => []], false);
+check('offer quota: with the module on and no plan, no draft is created at all', $pdo->query("SELECT COUNT(*) FROM offer WHERE provider_id = (SELECT id FROM provider WHERE account_id = $quotaId)")->fetchColumn() == 0
+    && str_contains($_SESSION['_flash']['error'] ?? '', 'Höchstzahl von 0'));
+$quotaPlan = $subs->createPlan('abo-quota', 'Quotenplan', 500, 'EUR', 1, []);
+$subs->updatePlan($quotaPlan, 'Quotenplan', 500, 'EUR', 1, [], true, ['freelancer.service' => 1], 1);
+$subs->assign($quotaId, $quotaPlan);
+$get('/account/offers/new?type=freelancer.service', $quotaId);
+$post('/account/offers/wizard', ['type' => 'freelancer.service', 'wizard_step' => 1, 'locales' => []], false);
+$quotaOfferId = (int) $pdo->query("SELECT id FROM offer WHERE provider_id = (SELECT id FROM provider WHERE account_id = $quotaId)")->fetchColumn();
+check('offer quota: a plan with freelancer.service = 1 lets the first draft through', $quotaOfferId > 0);
+$get('/account/offers/new?type=freelancer.service', $quotaId);
+$post('/account/offers/wizard', ['type' => 'freelancer.service', 'wizard_step' => 1, 'locales' => []], false);
+check('offer quota: the second one is refused once the plan\'s number is reached', $pdo->query("SELECT COUNT(*) FROM offer WHERE provider_id = (SELECT id FROM provider WHERE account_id = $quotaId)")->fetchColumn() == 1
+    && str_contains($_SESSION['_flash']['error'] ?? '', 'Höchstzahl von 1'));
+$quotaImage = tempnam(sys_get_temp_dir(), 'img');
+imagepng(imagecreatetruecolor(50, 50), $quotaImage);
+$_FILES = ['image' => ['tmp_name' => $quotaImage, 'error' => UPLOAD_ERR_OK, 'size' => filesize($quotaImage), 'name' => 'x.png', 'type' => 'image/png']];
+$post('/account/offers/' . $quotaOfferId . '/images', [], $quotaId);
+check('image quota: the plan\'s max_images_per_offer = 1 lets the first picture through', $pdo->query("SELECT COUNT(*) FROM offer_image WHERE offer_id = $quotaOfferId")->fetchColumn() == 1);
+$post('/account/offers/' . $quotaOfferId . '/images', [], $quotaId);
+check('image quota: a second picture is refused at that same number', $pdo->query("SELECT COUNT(*) FROM offer_image WHERE offer_id = $quotaOfferId")->fetchColumn() == 1);
+$subs->assign($quotaId, null);
+$quotaApp = new Modulento\Core\App($config, $pdo);
+$quotaApp->offerImages->deleteAll($quotaOfferId);
+$quotaApp->offers->delete($quotaOfferId);
+$pdo->exec("DELETE FROM subscription WHERE plan_id = $quotaPlan");
+$pdo->exec("DELETE FROM subscription_plan WHERE id = $quotaPlan");
+
 $subModules->save(array_values(array_diff(array_keys(Modulento\Core\Support\Modules::ALL), ['subscriptions'])));
 check('subscriptions: switched off, every feature is open to everyone', !$subModules->enabled('subscriptions') && $subs->allows($subAccount, 'abo.test.one') && $subs->allows(999999, 'abo.other'));
 $subModules->save(array_keys(Modulento\Core\Support\Modules::ALL));
@@ -1739,12 +1784,17 @@ $pdo->exec("DELETE FROM subscription_plan WHERE id = {$adminPlan['id']}");
 $subs->declareFeature('abo.declared', 'core.module.subscriptions.name');
 check('subscriptions: an extension declares a feature with its name key; a bad key is refused', $subs->declaredFeatures() === ['abo.declared' => 'core.module.subscriptions.name'] && (function () use ($subs) { try { $subs->declareFeature('Bad Key', 'x'); return false; } catch (InvalidArgumentException) { return true; } })());
 $editId = $subs->createPlan('abo-edit', 'Vorher', 500, 'EUR', 1, ['abo.test.one']);
-$subs->updatePlan($editId, 'Nachher', 1200, 'EUR', 3, ['abo.test.two', 'abo.declared'], true);
+$newPlan = $subs->plan($editId);
+check('subscriptions: a new plan starts without limits (unlimited)', $newPlan['offer_limits'] === [] && $newPlan['max_images_per_offer'] === null);
+$subs->updatePlan($editId, 'Nachher', 1200, 'EUR', 3, ['abo.test.two', 'abo.declared'], true, ['freelancer.service' => 2, 'auction.lot' => 0], 5);
 $edited = $subs->plan($editId);
 check('subscriptions: a plan is changed, its key stays', $edited['name'] === 'Nachher' && $edited['price_cents'] === 1200 && $edited['period_months'] === 3 && $edited['features'] === ['abo.test.two', 'abo.declared'] && $edited['slug'] === 'abo-edit');
+check('subscriptions: its limits are stored too - a type left out stays unlimited, one set to 0 is kept as 0', $edited['offer_limits'] === ['freelancer.service' => 2, 'auction.lot' => 0] && $edited['max_images_per_offer'] === 5);
 $subs->assign($subAccount, $editId);
 check('subscriptions: a change applies at once to an account that has the plan', $subs->allows($subAccount, 'abo.declared') && !$subs->allows($subAccount, 'abo.test.one'));
-$subs->updatePlan($editId, 'Nachher', 1200, 'EUR', 3, ['abo.test.two', 'abo.declared'], false);
+check('subscriptions: offerLimit()/imageLimit() read the active plan - missing type unlimited, 0 kept, module off ignores all of it', $subs->offerLimit($subAccount, 'freelancer.service') === 2 && $subs->offerLimit($subAccount, 'auction.lot') === 0
+    && $subs->offerLimit($subAccount, 'unknown.type') === null && $subs->imageLimit($subAccount) === 5);
+$subs->updatePlan($editId, 'Nachher', 1200, 'EUR', 3, ['abo.test.two', 'abo.declared'], false, [], null);
 check('subscriptions: an inactive plan is not offered, but its holders keep it', !in_array('abo-edit', array_column($subs->activePlans(), 'slug'), true) && $subs->allows($subAccount, 'abo.declared'));
 $refusedDelete = false;
 try {
@@ -1764,9 +1814,12 @@ $accountPage = $get('/account/subscription', 2);
 check('subscriptions: an account sees its own subscription page', $accountPage['status'] === 200 && str_contains($accountPage['body'], 'Mein Abo'));
 $adminEdit = $get('/admin/subscriptions/plans/' . $subPlan, 3);
 check('subscriptions admin: the plan page shows the features, and needs the permission', $adminEdit['status'] === 200 && str_contains($adminEdit['body'], 'abo.test.one') && $get('/admin/subscriptions/plans/' . $subPlan, 1)['status'] === 403 && $get('/admin/subscriptions/plans/999999', 3)['status'] === 404);
-$post('/admin/subscriptions/plans/' . $subPlan, ['name' => 'Testabo neu', 'price' => '12,50', 'currency' => 'EUR', 'period_months' => 3, 'features' => ['abo.test.one'], 'new_features' => 'abo.typed, abo.test.two', 'active' => '1'], 3);
+check('subscriptions admin: the plan page has a limit field per offer type', str_contains($adminEdit['body'], 'name="offer_limits[freelancer.service]"') && str_contains($adminEdit['body'], 'name="max_images_per_offer"'));
+$post('/admin/subscriptions/plans/' . $subPlan, ['name' => 'Testabo neu', 'price' => '12,50', 'currency' => 'EUR', 'period_months' => 3, 'features' => ['abo.test.one'], 'new_features' => 'abo.typed, abo.test.two', 'active' => '1',
+    'offer_limits' => ['freelancer.service' => '4', 'auction.lot' => ''], 'max_images_per_offer' => '6'], 3);
 $changedByForm = $subs->plan($subPlan);
 check('subscriptions admin: the form saves the plan with ticked and typed features', $changedByForm['name'] === 'Testabo neu' && $changedByForm['price_cents'] === 1250 && $changedByForm['features'] === ['abo.test.one', 'abo.typed', 'abo.test.two']);
+check('subscriptions admin: the form saves the new limits too - a blank field leaves that type unlimited', $changedByForm['offer_limits'] === ['freelancer.service' => 4] && $changedByForm['max_images_per_offer'] === 6);
 $subModules->save(array_values(array_diff(array_keys(Modulento\Core\Support\Modules::ALL), ['subscriptions'])));
 check('subscriptions: switched off, the overview and the account page are gone', $get('/subscriptions', null)['status'] === 404 && $get('/account/subscription', 2)['status'] === 404);
 $subModules->save(array_keys(Modulento\Core\Support\Modules::ALL));
@@ -1805,7 +1858,9 @@ check('feature routes: a visitor gets no route either', $featureRoute(null)['cal
 $subs->assign(3, null);
 $subModules->save(array_values(array_diff(array_keys(Modulento\Core\Support\Modules::ALL), ['subscriptions'])));
 check('feature routes: switched off, every feature route is open', $featureRoute(3)['called'] === true);
-$subModules->save(array_keys(Modulento\Core\Support\Modules::ALL));
+// Back to the suite's default state (see the setting inserted at the very
+// start): subscriptions off, so offers elsewhere keep working unplanned.
+$subModules->save(array_values(array_diff(array_keys(Modulento\Core\Support\Modules::ALL), ['subscriptions'])));
 $pdo->exec("DELETE FROM subscription WHERE plan_id = $featurePlan");
 $pdo->exec("DELETE FROM subscription_plan WHERE id = $featurePlan");
 $pdo->exec("DELETE FROM account WHERE id = $subAccount");
@@ -3444,6 +3499,7 @@ ini_restore('error_log');
 @unlink($mailLog);
 
 // --- Subscriptions paid: by transfer to the operator, or by Stripe on the platform's account ---
+$subModules->save(array_keys(Modulento\Core\Support\Modules::ALL));
 $payBilling = fn ($app) => $app->subscriptionBilling;
 $addr = ['name' => 'Kundin Test', 'street' => 'Ringweg 4', 'postal_code' => '20095', 'city' => 'Hamburg', 'country' => 'DE'];
 $payApp()->payments->setEnabled(Modulento\Core\Payment\Payments::TRANSFER, true);
@@ -3548,8 +3604,12 @@ $pdo->exec("DELETE FROM subscription_plan WHERE slug = 'abo-pay'");
 $payApp()->subscriptionBilling->saveBank('', '', '');
 $payApp()->payments->setEnabled(Modulento\Core\Payment\Payments::TRANSFER, false);
 $payApp()->payments->saveStripeKeys('', '');
+$subModules->save(array_values(array_diff(array_keys(Modulento\Core\Support\Modules::ALL), ['subscriptions'])));
 
 // --- Modules: optional functions of the core ------------------------------------
+// Subscriptions was switched off above for the rest of the suite's sake; back
+// on here so this section's own premise (everything on until switched off) holds.
+$subModules->save(array_keys(Modulento\Core\Support\Modules::ALL));
 check('modules: the page needs the settings permission', $get('/admin/modules', 1)['status'] === 403 && $post('/admin/modules', ['modules' => []], 2)['status'] === 403);
 $r = $get('/admin/modules', 3);
 check('modules: everything is on until switched off', $r['status'] === 200 && substr_count($r['body'], 'name="modules[]"') === 9 && substr_count($r['body'], ' checked') === 9);

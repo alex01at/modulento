@@ -9,6 +9,7 @@ use Modulento\Core\Support\Csrf;
 use Modulento\Core\Support\Database;
 use Modulento\Core\Support\Locales;
 use Modulento\Core\Support\Migrator;
+use Modulento\Core\Support\Modules;
 use Modulento\Core\Support\PasswordPolicy;
 use Modulento\Core\Support\Session;
 use Modulento\Core\Support\Settings;
@@ -185,6 +186,10 @@ final class Installer
             $settings = new Settings($db);
             $settings->set('core.site_name', $values['site_name']);
             (new Locales($settings, $this->root . '/core/lang'))->save($this->translator->locale(), Translator::localesIn($this->root . '/core/lang'));
+            // Every module is on by default except this one: with it on, an
+            // account without a plan could suddenly make no offers at all -
+            // an operator who wants paid plans switches it on deliberately.
+            (new Modules($settings))->save(array_diff(array_keys(Modules::ALL), ['subscriptions']));
         } catch (Throwable $e) {
             error_log('Installer: ' . $e);
 

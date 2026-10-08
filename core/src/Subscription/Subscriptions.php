@@ -62,7 +62,7 @@ final class Subscriptions
         return null;
     }
 
-    /** @return list<array{id: int, slug: string, name: string, price_cents: int, currency: string, period_months: int, features: list<string>, active: bool}> */
+    /** @return list<array{id: int, slug: string, name: string, price_cents: int, currency: string, period_months: int, features: list<string>, offer_limits: array<string, int>, max_images_per_offer: int|null, active: bool}> */
     public function plans(): array
     {
         $rows = $this->db->query('SELECT * FROM subscription_plan ORDER BY price_cents, id')->fetchAll(PDO::FETCH_ASSOC);
@@ -75,6 +75,8 @@ final class Subscriptions
             'currency' => $row['currency'],
             'period_months' => (int) $row['period_months'],
             'features' => $this->features($row['features']),
+            'offer_limits' => $this->offerLimits($row['offer_limits']),
+            'max_images_per_offer' => $row['max_images_per_offer'] !== null ? (int) $row['max_images_per_offer'] : null,
             'active' => (bool) $row['active'],
         ], $rows);
     }
@@ -85,10 +87,10 @@ final class Subscriptions
         if (preg_match('/^[a-z0-9-]{1,40}$/', $slug) !== 1) {
             throw new InvalidArgumentException('plan: slug');
         }
-        $values = $this->validated($name, $priceCents, $currency, $periodMonths, $features);
+        $values = $this->validated($name, $priceCents, $currency, $periodMonths, $features, [], null);
 
         try {
-            $stmt = $this->db->prepare('INSERT INTO subscription_plan (slug, name, price_cents, currency, period_months, features) VALUES (:slug, :name, :price, :currency, :period, :features)');
+            $stmt = $this->db->prepare('INSERT INTO subscription_plan (slug, name, price_cents, currency, period_months, features, offer_limits, max_images_per_offer) VALUES (:slug, :name, :price, :currency, :period, :features, :offer_limits, :max_images_per_offer)');
             $stmt->execute(['slug' => $slug] + $values);
         } catch (PDOException $e) {
             if ($e->getCode() === '23000') {
@@ -105,11 +107,12 @@ final class Subscriptions
      * any more, but the accounts that have it keep their features until it ends.
      *
      * @param list<string> $features
+     * @param array<string, int> $offerLimits offer type id => how many; a type left out is not allowed at all
      */
-    public function updatePlan(int $id, string $name, int $priceCents, string $currency, int $periodMonths, array $features, bool $active): void
+    public function updatePlan(int $id, string $name, int $priceCents, string $currency, int $periodMonths, array $features, bool $active, array $offerLimits, ?int $maxImagesPerOffer): void
     {
-        $values = $this->validated($name, $priceCents, $currency, $periodMonths, $features);
-        $stmt = $this->db->prepare('UPDATE subscription_plan SET name = :name, price_cents = :price, currency = :currency, period_months = :period, features = :features, active = :active WHERE id = :id');
+        $values = $this->validated($name, $priceCents, $currency, $periodMonths, $features, $offerLimits, $maxImagesPerOffer);
+        $stmt = $this->db->prepare('UPDATE subscription_plan SET name = :name, price_cents = :price, currency = :currency, period_months = :period, features = :features, offer_limits = :offer_limits, max_images_per_offer = :max_images_per_offer, active = :active WHERE id = :id');
         $stmt->execute($values + ['active' => $active ? 1 : 0, 'id' => $id]);
     }
 
@@ -185,7 +188,7 @@ final class Subscriptions
     public function current(int $accountId): ?array
     {
         $stmt = $this->db->prepare(
-            "SELECT s.id, s.status, s.period_end, s.provider_ref, p.slug, p.name, p.features
+            "SELECT s.id, s.status, s.period_end, s.provider_ref, p.slug, p.name, p.features, p.offer_limits, p.max_images_per_offer
              FROM subscription s JOIN subscription_plan p ON p.id = s.plan_id
              WHERE s.account_id = :account AND s.status IN ('trialing', 'active', 'past_due')
                AND (s.period_end IS NULL OR s.period_end > :now)
@@ -202,7 +205,38 @@ final class Subscriptions
             'slug' => $row['slug'],
             'name' => $row['name'],
             'features' => $this->features($row['features']),
+            'offer_limits' => $this->offerLimits($row['offer_limits']),
+            'max_images_per_offer' => $row['max_images_per_offer'] !== null ? (int) $row['max_images_per_offer'] : null,
         ];
+    }
+
+    /**
+     * How many offers of this type the account's plan allows - 0 without an
+     * active plan (the module is in use, so a plan is required), null for
+     * no limit at all (the module is switched off, or the plan simply
+     * never set a number for this type).
+     */
+    public function offerLimit(int $accountId, string $offerType): ?int
+    {
+        if (!$this->modules->enabled('subscriptions')) {
+            return null;
+        }
+
+        $current = $this->current($accountId);
+
+        return $current === null ? 0 : ($current['offer_limits'][$offerType] ?? null);
+    }
+
+    /** Same as offerLimit(), for pictures per offer - not tied to a type. */
+    public function imageLimit(int $accountId): ?int
+    {
+        if (!$this->modules->enabled('subscriptions')) {
+            return null;
+        }
+
+        $current = $this->current($accountId);
+
+        return $current === null ? 0 : $current['max_images_per_offer'];
     }
 
     /** Whether the account may use the feature. Switched off, the module allows everything. */
@@ -219,9 +253,10 @@ final class Subscriptions
 
     /**
      * @param list<string> $features
-     * @return array{name: string, price: int, currency: string, period: int, features: string}
+     * @param array<string, int> $offerLimits
+     * @return array{name: string, price: int, currency: string, period: int, features: string, offer_limits: string, max_images_per_offer: int|null}
      */
-    private function validated(string $name, int $priceCents, string $currency, int $periodMonths, array $features): array
+    private function validated(string $name, int $priceCents, string $currency, int $periodMonths, array $features, array $offerLimits, ?int $maxImagesPerOffer): array
     {
         $name = trim($name);
         if ($name === '' || mb_strlen($name) > 100) {
@@ -233,8 +268,16 @@ final class Subscriptions
         if (count($features) > 20 || array_filter($features, fn ($f) => !is_string($f) || preg_match('/^[a-z0-9._-]{1,60}$/', $f) !== 1) !== []) {
             throw new InvalidArgumentException('plan: features');
         }
+        if (array_filter($offerLimits, fn ($n) => !is_int($n) || $n < 0) !== [] || ($maxImagesPerOffer !== null && $maxImagesPerOffer < 0)) {
+            throw new InvalidArgumentException('plan: limits');
+        }
 
-        return ['name' => $name, 'price' => $priceCents, 'currency' => $currency, 'period' => $periodMonths, 'features' => implode(',', array_values(array_unique($features)))];
+        return [
+            'name' => $name, 'price' => $priceCents, 'currency' => $currency, 'period' => $periodMonths,
+            'features' => implode(',', array_values(array_unique($features))),
+            'offer_limits' => json_encode($offerLimits, JSON_FORCE_OBJECT),
+            'max_images_per_offer' => $maxImagesPerOffer,
+        ];
     }
 
     /** The subscription a Stripe subscription id belongs to, with the months of its plan. */
@@ -287,5 +330,13 @@ final class Subscriptions
     private function features(string $list): array
     {
         return array_values(array_filter(explode(',', $list), fn (string $f) => $f !== ''));
+    }
+
+    /** @return array<string, int> */
+    private function offerLimits(string $json): array
+    {
+        $decoded = json_decode($json, true);
+
+        return is_array($decoded) ? array_map('intval', $decoded) : [];
     }
 }

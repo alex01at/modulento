@@ -189,7 +189,7 @@ final class Offers
      *
      * @return array{rows: array<int, array>, total: int}
      */
-    public function listAll(?int $providerId, ?string $status, int $page, int $perPage): array
+    public function listAll(?int $providerId, ?string $status, int $page, int $perPage, ?string $type = null): array
     {
         $where = ['1 = 1'];
         $params = [];
@@ -200,6 +200,10 @@ final class Offers
         if ($status !== null) {
             $where[] = 'o.status = :status';
             $params['status'] = $status;
+        }
+        if ($type !== null) {
+            $where[] = 'o.type = :type';
+            $params['type'] = $type;
         }
         $whereSql = implode(' AND ', $where);
 

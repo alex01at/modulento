@@ -45,9 +45,10 @@ final class OfferImages
 
     /**
      * @param array{tmp_name?: string, error?: int, size?: int} $upload one entry of $_FILES
+     * @param int $max how many pictures this offer may have in total - the caller works out the limit (plan or the MAX_PER_OFFER default)
      * @return string|null language key of the problem, null on success
      */
-    public function add(int $offerId, array $upload): ?string
+    public function add(int $offerId, array $upload, int $max = self::MAX_PER_OFFER): ?string
     {
         if (!self::available()) {
             return 'core.offer.image.error.unavailable';
@@ -60,7 +61,7 @@ final class OfferImages
         if (filesize($upload['tmp_name']) > self::MAX_BYTES) {
             return 'core.offer.image.error.too_large';
         }
-        if (count($this->ofOffer($offerId)) >= self::MAX_PER_OFFER) {
+        if (count($this->ofOffer($offerId)) >= $max) {
             return 'core.offer.image.error.too_many';
         }
 
