@@ -122,6 +122,8 @@ final class AdminAccountController extends Controller
             'roles' => array_values($this->app->roles->all()),
             'role_ids' => $this->app->roles->idsOfAccount((int) $account['id']),
             'provider' => $this->app->providers->findByAccount((int) $account['id']),
+            'subscription' => $this->app->subscriptions->current((int) $account['id']),
+            'plans' => $this->app->subscriptions->plans(),
             'is_self' => (int) $account['id'] === $this->app->auth->account()['id'],
             'is_last_admin' => $this->app->accounts->isLastAdmin((int) $account['id']),
             'can_impersonate' => $this->app->auth->can('core.accounts.impersonate') && (int) $account['id'] !== $this->app->auth->account()['id'],
