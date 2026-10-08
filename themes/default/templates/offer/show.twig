@@ -12,7 +12,7 @@
         <small>
             <a href="{{ url(offer.provider_path) }}">{{ offer.provider_name }}</a>
             {% if offer.category %}· <a href="{{ url(offer.category.path) }}">{{ offer.category.name }}</a>{% endif %}
-            {% if offer.price_from is not null %}· {{ trans('core.offer.price_from', {price: money(offer.price_from, offer.currency)}) }}{% endif %}
+            {% if offer.price_from is not null %}· {{ trans(offer.price_label_key, {price: money(offer.price_from, offer.currency)}) }}{% endif %}
         </small>
     </p>
 

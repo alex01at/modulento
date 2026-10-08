@@ -779,6 +779,7 @@ return [
     'core.offers.none_found' => 'Nothing was found for this search.',
     'core.offers.total' => '{count} offers',
     'core.offer.price_from' => 'from {price}',
+    'core.offer.price_current' => 'current price {price}',
     'core.offer.image_alt' => '{title}, picture {number}',
     'core.offer.view_public' => 'View public page',
     'core.offer.edit' => 'Edit offer',

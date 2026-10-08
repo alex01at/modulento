@@ -23,6 +23,9 @@ interface OfferType
     /** Language key of the name shown to providers and administrators. */
     public function labelKey(): string;
 
+    /** Language key for the price shown in listings and on the offer page; receives {price}. */
+    public function priceLabelKey(): string;
+
     /** Template included inside the offer form for this type's fields. It receives "type_data". */
     public function formTemplate(): string;
 
