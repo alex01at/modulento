@@ -366,11 +366,11 @@ final class OfferController extends Controller
                 $chosen = is_array($_POST['locales'] ?? null) ? array_filter($_POST['locales'], 'is_string') : [];
                 $values['locales'] = array_values(array_unique([$primary, ...array_intersect($app->locales->enabled(), $chosen)]));
                 if (!isset($values['id'])) {
-                    // Offers take room and an administrator's time; a profile
-                    // nobody has looked at yet gets only a few - checked here,
-                    // not at the final save, since the row exists from now on.
-                    $max = $provider['status'] === 'approved' ? self::MAX_OFFERS : self::MAX_OFFERS_UNAPPROVED;
-                    if ($app->offers->listAll((int) $provider['id'], null, 1, 1)['total'] >= $max) {
+                    // Offers take room and an administrator's time - checked
+                    // here, not at the final save, since the row exists from
+                    // now on.
+                    $max = $this->offerQuota($provider, $type->id());
+                    if ($max !== null && $app->offers->listAll((int) $provider['id'], null, 1, 1, $type->id())['total'] >= $max) {
                         Session::flash('error', $this->trans('core.offer.error.too_many', ['max' => $max]));
                         $this->redirect('/account/offers');
                         return;
@@ -447,11 +447,10 @@ final class OfferController extends Controller
             return;
         }
 
-        // Offers take room and an administrator's time; a profile nobody
-        // has looked at yet gets only a few.
-        $max = $provider['status'] === 'approved' ? self::MAX_OFFERS : self::MAX_OFFERS_UNAPPROVED;
+        // Offers take room and an administrator's time.
+        $max = $this->offerQuota($provider, $typeId);
         $problem = match (true) {
-            $offer === null && $app->offers->listAll((int) $provider['id'], null, 1, 1)['total'] >= $max => $this->trans('core.offer.error.too_many', ['max' => $max]),
+            $offer === null && $max !== null && $app->offers->listAll((int) $provider['id'], null, 1, 1, $typeId)['total'] >= $max => $this->trans('core.offer.error.too_many', ['max' => $max]),
             (new RateLimiter($app->db))->hit('offer-save', (string) $provider['account_id'], 60, 3600) => $this->trans('core.error.too_many_requests'),
             default => null,
         };
@@ -543,11 +542,12 @@ final class OfferController extends Controller
             return;
         }
 
+        $max = $this->imageQuota((int) $offer['account_id']);
         $problem = (new RateLimiter($this->app->db))->hit('offer-image', (string) $offer['account_id'], 60, 3600)
             ? 'core.error.too_many_requests'
-            : $this->app->offerImages->add($offer['id'], is_array($_FILES['image'] ?? null) ? $_FILES['image'] : []);
+            : $this->app->offerImages->add($offer['id'], is_array($_FILES['image'] ?? null) ? $_FILES['image'] : [], $max);
         Session::flash($problem === null ? 'success' : 'error', $this->trans($problem ?? 'core.offer.image.added', [
-            'max' => OfferImages::MAX_PER_OFFER,
+            'max' => $max,
             'megabytes' => intdiv(OfferImages::MAX_BYTES, 1024 * 1024),
         ]));
         $this->redirect($this->safeReturn('/account/offers/' . $offer['id']));
@@ -584,6 +584,32 @@ final class OfferController extends Controller
         }
 
         return $provider;
+    }
+
+    /**
+     * How many offers of this type the provider's account may have. With the
+     * subscriptions module off, the old approval-status default applies, as
+     * it always has; with it on, the active plan decides alone - including
+     * when that plan simply never set a number for this type, which means
+     * no limit (unlike having no plan at all, which means none allowed).
+     */
+    private function offerQuota(array $provider, string $typeId): ?int
+    {
+        if (!$this->app->modules->enabled('subscriptions')) {
+            return $provider['status'] === 'approved' ? self::MAX_OFFERS : self::MAX_OFFERS_UNAPPROVED;
+        }
+
+        return $this->app->subscriptions->offerLimit($provider['account_id'], $typeId);
+    }
+
+    /** Same idea as offerQuota(), for pictures per offer. */
+    private function imageQuota(int $accountId): int
+    {
+        if (!$this->app->modules->enabled('subscriptions')) {
+            return OfferImages::MAX_PER_OFFER;
+        }
+
+        return $this->app->subscriptions->imageLimit($accountId) ?? PHP_INT_MAX;
     }
 
     /** The offer from the address, if it belongs to the logged-in account. Anyone else gets a 404. */
@@ -644,7 +670,7 @@ final class OfferController extends Controller
             'type_data' => $step === 5 ? $type->formData(null, $values['type_fields'] ?? null, $app, $selected) : [],
             'offer' => $step === 6 && isset($values['id']) ? $this->imageOffer((int) $values['id']) : null,
             'images_available' => OfferImages::available(),
-            'max_images' => OfferImages::MAX_PER_OFFER,
+            'max_images' => $this->imageQuota((int) $app->auth->account()['id']),
             // The answers as one form's fields, for the review: the last save reads them as any form.
             'answers' => $step === self::WIZARD_STEPS ? $this->answers($type->id(), $values) : [],
             'errors' => $errors,
@@ -732,7 +758,7 @@ final class OfferController extends Controller
             'errors' => $errors,
             'approval_required' => $app->offers->approvalRequired(),
             'images_available' => OfferImages::available(),
-            'max_images' => OfferImages::MAX_PER_OFFER,
+            'max_images' => $this->imageQuota((int) $app->auth->account()['id']),
             'currency' => $app->offers->currency(),
         ]);
     }

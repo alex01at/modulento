@@ -41,6 +41,17 @@
             <small>{{ trans('core.admin.subscriptions.plan.new_features_hint') }}</small>
         </fieldset>
 
+        <fieldset>
+            <legend>{{ trans('core.admin.subscriptions.plan.limits') }}</legend>
+            <p><small>{{ trans('core.admin.subscriptions.plan.limits_hint') }}</small></p>
+            {% for type in offer_types %}
+                <label for="plan-limit-{{ type.id }}">{{ trans(type.label_key) }}</label>
+                <input id="plan-limit-{{ type.id }}" name="offer_limits[{{ type.id }}]" type="number" min="0" value="{{ plan.offer_limits[type.id] ?? '' }}">
+            {% endfor %}
+            <label for="plan-max-images">{{ trans('core.admin.subscriptions.plan.max_images') }}</label>
+            <input id="plan-max-images" name="max_images_per_offer" type="number" min="0" value="{{ plan.max_images_per_offer ?? '' }}">
+        </fieldset>
+
         <label class="checkbox">
             <input type="checkbox" name="active" value="1" {{ plan.active ? 'checked' }}>
             <span>{{ trans('core.admin.subscriptions.plan.active') }}</span>

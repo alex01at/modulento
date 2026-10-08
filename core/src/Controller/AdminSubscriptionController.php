@@ -50,6 +50,8 @@ final class AdminSubscriptionController extends Controller
                 (int) ($_POST['period_months'] ?? 0),
                 $features
             );
+            // A new plan starts without limits (unlimited); fine-tune those
+            // afterwards in the edit form, same as with features.
             $app->adminLog->record($app->auth->account()['id'], 'subscription_plan', null, trim((string) $_POST['slug']));
             Session::flash('success', $this->trans('core.admin.subscriptions.flash.plan_created'));
         } catch (InvalidArgumentException $e) {
@@ -80,6 +82,8 @@ final class AdminSubscriptionController extends Controller
             'price' => Money::input($plan['price_cents'], $app->translator->locale()),
             'features' => array_map(fn (string $key) => ['key' => $key, 'label_key' => $declared[$key] ?? null], $keys),
             'periods' => [1, 3, 6, 12],
+            // Every offer type an installed extension registered, for one limit field each.
+            'offer_types' => array_map(fn ($type) => ['id' => $type->id(), 'label_key' => $type->labelKey()], $app->offers->types()),
         ]);
     }
 
@@ -92,6 +96,17 @@ final class AdminSubscriptionController extends Controller
         $features = array_values(array_filter(is_array($_POST['features'] ?? null) ? $_POST['features'] : [], 'is_string'));
         $typed = preg_split('/[\s,]+/', (string) ($_POST['new_features'] ?? ''), -1, PREG_SPLIT_NO_EMPTY) ?: [];
         $features = array_values(array_unique([...$features, ...$typed]));
+        // A blank field leaves that type out - offerLimit() then reads it as
+        // no limit, not as 0; only a typed number restricts it.
+        $offerLimits = [];
+        foreach (array_keys($app->offers->types()) as $typeId) {
+            $raw = trim((string) ($_POST['offer_limits'][$typeId] ?? ''));
+            if ($raw !== '') {
+                $offerLimits[$typeId] = max(0, (int) $raw);
+            }
+        }
+        $rawImages = trim((string) ($_POST['max_images_per_offer'] ?? ''));
+        $maxImagesPerOffer = $rawImages !== '' ? max(0, (int) $rawImages) : null;
 
         try {
             if ($price === null || $app->subscriptions->plan($id) === null) {
@@ -104,7 +119,9 @@ final class AdminSubscriptionController extends Controller
                 strtoupper(trim((string) ($_POST['currency'] ?? ''))),
                 (int) ($_POST['period_months'] ?? 0),
                 $features,
-                isset($_POST['active'])
+                isset($_POST['active']),
+                $offerLimits,
+                $maxImagesPerOffer
             );
             $app->adminLog->record($app->auth->account()['id'], 'subscription_plan_change', null, (string) $id);
             Session::flash('success', $this->trans('core.admin.subscriptions.flash.plan_saved'));
