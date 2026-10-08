@@ -5,6 +5,9 @@ Start Chrome with a debugging port, then run it:
   MODULENTO_URL=http://127.0.0.1:8317 MODULENTO_ADMIN=admin@example.test MODULENTO_PASSWORD=... python3 tests/browser/scenario.py
 
 It changes data (a block, a text, an account): use a throwaway installation.
+The last three checks (unread badge, media picker, mega menu) need the
+freelancer extension at extensions/freelancer and a one-time fixture:
+  php tests/browser/seed.php [admin@example.com]
 
 The scenario: sign in, edit the home page in place, add and hide blocks, change a text;
 then sign in as a new account and back to the administration."""
@@ -230,6 +233,45 @@ async def main():
         await b.type_into('.search-form input', 'xyz')
         search = await b.eval("(() => { const e = new Event('beforeunload', {cancelable: true}); window.dispatchEvent(e); return e.defaultPrevented; })()")
         check('unsaved changes: a search form (GET) never warns', search is False)
+
+        # 11. the unread badge (unread.js): seed.php left one unread offer message
+        # for the admin account, sent by another account on the admin's own offer;
+        # opening that offer as its provider marks the thread read.
+        await b.goto(BASE + '/account')
+        await asyncio.sleep(1.2)
+        check('unread badge: shows after the first poll, right on load', not await b.eval("document.querySelector('[data-unread]').hidden")
+              and await b.eval("document.querySelector('[data-unread]').textContent") == '1')
+        await b.goto(BASE + '/offers/testangebot')
+        await b.goto(BASE + '/account')
+        await asyncio.sleep(1.2)
+        check('unread badge: opening the thread marks it read, the badge hides again', await b.eval("document.querySelector('[data-unread]').hidden"))
+
+        # 12. the media library picker (editor.js): a picture from seed.php, inserted
+        # into the right field of a page's text editor
+        await b.goto(BASE + '/admin/pages/new')
+        check('media picker: the uploaded picture is offered', await b.eval("document.querySelectorAll('[data-media-insert]').length") > 0)
+        await b.click('.media-picker summary')
+        await b.click('[data-media-insert]')
+        area_html = await b.eval("document.querySelector('.editor-area').innerHTML")
+        check('media picker: inserted into the editable area and its textarea alike',
+              '<img src=' in area_html and area_html == await b.eval("document.querySelector('#body_de').value"))
+
+        # 13. the mega menu on a narrow screen (header-menu.js): a tap opens the
+        # submenu instead of following the link; the admin layout is a per-account
+        # preference, "header" is not the default, so it is switched on first
+        await b.goto(BASE + '/account/settings?tab=profile')
+        await b.click('input[name="admin_layout"][value="header"]')
+        await b.click('form[action$="/account/admin-layout"] button[type="submit"]')
+        await b.send('Emulation.setDeviceMetricsOverride', {'width': 390, 'height': 900, 'deviceScaleFactor': 1, 'mobile': True})
+        await b.goto(BASE + '/admin')
+        before = await b.location()
+        await b.eval("document.querySelector('li.mega .mega-link').click()")
+        await asyncio.sleep(0.3)
+        check('mega menu: a tap on a narrow screen opens the submenu, does not navigate',
+              await b.location() == before and await b.eval("document.querySelector('li.mega').classList.contains('is-open')"))
+        await b.click('li.mega .mega-link')
+        check('mega menu: a second tap on the same, now-open link follows it', await b.location() != before)
+        await b.send('Emulation.setDeviceMetricsOverride', {'width': 1200, 'height': 900, 'deviceScaleFactor': 1, 'mobile': False})
 
     finally:
         await b.close()
