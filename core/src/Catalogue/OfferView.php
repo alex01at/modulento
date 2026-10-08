@@ -13,7 +13,7 @@ final class OfferView
     /**
      * For lists: one card per offer.
      *
-     * @return array{id: int, title: string, summary: string, path: string, price_from: ?int, currency: string, thumb: ?string, provider_name: string, provider_path: string, provider_featured: bool, type: string, rating: array{count: int, average: ?float}}
+     * @return array{id: int, title: string, summary: string, path: string, price_from: ?int, price_label_key: string, currency: string, thumb: ?string, provider_name: string, provider_path: string, provider_featured: bool, type: string, rating: array{count: int, average: ?float}}
      */
     public static function card(array $offer, App $app): array
     {
@@ -26,6 +26,7 @@ final class OfferView
             'summary' => $text['summary'],
             'path' => '/offers/' . $text['slug'],
             'price_from' => $offer['price_from'],
+            'price_label_key' => $app->offers->type($offer['type'])->priceLabelKey(),
             'currency' => $offer['currency'],
             'thumb' => $image !== null ? OfferImages::urls($image)['thumb'] : null,
             'provider_name' => $offer['provider_name'],

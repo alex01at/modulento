@@ -126,6 +126,7 @@ final class OfferController extends Controller
                 'description' => $text['description'],
                 'path' => '/offers/' . $text['slug'],
                 'price_from' => $offer['price_from'],
+                'price_label_key' => $type->priceLabelKey(),
                 'currency' => $offer['currency'],
                 'images' => array_map([OfferImages::class, 'urls'], $offer['images']),
                 'provider_name' => $offer['provider_name'],
