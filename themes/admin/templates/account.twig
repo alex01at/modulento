@@ -120,6 +120,35 @@
     </div>
 </div>
 
+{% if module('subscriptions') and can('core.settings.manage') and provider %}
+<section class="card-box">
+    <h2>{{ trans('core.admin.subscriptions.assign.title') }}</h2>
+    <p>
+        {% if subscription %}
+            {{ subscription.name }} – {{ subscription.period_end ? trans('core.account.subscription.until', {date: subscription.period_end}) : trans('core.account.subscription.open') }}
+        {% else %}
+            {{ trans('core.account.subscription.none') }}
+        {% endif %}
+    </p>
+    <form method="post" action="{{ url('/admin/subscriptions/assign') }}" class="stack-form wide">
+        {{ csrf_field() }}
+        <input type="hidden" name="email" value="{{ target.email }}">
+        <input type="hidden" name="return" value="{{ url('/admin/accounts/' ~ target.id) }}">
+        <label for="assign-plan">{{ trans('core.admin.subscriptions.assign.plan') }}</label>
+        <select id="assign-plan" name="plan">
+            <option value="">{{ trans('core.admin.subscriptions.assign.none') }}</option>
+            {% for plan in plans|filter(p => p.active) %}
+                <option value="{{ plan.id }}" {{ subscription and subscription.slug == plan.slug ? 'selected' }}>{{ plan.name }}</option>
+            {% endfor %}
+        </select>
+        <label for="assign-until">{{ trans('core.admin.subscriptions.assign.until') }}</label>
+        <input id="assign-until" name="until" type="date">
+        <small>{{ trans('core.admin.subscriptions.assign.until_hint') }}</small>
+        <button type="submit">{{ trans('core.admin.subscriptions.assign.submit') }}</button>
+    </form>
+</section>
+{% endif %}
+
 {% if can_impersonate and target.status == 'active' %}
 <section class="card-box">
     <h2>{{ trans('core.admin.accounts.impersonate') }}</h2>

@@ -242,6 +242,6 @@ final class AdminSubscriptionController extends Controller
             }
         }
 
-        $this->redirect('/admin/subscriptions');
+        $this->redirect($this->safeReturn('/admin/subscriptions'));
     }
 }

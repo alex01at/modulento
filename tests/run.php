@@ -1780,6 +1780,17 @@ $subs->assign($quotaId, $bonusPlan);
 check('subscriptions: grants() is true once a plan with that feature is active', $subs->grants($quotaId, 'core.offer.auto_approve') && $subs->grants($quotaId, 'core.provider.featured_badge'));
 check('subscriptions: accountIdsWithFeature() finds it for placement, without needing one account id to ask about', in_array($quotaId, $subs->accountIdsWithFeature('core.catalogue.priority_placement'), true));
 
+// An administrator can hand a plan to an approved provider by hand, right
+// from that account's own page - not just through the general subscriptions
+// page with its own e-mail field.
+$r = $get('/admin/accounts/' . $quotaId, 3);
+check('admin account page: an approved provider can be given a plan from their own page, the current one pre-selected', str_contains($r['body'], 'Plan einem Konto geben')
+    && str_contains($r['body'], 'Bonusplan') && preg_match('/value="' . $bonusPlan . '"\s+selected/', $r['body']) === 1);
+check('admin account page: an account that is no provider gets no plan-assignment form at all', !str_contains($get('/admin/accounts/3', 3)['body'], 'Plan einem Konto geben'));
+$post('/admin/subscriptions/assign', ['email' => 'abo-quota@example.test', 'plan' => '', 'return' => '/admin/accounts/' . $quotaId], 3);
+check('admin account page: the form removes the plan just like the general one does, using the same route', $subs->current($quotaId) === null);
+$subs->assign($quotaId, $bonusPlan);
+
 $get('/account/offers/new?type=freelancer.service', $quotaId);
 $post('/account/offers/wizard', ['type' => 'freelancer.service', 'wizard_step' => 1, 'locales' => []], false);
 $post('/account/offers/wizard', ['type' => 'freelancer.service', 'wizard_step' => 2, 'category_id' => $childId], false);
