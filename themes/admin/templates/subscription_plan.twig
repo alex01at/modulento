@@ -33,13 +33,19 @@
             {% endif %}
             {% for feature in features %}
                 <label class="checkbox">
-                    <input type="checkbox" name="features[]" value="{{ feature.key }}" data-label="{{ feature.label_key ? trans(feature.label_key) : feature.key }}" {{ feature.key in plan.features ? 'checked' }}>
-                    <span>{% if feature.label_key %}{{ trans(feature.label_key) }} <small>{{ feature.key }}</small>{% else %}{{ feature.key }}{% endif %}</span>
+                    <input type="checkbox" name="features[]" value="{{ feature.key }}" data-label="{{ trans(feature.label_key) }}" {{ feature.key in plan.features ? 'checked' }}>
+                    <span>{{ trans(feature.label_key) }} <small>{{ feature.key }}</small></span>
                 </label>
             {% endfor %}
-            <label for="plan-new-features">{{ trans('core.admin.subscriptions.plan.new_features') }}</label>
-            <input id="plan-new-features" name="new_features" placeholder="visitenkarte.logo">
-            <small>{{ trans('core.admin.subscriptions.plan.new_features_hint') }}</small>
+
+            <label for="plan-custom-0">{{ trans('core.admin.subscriptions.plan.custom_features') }}</label>
+            <small>{{ trans('core.admin.subscriptions.plan.custom_features_hint') }}</small>
+            {% for key in custom_features %}
+                <input id="plan-custom-{{ loop.index0 }}" class="custom-feature" name="custom_features[]" value="{{ key }}" maxlength="60" pattern="[a-z0-9._-]+">
+            {% endfor %}
+            {% for i in 1..3 %}
+                <input id="plan-custom-{{ custom_features|length + loop.index0 }}" class="custom-feature" name="custom_features[]" placeholder="visitenkarte.logo" maxlength="60" pattern="[a-z0-9._-]+">
+            {% endfor %}
         </fieldset>
 
         <fieldset>
