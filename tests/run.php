@@ -4831,6 +4831,82 @@ check('shop: the mail names the order in its subject, with the order link',
 $mailBlocks = array_filter(explode("\n--\n", (string) file_get_contents($mailLog)));
 $ourMail = array_values(array_filter($mailBlocks, fn (string $m) => str_starts_with(ltrim($m), 'To: shopbuyer@example.test')));
 check('shop: the mail body lists the downloadable variant by name', $ourMail !== [] && str_contains(end($ourMail), 'Standard'));
+
+// A cart that somehow spans two providers is refused, not guessed at or split.
+$insertAccount->execute([12, 'secondshopowner@example.test', $testHash, 'active']);
+$post('/account/provider', ['type' => 'private', 'name' => 'Zweiter Shop-Betreiber', 'street' => 'Weg 2', 'postal_code' => '20099', 'city' => 'Hamburg', 'country' => 'DE'], 12);
+$post('/admin/providers/' . $provider(12)['id'] . '/decide', ['decision' => 'approve'], 3);
+$secondShopForm = ['type' => 'shop.product', 'category_id' => (string) $shopCatId,
+    'text' => ['de' => ['title' => 'Zweites Produkt', 'summary' => '', 'description' => 'x'], 'en' => ['title' => '', 'summary' => '', 'description' => '']],
+    'variant' => [0 => ['text' => ['de' => ['label' => 'Standard']], 'price' => '5', 'stock' => '5']]];
+$post('/account/offers/new', $secondShopForm, 12);
+$secondOfferId = (int) $pdo->query("SELECT id FROM offer WHERE type = 'shop.product' AND id NOT IN ({$productId}, {$digitalOfferId}) ORDER BY id DESC")->fetchColumn();
+$secondVariantId = (int) $pdo->query("SELECT id FROM x_shop_variant WHERE offer_id = {$secondOfferId}")->fetchColumn();
+$post('/admin/offers/' . $secondOfferId . '/decide', ['decision' => 'approve'], 3);
+
+$post('/cart/add', ['variant_id' => (string) $digitalVariantId, 'quantity' => '1'], 11);
+$post('/cart/add', ['variant_id' => (string) $secondVariantId, 'quantity' => '1'], false);
+check('shop: a cart spanning two providers is sent back from checkout, not charged or split',
+    $get('/checkout', false)['status'] === 302 && $post('/checkout', ['payment_method' => 'core.offline'], false)['status'] === 302
+    && $pdo->query('SELECT COUNT(*) FROM orders WHERE id > ' . $digitalOrderId)->fetchColumn() == 0);
+check('shop: the cart page itself still works with mixed providers in it', str_contains($get('/cart', false)['body'], 'Zweites Produkt'));
+
+// CSV import: create-only, grouped by the "product" column, one row per variant.
+check('shop: a buyer without a provider profile is sent to create one, not shown the import form', $get('/account/shop/import', 11)['status'] === 302);
+$r = $get('/account/shop/import/template', 10);
+check('shop: the template download starts with the header row', $r['status'] === 200 && str_starts_with($r['body'], "product,category,summary,description,variant_label,sku,price,stock,digital\n"));
+
+$importRows = [
+    ['Import-Hose', 'Kleidung', 'Bequeme Hose', 'Robuster Stoff.', 'Größe M', 'HOSE-M', '29.99', '8', ''],
+    ['Import-Hose', 'Kleidung', 'Bequeme Hose', 'Robuster Stoff.', 'Größe L', 'HOSE-L', '32.50', '4', ''],
+    ['T-Shirt Basic', 'Kleidung', '', '', 'Standard', 'TSHIRT-DUP', '9.99', '3', ''],
+    ['Import-Buch', 'Kleidung', 'Ein E-Book', '', 'Standard', 'TSHIRT-M', '4.99', '0', '1'],
+    ['Import-Mixed', 'kleidung', '', '', 'Gut', '', '15.00', '2', ''],
+    ['Import-Mixed', 'Kleidung', '', '', 'Kaputt', '', '', '2', ''],
+];
+$csvPath = tempnam(sys_get_temp_dir(), 'shop_import');
+$csvHandle = fopen($csvPath, 'w');
+fputcsv($csvHandle, Modulento\Shop\CsvImport::TEMPLATE_HEADER);
+foreach ($importRows as $row) {
+    fputcsv($csvHandle, $row);
+}
+fclose($csvHandle);
+
+$_FILES = ['file' => ['tmp_name' => $csvPath, 'error' => UPLOAD_ERR_OK, 'name' => 'products.csv', 'size' => filesize($csvPath)]];
+$r = $post('/account/shop/import', [], 10);
+$_FILES = [];
+@unlink($csvPath);
+
+check('shop: the import creates one product per distinct name, with as many variants as valid rows',
+    $r['status'] === 200 && str_contains($r['body'], '2 Produkt(e) mit insgesamt 3 Variante(n) angelegt.'));
+check('shop: a product name that already exists is skipped, not merged or duplicated',
+    str_contains($r['body'], 'T-Shirt Basic') && $pdo->query("SELECT COUNT(*) FROM offer_translation WHERE title = 'T-Shirt Basic'")->fetchColumn() == 1);
+check('shop: a row whose sku is already taken is rejected, and a product left with no valid variant is not created at all',
+    str_contains($r['body'], 'Import-Buch') && $pdo->query("SELECT COUNT(*) FROM offer_translation WHERE title = 'Import-Buch'")->fetchColumn() == 0);
+check('shop: a row with no price is rejected but its sibling variant still gets its product created',
+    str_contains($r['body'], 'Import-Mixed') && $pdo->query("SELECT COUNT(*) FROM x_shop_variant v JOIN offer_translation t ON t.offer_id = v.offer_id WHERE t.title = 'Import-Mixed'")->fetchColumn() == 1);
+
+$hoseId = (int) $pdo->query("SELECT offer_id FROM offer_translation WHERE title = 'Import-Hose'")->fetchColumn();
+$hoseM = $pdo->query("SELECT * FROM x_shop_variant WHERE sku = 'HOSE-M'")->fetch();
+$hoseL = $pdo->query("SELECT * FROM x_shop_variant WHERE sku = 'HOSE-L'")->fetch();
+check('shop: an imported product is categorised, priced and stocked from the csv, with price_from the lowest variant',
+    (int) $hoseM['offer_id'] === $hoseId && (int) $hoseM['price'] === 2999 && (int) $hoseM['stock'] === 8
+    && (int) $hoseL['price'] === 3250 && (int) $hoseL['stock'] === 4
+    && (int) $pdo->query("SELECT category_id FROM offer WHERE id = {$hoseId}")->fetchColumn() === $shopCatId
+    && (int) $pdo->query("SELECT price_from FROM offer WHERE id = {$hoseId}")->fetchColumn() === 2999);
+check('shop: an imported product needs the same approval as one created by hand', $pdo->query("SELECT status FROM offer WHERE id = {$hoseId}")->fetchColumn() === 'pending');
+
+$mixedId = (int) $pdo->query("SELECT offer_id FROM offer_translation WHERE title = 'Import-Mixed'")->fetchColumn();
+check('shop: the category match is case-insensitive', (int) $pdo->query("SELECT category_id FROM offer WHERE id = {$mixedId}")->fetchColumn() === $shopCatId);
+
+$pdo->exec("DELETE FROM x_shop_variant WHERE offer_id IN ({$hoseId}, {$mixedId})");
+$pdo->exec("DELETE FROM offer WHERE id IN ({$hoseId}, {$mixedId})");
+
+$pdo->exec("DELETE FROM x_shop_cart_item WHERE account_id = 11");
+$pdo->exec("DELETE FROM x_shop_variant WHERE offer_id = {$secondOfferId}");
+$pdo->exec("DELETE FROM offer WHERE id = {$secondOfferId}");
+$pdo->exec('DELETE FROM account WHERE id = 12');
+
 // $tmpFile was moved, not copied, into storage by the successful upload
 // above (rename()'s fallback) - gone already, nothing to clean up here.
 $downloadsDir = $config['app']['uploads'] . '/shop-downloads/' . $digitalOfferId;
