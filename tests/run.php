@@ -4630,6 +4630,8 @@ $pdo->exec("DELETE FROM package WHERE kind = 'extension' AND id = 'shop'");
 $pdo->exec("CREATE TABLE x_shop_variant (id INTEGER PRIMARY KEY, offer_id INTEGER REFERENCES offer (id) ON DELETE CASCADE, position INTEGER, sku TEXT UNIQUE, price INTEGER, stock INTEGER)");
 $pdo->exec("CREATE TABLE x_shop_variant_translation (variant_id INTEGER REFERENCES x_shop_variant (id) ON DELETE CASCADE, locale TEXT, label TEXT, PRIMARY KEY (variant_id, locale))");
 $pdo->exec("CREATE TABLE x_shop_cart_item (id INTEGER PRIMARY KEY, account_id INTEGER REFERENCES account (id) ON DELETE CASCADE, variant_id INTEGER REFERENCES x_shop_variant (id) ON DELETE CASCADE, quantity INTEGER, added_at TEXT, UNIQUE (account_id, variant_id))");
+$pdo->exec("CREATE TABLE x_shop_discount (id INTEGER PRIMARY KEY, code TEXT UNIQUE, type TEXT, value INTEGER, active INTEGER DEFAULT 1, expires_at TEXT, max_uses INTEGER, used_count INTEGER DEFAULT 0, min_subtotal INTEGER, created_at TEXT)");
+$pdo->exec("CREATE TABLE x_shop_cart_discount (account_id INTEGER PRIMARY KEY REFERENCES account (id) ON DELETE CASCADE, discount_id INTEGER REFERENCES x_shop_discount (id) ON DELETE CASCADE, applied_at TEXT)");
 $pdo->exec("INSERT INTO extension VALUES ('shop', '0.1.0', 1)");
 
 $post('/admin/categories/new', ['text' => ['de' => ['name' => 'Kleidung', 'slug' => ''], 'en' => ['name' => '', 'slug' => '']]], 3);
@@ -4716,9 +4718,63 @@ check('shop: a cancellation can be requested by the provider', $orderRow($second
 $post('/orders/' . $secondOrderId . '/transition', ['transition' => 'agree_cancel'], 11);
 check('shop: once the buyer agrees, the order is cancelled and the variant\'s stock is given back', $orderRow($secondOrderId)['state'] === 'cancelled' && (int) $variantRow('TSHIRT-M')['stock'] === 2);
 
+// Discount codes: a pure check of the proration math (no HTTP needed - it is
+// a pure function), then a real code through a real checkout.
+$discountsService = new Modulento\Shop\Discounts($pdo);
+$prorated = $discountsService->apply([['label' => 'X', 'quantity' => 2, 'unit_price' => 1999]], 101);
+check('shop: a flat discount that does not divide evenly by the quantity splits the line instead of rounding',
+    $prorated === [['label' => 'X', 'quantity' => 1, 'unit_price' => 1999], ['label' => 'X', 'quantity' => 1, 'unit_price' => 1898]]
+    && array_sum(array_map(fn ($l) => $l['quantity'] * $l['unit_price'], $prorated)) === 2 * 1999 - 101);
+$prorated2 = $discountsService->apply([['label' => 'A', 'quantity' => 1, 'unit_price' => 1000], ['label' => 'B', 'quantity' => 1, 'unit_price' => 2000]], 300);
+check('shop: a discount is prorated across several lines by their share of the subtotal',
+    $prorated2 === [['label' => 'A', 'quantity' => 1, 'unit_price' => 900], ['label' => 'B', 'quantity' => 1, 'unit_price' => 1800]]);
+
+$post('/admin/shop/discounts', ['code' => 'invalid code', 'type' => 'percent', 'value' => '10', 'active' => '1'], 3);
+check('shop: a discount code with a space is refused', $discountsService->findByCode('invalid code') === null);
+$post('/admin/shop/discounts', ['code' => 'test10', 'type' => 'percent', 'value' => '10', 'active' => '1', 'max_uses' => '5'], 3);
+$percentDiscount = $discountsService->findByCode('TEST10');
+check('shop: a percent discount code is created, stored uppercase, with its usage limit', $percentDiscount !== null && $percentDiscount['type'] === 'percent' && $percentDiscount['value'] === 10 && $percentDiscount['max_uses'] === 5);
+$r = $get('/admin/shop/discounts', 3);
+check('shop: the admin list shows the new code with its use count', $r['status'] === 200 && str_contains($r['body'], 'TEST10') && str_contains($r['body'], '10 %') && str_contains($r['body'], '0 / 5'));
+
+check('shop: applying a code that does not exist is refused', $post('/cart/discount', ['code' => 'NOPE'], 11)['status'] === 302
+    && $pdo->query('SELECT COUNT(*) FROM x_shop_cart_discount')->fetchColumn() == 0);
+$post('/cart/add', ['variant_id' => (string) $variantM, 'quantity' => '2'], 11);
+$post('/cart/discount', ['code' => 'test10'], false);
+check('shop: a valid code is applied to the account\'s cart, matched case-insensitively', $pdo->query('SELECT discount_id FROM x_shop_cart_discount WHERE account_id = 11')->fetchColumn() == $percentDiscount['id']);
+$r = $get('/cart', false);
+check('shop: the cart shows the discount and the reduced total (3998 - 10% = 3598)', str_contains($r['body'], 'TEST10') && str_contains($r['body'], '35,98'));
+
+$ordersBeforeDiscount = $lastOrder();
+$post('/checkout', ['payment_method' => 'core.offline', 'accept_terms' => '1'], false);
+$discountOrderId = $lastOrder();
+$discountOrder = $orderRow($discountOrderId);
+check('shop: checkout with a discount applies it to the order total (3598 + 4,90 shipping = 4088)',
+    $discountOrderId > $ordersBeforeDiscount && (int) $discountOrder['total'] === 4088);
+check('shop: the discount is prorated into the product line, never a negative price', $pdo->query("SELECT label || ':' || quantity || ':' || unit_price FROM order_item WHERE order_id = {$discountOrderId} ORDER BY position")->fetchAll(PDO::FETCH_COLUMN)
+    == ['T-Shirt Basic — Größe M:2:1799', 'Versand:1:490']);
+check('shop: one use was taken, atomically, and the cart\'s applied code was cleared', $discountsService->find($percentDiscount['id'])['used_count'] === 1
+    && $pdo->query('SELECT COUNT(*) FROM x_shop_cart_discount')->fetchColumn() == 0);
+check('shop: the order page shows which code was used and how much it took off', str_contains($get('/orders/' . $discountOrderId, 11)['body'], 'TEST10'));
+
+$post('/admin/shop/discounts/' . $percentDiscount['id'] . '/toggle', [], 3);
+check('shop: the admin toggle deactivates a code, shown as inactive in the list', !$discountsService->find($percentDiscount['id'])['active']
+    && str_contains($get('/admin/shop/discounts', 3)['body'], 'inaktiv'));
+$post('/cart/discount', ['code' => 'TEST10'], 11);
+check('shop: an inactive code cannot be applied', $pdo->query('SELECT COUNT(*) FROM x_shop_cart_discount')->fetchColumn() == 0);
+
+$post('/orders/' . $discountOrderId . '/transition', ['transition' => 'request_cancel', 'note' => 'Testweise'], 10);
+$post('/orders/' . $discountOrderId . '/transition', ['transition' => 'agree_cancel'], 11);
+check('shop: cancelling the order gives the discount\'s use back too', $discountsService->find($percentDiscount['id'])['used_count'] === 0);
+$post('/admin/shop/discounts/' . $percentDiscount['id'] . '/delete', [], 3);
+check('shop: the admin delete removes the code for good', $discountsService->find($percentDiscount['id']) === null);
+
+$pdo->exec("DELETE FROM orders WHERE id IN ({$discountOrderId})");
+$pdo->exec('DELETE FROM x_shop_cart_item');
+$pdo->exec('DELETE FROM x_shop_cart_discount');
+$pdo->exec('DELETE FROM x_shop_discount');
 $pdo->exec("DELETE FROM review WHERE order_id IN ({$orderId}, {$secondOrderId})");
 $pdo->exec("DELETE FROM orders WHERE id IN ({$orderId}, {$secondOrderId})");
-$pdo->exec('DELETE FROM x_shop_cart_item');
 $pdo->exec("DELETE FROM x_shop_variant WHERE offer_id = {$productId}");
 $pdo->exec("DELETE FROM offer WHERE id = {$productId}");
 $pdo->exec("DELETE FROM category WHERE id = {$shopCatId}");
