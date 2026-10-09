@@ -27,6 +27,8 @@ final class Modules
 
     private const SETTING = 'core.modules_disabled';
 
+    /** @var array<string, string> id => language key stem, modules an extension brought along */
+    private array $extra = [];
     /** @var string[]|null */
     private ?array $disabled = null;
 
@@ -34,9 +36,30 @@ final class Modules
     {
     }
 
+    /**
+     * An optional feature of an extension, switched off and on the same way
+     * as a core module. Only exists while that extension is active - called
+     * from its Extension::register(), nothing calls it otherwise.
+     */
+    public function register(string $id, string $labelKey): void
+    {
+        $this->extra[$id] = $labelKey;
+        // A module registered after disabled() was already read (core's own
+        // modules are checked during Kernel::registerCore(), before
+        // extensions load) must not be judged against a stale, narrower
+        // list of known ids.
+        $this->disabled = null;
+    }
+
+    /** @return array<string, string> id => language key stem, core modules first */
+    public function all(): array
+    {
+        return self::ALL + $this->extra;
+    }
+
     public function enabled(string $id): bool
     {
-        return isset(self::ALL[$id]) && !in_array($id, $this->disabled(), true);
+        return isset($this->all()[$id]) && !in_array($id, $this->disabled(), true);
     }
 
     /** @return string[] */
@@ -44,14 +67,14 @@ final class Modules
     {
         return $this->disabled ??= array_values(array_intersect(
             array_filter(explode(',', $this->settings->get(self::SETTING, ''))),
-            array_keys(self::ALL)
+            array_keys($this->all())
         ));
     }
 
     /** @param string[] $enabledIds every module not named here is switched off */
     public function save(array $enabledIds): void
     {
-        $this->disabled = array_values(array_diff(array_keys(self::ALL), $enabledIds));
+        $this->disabled = array_values(array_diff(array_keys($this->all()), $enabledIds));
         $this->settings->set(self::SETTING, implode(',', $this->disabled));
     }
 }

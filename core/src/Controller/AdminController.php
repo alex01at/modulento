@@ -6,7 +6,6 @@ namespace Modulento\Core\Controller;
 
 use Modulento\Core\App;
 use Modulento\Core\Support\Branding;
-use Modulento\Core\Support\Modules;
 use Modulento\Core\Support\Session;
 use Modulento\Core\Support\UpdateChecks;
 use PDO;
@@ -21,17 +20,18 @@ final class AdminController extends Controller
 
     public function modules(array $params): void
     {
+        $modules = $this->app->modules->all();
         $this->render('@admin/modules.twig', ['modules' => array_map(
             fn (string $id, string $key) => ['id' => $id, 'key' => $key, 'enabled' => $this->app->modules->enabled($id)],
-            array_keys(Modules::ALL),
-            Modules::ALL
+            array_keys($modules),
+            $modules
         )]);
     }
 
     public function saveModules(array $params): void
     {
         $chosen = is_array($_POST['modules'] ?? null) ? array_filter($_POST['modules'], 'is_string') : [];
-        $this->app->modules->save(array_values(array_intersect(array_keys(Modules::ALL), $chosen)));
+        $this->app->modules->save(array_values(array_intersect(array_keys($this->app->modules->all()), $chosen)));
         Session::flash('success', $this->trans('core.admin.modules.saved'));
         $this->redirect('/admin/modules');
     }
