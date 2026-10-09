@@ -4627,7 +4627,8 @@ $subModules->save(array_values(array_diff(array_keys(Modulento\Core\Support\Modu
 // tests) in the same shared tables this uses for real - clear it first.
 $pdo->exec("DELETE FROM extension WHERE id = 'shop'");
 $pdo->exec("DELETE FROM package WHERE kind = 'extension' AND id = 'shop'");
-$pdo->exec("CREATE TABLE x_shop_variant (id INTEGER PRIMARY KEY, offer_id INTEGER REFERENCES offer (id) ON DELETE CASCADE, position INTEGER, sku TEXT UNIQUE, price INTEGER, stock INTEGER)");
+$pdo->exec("CREATE TABLE x_shop_variant (id INTEGER PRIMARY KEY, offer_id INTEGER REFERENCES offer (id) ON DELETE CASCADE, position INTEGER, sku TEXT UNIQUE, price INTEGER, stock INTEGER,
+    is_digital INTEGER NOT NULL DEFAULT 0, file_name TEXT, file_original_name TEXT, file_extension TEXT, file_bytes INTEGER)");
 $pdo->exec("CREATE TABLE x_shop_variant_translation (variant_id INTEGER REFERENCES x_shop_variant (id) ON DELETE CASCADE, locale TEXT, label TEXT, PRIMARY KEY (variant_id, locale))");
 $pdo->exec("CREATE TABLE x_shop_cart_item (id INTEGER PRIMARY KEY, account_id INTEGER REFERENCES account (id) ON DELETE CASCADE, variant_id INTEGER REFERENCES x_shop_variant (id) ON DELETE CASCADE, quantity INTEGER, added_at TEXT, UNIQUE (account_id, variant_id))");
 $pdo->exec("CREATE TABLE x_shop_discount (id INTEGER PRIMARY KEY, code TEXT UNIQUE, type TEXT, value INTEGER, active INTEGER DEFAULT 1, expires_at TEXT, max_uses INTEGER, used_count INTEGER DEFAULT 0, min_subtotal INTEGER, created_at TEXT)");
@@ -4769,14 +4770,81 @@ check('shop: cancelling the order gives the discount\'s use back too', $discount
 $post('/admin/shop/discounts/' . $percentDiscount['id'] . '/delete', [], 3);
 check('shop: the admin delete removes the code for good', $discountsService->find($percentDiscount['id']) === null);
 
-$pdo->exec("DELETE FROM orders WHERE id IN ({$discountOrderId})");
+// Digital products: no shipping, no stock to run out of, a download once paid.
+$digitalForm = ['type' => 'shop.product', 'category_id' => (string) $shopCatId,
+    'text' => ['de' => ['title' => 'E-Book Testwissen', 'summary' => 'Ein PDF zum Lernen', 'description' => 'Praktisches Wissen.'], 'en' => ['title' => '', 'summary' => '', 'description' => '']],
+    'variant' => [0 => ['text' => ['de' => ['label' => 'Standard']], 'price' => '9,99', 'stock' => '0', 'digital' => '1']]];
+$post('/account/offers/new', $digitalForm, 10);
+$digitalOfferId = (int) $pdo->query("SELECT id FROM offer WHERE type = 'shop.product' AND id <> {$productId} ORDER BY id DESC")->fetchColumn();
+$digitalVariantId = (int) $pdo->query("SELECT id FROM x_shop_variant WHERE offer_id = {$digitalOfferId}")->fetchColumn();
+$digitalVariantRow = fn () => $pdo->query("SELECT * FROM x_shop_variant WHERE id = {$digitalVariantId}")->fetch();
+check('shop: a digital variant is saved with is_digital set, stock stays 0 and irrelevant', (bool) $digitalVariantRow()['is_digital'] === true && (int) $digitalVariantRow()['stock'] === 0);
+$post('/admin/offers/' . $digitalOfferId . '/decide', ['decision' => 'approve'], 3);
+
+$tmpFile = tempnam(sys_get_temp_dir(), 'shop_test');
+file_put_contents($tmpFile, 'PDF-ish test content');
+$_FILES = ['file' => ['tmp_name' => $tmpFile, 'error' => UPLOAD_ERR_OK, 'name' => 'Lehrbuch.pdf', 'size' => filesize($tmpFile)]];
+$post('/account/shop/variants/' . $digitalVariantId . '/file', [], 10);
+$_FILES = [];
+check('shop: the file is stored, the original name kept for the download', $digitalVariantRow()['file_name'] !== null && $digitalVariantRow()['file_original_name'] === 'Lehrbuch.pdf');
+// rename()'s fallback (no real HTTP upload in this suite) moves the file
+// rather than copying it, so the second attempt needs one of its own.
+$tmpFile2 = tempnam(sys_get_temp_dir(), 'shop_test');
+file_put_contents($tmpFile2, 'Different content');
+$_FILES = ['file' => ['tmp_name' => $tmpFile2, 'error' => UPLOAD_ERR_OK, 'name' => 'x.pdf', 'size' => filesize($tmpFile2)]];
+check('shop: the file cannot be replaced by another provider', $post('/account/shop/variants/' . $digitalVariantId . '/file', [], 1)['status'] === 404
+    && $digitalVariantRow()['file_original_name'] === 'Lehrbuch.pdf');
+$_FILES = [];
+@unlink($tmpFile2);
+
+$post('/cart/add', ['variant_id' => (string) $digitalVariantId, 'quantity' => '1'], 11);
+check('shop: a digital variant can be added to the cart regardless of its stock', $pdo->query("SELECT quantity FROM x_shop_cart_item WHERE account_id = 11 AND variant_id = {$digitalVariantId}")->fetchColumn() == 1);
+check('shop: an all-digital cart is not charged shipping', str_contains($get('/checkout', false)['body'], 'Versand: 0,00'));
+$digitalOrdersBefore = $lastOrder();
+$post('/checkout', ['payment_method' => 'core.offline', 'accept_terms' => '1'], false);
+$digitalOrderId = $lastOrder();
+check('shop: checkout of an all-digital cart creates an order with one line, no shipping line',
+    $digitalOrderId > $digitalOrdersBefore && $pdo->query("SELECT COUNT(*) FROM order_item WHERE order_id = {$digitalOrderId}")->fetchColumn() == 1);
+check('shop: the download is refused before the order is paid', $get('/orders/' . $digitalOrderId . '/download/' . $digitalVariantId, 11)['status'] === 404);
+
+$post('/orders/' . $digitalOrderId . '/paid', [], 10);
+check('shop: the provider confirming payment marks the order paid', $orderRow($digitalOrderId)['payment_state'] === 'paid');
+check('shop: the order page now offers the download', str_contains($get('/orders/' . $digitalOrderId, 11)['body'], 'Standard herunterladen'));
+$download = $get('/orders/' . $digitalOrderId . '/download/' . $digitalVariantId, 11);
+check('shop: the buyer downloads the exact file that was uploaded', $download['status'] === 200 && $download['body'] === 'PDF-ish test content');
+check('shop: nobody else can download it', $get('/orders/' . $digitalOrderId . '/download/' . $digitalVariantId, 1)['status'] === 404);
+
+// The scheduled task: Scheduler::runDue() itself uses MySQL's GET_LOCK(),
+// which this SQLite suite cannot run, so DigitalDeliveries is called
+// directly - the same reason Auctions::closeDue() is tested this way.
+$shopApp = new Modulento\Core\App($config, $pdo);
+$shopApp->translator->load($config['app']['root'] . '/core/lang', 'core');
+Modulento\Core\Kernel::registerCore($shopApp);
+$shopApp->extensions->loadEnabled($shopApp);
+Modulento\Core\Kernel::registerLast($shopApp);
+$mailedCount = (new Modulento\Shop\DigitalDeliveries($pdo))->mailDue($shopApp);
+check('shop: the scheduled task mails the download link once, and not a second time',
+    $mailedCount === 1 && (new Modulento\Shop\DigitalDeliveries($pdo))->mailDue($shopApp) === 0);
+$mail = lastMail($mailLog, 'shopbuyer@example.test');
+check('shop: the mail names the order in its subject, with the order link',
+    $mail !== null && str_contains($mail['subject'], sprintf('%06d', $digitalOrderId)) && str_contains($mail['link'], '/orders/' . $digitalOrderId));
+$mailBlocks = array_filter(explode("\n--\n", (string) file_get_contents($mailLog)));
+$ourMail = array_values(array_filter($mailBlocks, fn (string $m) => str_starts_with(ltrim($m), 'To: shopbuyer@example.test')));
+check('shop: the mail body lists the downloadable variant by name', $ourMail !== [] && str_contains(end($ourMail), 'Standard'));
+// $tmpFile was moved, not copied, into storage by the successful upload
+// above (rename()'s fallback) - gone already, nothing to clean up here.
+$downloadsDir = $config['app']['uploads'] . '/shop-downloads/' . $digitalOfferId;
+array_map('unlink', glob($downloadsDir . '/*') ?: []);
+is_dir($downloadsDir) && rmdir($downloadsDir);
+
+$pdo->exec("DELETE FROM orders WHERE id IN ({$discountOrderId}, {$digitalOrderId})");
 $pdo->exec('DELETE FROM x_shop_cart_item');
 $pdo->exec('DELETE FROM x_shop_cart_discount');
 $pdo->exec('DELETE FROM x_shop_discount');
 $pdo->exec("DELETE FROM review WHERE order_id IN ({$orderId}, {$secondOrderId})");
 $pdo->exec("DELETE FROM orders WHERE id IN ({$orderId}, {$secondOrderId})");
-$pdo->exec("DELETE FROM x_shop_variant WHERE offer_id = {$productId}");
-$pdo->exec("DELETE FROM offer WHERE id = {$productId}");
+$pdo->exec("DELETE FROM x_shop_variant WHERE offer_id IN ({$productId}, {$digitalOfferId})");
+$pdo->exec("DELETE FROM offer WHERE id IN ({$productId}, {$digitalOfferId})");
 $pdo->exec("DELETE FROM category WHERE id = {$shopCatId}");
 $pdo->exec('DELETE FROM account WHERE id IN (10, 11)');
 $pdo->exec("UPDATE extension SET enabled = 0 WHERE id = 'shop'");
