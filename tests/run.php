@@ -3873,7 +3873,7 @@ foreach (glob($root . '/{core/src,extensions/*/src}/{,*/}*.php', GLOB_BRACE) as 
     preg_match_all("/(?:trans\\(|flash\\('[a-z]+', \\\$this->trans\\(|'key' => |back\\([^,]+, '[a-z]+', |Key\\) => |return |\\\$errors\\[\\] = |UpdateException\\(|result\\([a-z]+, '[a-z_]+', )'((?:core|" . implode('|', array_map('basename', glob($root . '/extensions/*', GLOB_ONLYDIR))) . ")\\.[a-z0-9_.]+[a-z0-9])'/", (string) file_get_contents($file), $found);
     foreach ($found[1] as $key) {
         // Offer type ids look like keys but are not.
-        if (!isset($knownKeys[$key]) && !in_array($key, ['freelancer.service', 'auction.lot', 'auction.sale', 'core.offline'], true)) {
+        if (!isset($knownKeys[$key]) && !in_array($key, ['freelancer.service', 'auction.lot', 'auction.sale', 'core.offline', 'shop.product'], true)) {
             $missingKeys[] = $key . ' in ' . basename($file);
         }
     }
@@ -4616,6 +4616,114 @@ $updater = new Modulento\Core\Support\Updater($dir, 'owner/repo', '', fn () => n
 $result = $updater->applyUpdate();
 check('update refuses to touch a git working copy', !$result['success'] && $result['message_key'] === 'core.update.error.dev_checkout');
 check('updater is off without a repository', !(new Modulento\Core\Support\Updater($dir, '', '', fn () => null))->isEnabled());
+
+// --- Shop: a single-provider shop with variants, a cart spanning several products, one checkout ---
+// The modules test above deleted core.modules_disabled outright and never put
+// it back (subscriptions is "on" by default otherwise) - offer quotas then
+// come from Subscriptions::offerLimit() instead of the plain approved/not
+// constants, which is not what this section means to exercise.
+$subModules->save(array_values(array_diff(array_keys(Modulento\Core\Support\Modules::ALL), ['subscriptions'])));
+// A mock "shop" extension/package row was created above (package installer
+// tests) in the same shared tables this uses for real - clear it first.
+$pdo->exec("DELETE FROM extension WHERE id = 'shop'");
+$pdo->exec("DELETE FROM package WHERE kind = 'extension' AND id = 'shop'");
+$pdo->exec("CREATE TABLE x_shop_variant (id INTEGER PRIMARY KEY, offer_id INTEGER REFERENCES offer (id) ON DELETE CASCADE, position INTEGER, sku TEXT UNIQUE, price INTEGER, stock INTEGER)");
+$pdo->exec("CREATE TABLE x_shop_variant_translation (variant_id INTEGER REFERENCES x_shop_variant (id) ON DELETE CASCADE, locale TEXT, label TEXT, PRIMARY KEY (variant_id, locale))");
+$pdo->exec("CREATE TABLE x_shop_cart_item (id INTEGER PRIMARY KEY, account_id INTEGER REFERENCES account (id) ON DELETE CASCADE, variant_id INTEGER REFERENCES x_shop_variant (id) ON DELETE CASCADE, quantity INTEGER, added_at TEXT, UNIQUE (account_id, variant_id))");
+$pdo->exec("INSERT INTO extension VALUES ('shop', '0.1.0', 1)");
+
+$post('/admin/categories/new', ['text' => ['de' => ['name' => 'Kleidung', 'slug' => ''], 'en' => ['name' => '', 'slug' => '']]], 3);
+$shopCatId = (int) $pdo->query("SELECT category_id FROM category_translation WHERE slug = 'kleidung'")->fetchColumn();
+$insertAccount->execute([10, 'shopowner@example.test', $testHash, 'active']);
+$insertAccount->execute([11, 'shopbuyer@example.test', $testHash, 'active']);
+$post('/account/provider', ['type' => 'private', 'name' => 'Shop-Betreiber', 'street' => 'Ladenweg 1', 'postal_code' => '20095', 'city' => 'Hamburg', 'country' => 'DE'], 10);
+$post('/admin/providers/' . $provider(10)['id'] . '/decide', ['decision' => 'approve'], 3);
+$shopProviderId = (int) $provider(10)['id'];
+$post('/admin/shop/settings', ['shipping_flat' => '4,90'], 3);
+check('shop: the shipping flat rate is stored in minor units', $pdo->query("SELECT value FROM setting WHERE name = 'shop.shipping_flat'")->fetchColumn() === '490');
+
+$variantRow = fn (string $sku) => $pdo->query("SELECT * FROM x_shop_variant WHERE sku = '{$sku}'")->fetch();
+$productForm = ['type' => 'shop.product', 'category_id' => (string) $shopCatId,
+    'text' => ['de' => ['title' => 'T-Shirt Basic', 'summary' => 'Baumwolle, zwei Größen', 'description' => "100% Baumwolle.\nMaschinenwäsche bis 30°C."], 'en' => ['title' => '', 'summary' => '', 'description' => '']],
+    'variant' => [
+        0 => ['sku' => 'TSHIRT-M', 'price' => '19,99', 'stock' => '5', 'text' => ['de' => ['label' => 'Größe M']]],
+        1 => ['sku' => 'TSHIRT-L', 'price' => '24,99', 'stock' => '0', 'text' => ['de' => ['label' => 'Größe L']]],
+    ]];
+$post('/account/offers/new', $productForm, 10);
+$product = $pdo->query("SELECT * FROM offer WHERE type = 'shop.product' ORDER BY id DESC")->fetch();
+check('shop: a product is saved with the lowest variant price as price_from, two variants stored with their own sku/price/stock',
+    $product !== false && $product['status'] === 'draft' && (int) $product['price_from'] === 1999
+    && $variantRow('TSHIRT-M') !== false && (int) $variantRow('TSHIRT-M')['stock'] === 5 && (int) $variantRow('TSHIRT-L')['price'] === 2499 && (int) $variantRow('TSHIRT-L')['stock'] === 0);
+$productId = (int) $product['id'];
+$variantM = (int) $variantRow('TSHIRT-M')['id'];
+$variantL = (int) $variantRow('TSHIRT-L')['id'];
+
+check('shop: a second variant with a sku already in use is refused', (function () use ($post, $productForm, $productId, $pdo) {
+    $form = $productForm;
+    $form['variant'][1]['sku'] = 'TSHIRT-M';
+    $post('/account/offers/' . $productId, $form, 10);
+    return $pdo->query("SELECT COUNT(*) FROM x_shop_variant WHERE offer_id = {$productId}")->fetchColumn() == 2;
+})());
+
+$post('/admin/offers/' . $productId . '/decide', ['decision' => 'approve'], 3);
+$productSlug = $product['slug'] ?? $pdo->query("SELECT slug FROM offer_translation WHERE offer_id = {$productId} AND locale = 'de'")->fetchColumn();
+$r = $get('/offers/' . $productSlug, null);
+check('shop: a visitor who is not logged in is sent to log in, sees no variant picker at all',
+    str_contains($r['body'], 'Melde dich an') && !str_contains($r['body'], 'name="variant_id"'));
+$r = $get('/offers/' . $productSlug, 11);
+check('shop: logged in, both variants are offered, the out-of-stock one disabled',
+    str_contains($r['body'], 'Größe M') && str_contains($r['body'], 'Größe L')
+    && preg_match('/value="' . $variantL . '"\s+disabled/', $r['body']) === 1
+    && preg_match('/value="' . $variantM . '"\s+disabled/', $r['body']) === 0);
+check('shop: adding more than is in stock is refused, nothing is added', $post('/cart/add', ['variant_id' => (string) $variantL, 'quantity' => '1'], 11)['status'] === 302
+    && $pdo->query('SELECT COUNT(*) FROM x_shop_cart_item')->fetchColumn() == 0);
+$post('/cart/add', ['variant_id' => (string) $variantM, 'quantity' => '2'], 11);
+check('shop: a valid quantity is added to the cart, tied to the account', $pdo->query("SELECT quantity FROM x_shop_cart_item WHERE account_id = 11 AND variant_id = {$variantM}")->fetchColumn() == 2);
+$post('/cart/add', ['variant_id' => (string) $variantM, 'quantity' => '1'], false);
+check('shop: adding the same variant again increases the quantity instead of a second row', $pdo->query('SELECT COUNT(*) FROM x_shop_cart_item')->fetchColumn() == 1
+    && $pdo->query("SELECT quantity FROM x_shop_cart_item WHERE account_id = 11 AND variant_id = {$variantM}")->fetchColumn() == 3);
+$r = $get('/cart', false);
+check('shop: the cart shows the line and its total', str_contains($r['body'], 'T-Shirt Basic') && str_contains($r['body'], '59,97'));
+
+$r = $get('/checkout', false);
+check('shop: checkout shows subtotal, the flat shipping rate and the grand total', str_contains($r['body'], '59,97') && str_contains($r['body'], '4,90') && str_contains($r['body'], '64,87'));
+$ordersBefore = $lastOrder();
+$post('/checkout', ['payment_method' => 'core.offline', 'accept_terms' => '1'], false);
+$orderId = $lastOrder();
+$order = $orderRow($orderId);
+check('shop: checkout creates one order for the single provider, total is cart plus shipping, the cart is emptied',
+    $orderId > $ordersBefore && (int) $order['buyer_id'] === 11 && (int) $order['provider_id'] === $shopProviderId && $order['offer_id'] === null
+    && $order['flow'] === 'shop.product' && $order['state'] === 'placed' && (int) $order['total'] === 6487 && $order['currency'] === 'EUR'
+    && $pdo->query('SELECT COUNT(*) FROM x_shop_cart_item')->fetchColumn() == 0);
+check('shop: the order has one line per cart item plus a shipping line', $pdo->query("SELECT label || ':' || quantity || ':' || unit_price FROM order_item WHERE order_id = {$orderId} ORDER BY position")->fetchAll(PDO::FETCH_COLUMN)
+    == ['T-Shirt Basic — Größe M:3:1999', 'Versand:1:490']);
+check('shop: stock was taken for what was ordered, atomically - not just recorded after the fact', (int) $variantRow('TSHIRT-M')['stock'] === 2);
+
+check('shop: the order page shows the shipping line and carries the generic order flow onward', str_contains($get('/orders/' . $orderId, 11)['body'], 'Versand: 4,90'));
+check('shop: the provider marks it shipped, the buyer confirms receipt - no shop-specific route needed for this', $act($orderId, 'ship', 10)['status'] === 302 && $orderRow($orderId)['state'] === 'shipped');
+$act($orderId, 'accept_delivery', 11);
+check('shop: completed, and open for a review', $orderRow($orderId)['state'] === 'completed' && str_contains($get('/orders/' . $orderId, 11)['body'], 'name="rating"'));
+$post('/orders/' . $orderId . '/review', ['rating' => '5', 'body' => 'Passt gut, schnell geliefert.'], 11);
+check('shop: a review is stored against the provider', (int) $pdo->query("SELECT COUNT(*) FROM review WHERE order_id = {$orderId}")->fetchColumn() === 1);
+
+// A second order, cancelled before shipping: stock has to come back.
+$post('/cart/add', ['variant_id' => (string) $variantM, 'quantity' => '1'], 11);
+$post('/checkout', ['payment_method' => 'core.offline', 'accept_terms' => '1'], false);
+$secondOrderId = $lastOrder();
+check('shop: stock taken for the second order too', (int) $variantRow('TSHIRT-M')['stock'] === 1);
+$post('/orders/' . $secondOrderId . '/transition', ['transition' => 'request_cancel', 'note' => 'Nicht mehr lieferbar'], 10);
+check('shop: a cancellation can be requested by the provider', $orderRow($secondOrderId)['state'] === 'cancel_requested');
+$post('/orders/' . $secondOrderId . '/transition', ['transition' => 'agree_cancel'], 11);
+check('shop: once the buyer agrees, the order is cancelled and the variant\'s stock is given back', $orderRow($secondOrderId)['state'] === 'cancelled' && (int) $variantRow('TSHIRT-M')['stock'] === 2);
+
+$pdo->exec("DELETE FROM review WHERE order_id IN ({$orderId}, {$secondOrderId})");
+$pdo->exec("DELETE FROM orders WHERE id IN ({$orderId}, {$secondOrderId})");
+$pdo->exec('DELETE FROM x_shop_cart_item');
+$pdo->exec("DELETE FROM x_shop_variant WHERE offer_id = {$productId}");
+$pdo->exec("DELETE FROM offer WHERE id = {$productId}");
+$pdo->exec("DELETE FROM category WHERE id = {$shopCatId}");
+$pdo->exec('DELETE FROM account WHERE id IN (10, 11)');
+$pdo->exec("UPDATE extension SET enabled = 0 WHERE id = 'shop'");
 
 foreach ($GLOBALS['failed'] ?? [] as $label) {
     echo "FAIL  {$label}\n";
