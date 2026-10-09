@@ -32,6 +32,13 @@ jobs:
           ref: main
           path: extensions/auction
 
+      - name: Checkout extension shop
+        uses: actions/checkout@v4
+        with:
+          repository: alex01at/modulento-ext-shop
+          ref: main
+          path: extensions/shop
+
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
