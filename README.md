@@ -988,6 +988,8 @@ extensions/<id>/
 | `offerType(OfferType)` | A kind of offer for the catalogue, see below |
 | `orderFlow(OrderFlow)` | How offers of a type are ordered and carried out, see below |
 | `paymentMethod(PaymentMethod)` | A way to pay, e.g. a payment service |
+| `module(id, labelKey)` | An optional feature of the extension, switched off and on under Administration → Modules exactly like a core module; `labelKey` needs both `<labelKey>.name` and `<labelKey>.description` in the extension's own `lang/` files. Only ever listed while the extension itself is active, since this call is what adds it |
+| `moduleEnabled(id)` | Whether a module - this extension's own, another's, or a core one - is currently switched on; call right after `module()` to decide what else to register (routes, menu entries, …) for that feature |
 
 Core services an extension uses instead of SQL on core tables, all on the
 `App` object: `accounts` (find, create, change accounts), `tokens` (one-time
@@ -1145,7 +1147,9 @@ content, profile pictures, "stay logged in" and subscriptions. A module that is 
 routes, menu entries or links; its data stays and is back when it is switched
 on again (`$app->modules->enabled('reviews')`, in templates `module('reviews')`).
 The withdrawal and the report form are legal duties in many cases - switch
-them off only where they do not apply.
+them off only where they do not apply. An active extension can list an
+optional feature of its own here too (`Registrar::module()`, see "Writing an
+extension") - it appears and disappears with the extension itself.
 
 **Subscriptions** (the module "Subscriptions") sell plans to accounts: a plan
 has a price, a period and a list of features, and an account has one plan at a
@@ -1329,7 +1333,7 @@ Version 1 consists of:
   `extension.json` with `id`, `name`, `version`, `api`, `namespace`
 - the `Registrar` methods `routes`, `permission`, `adminMenu`, `navigation`, `homeSection`,
   `providerSection`, `accountLink`, `listen`, `task`, `offerType`, `orderFlow`, `paymentMethod`,
-  and its `manifest`
+  `module`, `moduleEnabled`, and its `manifest`
 - the interfaces `Modulento\Core\Catalogue\OfferType`,
   `Modulento\Core\Order\OrderFlow` and `Modulento\Core\Order\PaymentMethod`,
   including the keys of the arrays they return (states, transitions,

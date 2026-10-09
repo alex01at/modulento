@@ -4770,6 +4770,29 @@ check('shop: cancelling the order gives the discount\'s use back too', $discount
 $post('/admin/shop/discounts/' . $percentDiscount['id'] . '/delete', [], 3);
 check('shop: the admin delete removes the code for good', $discountsService->find($percentDiscount['id']) === null);
 
+// Discount codes as their own module (Administration → Modules), added
+// only because the shop extension is active - switching it off hides the
+// cart's apply-code form and removes the admin discounts routes, without
+// touching core modules (subscriptions stays off, set at the top of this
+// section) or any code still in x_shop_discount.
+check('shop: the discounts module is listed in Administration → Modules, on by default',
+    str_contains($get('/admin/modules', 3)['body'], 'Rabattcodes')
+    && str_contains($get('/admin/modules', 3)['body'], 'value="shop.discounts" checked'));
+
+$coreModulesWithoutSubscriptions = array_values(array_diff(array_keys(Modulento\Core\Support\Modules::ALL), ['subscriptions']));
+$post('/admin/modules', ['modules' => $coreModulesWithoutSubscriptions], 3);
+check('shop: switched off, its admin page and the cart route are both gone',
+    $get('/admin/shop/discounts', 3)['status'] === 404 && $post('/cart/discount', ['code' => 'ANY'], 11)['status'] === 404);
+
+$pdo->exec("INSERT INTO x_shop_cart_item (account_id, variant_id, quantity, added_at) VALUES (11, {$variantM}, 1, '2026-01-01 00:00:00')");
+check('shop: switched off, the cart no longer shows the discount code field', !str_contains($get('/cart', 11)['body'], 'Rabattcode'));
+$pdo->exec('DELETE FROM x_shop_cart_item WHERE account_id = 11');
+
+$post('/admin/modules', ['modules' => array_merge($coreModulesWithoutSubscriptions, ['shop.discounts'])], 3);
+check('shop: switched back on, its admin page and cart route work again',
+    $get('/admin/shop/discounts', 3)['status'] === 200
+    && str_contains($get('/admin/modules', 3)['body'], 'value="shop.discounts" checked'));
+
 // Digital products: no shipping, no stock to run out of, a download once paid.
 $digitalForm = ['type' => 'shop.product', 'category_id' => (string) $shopCatId,
     'text' => ['de' => ['title' => 'E-Book Testwissen', 'summary' => 'Ein PDF zum Lernen', 'description' => 'Praktisches Wissen.'], 'en' => ['title' => '', 'summary' => '', 'description' => '']],

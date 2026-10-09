@@ -88,6 +88,27 @@ final class Registrar
     }
 
     /**
+     * An optional feature of this extension, switched off and on under
+     * Administration → Modules exactly like a core module - call
+     * $app->modules->enabled($id) in register() itself (to decide whether
+     * to add this feature's routes/menu entries/listeners at all) and
+     * wherever else it matters. Only ever listed while this extension is
+     * active, since nothing calls this otherwise. The id starts with the
+     * extension id; $labelKey needs both "<labelKey>.name" and
+     * "<labelKey>.description" in this extension's own lang files.
+     */
+    public function module(string $id, string $labelKey): void
+    {
+        $this->app->modules->register($this->prefixed($id, 'Module'), $labelKey);
+    }
+
+    /** Whether a module - this extension's own, another's, or a core one - is currently switched on. */
+    public function moduleEnabled(string $id): bool
+    {
+        return $this->app->modules->enabled($id);
+    }
+
+    /**
      * A section on the home page, e.g. the latest posts. The template is
      * one of this extension's ("@id/home.twig"); a theme may override it
      * like any other. $data supplies its variables and runs only when the
