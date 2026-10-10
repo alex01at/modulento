@@ -5052,7 +5052,11 @@ $pdo->exec("CREATE TABLE x_card_profile (id INTEGER PRIMARY KEY, provider_id INT
 $pdo->exec("CREATE TABLE x_card_gallery (id INTEGER PRIMARY KEY, provider_id INTEGER REFERENCES provider (id) ON DELETE CASCADE, name TEXT, extension TEXT, width INTEGER, height INTEGER, position INTEGER, created_at TEXT)");
 $pdo->exec("CREATE TABLE x_card_offering (id INTEGER PRIMARY KEY, provider_id INTEGER REFERENCES provider (id) ON DELETE CASCADE, title TEXT, description TEXT, price TEXT, position INTEGER, created_at TEXT)");
 $pdo->exec("CREATE TABLE x_card_event (id INTEGER PRIMARY KEY, provider_id INTEGER REFERENCES provider (id) ON DELETE CASCADE, type TEXT, created_at TEXT)");
-$pdo->exec("INSERT INTO extension VALUES ('card', '0.1.0', 1)");
+$pdo->exec("CREATE TABLE x_card_organization (id INTEGER PRIMARY KEY, owner_provider_id INTEGER UNIQUE REFERENCES provider (id) ON DELETE CASCADE,
+    company TEXT, logo_name TEXT, logo_extension TEXT, design TEXT NOT NULL DEFAULT 'classic', color_preset TEXT, created_at TEXT, updated_at TEXT)");
+$pdo->exec("CREATE TABLE x_card_organization_member (id INTEGER PRIMARY KEY, organization_id INTEGER REFERENCES x_card_organization (id) ON DELETE CASCADE,
+    provider_id INTEGER UNIQUE REFERENCES provider (id) ON DELETE CASCADE, role TEXT, workplace TEXT, joined_at TEXT)");
+$pdo->exec("INSERT INTO extension VALUES ('card', '0.2.0', 1)");
 
 $post('/admin/categories/new', ['text' => ['de' => ['name' => 'Handwerk', 'slug' => ''], 'en' => ['name' => '', 'slug' => '']]], 3);
 $cardCatId = (int) $pdo->query("SELECT category_id FROM category_translation WHERE slug = 'handwerk'")->fetchColumn();
@@ -5120,7 +5124,7 @@ check('card: vCard is refused without the Pro feature', $get('/card/' . $cardSlu
 
 // Grant every card feature through a real plan, exactly the way an operator would.
 $cardPlan = $cardSubs->createPlan('card-pro', 'Karte Pro', 900, 'EUR', 1,
-    ['card.feature.design', 'card.feature.colors', 'card.feature.gallery', 'card.feature.offerings', 'card.feature.booking', 'card.feature.vcard', 'card.feature.stats']);
+    ['card.feature.design', 'card.feature.colors', 'card.feature.gallery', 'card.feature.offerings', 'card.feature.booking', 'card.feature.vcard', 'card.feature.stats', 'card.feature.team']);
 $cardSubs->assign(30, $cardPlan);
 
 $r = $get('/account/card', 30);
@@ -5232,6 +5236,114 @@ check('card: the statistics page shows the real view count once granted', str_co
 $r = $get('/providers/' . $cardSlug, null);
 check('card: the standard marketplace profile page still works, with a teaser linking to the full card', $r['status'] === 200
     && str_contains($r['body'], 'href="/card/' . $cardSlug . '"'));
+
+// Custom colours actually render now (a real Phase-1 gap found and fixed
+// while building Firma/team branding, which depends on this working at
+// all - see card.css's comment and _meta.twig's inline <style> block).
+$post('/account/card', [
+    'company' => 'Fischer Tischlerei', 'category_id' => (string) $cardCatId, 'design' => 'classic', 'use_custom_colors' => '1',
+    'color_background' => '#fdf2e9', 'color_header' => '#b45309', 'color_content' => '#1f2430', 'color_footer' => '#b45309',
+    'booking_mode' => 'request', 'booking_url' => '',
+], 30);
+$coloredCard = $get('/card/' . $cardSlug, null);
+check('card: custom colours actually render as an inline override, scoped to beat the design\'s own default', str_contains($coloredCard['body'], 'body[data-design]')
+    && str_contains($coloredCard['body'], '--card-accent: #b45309;') && str_contains($coloredCard['body'], '--card-bg: #fdf2e9;'));
+check('card: without "use custom colours", no override style is rendered at all', (function () use ($post, $get, $cardCatId, $cardSlug) {
+    // The checkbox is omitted entirely, exactly as an unchecked HTML checkbox
+    // never appears in the POST body at all - Cards::validate() reads it
+    // with isset(), not by its value.
+    $post('/account/card', ['company' => 'Fischer Tischlerei', 'category_id' => (string) $cardCatId, 'design' => 'classic'], 30);
+    return !str_contains($get('/card/' . $cardSlug, null)['body'], 'body[data-design]');
+})());
+
+// --- Firma/team: a Pro owner founds an organisation, invites a member, branding resolves live ---
+check('card: the team page is locked for an account without the feature', str_contains($get('/account/team', 32)['body'], 'Das ist in deinem aktuellen Plan nicht enthalten'));
+
+$teamForm = $get('/account/team', 30);
+check('card: a Pro account without an organisation sees the founding form', $teamForm['status'] === 200 && str_contains($teamForm['body'], 'name="company"'));
+
+$post('/account/team', ['company' => ''], 30);
+check('card: founding with an empty company name is refused', $pdo->query("SELECT COUNT(*) FROM x_card_organization WHERE owner_provider_id = {$cardProviderId}")->fetchColumn() == 0);
+$post('/account/team', ['company' => 'Fischer Gruppe'], 30);
+$cardOrgId = (int) $pdo->query("SELECT id FROM x_card_organization WHERE owner_provider_id = {$cardProviderId}")->fetchColumn();
+check('card: founding creates the organisation with the owner as its first member', $cardOrgId > 0
+    && $pdo->query("SELECT role FROM x_card_organization_member WHERE organization_id = {$cardOrgId} AND provider_id = {$cardProviderId}")->fetchColumn() === 'owner');
+
+$post('/account/team', ['company' => 'Zweite Firma'], 30);
+check('card: an account already in an organisation cannot found a second one', $pdo->query('SELECT COUNT(*) FROM x_card_organization')->fetchColumn() == 1);
+
+$ownerDashboard = $get('/account/team', 30);
+check('card: the owner now sees the management dashboard, not the founding form', str_contains($ownerDashboard['body'], 'Fischer Gruppe') && !str_contains($ownerDashboard['body'], 'card.team.found_submit'));
+
+$post('/account/team/branding', ['company' => 'Fischer Gruppe', 'design' => 'professional', 'color_preset' => 'graphite'], 30);
+$cardOrgRow = $pdo->query("SELECT design, color_preset FROM x_card_organization WHERE id = {$cardOrgId}")->fetch();
+check('card: the owner\'s branding form saves the design and the curated colour preset', $cardOrgRow['design'] === 'professional' && $cardOrgRow['color_preset'] === 'graphite');
+
+$ownerPublicCard = $get('/card/' . $cardSlug, null);
+check('card: the owner\'s own public card reflects the organisation\'s branding - company, design and preset colours', str_contains($ownerPublicCard['body'], 'data-design="professional"')
+    && str_contains($ownerPublicCard['body'], 'Fischer Gruppe') && str_contains($ownerPublicCard['body'], '--card-accent: #334155;'));
+
+$http->reset();
+$post('/account/team/invite', ['email' => 'not-an-email'], 30);
+check('card: inviting an invalid e-mail address is refused, nothing created', $pdo->query("SELECT COUNT(*) FROM x_card_organization_member WHERE organization_id = {$cardOrgId}")->fetchColumn() == 1);
+$post('/account/team/invite', ['email' => 'kollege@example.test'], 30);
+$memberAccountId = (int) $pdo->query("SELECT id FROM account WHERE email = 'kollege@example.test'")->fetchColumn();
+$memberProviderId = (int) $pdo->query("SELECT id FROM provider WHERE account_id = {$memberAccountId}")->fetchColumn();
+check('card: inviting creates an approved provider and an employee membership, named from the e-mail', $memberAccountId > 0 && $memberProviderId > 0
+    && $pdo->query("SELECT status FROM provider WHERE id = {$memberProviderId}")->fetchColumn() === 'approved'
+    && $pdo->query("SELECT name FROM provider WHERE id = {$memberProviderId}")->fetchColumn() === 'Kollege'
+    && $pdo->query("SELECT role FROM x_card_organization_member WHERE provider_id = {$memberProviderId}")->fetchColumn() === 'employee');
+check('card: the seat count synced to the subscription (even a flat plan tracks it; only a per-seat plan bills by it)', (int) $pdo->query("SELECT quantity FROM subscription WHERE account_id = 30 AND status = 'active'")->fetchColumn() === 2);
+
+$inviteMail = lastMail($mailLog, 'kollege@example.test');
+check('card: the invited member gets a set-password mail naming the company', $inviteMail !== null && str_contains($inviteMail['subject'], 'Fischer Gruppe') && str_starts_with($inviteMail['link'], '/reset-password/'));
+$post('/account/team/invite', ['email' => 'kollege@example.test'], 30);
+check('card: inviting the same e-mail twice is refused (the account already exists)', $pdo->query("SELECT COUNT(*) FROM account WHERE email = 'kollege@example.test'")->fetchColumn() == 1);
+
+$post($inviteMail['link'], ['password' => $pw, 'password_repeat' => $pw], null);
+$post('/login', ['email' => 'kollege@example.test', 'password' => $pw], false);
+
+$memberEditor = $get('/account/card', $memberAccountId);
+check('card: the new member\'s own editor shows it is team-managed and hides logo/design/colour sections', str_contains($memberEditor['body'], 'Fischer Gruppe')
+    && !str_contains($memberEditor['body'], 'name="logo"') && str_contains($memberEditor['body'], 'card.edit.team_managed') === false && str_contains($memberEditor['body'], 'Vom Team verwaltet'));
+$post('/account/card', ['category_id' => '', 'company' => 'Versuchte Eigene Firma', 'design' => 'playful', 'use_custom_colors' => '1', 'workplace' => 'Niederlassung München'], $memberAccountId);
+$memberCardRow = $pdo->query("SELECT company, design, use_custom_colors FROM x_card_profile WHERE provider_id = {$memberProviderId}")->fetch();
+check('card: a member cannot set their own company or design - silently ignored, exactly like the Free/Pro gate', $memberCardRow['company'] === null && $memberCardRow['design'] === 'classic' && (int) $memberCardRow['use_custom_colors'] === 0);
+
+$post('/account/card/logo', [], $memberAccountId);
+check('card: a member\'s own logo-upload attempt is refused, not silently accepted', $pdo->query("SELECT logo_name FROM x_card_profile WHERE provider_id = {$memberProviderId}")->fetchColumn() === null);
+
+$memberSlug = $pdo->query("SELECT slug FROM provider WHERE id = {$memberProviderId}")->fetchColumn();
+$memberPublicCard = $get('/card/' . $memberSlug, null);
+check('card: the member\'s own public card shows the organisation\'s branding, not a blank one', str_contains($memberPublicCard['body'], 'data-design="professional"')
+    && str_contains($memberPublicCard['body'], 'Fischer Gruppe') && str_contains($memberPublicCard['body'], '--card-accent: #334155;'));
+check('card: without an address of its own, the member\'s card falls back to the owner\'s address, prefixed by the member\'s own workplace', str_contains($memberPublicCard['body'], 'Niederlassung München')
+    && str_contains($memberPublicCard['body'], 'Werkstattweg 3'));
+
+// A Firma seat carries full Pro access, not just branding - the member has
+// no subscription of their own at all, it is entirely inherited from the
+// organisation owner's plan (Organizations::effectiveAllows()).
+check('card: a member with no subscription of their own can still download a vCard - inherited from the owner\'s plan', $get('/card/' . $memberSlug . '/vcard.vcf', null)['status'] === 200);
+check('card: a member\'s own statistics page is unlocked too, same inheritance', !str_contains($get('/account/card/stats', $memberAccountId)['body'], 'Das ist in deinem aktuellen Plan nicht enthalten'));
+
+$post('/account/team/branding', ['company' => 'Sollte nicht klappen', 'design' => 'classic', 'color_preset' => ''], $memberAccountId);
+check('card: a member cannot change the organisation\'s branding at all - still professional/graphite', $pdo->query("SELECT design FROM x_card_organization WHERE id = {$cardOrgId}")->fetchColumn() === 'professional');
+
+$post('/account/team/' . $cardProviderId . '/remove', [], 30);
+check('card: the owner cannot be removed from their own organisation', $pdo->query("SELECT COUNT(*) FROM x_card_organization_member WHERE organization_id = {$cardOrgId}")->fetchColumn() == 2);
+$post('/account/team/' . $memberProviderId . '/remove', [], 30);
+check('card: removing a member deletes the membership and syncs the seat count back down', $pdo->query("SELECT COUNT(*) FROM x_card_organization_member WHERE provider_id = {$memberProviderId}")->fetchColumn() == 0
+    && (int) $pdo->query("SELECT quantity FROM subscription WHERE account_id = 30 AND status = 'active'")->fetchColumn() === 1);
+$removedMemberCard = $get('/card/' . $memberSlug, null);
+check('card: a removed member\'s card survives, just without the organisation\'s branding any more', $removedMemberCard['status'] === 200 && !str_contains($removedMemberCard['body'], 'Fischer Gruppe'));
+
+// Cleanup (team).
+$pdo->exec("DELETE FROM x_card_profile WHERE provider_id = {$memberProviderId}");
+$pdo->exec("DELETE FROM x_card_organization_member WHERE organization_id = {$cardOrgId}");
+$pdo->exec("DELETE FROM x_card_organization WHERE id = {$cardOrgId}");
+$pdo->exec("DELETE FROM provider WHERE id = {$memberProviderId}");
+$pdo->exec("DELETE FROM account WHERE id = {$memberAccountId}");
+$pdo->exec('UPDATE subscription SET quantity = 1 WHERE account_id = 30');
 
 // Cleanup.
 $pdo->exec("DELETE FROM x_card_event WHERE provider_id = {$cardProviderId}");
