@@ -311,8 +311,10 @@ never sees the administration at all, whatever else it may do.
 
 **Administration → Updates** is the one place for updates. It lists the core,
 each installed extension and each installed theme with the installed and the
-newest version. **Check** asks every source once and keeps the answers; the
-dashboard and this page read them, so opening a page never asks GitHub.
+newest version. **Check** asks every source once and keeps the answers; this
+page only ever reads them. The dashboard reads them too, but repeats the
+check itself, quietly, once the last one is a day old or more (or there has
+never been one) - nobody has to remember to ask (`UpdateChecks::isStale()`).
 **Update** installs the newest release of one component. The core has its own
 migration step, which runs by itself when an update is applied.
 
@@ -1237,7 +1239,11 @@ uploaded (checked like a package from GitHub, not updated automatically).
 **Administration → Updates** lists every component in one place: the core,
 each extension and each theme, with the installed and the newest version. A
 check asks each source once and keeps the answer; the dashboard counts what
-has a newer release. The packages page only shows what is installed.
+has a newer release. The packages page only shows what is installed. Nobody
+needs to remember to check: the dashboard's own "Updates" tile repeats the
+check itself, quietly, whenever the last one is a day old or more (or there
+has never been one) - the manual check on this page still exists for asking
+right away.
 
 **Administration → Home page** arranges the blocks of the start page: title
 area, text, latest offers, top providers, a picture from the media library and

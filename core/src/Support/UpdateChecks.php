@@ -10,12 +10,16 @@ use Modulento\Core\Package\Packages;
 /**
  * Every component that can be updated - the core, and each installed
  * extension or theme - in one place. "Check" asks each release server once and
- * stores the answers; the dashboard and the Updates page only read them, so
- * opening a page never asks GitHub.
+ * stores the answers; the Updates page only ever reads them. The dashboard
+ * reads them too, but repeats the check itself first when the last one is
+ * a day old or more (see isStale()), so an administrator never has to
+ * remember to ask.
  */
 final class UpdateChecks
 {
     private const SETTING = 'core.update_check';
+    /** How long a check stands before the dashboard quietly repeats it on its own. */
+    private const STALE_AFTER_SECONDS = 86400;
 
     public function __construct(private App $app)
     {
@@ -65,6 +69,14 @@ final class UpdateChecks
     public function checkedAt(): ?string
     {
         return $this->stored()['checked_at'] ?? null;
+    }
+
+    /** Never checked, or the last check is old enough that the dashboard should ask again. */
+    public function isStale(): bool
+    {
+        $checkedAt = $this->checkedAt();
+
+        return $checkedAt === null || strtotime($checkedAt . ' UTC') < time() - self::STALE_AFTER_SECONDS;
     }
 
     /**
