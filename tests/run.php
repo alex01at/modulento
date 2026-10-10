@@ -4206,17 +4206,33 @@ check('media: the page lists each picture with its address and a way to remove i
 $post('/admin/media/' . $media['id'] . '/delete', [], 3);
 check('media: removing a picture removes its file too', $pdo->query('SELECT COUNT(*) FROM media')->fetchColumn() == 0 && !is_file($config['app']['uploads'] . '/media/' . $media['file']));
 
-// Dashboard: the update card shows what the last check found; the check itself only runs on the Updates page.
+// Dashboard: the update card shows what the last check found. A check
+// older than a day (or none at all) is repeated by the dashboard itself,
+// silently - see UpdateChecks::isStale() below, tested without a repository
+// so these display-logic checks stay free of any real network access; the
+// seeded "checked_at" here is always fresh enough not to trigger that.
 $updateConfig = ['update' => ['repo' => 'acme/modulento']] + $config;
 $app = new Modulento\Core\App($config, $pdo);
-$app->settings->set('core.update_check', json_encode(['core' => '99.0.0', 'packages' => [], 'checked_at' => '2026-10-04 10:00']));
+$app->settings->set('core.update_check', json_encode(['core' => '99.0.0', 'packages' => [], 'checked_at' => gmdate('Y-m-d H:i')]));
 $rr = request($pdo, $updateConfig, 'GET', '/admin', 3);
 check('dashboard: an available update is counted and named, with the installed version next to it', str_contains($rr['body'], 'Modulento 99.0.0') && str_contains($rr['body'], '<span class="stat-value">1</span>'));
-$app->settings->set('core.update_check', json_encode(['core' => '0.0.0', 'packages' => [], 'checked_at' => '2026-10-04 10:00']));
-check('dashboard: an up-to-date check says so with its date', str_contains(request($pdo, $updateConfig, 'GET', '/admin', 3)['body'], 'Aktuell · geprüft am 2026-10-04 10:00 UTC'));
+$justNow = gmdate('Y-m-d H:i');
+$app->settings->set('core.update_check', json_encode(['core' => '0.0.0', 'packages' => [], 'checked_at' => $justNow]));
+check('dashboard: an up-to-date check says so with its date', str_contains(request($pdo, $updateConfig, 'GET', '/admin', 3)['body'], 'Aktuell · geprüft am ' . $justNow . ' UTC'));
 $app->settings->set('core.update_check', '');
-check('dashboard: before any check it says so; without a repository it says that updates are off', str_contains(request($pdo, $updateConfig, 'GET', '/admin', 3)['body'], 'Noch nicht auf Updates geprüft')
-    && str_contains(request($pdo, $config, 'GET', '/admin', 3)['body'], 'Updates sind ausgeschaltet'));
+check('dashboard: without a repository it says that updates are off', str_contains(request($pdo, $config, 'GET', '/admin', 3)['body'], 'Updates sind ausgeschaltet'));
+
+// The dashboard's own silent repeat check: never checked, or a check older
+// than a day, counts as stale; nothing here ever reaches a release server -
+// that only happens through the real check (confirmed above never fired by
+// a plain display-logic test) or by hand on /admin/updates.
+$updateChecks = new Modulento\Core\Support\UpdateChecks($app);
+$app->settings->set('core.update_check', json_encode(['core' => '0.0.0', 'packages' => [], 'checked_at' => gmdate('Y-m-d H:i', time() - 3600)]));
+check('updates: a check from an hour ago is not stale yet', !$updateChecks->isStale());
+$app->settings->set('core.update_check', json_encode(['core' => '0.0.0', 'packages' => [], 'checked_at' => gmdate('Y-m-d H:i', time() - 90000)]));
+check('updates: a check from more than a day ago is stale', $updateChecks->isStale());
+$app->settings->set('core.update_check', '');
+check('updates: never checked at all counts as stale too', $updateChecks->isStale());
 
 // Settings in tabs: one page, every tab in the same form.
 $rr = $get('/account/settings', 3);

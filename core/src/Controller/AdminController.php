@@ -72,14 +72,23 @@ final class AdminController extends Controller
             return null;
         }
 
+        $enabled = ($this->app->config['update']['repo'] ?? '') !== '';
         $checks = new UpdateChecks($this->app);
+        if ($enabled && $checks->isStale()) {
+            // Best-effort and silent: the dashboard must never hang on a
+            // slow or unreachable release server, and a transient failure
+            // here is not worth a flash message on a page nobody asked to
+            // check anything on. The manual check on /admin/updates still
+            // reports its own problems the normal way.
+            $checks->refresh();
+        }
         $available = $checks->available();
 
         return [
             'count' => count($available),
             'names' => array_map(fn (array $component) => ($component['kind'] === 'core' ? 'Modulento' : $component['id']) . ' ' . $component['latest'], $available),
             'checked_at' => $checks->checkedAt(),
-            'enabled' => ($this->app->config['update']['repo'] ?? '') !== '',
+            'enabled' => $enabled,
         ];
     }
 
