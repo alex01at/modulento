@@ -5,13 +5,18 @@
 {% block content %}
 {% include 'account/_nav.twig' %}
 <h1>{{ trans('core.subscriptions.checkout.title') }}</h1>
-<p><strong>{{ plan.name }}</strong> · {{ money(plan.price_cents, plan.currency) }} <small>{{ trans(plan.period_months == 1 ? 'core.subscriptions.period_one' : 'core.subscriptions.period', {count: plan.period_months}) }}</small></p>
+<p><strong>{{ plan.name }}</strong> · {{ money(plan.price_cents, plan.currency) }}{% if plan.per_seat %} {{ trans('core.subscriptions.checkout.per_seat') }}{% endif %} <small>{{ trans(plan.period_months == 1 ? 'core.subscriptions.period_one' : 'core.subscriptions.period', {count: plan.period_months}) }}</small></p>
 
 {% if not methods.transfer and not methods.stripe %}
     <p>{{ trans('core.subscriptions.checkout.none') }}</p>
 {% else %}
     <form method="post" action="{{ url('/subscriptions/' ~ plan.id ~ '/checkout') }}" class="stack-form">
         {{ csrf_field() }}
+        {% if plan.per_seat %}
+            <label for="checkout-quantity">{{ trans('core.subscriptions.checkout.quantity') }}</label>
+            <input id="checkout-quantity" name="quantity" type="number" min="{{ plan.min_quantity }}" value="{{ plan.min_quantity }}" required>
+            <small>{{ trans('core.subscriptions.checkout.quantity_hint', {min: plan.min_quantity}) }}</small>
+        {% endif %}
         <h2>{{ trans('core.subscriptions.checkout.address') }}</h2>
         <p><small>{{ trans('core.subscriptions.checkout.address_hint') }}</small></p>
         <label for="billing-name">{{ trans('core.subscriptions.checkout.name') }}</label>

@@ -89,15 +89,15 @@ final class StripeGateway
      * A Checkout Session on the platform's own account for a subscription:
      * the buyer pays every period and Stripe repeats the charge.
      *
-     * @param int $amount in minor units, for one period of $months months
+     * @param int $amount in minor units, for one period of $months months - the price of ONE seat when $quantity > 1
      * @return array{id: string, url: string}
      */
-    public function createSubscriptionCheckout(int $amount, string $currency, int $months, string $productName, string $reference, string $successUrl, string $cancelUrl): array
+    public function createSubscriptionCheckout(int $amount, string $currency, int $months, string $productName, string $reference, string $successUrl, string $cancelUrl, int $quantity = 1): array
     {
         $session = $this->call('POST', '/v1/checkout/sessions', [
             'mode' => 'subscription',
             'line_items' => [[
-                'quantity' => 1,
+                'quantity' => $quantity,
                 'price_data' => [
                     'currency' => strtolower($currency),
                     'unit_amount' => $amount,
@@ -118,6 +118,34 @@ final class StripeGateway
         }
 
         return ['id' => $session['id'], 'url' => $session['url']];
+    }
+
+    /**
+     * The id of a subscription's one line item - where quantity lives in
+     * Stripe's model, not on the subscription itself. Captured once, right
+     * after a Checkout session completes, so a seat count can be updated
+     * live afterwards without asking Stripe again.
+     */
+    public function subscriptionItemId(string $subscription): ?string
+    {
+        if (preg_match('/^sub_[A-Za-z0-9]+$/', $subscription) !== 1) {
+            throw new PaymentException('core.payment.error.unexpected', 'Stripe: malformed subscription id');
+        }
+
+        $data = $this->call('GET', '/v1/subscriptions/' . $subscription);
+        $item = $data['items']['data'][0]['id'] ?? null;
+
+        return is_string($item) ? $item : null;
+    }
+
+    /** Changes the seat count of a running subscription; Stripe prorates the difference onto the next invoice. */
+    public function updateSubscriptionItemQuantity(string $itemId, int $quantity): void
+    {
+        if (preg_match('/^si_[A-Za-z0-9]+$/', $itemId) !== 1) {
+            throw new PaymentException('core.payment.error.unexpected', 'Stripe: malformed subscription item id');
+        }
+
+        $this->call('POST', '/v1/subscription_items/' . $itemId, ['quantity' => $quantity]);
     }
 
     /** Ends the renewal at the close of the current period; the subscription runs to its end. */

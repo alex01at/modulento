@@ -117,6 +117,8 @@ final class AdminSubscriptionController extends Controller
         }
         $rawImages = trim((string) ($_POST['max_images_per_offer'] ?? ''));
         $maxImagesPerOffer = $rawImages !== '' ? max(0, (int) $rawImages) : null;
+        $perSeat = isset($_POST['per_seat']);
+        $minQuantity = max(1, (int) ($_POST['min_quantity'] ?? 1));
 
         try {
             if ($price === null || $app->subscriptions->plan($id) === null) {
@@ -131,7 +133,9 @@ final class AdminSubscriptionController extends Controller
                 $features,
                 isset($_POST['active']),
                 $offerLimits,
-                $maxImagesPerOffer
+                $maxImagesPerOffer,
+                $perSeat,
+                $minQuantity
             );
             $app->adminLog->record($app->auth->account()['id'], 'subscription_plan_change', null, (string) $id);
             Session::flash('success', $this->trans('core.admin.subscriptions.flash.plan_saved'));

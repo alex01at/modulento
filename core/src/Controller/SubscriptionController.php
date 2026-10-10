@@ -63,7 +63,11 @@ final class SubscriptionController extends Controller
         $app = $this->app;
         $accountId = (int) $app->auth->account()['id'];
         $planId = (int) $params['id'];
+        $plan = $app->subscriptions->plan($planId);
         $method = (string) ($_POST['method'] ?? '');
+        // A flat plan is always one unit; only a per-seat plan reads its own
+        // floor and the buyer's requested count.
+        $quantity = $plan !== null && $plan['per_seat'] ? max($plan['min_quantity'], (int) ($_POST['quantity'] ?? $plan['min_quantity'])) : 1;
         $offered = $app->subscriptionBilling->methods();
         $back = '/subscriptions/' . $planId . '/checkout';
 
@@ -77,7 +81,7 @@ final class SubscriptionController extends Controller
             ]);
 
             if ($method === 'transfer' && $offered['transfer']) {
-                $order = $app->subscriptionBilling->startTransfer($accountId, $planId);
+                $order = $app->subscriptionBilling->startTransfer($accountId, $planId, $quantity);
                 $this->redirect('/subscriptions/orders/' . $order['id']);
                 return;
             }
@@ -86,7 +90,8 @@ final class SubscriptionController extends Controller
                     $accountId,
                     $planId,
                     $app->url('/account/subscription', null, true),
-                    $app->url('/subscriptions', null, true)
+                    $app->url('/subscriptions', null, true),
+                    $quantity
                 );
                 header('Location: ' . $url);
                 return;
