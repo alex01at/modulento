@@ -221,8 +221,8 @@ $pdo->exec("CREATE TABLE notification (id INTEGER PRIMARY KEY, account_id INTEGE
 // Created this early (not just where the rest of migration 022 is mirrored,
 // further down) because OfferController now consults a plan's limits on
 // every offer wizard request, not only on the subscriptions tests' own pages.
-$pdo->exec("CREATE TABLE subscription_plan (id INTEGER PRIMARY KEY, slug TEXT UNIQUE, name TEXT, price_cents INTEGER, currency TEXT, period_months INTEGER, features TEXT NOT NULL DEFAULT '', offer_limits TEXT NOT NULL DEFAULT '{}', max_images_per_offer INTEGER NULL, active INTEGER NOT NULL DEFAULT 1)");
-$pdo->exec("CREATE TABLE subscription (id INTEGER PRIMARY KEY, account_id INTEGER REFERENCES account (id) ON DELETE CASCADE, plan_id INTEGER REFERENCES subscription_plan (id), status TEXT, period_end TEXT, provider_ref TEXT NULL, reminded_for TEXT NULL, created_at TEXT, updated_at TEXT)");
+$pdo->exec("CREATE TABLE subscription_plan (id INTEGER PRIMARY KEY, slug TEXT UNIQUE, name TEXT, price_cents INTEGER, currency TEXT, period_months INTEGER, features TEXT NOT NULL DEFAULT '', offer_limits TEXT NOT NULL DEFAULT '{}', max_images_per_offer INTEGER NULL, per_seat INTEGER NOT NULL DEFAULT 0, min_quantity INTEGER NOT NULL DEFAULT 1, active INTEGER NOT NULL DEFAULT 1)");
+$pdo->exec("CREATE TABLE subscription (id INTEGER PRIMARY KEY, account_id INTEGER REFERENCES account (id) ON DELETE CASCADE, plan_id INTEGER REFERENCES subscription_plan (id), status TEXT, period_end TEXT, provider_ref TEXT NULL, quantity INTEGER NOT NULL DEFAULT 1, stripe_item_ref TEXT NULL, reminded_for TEXT NULL, created_at TEXT, updated_at TEXT)");
 $pdo->exec("CREATE TABLE provider (id INTEGER PRIMARY KEY, account_id INTEGER UNIQUE REFERENCES account (id) ON DELETE CASCADE, type TEXT, status TEXT,
     status_note TEXT, name TEXT, slug TEXT UNIQUE, legal_name TEXT, street TEXT, postal_code TEXT, city TEXT, country TEXT, contact_email TEXT, phone TEXT,
     vat_id TEXT, tax_id TEXT, company_register TEXT, self_certified_at TEXT, details_changed_at TEXT, decided_at TEXT, decided_by INTEGER, created_at TEXT, updated_at TEXT,
@@ -1704,7 +1704,7 @@ $subModules->save(array_keys(Modulento\Core\Support\Modules::ALL));
 $subs = new Modulento\Core\Subscription\Subscriptions($pdo, $subModules);
 // subscription_plan and subscription themselves are created much earlier
 // (see the comment there) - the rest of migration 022 onward follows here.
-$pdo->exec("CREATE TABLE subscription_order (id INTEGER PRIMARY KEY, account_id INTEGER REFERENCES account (id) ON DELETE CASCADE, plan_id INTEGER REFERENCES subscription_plan (id), method TEXT, status TEXT, reference TEXT UNIQUE, amount_cents INTEGER, currency TEXT, stripe_session TEXT NULL, created_at TEXT, paid_at TEXT NULL)");
+$pdo->exec("CREATE TABLE subscription_order (id INTEGER PRIMARY KEY, account_id INTEGER REFERENCES account (id) ON DELETE CASCADE, plan_id INTEGER REFERENCES subscription_plan (id), quantity INTEGER NOT NULL DEFAULT 1, method TEXT, status TEXT, reference TEXT UNIQUE, amount_cents INTEGER, currency TEXT, stripe_session TEXT NULL, created_at TEXT, paid_at TEXT NULL)");
 $pdo->exec("CREATE TABLE subscription_billing_address (account_id INTEGER PRIMARY KEY REFERENCES account (id) ON DELETE CASCADE, name TEXT, street TEXT, postal_code TEXT, city TEXT, country TEXT, updated_at TEXT)");
 $pdo->exec("CREATE TABLE subscription_invoice (id INTEGER PRIMARY KEY, number TEXT UNIQUE, year INTEGER, seq INTEGER, source_ref TEXT UNIQUE, account_id INTEGER NULL REFERENCES account (id) ON DELETE SET NULL, plan_name TEXT, months INTEGER, currency TEXT, net_cents INTEGER, tax_rate INTEGER, tax_cents INTEGER, gross_cents INTEGER, buyer_name TEXT, buyer_street TEXT, buyer_postal_code TEXT, buyer_city TEXT, buyer_country TEXT, issuer TEXT, issued_at TEXT, UNIQUE (year, seq))");
 $pdo->exec("INSERT INTO account (email, password_hash, created_at) VALUES ('abo-test@example.test', 'x', '" . Modulento\Core\Support\Clock::now() . "')");
@@ -1741,7 +1741,7 @@ $post('/account/offers/wizard', ['type' => 'freelancer.service', 'wizard_step' =
 check('offer quota: with the module on and no plan, no draft is created at all', $pdo->query("SELECT COUNT(*) FROM offer WHERE provider_id = (SELECT id FROM provider WHERE account_id = $quotaId)")->fetchColumn() == 0
     && str_contains($_SESSION['_flash']['error'] ?? '', 'Höchstzahl von 0'));
 $quotaPlan = $subs->createPlan('abo-quota', 'Quotenplan', 500, 'EUR', 1, []);
-$subs->updatePlan($quotaPlan, 'Quotenplan', 500, 'EUR', 1, [], true, ['freelancer.service' => 1], 1);
+$subs->updatePlan($quotaPlan, 'Quotenplan', 500, 'EUR', 1, [], true, ['freelancer.service' => 1], 1, false, 1);
 $subs->assign($quotaId, $quotaPlan);
 $get('/account/offers/new?type=freelancer.service', $quotaId);
 $post('/account/offers/wizard', ['type' => 'freelancer.service', 'wizard_step' => 1, 'locales' => []], false);
@@ -1775,7 +1775,7 @@ check('subscriptions: grants() is false without the module, false without a plan
         return $r;
     })());
 $bonusPlan = $subs->createPlan('abo-bonus', 'Bonusplan', 500, 'EUR', 1, ['core.offer.auto_approve', 'core.provider.featured_badge', 'core.catalogue.priority_placement']);
-$subs->updatePlan($bonusPlan, 'Bonusplan', 500, 'EUR', 1, ['core.offer.auto_approve', 'core.provider.featured_badge', 'core.catalogue.priority_placement'], true, ['freelancer.service' => 1], null);
+$subs->updatePlan($bonusPlan, 'Bonusplan', 500, 'EUR', 1, ['core.offer.auto_approve', 'core.provider.featured_badge', 'core.catalogue.priority_placement'], true, ['freelancer.service' => 1], null, false, 1);
 $subs->assign($quotaId, $bonusPlan);
 check('subscriptions: grants() is true once a plan with that feature is active', $subs->grants($quotaId, 'core.offer.auto_approve') && $subs->grants($quotaId, 'core.provider.featured_badge'));
 check('subscriptions: accountIdsWithFeature() finds it for placement, without needing one account id to ask about', in_array($quotaId, $subs->accountIdsWithFeature('core.catalogue.priority_placement'), true));
@@ -1848,7 +1848,7 @@ check('subscriptions: an extension declares a feature with its name key; a bad k
 $editId = $subs->createPlan('abo-edit', 'Vorher', 500, 'EUR', 1, ['abo.test.one']);
 $newPlan = $subs->plan($editId);
 check('subscriptions: a new plan starts without limits (unlimited)', $newPlan['offer_limits'] === [] && $newPlan['max_images_per_offer'] === null);
-$subs->updatePlan($editId, 'Nachher', 1200, 'EUR', 3, ['abo.test.two', 'abo.declared'], true, ['freelancer.service' => 2, 'auction.lot' => 0], 5);
+$subs->updatePlan($editId, 'Nachher', 1200, 'EUR', 3, ['abo.test.two', 'abo.declared'], true, ['freelancer.service' => 2, 'auction.lot' => 0], 5, false, 1);
 $edited = $subs->plan($editId);
 check('subscriptions: a plan is changed, its key stays', $edited['name'] === 'Nachher' && $edited['price_cents'] === 1200 && $edited['period_months'] === 3 && $edited['features'] === ['abo.test.two', 'abo.declared'] && $edited['slug'] === 'abo-edit');
 check('subscriptions: its limits are stored too - a type left out stays unlimited, one set to 0 is kept as 0', $edited['offer_limits'] === ['freelancer.service' => 2, 'auction.lot' => 0] && $edited['max_images_per_offer'] === 5);
@@ -1856,7 +1856,7 @@ $subs->assign($subAccount, $editId);
 check('subscriptions: a change applies at once to an account that has the plan', $subs->allows($subAccount, 'abo.declared') && !$subs->allows($subAccount, 'abo.test.one'));
 check('subscriptions: offerLimit()/imageLimit() read the active plan - missing type unlimited, 0 kept, module off ignores all of it', $subs->offerLimit($subAccount, 'freelancer.service') === 2 && $subs->offerLimit($subAccount, 'auction.lot') === 0
     && $subs->offerLimit($subAccount, 'unknown.type') === null && $subs->imageLimit($subAccount) === 5);
-$subs->updatePlan($editId, 'Nachher', 1200, 'EUR', 3, ['abo.test.two', 'abo.declared'], false, [], null);
+$subs->updatePlan($editId, 'Nachher', 1200, 'EUR', 3, ['abo.test.two', 'abo.declared'], false, [], null, false, 1);
 check('subscriptions: an inactive plan is not offered, but its holders keep it', !in_array('abo-edit', array_column($subs->activePlans(), 'slug'), true) && $subs->allows($subAccount, 'abo.declared'));
 $refusedDelete = false;
 try {
@@ -3805,6 +3805,73 @@ check('reminders: a renewal of a transfer keeps the days left, from the end of t
     $after = $payApp()->subscriptions->current($payAccount)['period_end'];
     return $after > $before && $after >= Modulento\Core\Support\Clock::now(30 * 86400);
 })());
+// --- Per-seat plans: price_cents is per seat, a plan has a floor, and the seat count syncs live to Stripe ---
+$seatPlan = $payApp()->subscriptions->createPlan('abo-seat', 'Teamplan', 200, 'EUR', 1, ['abo.pay.one']);
+$seatForm = $get('/admin/subscriptions/plans/' . $seatPlan, 3);
+check('per-seat plans: the plan form offers the per-seat checkbox and a minimum field', str_contains($seatForm['body'], 'name="per_seat"') && str_contains($seatForm['body'], 'name="min_quantity"'));
+$post('/admin/subscriptions/plans/' . $seatPlan, ['name' => 'Teamplan', 'price' => '2,00', 'currency' => 'EUR', 'period_months' => '1', 'active' => '1', 'per_seat' => '1', 'min_quantity' => '5'], 3);
+$seatPlanRow = $payApp()->subscriptions->plan($seatPlan);
+check('per-seat plans: the admin form saves per_seat and the minimum', $seatPlanRow['per_seat'] === true && $seatPlanRow['min_quantity'] === 5);
+
+$pdo->exec("INSERT INTO account (email, password_hash, status, created_at, email_verified_at, terms_accepted_at) VALUES ('abo-seat@example.test', 'x', 'active', '" . Modulento\Core\Support\Clock::now() . "', '" . Modulento\Core\Support\Clock::now() . "', '" . Modulento\Core\Support\Clock::now() . "')");
+$seatAccount = (int) $pdo->lastInsertId();
+
+$checkoutPage = $get('/subscriptions/' . $seatPlan . '/checkout', $seatAccount);
+check('per-seat plans: the checkout page offers a quantity field defaulting to the minimum', str_contains($checkoutPage['body'], 'name="quantity"') && str_contains($checkoutPage['body'], 'min="5"'));
+
+$http->reset();
+$pPost('/subscriptions/' . $seatPlan . '/checkout', $addr + ['method' => 'transfer', 'quantity' => '3'], $seatAccount);
+$seatOrder = $pdo->query("SELECT id, quantity, amount_cents FROM subscription_order WHERE account_id = $seatAccount AND method = 'transfer'")->fetch();
+check('per-seat plans: an order below the minimum is clamped up to it, and the amount is price times quantity', (int) $seatOrder['quantity'] === 5 && (int) $seatOrder['amount_cents'] === 1000);
+$post('/admin/subscriptions/orders/' . $seatOrder['id'] . '/paid', [], 3);
+$seatGranted = $payApp()->subscriptions->current($seatAccount);
+check('per-seat plans: a paid transfer order grants the seat count it was placed for', $seatGranted !== null && $seatGranted['quantity'] === 5 && $seatGranted['per_seat'] === true && $seatGranted['min_quantity'] === 5);
+
+$http->reset();
+$http->answer(200, ['id' => 'cs_test_SEAT1', 'url' => 'https://checkout.stripe.com/c/pay/cs_test_SEAT1']);
+$pPost('/subscriptions/' . $seatPlan . '/checkout', $addr + ['method' => 'stripe', 'quantity' => '9'], $seatAccount);
+$seatCheckoutRequest = $http->requests[0] ?? null;
+check('per-seat plans: Stripe gets the real quantity as the line item quantity, priced per seat', $seatCheckoutRequest !== null && str_contains($seatCheckoutRequest['body'] ?? '', '%5Bquantity%5D=9') && str_contains($seatCheckoutRequest['body'] ?? '', '%5Bunit_amount%5D=200'));
+$seatStripeOrder = $pdo->query("SELECT id, reference, quantity, amount_cents FROM subscription_order WHERE account_id = $seatAccount AND method = 'stripe'")->fetch();
+check('per-seat plans: the Stripe order itself keeps the full amount for the invoice', (int) $seatStripeOrder['quantity'] === 9 && (int) $seatStripeOrder['amount_cents'] === 1800);
+
+$http->reset();
+$http->answer(200, ['items' => ['data' => [['id' => 'si_TEST1']]]]);
+$seatSession = $subBody('checkout.session.completed', ['id' => 'cs_test_SEAT1', 'mode' => 'subscription', 'payment_status' => 'paid', 'amount_total' => 1800, 'currency' => 'eur', 'subscription' => 'sub_SEAT1', 'client_reference_id' => $seatStripeOrder['reference'], 'metadata' => ['subscription_order' => $seatStripeOrder['reference']]]);
+$hook($seatSession, $sign($seatSession, $webhookSecret));
+$seatStripeGranted = $pdo->query("SELECT quantity, stripe_item_ref FROM subscription WHERE account_id = $seatAccount AND status = 'active' ORDER BY id DESC LIMIT 1")->fetch();
+check('per-seat plans: a paid Stripe checkout grants the quantity it was for, and captures the subscription item id', (int) $seatStripeGranted['quantity'] === 9 && $seatStripeGranted['stripe_item_ref'] === 'si_TEST1');
+
+$http->reset();
+$http->answer(200, ['id' => 'si_TEST1', 'quantity' => 12]);
+$payApp()->subscriptionBilling->setQuantity($seatAccount, 12);
+$afterGrow = $pdo->query("SELECT quantity FROM subscription WHERE account_id = $seatAccount AND status = 'active'")->fetchColumn();
+$quantityRequest = $http->requests[0] ?? null;
+check('per-seat plans: growing the seat count updates the row and pushes the new quantity to Stripe live', (int) $afterGrow === 12 && $quantityRequest !== null && str_ends_with($quantityRequest['url'], '/v1/subscription_items/si_TEST1') && str_contains($quantityRequest['body'] ?? '', 'quantity=12'));
+
+$http->reset();
+$http->answer(200, ['id' => 'si_TEST1', 'quantity' => 5]);
+$payApp()->subscriptionBilling->setQuantity($seatAccount, 2);
+$afterShrink = $pdo->query("SELECT quantity FROM subscription WHERE account_id = $seatAccount AND status = 'active'")->fetchColumn();
+check('per-seat plans: shrinking below the plan\'s minimum is clamped up to it, never billing fewer seats than guaranteed', (int) $afterShrink === 5);
+
+$http->reset();
+$payApp()->subscriptionBilling->setQuantity($seatAccount, 5);
+check('per-seat plans: setting the same quantity again touches neither the row nor Stripe', $http->requests === []);
+
+$pdo->exec("UPDATE subscription SET stripe_item_ref = NULL, provider_ref = NULL WHERE account_id = $seatAccount");
+$http->reset();
+$payApp()->subscriptionBilling->setQuantity($seatAccount, 6);
+check('per-seat plans: without a captured Stripe item (e.g. a transfer subscription), only the local count moves', (int) $pdo->query("SELECT quantity FROM subscription WHERE account_id = $seatAccount AND status = 'active'")->fetchColumn() === 6 && $http->requests === []);
+
+$noSubscriptionRefused = (function () use ($payApp) { try { $payApp()->subscriptionBilling->setQuantity(999999, 5); return false; } catch (InvalidArgumentException) { return true; } })();
+check('per-seat plans: changing the quantity of an account without an active subscription is refused', $noSubscriptionRefused);
+
+$pdo->exec("DELETE FROM subscription_order WHERE account_id = $seatAccount");
+$pdo->exec("DELETE FROM subscription WHERE account_id = $seatAccount");
+$pdo->exec("DELETE FROM account WHERE id = $seatAccount");
+$pdo->exec("DELETE FROM subscription_plan WHERE slug = 'abo-seat'");
+
 $pdo->exec("DELETE FROM subscription_order WHERE account_id = $payAccount");
 $pdo->exec("DELETE FROM subscription WHERE account_id = $payAccount");
 $pdo->exec("DELETE FROM account WHERE id = $payAccount");

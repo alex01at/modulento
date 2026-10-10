@@ -89,20 +89,23 @@ final class SubscriptionBilling
 
     // --- Orders -----------------------------------------------------------------------
 
-    /** An order to pay by transfer; the page shows the account and the reference. */
-    public function startTransfer(int $accountId, int $planId): array
+    /** An order to pay by transfer; the page shows the account and the reference. $quantity only matters for a per_seat plan. */
+    public function startTransfer(int $accountId, int $planId, int $quantity = 1): array
     {
-        return $this->createOrder($accountId, $planId, 'transfer');
+        return $this->createOrder($accountId, $planId, 'transfer', $quantity);
     }
 
     /** An order paid by Stripe: the address of the checkout the buyer goes to. */
-    public function startStripe(int $accountId, int $planId, string $successUrl, string $cancelUrl): string
+    public function startStripe(int $accountId, int $planId, string $successUrl, string $cancelUrl, int $quantity = 1): string
     {
-        $order = $this->createOrder($accountId, $planId, 'stripe');
+        $order = $this->createOrder($accountId, $planId, 'stripe', $quantity);
         $plan = $this->subscriptions->plan($planId);
+        // The checkout line item is priced per seat; Stripe multiplies by
+        // quantity itself and the two totals are kept equal by createOrder().
+        $unitAmount = $plan['per_seat'] ? $plan['price_cents'] : $order['amount_cents'];
 
         try {
-            $session = $this->payments->startSubscriptionCheckout($order['amount_cents'], $order['currency'], $plan['period_months'], $plan['name'], $order['reference'], $successUrl, $cancelUrl);
+            $session = $this->payments->startSubscriptionCheckout($unitAmount, $order['currency'], $plan['period_months'], $plan['name'], $order['reference'], $successUrl, $cancelUrl, $order['quantity']);
         } catch (PaymentException $e) {
             $this->setOrderStatus((int) $order['id'], 'canceled');
             throw $e;
@@ -149,7 +152,7 @@ final class SubscriptionBilling
             }
             $current = $this->subscriptions->current($order['account_id']);
             $from = $current !== null && $current['period_end'] !== null && $current['period_end'] > Clock::now() ? $current['period_end'] : Clock::now();
-            $this->subscriptions->assign($order['account_id'], $order['plan_id'], Subscriptions::addMonths($from, $order['months']));
+            $this->subscriptions->assign($order['account_id'], $order['plan_id'], Subscriptions::addMonths($from, $order['months']), null, $order['quantity']);
             $this->db->commit();
         } catch (PDOException $e) {
             $this->db->rollBack();
@@ -157,6 +160,33 @@ final class SubscriptionBilling
         }
 
         $this->invoiceAndMail($order, 'order:' . $order['reference']);
+    }
+
+    /**
+     * Changes the seat count of an account's running per-seat subscription -
+     * the entry point an extension calls when a member joins or leaves a
+     * team it bills for (see the card extension's Organizations class).
+     * Clamped to the plan's floor, so removing members never bills for
+     * fewer seats than the plan guarantees. Live on Stripe too, where a
+     * checkout has already captured the subscription item id; otherwise
+     * (a transfer subscription, or no change) only the local count moves.
+     */
+    public function setQuantity(int $accountId, int $quantity): void
+    {
+        $current = $this->subscriptions->current($accountId);
+        if ($current === null) {
+            throw new InvalidArgumentException('subscription: none active');
+        }
+
+        $quantity = max($quantity, $current['min_quantity']);
+        if ($quantity === $current['quantity']) {
+            return;
+        }
+
+        $this->subscriptions->updateQuantity($current['id'], $quantity);
+        if ($current['stripe_item_ref'] !== null) {
+            $this->payments->updateSubscriptionItemQuantity($current['stripe_item_ref'], $quantity);
+        }
     }
 
     /** Stops the renewal of the account's Stripe subscription; it runs to the end of the period. */
@@ -221,11 +251,26 @@ final class SubscriptionBilling
                 return;
             }
             $subscription = is_string($session['subscription'] ?? null) ? $session['subscription'] : null;
-            $this->subscriptions->assign($order['account_id'], $order['plan_id'], Subscriptions::addMonths(Clock::now(), $order['months']), $subscription);
+            $this->subscriptions->assign($order['account_id'], $order['plan_id'], Subscriptions::addMonths(Clock::now(), $order['months']), $subscription, $order['quantity']);
             $this->db->commit();
         } catch (PDOException $e) {
             $this->db->rollBack();
             throw $e;
+        }
+
+        // Quantity lives on Stripe's subscription *item*, not the
+        // subscription itself - captured once here so a later seat-count
+        // change (setQuantity()) can update it without asking Stripe first.
+        // Best-effort: a failure here never undoes the payment just recorded.
+        if ($subscription !== null && $order['quantity'] > 1) {
+            try {
+                $itemId = $this->payments->subscriptionItemId($subscription);
+                if ($itemId !== null) {
+                    $this->subscriptions->setStripeItemRefByProviderRef($subscription, $itemId);
+                }
+            } catch (PaymentException $e) {
+                error_log('Could not capture the Stripe subscription item id for ' . $order['reference'] . ': ' . $e->getMessage());
+            }
         }
 
         $this->invoiceAndMail($order, 'order:' . $order['reference']);
@@ -319,7 +364,7 @@ final class SubscriptionBilling
         ], $who['locale']);
     }
 
-    private function createOrder(int $accountId, int $planId, string $method): array
+    private function createOrder(int $accountId, int $planId, string $method, int $quantity = 1): array
     {
         $plan = $this->subscriptions->plan($planId);
         if ($plan === null || !$plan['active']) {
@@ -334,11 +379,16 @@ final class SubscriptionBilling
             throw new InvalidArgumentException('order: a Stripe subscription is running');
         }
 
+        // A flat plan is always one unit; a per-seat plan is never ordered
+        // for fewer than its floor, even if a smaller number was passed in.
+        $quantity = $plan['per_seat'] ? max($quantity, $plan['min_quantity']) : 1;
+        $amount = $plan['price_cents'] * $quantity;
+
         for ($try = 0; ; $try++) {
             $reference = 'ABO-' . strtoupper(bin2hex(random_bytes(4)));
             try {
-                $this->db->prepare("INSERT INTO subscription_order (account_id, plan_id, method, status, reference, amount_cents, currency, created_at) VALUES (:account, :plan, :method, 'pending', :reference, :amount, :currency, :now)")
-                    ->execute(['account' => $accountId, 'plan' => $planId, 'method' => $method, 'reference' => $reference, 'amount' => $plan['price_cents'], 'currency' => $plan['currency'], 'now' => Clock::now()]);
+                $this->db->prepare("INSERT INTO subscription_order (account_id, plan_id, quantity, method, status, reference, amount_cents, currency, created_at) VALUES (:account, :plan, :quantity, :method, 'pending', :reference, :amount, :currency, :now)")
+                    ->execute(['account' => $accountId, 'plan' => $planId, 'quantity' => $quantity, 'method' => $method, 'reference' => $reference, 'amount' => $amount, 'currency' => $plan['currency'], 'now' => Clock::now()]);
                 break;
             } catch (PDOException $e) {
                 if ($e->getCode() !== '23000' || $try >= 4) {
@@ -378,7 +428,7 @@ final class SubscriptionBilling
 
     private function orderSql(): string
     {
-        return 'SELECT o.id, o.account_id, o.plan_id, o.method, o.status, o.reference, o.amount_cents, o.currency, o.created_at, o.paid_at,
+        return 'SELECT o.id, o.account_id, o.plan_id, o.quantity, o.method, o.status, o.reference, o.amount_cents, o.currency, o.created_at, o.paid_at,
                        a.email, p.name AS plan_name, p.period_months, p.slug
                 FROM subscription_order o
                 JOIN account a ON a.id = o.account_id
@@ -391,6 +441,7 @@ final class SubscriptionBilling
             'id' => (int) $row['id'],
             'account_id' => (int) $row['account_id'],
             'plan_id' => (int) $row['plan_id'],
+            'quantity' => (int) $row['quantity'],
             'method' => $row['method'],
             'status' => $row['status'],
             'reference' => $row['reference'],

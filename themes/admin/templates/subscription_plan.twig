@@ -59,6 +59,17 @@
             <input id="plan-max-images" name="max_images_per_offer" type="number" min="0" value="{{ plan.max_images_per_offer ?? '' }}">
         </fieldset>
 
+        <fieldset>
+            <legend>{{ trans('core.admin.subscriptions.plan.seats') }}</legend>
+            <p><small>{{ trans('core.admin.subscriptions.plan.seats_hint') }}</small></p>
+            <label class="checkbox">
+                <input type="checkbox" name="per_seat" value="1" {{ plan.per_seat ? 'checked' }}>
+                <span>{{ trans('core.admin.subscriptions.plan.per_seat') }}</span>
+            </label>
+            <label for="plan-min-quantity">{{ trans('core.admin.subscriptions.plan.min_quantity') }}</label>
+            <input id="plan-min-quantity" name="min_quantity" type="number" min="1" value="{{ plan.min_quantity }}">
+        </fieldset>
+
         <label class="checkbox">
             <input type="checkbox" name="active" value="1" {{ plan.active ? 'checked' }}>
             <span>{{ trans('core.admin.subscriptions.plan.active') }}</span>

@@ -62,7 +62,7 @@ final class Subscriptions
         return null;
     }
 
-    /** @return list<array{id: int, slug: string, name: string, price_cents: int, currency: string, period_months: int, features: list<string>, offer_limits: array<string, int>, max_images_per_offer: int|null, active: bool}> */
+    /** @return list<array{id: int, slug: string, name: string, price_cents: int, currency: string, period_months: int, features: list<string>, offer_limits: array<string, int>, max_images_per_offer: int|null, per_seat: bool, min_quantity: int, active: bool}> */
     public function plans(): array
     {
         $rows = $this->db->query('SELECT * FROM subscription_plan ORDER BY price_cents, id')->fetchAll(PDO::FETCH_ASSOC);
@@ -77,6 +77,8 @@ final class Subscriptions
             'features' => $this->features($row['features']),
             'offer_limits' => $this->offerLimits($row['offer_limits']),
             'max_images_per_offer' => $row['max_images_per_offer'] !== null ? (int) $row['max_images_per_offer'] : null,
+            'per_seat' => (bool) $row['per_seat'],
+            'min_quantity' => (int) $row['min_quantity'],
             'active' => (bool) $row['active'],
         ], $rows);
     }
@@ -87,11 +89,11 @@ final class Subscriptions
         if (preg_match('/^[a-z0-9-]{1,40}$/', $slug) !== 1) {
             throw new InvalidArgumentException('plan: slug');
         }
-        $values = $this->validated($name, $priceCents, $currency, $periodMonths, $features, [], null);
+        $values = $this->validated($name, $priceCents, $currency, $periodMonths, $features, [], null, false, 1);
 
         try {
             $stmt = $this->db->prepare('INSERT INTO subscription_plan (slug, name, price_cents, currency, period_months, features, offer_limits, max_images_per_offer) VALUES (:slug, :name, :price, :currency, :period, :features, :offer_limits, :max_images_per_offer)');
-            $stmt->execute(['slug' => $slug] + $values);
+            $stmt->execute(['slug' => $slug] + array_intersect_key($values, array_flip(['name', 'price', 'currency', 'period', 'features', 'offer_limits', 'max_images_per_offer'])));
         } catch (PDOException $e) {
             if ($e->getCode() === '23000') {
                 throw new InvalidArgumentException('plan: slug taken', 0, $e);
@@ -108,11 +110,14 @@ final class Subscriptions
      *
      * @param list<string> $features
      * @param array<string, int> $offerLimits offer type id => how many; a type left out is not allowed at all
+     * @param bool $perSeat whether price_cents is the price of one seat, not the whole plan - an extension's own
+     *        checkout quantity field and Stripe's live seat sync both key off this
+     * @param int $minQuantity the floor an account is always billed for, even with fewer seats actually in use
      */
-    public function updatePlan(int $id, string $name, int $priceCents, string $currency, int $periodMonths, array $features, bool $active, array $offerLimits, ?int $maxImagesPerOffer): void
+    public function updatePlan(int $id, string $name, int $priceCents, string $currency, int $periodMonths, array $features, bool $active, array $offerLimits, ?int $maxImagesPerOffer, bool $perSeat, int $minQuantity): void
     {
-        $values = $this->validated($name, $priceCents, $currency, $periodMonths, $features, $offerLimits, $maxImagesPerOffer);
-        $stmt = $this->db->prepare('UPDATE subscription_plan SET name = :name, price_cents = :price, currency = :currency, period_months = :period, features = :features, offer_limits = :offer_limits, max_images_per_offer = :max_images_per_offer, active = :active WHERE id = :id');
+        $values = $this->validated($name, $priceCents, $currency, $periodMonths, $features, $offerLimits, $maxImagesPerOffer, $perSeat, $minQuantity);
+        $stmt = $this->db->prepare('UPDATE subscription_plan SET name = :name, price_cents = :price, currency = :currency, period_months = :period, features = :features, offer_limits = :offer_limits, max_images_per_offer = :max_images_per_offer, per_seat = :per_seat, min_quantity = :min_quantity, active = :active WHERE id = :id');
         $stmt->execute($values + ['active' => $active ? 1 : 0, 'id' => $id]);
     }
 
@@ -132,7 +137,7 @@ final class Subscriptions
      * it had is cancelled, not deleted. Without an end the plan is open-ended,
      * as when an operator grants it by hand.
      */
-    public function assign(int $accountId, ?int $planId, ?string $periodEnd = null, ?string $providerRef = null): void
+    public function assign(int $accountId, ?int $planId, ?string $periodEnd = null, ?string $providerRef = null, int $quantity = 1): void
     {
         if ($periodEnd !== null && preg_match('/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/', $periodEnd) !== 1) {
             throw new InvalidArgumentException('subscription: period end');
@@ -151,8 +156,8 @@ final class Subscriptions
             $this->db->prepare("UPDATE subscription SET status = 'canceled', updated_at = :now WHERE account_id = :account AND status <> 'canceled'")
                 ->execute(['now' => $now, 'account' => $accountId]);
             if ($planId !== null) {
-                $this->db->prepare("INSERT INTO subscription (account_id, plan_id, status, period_end, provider_ref, created_at, updated_at) VALUES (:account, :plan, 'active', :end, :ref, :created, :updated)")
-                    ->execute(['account' => $accountId, 'plan' => $planId, 'end' => $periodEnd, 'ref' => $providerRef, 'created' => $now, 'updated' => $now]);
+                $this->db->prepare("INSERT INTO subscription (account_id, plan_id, status, period_end, provider_ref, quantity, created_at, updated_at) VALUES (:account, :plan, 'active', :end, :ref, :quantity, :created, :updated)")
+                    ->execute(['account' => $accountId, 'plan' => $planId, 'end' => $periodEnd, 'ref' => $providerRef, 'quantity' => max(1, $quantity), 'created' => $now, 'updated' => $now]);
             }
             if ($own) {
                 $this->db->commit();
@@ -201,7 +206,8 @@ final class Subscriptions
     public function current(int $accountId): ?array
     {
         $stmt = $this->db->prepare(
-            "SELECT s.id, s.status, s.period_end, s.provider_ref, p.slug, p.name, p.features, p.offer_limits, p.max_images_per_offer
+            "SELECT s.id, s.status, s.period_end, s.provider_ref, s.quantity, s.stripe_item_ref,
+                    p.slug, p.name, p.features, p.offer_limits, p.max_images_per_offer, p.per_seat, p.min_quantity
              FROM subscription s JOIN subscription_plan p ON p.id = s.plan_id
              WHERE s.account_id = :account AND s.status IN ('trialing', 'active', 'past_due')
                AND (s.period_end IS NULL OR s.period_end > :now)
@@ -215,12 +221,30 @@ final class Subscriptions
             'status' => $row['status'],
             'period_end' => $row['period_end'],
             'provider_ref' => $row['provider_ref'],
+            'quantity' => (int) $row['quantity'],
+            'stripe_item_ref' => $row['stripe_item_ref'],
             'slug' => $row['slug'],
             'name' => $row['name'],
             'features' => $this->features($row['features']),
             'offer_limits' => $this->offerLimits($row['offer_limits']),
             'max_images_per_offer' => $row['max_images_per_offer'] !== null ? (int) $row['max_images_per_offer'] : null,
+            'per_seat' => (bool) $row['per_seat'],
+            'min_quantity' => (int) $row['min_quantity'],
         ];
+    }
+
+    /** The live seat count, for a plan priced per_seat - written by SubscriptionBilling::setQuantity(), which also keeps Stripe in sync. */
+    public function updateQuantity(int $subscriptionId, int $quantity): void
+    {
+        $this->db->prepare('UPDATE subscription SET quantity = :quantity, updated_at = :now WHERE id = :id')
+            ->execute(['quantity' => max(1, $quantity), 'now' => Clock::now(), 'id' => $subscriptionId]);
+    }
+
+    /** Captures the Stripe subscription *item* id once, right after a Stripe checkout completes - quantity lives there in Stripe's model. */
+    public function setStripeItemRefByProviderRef(string $providerRef, string $itemRef): void
+    {
+        $this->db->prepare('UPDATE subscription SET stripe_item_ref = :item WHERE provider_ref = :ref')
+            ->execute(['item' => $itemRef, 'ref' => $providerRef]);
     }
 
     /**
@@ -314,9 +338,9 @@ final class Subscriptions
     /**
      * @param list<string> $features
      * @param array<string, int> $offerLimits
-     * @return array{name: string, price: int, currency: string, period: int, features: string, offer_limits: string, max_images_per_offer: int|null}
+     * @return array{name: string, price: int, currency: string, period: int, features: string, offer_limits: string, max_images_per_offer: int|null, per_seat: int, min_quantity: int}
      */
-    private function validated(string $name, int $priceCents, string $currency, int $periodMonths, array $features, array $offerLimits, ?int $maxImagesPerOffer): array
+    private function validated(string $name, int $priceCents, string $currency, int $periodMonths, array $features, array $offerLimits, ?int $maxImagesPerOffer, bool $perSeat, int $minQuantity): array
     {
         $name = trim($name);
         if ($name === '' || mb_strlen($name) > 100) {
@@ -331,12 +355,17 @@ final class Subscriptions
         if (array_filter($offerLimits, fn ($n) => !is_int($n) || $n < 0) !== [] || ($maxImagesPerOffer !== null && $maxImagesPerOffer < 0)) {
             throw new InvalidArgumentException('plan: limits');
         }
+        if ($minQuantity < 1 || $minQuantity > 10000) {
+            throw new InvalidArgumentException('plan: min quantity');
+        }
 
         return [
             'name' => $name, 'price' => $priceCents, 'currency' => $currency, 'period' => $periodMonths,
             'features' => implode(',', array_values(array_unique($features))),
             'offer_limits' => json_encode($offerLimits, JSON_FORCE_OBJECT),
             'max_images_per_offer' => $maxImagesPerOffer,
+            'per_seat' => $perSeat ? 1 : 0,
+            'min_quantity' => $minQuantity,
         ];
     }
 

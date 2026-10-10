@@ -493,9 +493,9 @@ final class Payments
      * The address of a Stripe checkout for a subscription, on the platform's
      * own account (no connected account: the operator is the seller).
      */
-    public function startSubscriptionCheckout(int $amount, string $currency, int $months, string $productName, string $reference, string $successUrl, string $cancelUrl): array
+    public function startSubscriptionCheckout(int $amount, string $currency, int $months, string $productName, string $reference, string $successUrl, string $cancelUrl, int $quantity = 1): array
     {
-        $session = $this->stripe()->createSubscriptionCheckout($amount, $currency, $months, $productName, $reference, $successUrl, $cancelUrl);
+        $session = $this->stripe()->createSubscriptionCheckout($amount, $currency, $months, $productName, $reference, $successUrl, $cancelUrl, $quantity);
 
         return ['id' => $session['id'], 'url' => self::redirectTarget($session['url'], self::STRIPE_CHECKOUT_HOSTS)];
     }
@@ -503,6 +503,18 @@ final class Payments
     public function cancelStripeSubscription(string $subscription): void
     {
         $this->stripe()->cancelSubscription($subscription);
+    }
+
+    /** The id of a subscription's one line item, for live seat-quantity sync (per-seat plans only). */
+    public function subscriptionItemId(string $subscription): ?string
+    {
+        return $this->stripe()->subscriptionItemId($subscription);
+    }
+
+    /** Updates the seat count of a running Stripe subscription. */
+    public function updateSubscriptionItemQuantity(string $itemId, int $quantity): void
+    {
+        $this->stripe()->updateSubscriptionItemQuantity($itemId, $quantity);
     }
 
     /**
