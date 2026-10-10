@@ -43,6 +43,13 @@ jobs:
           ref: main
           path: extensions/shop
 
+      - name: Checkout extension card
+        uses: actions/checkout@v4
+        with:
+          repository: alex01at/modulento-ext-card
+          ref: main
+          path: extensions/card
+
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
