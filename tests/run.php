@@ -4964,6 +4964,225 @@ $pdo->exec("DELETE FROM category WHERE id = {$shopCatId}");
 $pdo->exec('DELETE FROM account WHERE id IN (10, 11)');
 $pdo->exec("UPDATE extension SET enabled = 0 WHERE id = 'shop'");
 
+// --- Card: turns an approved provider's profile into a shareable digital business card ---
+// Subscriptions was switched off at the top of the Shop section above; this
+// section is precisely about Pro-gating, so it needs it on again - nothing
+// runs after this section, so there is nothing to put back afterward.
+$cardModules = new Modulento\Core\Support\Modules(new Modulento\Core\Support\Settings($pdo));
+$cardModules->save(array_keys(Modulento\Core\Support\Modules::ALL));
+$cardSubs = new Modulento\Core\Subscription\Subscriptions($pdo, $cardModules);
+$pdo->exec("DELETE FROM extension WHERE id = 'card'");
+$pdo->exec("CREATE TABLE x_card_profile (id INTEGER PRIMARY KEY, provider_id INTEGER UNIQUE REFERENCES provider (id) ON DELETE CASCADE,
+    company TEXT, category_id INTEGER REFERENCES category (id) ON DELETE SET NULL, logo_name TEXT, logo_extension TEXT,
+    whatsapp TEXT, website_url TEXT, linkedin_url TEXT, instagram_url TEXT, facebook_url TEXT, youtube_url TEXT, snapchat_url TEXT,
+    booking_url TEXT, booking_mode TEXT, opening_hours TEXT, design TEXT NOT NULL DEFAULT 'classic', use_custom_colors INTEGER NOT NULL DEFAULT 0,
+    color_background TEXT, color_header TEXT, color_content TEXT, color_footer TEXT,
+    view_count INTEGER NOT NULL DEFAULT 0, clicks_phone INTEGER NOT NULL DEFAULT 0, clicks_email INTEGER NOT NULL DEFAULT 0,
+    clicks_website INTEGER NOT NULL DEFAULT 0, clicks_address INTEGER NOT NULL DEFAULT 0, clicks_linkedin INTEGER NOT NULL DEFAULT 0,
+    clicks_instagram INTEGER NOT NULL DEFAULT 0, clicks_facebook INTEGER NOT NULL DEFAULT 0, clicks_youtube INTEGER NOT NULL DEFAULT 0,
+    clicks_booking INTEGER NOT NULL DEFAULT 0, clicks_whatsapp INTEGER NOT NULL DEFAULT 0, clicks_snapchat INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT, updated_at TEXT)");
+$pdo->exec("CREATE TABLE x_card_gallery (id INTEGER PRIMARY KEY, provider_id INTEGER REFERENCES provider (id) ON DELETE CASCADE, name TEXT, extension TEXT, width INTEGER, height INTEGER, position INTEGER, created_at TEXT)");
+$pdo->exec("CREATE TABLE x_card_offering (id INTEGER PRIMARY KEY, provider_id INTEGER REFERENCES provider (id) ON DELETE CASCADE, title TEXT, description TEXT, price TEXT, position INTEGER, created_at TEXT)");
+$pdo->exec("CREATE TABLE x_card_event (id INTEGER PRIMARY KEY, provider_id INTEGER REFERENCES provider (id) ON DELETE CASCADE, type TEXT, created_at TEXT)");
+$pdo->exec("INSERT INTO extension VALUES ('card', '0.1.0', 1)");
+
+$post('/admin/categories/new', ['text' => ['de' => ['name' => 'Handwerk', 'slug' => ''], 'en' => ['name' => '', 'slug' => '']]], 3);
+$cardCatId = (int) $pdo->query("SELECT category_id FROM category_translation WHERE slug = 'handwerk'")->fetchColumn();
+
+$insertAccount->execute([30, 'cardowner@example.test', $testHash, 'active']);
+$insertAccount->execute([31, 'cardplain@example.test', $testHash, 'active']);
+check('card: without a provider profile, the editor sends you to create one', $get('/account/card', 31)['status'] === 302);
+
+$post('/account/provider', ['type' => 'private', 'name' => 'Rosa Fischer', 'street' => 'Werkstattweg 3', 'postal_code' => '50667', 'city' => 'Köln', 'country' => 'DE',
+    'phone' => '+49 221 1234567', 'contact_email' => 'rosa@example.test',
+    'text' => ['de' => ['headline' => 'Tischlerin', 'description' => 'Handgefertigte Möbel aus Köln.'], 'en' => ['headline' => '', 'description' => '']]], 30);
+$post('/admin/providers/' . $provider(30)['id'] . '/decide', ['decision' => 'approve'], 3);
+$cardProviderId = (int) $provider(30)['id'];
+$cardSlug = (string) $pdo->query("SELECT slug FROM provider WHERE id = {$cardProviderId}")->fetchColumn();
+
+check('card: the account nav offers a link once a provider exists', str_contains($get('/account/provider', 30)['body'], 'href="/account/card"'));
+
+$r = $get('/account/card', 30);
+check('card: the editor shows the provider\'s own name, and both Pro sections are locked without a plan', str_contains($r['body'], 'Rosa Fischer')
+    && str_contains($r['body'], 'card-box') === false && substr_count($r['body'], 'Nur mit Pro') >= 2);
+
+$post('/account/card', [
+    'company' => 'Fischer Tischlerei', 'category_id' => (string) $cardCatId, 'whatsapp' => '+49 171 9876543',
+    'website_url' => 'fischer-tischlerei.de', 'linkedin_url' => 'https://linkedin.com/in/rosa-fischer',
+    'opening_hours' => "Mo-Fr 8-17 Uhr\nSa geschlossen", 'design' => 'modern', 'use_custom_colors' => '1',
+    'color_background' => '#ffffff', 'color_header' => '#112233', 'color_content' => '#112233', 'color_footer' => '#112233',
+    'booking_mode' => 'link', 'booking_url' => 'https://calendly.com/rosa',
+], 30);
+$cardRow = fn () => $pdo->query("SELECT * FROM x_card_profile WHERE provider_id = {$cardProviderId}")->fetch();
+check('card: saved fields stick, but every Pro-only field silently falls back without a plan', $cardRow()['company'] === 'Fischer Tischlerei'
+    && $cardRow()['category_id'] == $cardCatId && $cardRow()['whatsapp'] === '+49 171 9876543'
+    && $cardRow()['website_url'] === 'https://fischer-tischlerei.de'
+    && $cardRow()['design'] === 'classic' && (int) $cardRow()['use_custom_colors'] === 0
+    && $cardRow()['booking_mode'] === null && $cardRow()['booking_url'] === null);
+check('card: a bare domain gets "https://" added automatically', $cardRow()['website_url'] === 'https://fischer-tischlerei.de');
+
+$r = $get('/card/' . $cardSlug, null);
+check('card: the public page is the classic design (Free fallback), shows the provider\'s own headline/description', str_contains($r['body'], 'data-design="classic"')
+    && str_contains($r['body'], 'Rosa Fischer') && str_contains($r['body'], 'Tischlerin') && str_contains($r['body'], 'Handgefertigte Möbel aus Köln')
+    && str_contains($r['body'], 'Fischer Tischlerei') && str_contains($r['body'], 'Handwerk'));
+check('card: a view is counted on every public page load', (int) $cardRow()['view_count'] === 1);
+$get('/card/' . $cardSlug, null);
+check('card: and again on the next one', (int) $cardRow()['view_count'] === 2);
+
+check('card: Free still gets its contact links, click-tracked through /go/', str_contains($r['body'], '/go/' . $cardSlug . '/phone')
+    && str_contains($r['body'], '/go/' . $cardSlug . '/email') && str_contains($r['body'], '/go/' . $cardSlug . '/whatsapp')
+    && str_contains($r['body'], '/go/' . $cardSlug . '/website') && str_contains($r['body'], '/go/' . $cardSlug . '/linkedin'));
+check('card: Free gets no gallery/offerings/vCard/booking button at all', !str_contains($r['body'], 'vcard.vcf') && !str_contains($r['body'], '/termin')
+    && !str_contains($r['body'], 'card-gallery') && !str_contains($r['body'], 'card-offerings'));
+
+check('card: a phone click redirects and is counted', $get('/go/' . $cardSlug . '/phone', null)['status'] === 302 && (int) $cardRow()['clicks_phone'] === 1);
+check('card: an address click redirects and is counted', $get('/go/' . $cardSlug . '/address', null)['status'] === 302 && (int) $cardRow()['clicks_address'] === 1);
+check('card: an unknown link type 404s, nothing counted', $get('/go/' . $cardSlug . '/carrier-pigeon', null)['status'] === 404);
+check('card: booking is not reachable at all without the feature and a mode', $get('/go/' . $cardSlug . '/booking', null)['status'] === 404);
+
+// formatAddress() itself, the part no HTTP status code can show: the exact
+// join order and the Maps query it feeds (headers_list() is empty under
+// the CLI SAPI this suite runs under, so a redirect's Location can only be
+// checked this way - as a pure function - not read back off the response).
+$cardAddressProvider = ['street' => 'Werkstattweg 3', 'postal_code' => '50667', 'city' => 'Köln', 'country' => 'DE'];
+check('card: formatAddress() joins street, postal code + city, and the country name', Modulento\Card\Cards::formatAddress($cardAddressProvider, fn ($c) => $c === 'DE' ? 'Deutschland' : $c)
+    === 'Werkstattweg 3, 50667 Köln, Deutschland');
+check('card: formatAddress() is null with nothing to show', Modulento\Card\Cards::formatAddress(['street' => '', 'postal_code' => '', 'city' => '', 'country' => ''], fn ($c) => $c) === null);
+check('card: vCard is refused without the Pro feature', $get('/card/' . $cardSlug . '/vcard.vcf', null)['status'] === 404);
+
+// Grant every card feature through a real plan, exactly the way an operator would.
+$cardPlan = $cardSubs->createPlan('card-pro', 'Karte Pro', 900, 'EUR', 1,
+    ['card.feature.design', 'card.feature.colors', 'card.feature.gallery', 'card.feature.offerings', 'card.feature.booking', 'card.feature.vcard', 'card.feature.stats']);
+$cardSubs->assign(30, $cardPlan);
+
+$r = $get('/account/card', 30);
+check('card: with a plan, the Pro sections are no longer locked', !str_contains($r['body'], 'Nur mit Pro'));
+
+$post('/account/card', [
+    'company' => 'Fischer Tischlerei', 'category_id' => (string) $cardCatId, 'whatsapp' => '+49 171 9876543',
+    'website_url' => 'fischer-tischlerei.de', 'linkedin_url' => 'https://linkedin.com/in/rosa-fischer',
+    'opening_hours' => "Mo-Fr 8-17 Uhr\nSa geschlossen", 'design' => 'modern', 'use_custom_colors' => '1',
+    'color_background' => '#ffffff', 'color_header' => '#112233', 'color_content' => '#112233', 'color_footer' => '#112233',
+    'booking_mode' => 'link', 'booking_url' => 'https://calendly.com/rosa',
+], 30);
+check('card: with the plan, Pro fields are actually saved this time', $cardRow()['design'] === 'modern' && (int) $cardRow()['use_custom_colors'] === 1
+    && $cardRow()['booking_mode'] === 'link' && $cardRow()['booking_url'] === 'https://calendly.com/rosa');
+
+$r = $get('/card/' . $cardSlug, null);
+check('card: the public page now renders the modern design and offers vCard + booking', str_contains($r['body'], 'data-design="modern"')
+    && str_contains($r['body'], 'vcard.vcf') && str_contains($r['body'], '/go/' . $cardSlug . '/booking'));
+
+check('card: now the booking link redirects and is counted', $get('/go/' . $cardSlug . '/booking', null)['status'] === 302 && (int) $cardRow()['clicks_booking'] === 1);
+
+$vcard = $get('/card/' . $cardSlug . '/vcard.vcf', null);
+check('card: the vCard is a well-formed vCard 3.0 with the provider\'s own fields', $vcard['status'] === 200
+    && str_contains($vcard['body'], "BEGIN:VCARD\r\n") && str_contains($vcard['body'], 'FN:Rosa Fischer')
+    && str_contains($vcard['body'], 'TITLE:Tischlerin') && str_contains($vcard['body'], 'ORG:Fischer Tischlerei')
+    && str_contains($vcard['body'], 'TEL;TYPE=WORK,VOICE:+49 221 1234567') && str_contains($vcard['body'], "END:VCARD\r\n"));
+
+// Gallery: a real upload through the real route, the limit enforced, ownership checked on delete.
+$cardImage = tempnam(sys_get_temp_dir(), 'cardimg');
+imagepng(imagecreatetruecolor(300, 200), $cardImage);
+$_FILES = ['image' => ['tmp_name' => $cardImage, 'error' => UPLOAD_ERR_OK, 'size' => filesize($cardImage), 'name' => 'werkstatt.png', 'type' => 'image/png']];
+$post('/account/card/gallery/add', [], 30);
+$_FILES = [];
+check('card: a gallery picture is stored, resized, two sizes written', $pdo->query("SELECT COUNT(*) FROM x_card_gallery WHERE provider_id = {$cardProviderId}")->fetchColumn() == 1);
+$cardGalleryDir = $config['app']['uploads'] . '/card-gallery/' . $cardProviderId;
+$cardGalleryRow = $pdo->query("SELECT * FROM x_card_gallery WHERE provider_id = {$cardProviderId}")->fetch();
+check('card: both sizes exist on disk', is_file($cardGalleryDir . '/' . $cardGalleryRow['name'] . '.' . $cardGalleryRow['extension'])
+    && is_file($cardGalleryDir . '/' . $cardGalleryRow['name'] . '_thumb.' . $cardGalleryRow['extension']));
+check('card: the picture shows on the public page once the gallery feature is granted', str_contains($get('/card/' . $cardSlug, null)['body'], 'card-gallery'));
+
+for ($i = 0; $i < Modulento\Card\Gallery::MAX_IMAGES - 1; $i++) {
+    $img = tempnam(sys_get_temp_dir(), 'cardimg');
+    imagepng(imagecreatetruecolor(50, 50), $img);
+    $_FILES = ['image' => ['tmp_name' => $img, 'error' => UPLOAD_ERR_OK, 'size' => filesize($img), 'name' => "g{$i}.png", 'type' => 'image/png']];
+    $post('/account/card/gallery/add', [], 30);
+    $_FILES = [];
+}
+check('card: the gallery stops at its maximum', $pdo->query("SELECT COUNT(*) FROM x_card_gallery WHERE provider_id = {$cardProviderId}")->fetchColumn() == Modulento\Card\Gallery::MAX_IMAGES);
+$img = tempnam(sys_get_temp_dir(), 'cardimg');
+imagepng(imagecreatetruecolor(50, 50), $img);
+$_FILES = ['image' => ['tmp_name' => $img, 'error' => UPLOAD_ERR_OK, 'size' => filesize($img), 'name' => 'over.png', 'type' => 'image/png']];
+$post('/account/card/gallery/add', [], 30);
+$_FILES = [];
+check('card: one more than the maximum is refused', $pdo->query("SELECT COUNT(*) FROM x_card_gallery WHERE provider_id = {$cardProviderId}")->fetchColumn() == Modulento\Card\Gallery::MAX_IMAGES);
+$post('/account/card/gallery/' . $cardGalleryRow['id'] . '/delete', [], 30);
+check('card: a deleted picture is gone from the row and from disk', $pdo->query("SELECT COUNT(*) FROM x_card_gallery WHERE provider_id = {$cardProviderId}")->fetchColumn() == Modulento\Card\Gallery::MAX_IMAGES - 1
+    && !is_file($cardGalleryDir . '/' . $cardGalleryRow['name'] . '.' . $cardGalleryRow['extension']));
+
+// Offerings: a plain display list, no checkout anywhere near it.
+$post('/account/card/offerings/add', ['title' => 'Maßanfertigung', 'price' => 'ab 450 €', 'description' => 'Individuelle Möbel nach Maß.'], 30);
+$cardOffering = $pdo->query("SELECT * FROM x_card_offering WHERE provider_id = {$cardProviderId}")->fetch();
+check('card: an offering is stored with its free-text price', $cardOffering['title'] === 'Maßanfertigung' && $cardOffering['price'] === 'ab 450 €');
+check('card: the offering shows on the public page', str_contains($get('/card/' . $cardSlug, null)['body'], 'Maßanfertigung'));
+$post('/account/card/offerings/add', ['title' => ''], 30);
+check('card: a title is required', $pdo->query("SELECT COUNT(*) FROM x_card_offering WHERE provider_id = {$cardProviderId}")->fetchColumn() == 1);
+for ($i = 0; $i < Modulento\Card\Offerings::MAX_OFFERINGS - 1; $i++) {
+    $post('/account/card/offerings/add', ['title' => "Angebot {$i}"], 30);
+}
+check('card: the offerings list stops at its maximum', $pdo->query("SELECT COUNT(*) FROM x_card_offering WHERE provider_id = {$cardProviderId}")->fetchColumn() == Modulento\Card\Offerings::MAX_OFFERINGS);
+$post('/account/card/offerings/add', ['title' => 'Zu viel'], 30);
+check('card: one more than the maximum is refused', $pdo->query("SELECT COUNT(*) FROM x_card_offering WHERE provider_id = {$cardProviderId}")->fetchColumn() == Modulento\Card\Offerings::MAX_OFFERINGS);
+$post('/account/card/offerings/' . $cardOffering['id'] . '/delete', [], 30);
+check('card: an offering can be removed again', $pdo->query("SELECT COUNT(*) FROM x_card_offering WHERE provider_id = {$cardProviderId}")->fetchColumn() == Modulento\Card\Offerings::MAX_OFFERINGS - 1);
+
+// Booking request form (mode "request"): a plain e-mail, no scheduling of its own.
+$post('/account/card', [
+    'company' => 'Fischer Tischlerei', 'category_id' => (string) $cardCatId, 'opening_hours' => '', 'design' => 'modern',
+    'booking_mode' => 'request', 'booking_url' => '',
+], 30);
+check('card: switching to the request form clears the external URL', $cardRow()['booking_mode'] === 'request' && $cardRow()['booking_url'] === null);
+check('card: the booking button now links to the request form, not /go/', str_contains($get('/card/' . $cardSlug, null)['body'], '/card/' . $cardSlug . '/termin'));
+
+// The timing trap compares time() at render vs. at submit, in the same
+// session - "false" on the posts below reuses the session the preceding
+// get() just rendered the form into, exactly as a real browser would.
+$r = $get('/card/' . $cardSlug . '/termin', null);
+check('card: the request form page loads', $r['status'] === 200 && str_contains($r['body'], 'name="preferred_time"'));
+$post('/card/' . $cardSlug . '/termin', ['name' => 'Jonas Beck', 'email' => 'jonas@example.test', 'preferred_time' => 'Dienstagnachmittag', 'message' => 'Brauche ein neues Regal.', 'website' => '', 'js_ok' => '1'], false);
+check('card: a submission inside the timing trap (no wait) is silently swallowed - no mail sent', lastMail($mailLog, 'rosa@example.test') === null);
+
+$get('/card/' . $cardSlug . '/termin', false);
+sleep(4);
+$post('/card/' . $cardSlug . '/termin', ['name' => 'Jonas Beck', 'email' => 'jonas@example.test', 'preferred_time' => 'Dienstagnachmittag', 'message' => 'Brauche ein neues Regal.', 'website' => '', 'js_ok' => '1'], false);
+$mail = lastMail($mailLog, 'rosa@example.test');
+check('card: a real submission, past the timing trap, mails the card owner', $mail !== null && str_contains($mail['subject'], 'Jonas Beck'));
+
+$post('/card/' . $cardSlug . '/termin', ['name' => 'Bot', 'email' => 'bot@example.test', 'preferred_time' => 'x', 'website' => 'http://spam.test', 'js_ok' => '1'], false);
+check('card: a filled honeypot is silently caught - same flash, no mail', lastMail($mailLog, 'rosa@example.test')['subject'] === $mail['subject']);
+
+// Statistics: locked without the feature (already granted here, so check the gate itself with a second, plain account).
+$insertAccount->execute([32, 'cardplain2@example.test', $testHash, 'active']);
+$post('/account/provider', ['type' => 'private', 'name' => 'Plain Card', 'street' => 'Weg 9', 'postal_code' => '10115', 'city' => 'Berlin', 'country' => 'DE'], 32);
+$post('/admin/providers/' . $provider(32)['id'] . '/decide', ['decision' => 'approve'], 3);
+check('card: the statistics page is locked without the feature', str_contains($get('/account/card/stats', 32)['body'], 'Das ist in deinem aktuellen Plan nicht enthalten'));
+
+$r = $get('/account/card/stats', 30);
+check('card: the statistics page shows the real view count once granted', str_contains($r['body'], '<strong>' . $cardRow()['view_count'] . '</strong>'));
+
+$r = $get('/providers/' . $cardSlug, null);
+check('card: the standard marketplace profile page still works, with a teaser linking to the full card', $r['status'] === 200
+    && str_contains($r['body'], 'href="/card/' . $cardSlug . '"'));
+
+// Cleanup.
+$pdo->exec("DELETE FROM x_card_event WHERE provider_id = {$cardProviderId}");
+$pdo->exec("DELETE FROM x_card_offering WHERE provider_id = {$cardProviderId}");
+$pdo->exec("DELETE FROM x_card_gallery WHERE provider_id = {$cardProviderId}");
+array_map('unlink', glob($cardGalleryDir . '/*') ?: []);
+is_dir($cardGalleryDir) && rmdir($cardGalleryDir);
+$cardLogoDir = $config['app']['uploads'] . '/card-logo';
+array_map('unlink', glob($cardLogoDir . '/*') ?: []);
+is_dir($cardLogoDir) && rmdir($cardLogoDir);
+$pdo->exec("DELETE FROM x_card_profile WHERE provider_id IN ({$cardProviderId}, (SELECT id FROM provider WHERE account_id = 32))");
+$pdo->exec('DELETE FROM subscription WHERE plan_id = ' . $cardPlan);
+$pdo->exec('DELETE FROM subscription_plan WHERE id = ' . $cardPlan);
+$pdo->exec("DELETE FROM provider WHERE account_id IN (30, 32)");
+$pdo->exec('DELETE FROM category WHERE id = ' . $cardCatId);
+$pdo->exec('DELETE FROM account WHERE id IN (30, 31, 32)');
+$pdo->exec("UPDATE extension SET enabled = 0 WHERE id = 'card'");
+
 foreach ($GLOBALS['failed'] ?? [] as $label) {
     echo "FAIL  {$label}\n";
 }
