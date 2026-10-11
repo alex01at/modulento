@@ -101,6 +101,8 @@
         </label>
     {% endif %}
 
+    {% include '_custom_fields_form.twig' %}
+
     <button type="submit">{{ trans('core.account.save') }}</button>
 </form>
 <p><a href="{{ url('/account') }}">{{ trans('core.nav.dashboard') }}</a></p>

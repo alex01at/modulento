@@ -1,0 +1,9 @@
+{# The operator's own fields (Administration → Custom fields), filled in and shown without any extension. #}
+{% if custom_fields is not empty %}
+    <dl>
+        {% for field in custom_fields %}
+            <dt>{{ field.label }}</dt>
+            <dd>{{ field.value is same as(true) ? '✓' : field.value }}</dd>
+        {% endfor %}
+    </dl>
+{% endif %}

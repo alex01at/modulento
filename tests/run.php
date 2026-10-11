@@ -243,6 +243,10 @@ $pdo->exec("CREATE TABLE offer (id INTEGER PRIMARY KEY, provider_id INTEGER REFE
     status TEXT, status_note TEXT, price_from INTEGER, currency TEXT, decided_at TEXT, decided_by INTEGER, published_at TEXT, created_at TEXT, updated_at TEXT)");
 $pdo->exec("CREATE TABLE offer_translation (offer_id INTEGER REFERENCES offer (id) ON DELETE CASCADE, locale TEXT, title TEXT, slug TEXT, summary TEXT, description TEXT, PRIMARY KEY (offer_id, locale), UNIQUE (locale, slug))");
 $pdo->exec("CREATE TABLE offer_image (id INTEGER PRIMARY KEY, offer_id INTEGER REFERENCES offer (id) ON DELETE CASCADE, name TEXT, extension TEXT, width INTEGER, height INTEGER, position INTEGER, created_at TEXT)");
+$pdo->exec("CREATE TABLE custom_field (id INTEGER PRIMARY KEY, entity TEXT, field_key TEXT, type TEXT, required INTEGER NOT NULL DEFAULT 0, position INTEGER NOT NULL DEFAULT 0, type_ids TEXT, created_at TEXT, UNIQUE (entity, field_key))");
+$pdo->exec("CREATE TABLE custom_field_translation (field_id INTEGER REFERENCES custom_field (id) ON DELETE CASCADE, locale TEXT, label TEXT, option_labels TEXT, PRIMARY KEY (field_id, locale))");
+$pdo->exec("CREATE TABLE custom_field_offer_value (field_id INTEGER REFERENCES custom_field (id) ON DELETE CASCADE, offer_id INTEGER REFERENCES offer (id) ON DELETE CASCADE, locale TEXT NOT NULL DEFAULT '', value TEXT, PRIMARY KEY (field_id, offer_id, locale))");
+$pdo->exec("CREATE TABLE custom_field_provider_value (field_id INTEGER REFERENCES custom_field (id) ON DELETE CASCADE, provider_id INTEGER REFERENCES provider (id) ON DELETE CASCADE, locale TEXT NOT NULL DEFAULT '', value TEXT, PRIMARY KEY (field_id, provider_id, locale))");
 $pdo->exec("CREATE TABLE x_freelancer_package (id INTEGER PRIMARY KEY, offer_id INTEGER REFERENCES offer (id) ON DELETE CASCADE, tier INTEGER, price INTEGER, delivery_days INTEGER, revisions INTEGER, UNIQUE (offer_id, tier))");
 $pdo->exec("CREATE TABLE x_freelancer_package_translation (package_id INTEGER REFERENCES x_freelancer_package (id) ON DELETE CASCADE, locale TEXT, name TEXT, description TEXT, PRIMARY KEY (package_id, locale))");
 $pdo->exec("CREATE TABLE x_freelancer_extra (id INTEGER PRIMARY KEY, offer_id INTEGER REFERENCES offer (id) ON DELETE CASCADE, position INTEGER, price INTEGER, extra_days INTEGER)");
@@ -1293,6 +1297,88 @@ $pdo->exec("UPDATE provider SET status = 'approved' WHERE account_id = 1");
 $pdo->exec("DELETE FROM offer WHERE id <> {$offerId}");
 check('offer: a draft is not public', $get('/offers/ich-gestalte-dein-logo', null)['status'] === 404 && !str_contains($get('/offers', null)['body'], 'Ich gestalte'));
 check('offer: someone else cannot open or change it', $get('/account/offers/' . $offerId, 2)['status'] === 404 && $post('/account/offers/' . $offerId . '/delete', [], 2)['status'] === 404 && $offerRow() !== false);
+
+// --- Custom fields: the operator's own fields on offers and the provider profile, no extension needed ---
+check('custom fields need their permission', $post('/admin/custom-fields/new', ['entity' => 'offer', 'type' => 'text', 'text' => ['de' => ['label' => 'x']]], 1)['status'] === 403);
+
+$post('/admin/custom-fields/new', ['entity' => 'offer', 'type' => 'select', 'required' => '1',
+    'text' => ['de' => ['label' => 'Liefergebiet', 'options' => ['Berlin', 'Hamburg']], 'en' => ['label' => 'Delivery area', 'options' => ['Berlin', 'Hamburg']]],
+    'type_ids' => ['freelancer.service']], 3);
+$deliveryFieldId = (int) $pdo->query("SELECT id FROM custom_field WHERE field_key = 'liefergebiet'")->fetchColumn();
+check('custom fields: a select field is created with its options and its type restriction', $deliveryFieldId > 0
+    && $pdo->query("SELECT type FROM custom_field WHERE id = {$deliveryFieldId}")->fetchColumn() === 'select'
+    && json_decode($pdo->query("SELECT type_ids FROM custom_field WHERE id = {$deliveryFieldId}")->fetchColumn(), true) === ['freelancer.service']
+    && json_decode($pdo->query("SELECT option_labels FROM custom_field_translation WHERE field_id = {$deliveryFieldId} AND locale = 'de'")->fetchColumn(), true) === ['berlin' => 'Berlin', 'hamburg' => 'Hamburg']);
+
+$post('/admin/custom-fields/new', ['entity' => 'offer', 'type' => 'checkbox', 'text' => ['de' => ['label' => 'Express'], 'en' => ['label' => 'Express']]], 3);
+$expressFieldId = (int) $pdo->query("SELECT id FROM custom_field WHERE field_key = 'express'")->fetchColumn();
+check('custom fields: a field with no type restriction applies to every type', $expressFieldId > 0 && json_decode($pdo->query("SELECT type_ids FROM custom_field WHERE id = {$expressFieldId}")->fetchColumn(), true) === []);
+
+$post('/admin/custom-fields/new', ['entity' => 'provider', 'type' => 'text', 'required' => '1', 'text' => ['de' => ['label' => 'Slogan'], 'en' => ['label' => 'Slogan']]], 3);
+$sloganFieldId = (int) $pdo->query("SELECT id FROM custom_field WHERE field_key = 'slogan'")->fetchColumn();
+check('custom fields: a provider field lives separately from the offer fields', $sloganFieldId > 0 && $pdo->query("SELECT entity FROM custom_field WHERE id = {$sloganFieldId}")->fetchColumn() === 'provider');
+
+check('custom fields: a field needs a label in the default language', str_contains($post('/admin/custom-fields/new', ['entity' => 'offer', 'type' => 'text', 'text' => ['de' => ['label' => '']]], 3)['body'], 'braucht in der Standardsprache eine Beschriftung'));
+
+check('custom fields: the offer tab lists both offer fields', str_contains($get('/admin/custom-fields?entity=offer', 3)['body'], 'Liefergebiet') && str_contains($get('/admin/custom-fields?entity=offer', 3)['body'], 'Express'));
+check('custom fields: the provider tab shows only the provider field', str_contains($get('/admin/custom-fields?entity=provider', 3)['body'], 'Slogan') && !str_contains($get('/admin/custom-fields?entity=provider', 3)['body'], 'Liefergebiet'));
+
+$cfApp = new Modulento\Core\App($config, $pdo);
+$cfApp->translator->load($config['app']['root'] . '/core/lang', 'core');
+$cfApp->translator->setLocale('de');
+$offerDefs = $cfApp->customFields->definitions('offer');
+check('custom fields: applicable() keeps a type-restricted field only for its own type', !in_array($deliveryFieldId, array_column($cfApp->customFields->applicable($offerDefs, 'shop.product'), 'id'), true)
+    && in_array($deliveryFieldId, array_column($cfApp->customFields->applicable($offerDefs, 'freelancer.service'), 'id'), true));
+
+// A fresh account/provider/offer, kept isolated from the fixtures used everywhere else in this
+// suite - "Liefergebiet" is required on freelancer.service from here on, and every other save
+// of such an offer in this file must stay unaffected by that.
+$pdo->exec("INSERT INTO account (email, password_hash, status, created_at, email_verified_at, terms_accepted_at) VALUES ('cf-test@example.test', 'x', 'active', '2026-01-01 00:00:00', '2026-01-01 00:00:00', '2026-01-01 00:00:00')");
+$cfAccountId = (int) $pdo->lastInsertId();
+$cfProviderForm = ['type' => 'private', 'name' => 'CF Test', 'street' => 'Teststr. 1', 'postal_code' => '12345', 'city' => 'Teststadt', 'country' => 'DE'];
+check('custom fields: a required provider field is enforced, even on first creation', str_contains($post('/account/provider', $cfProviderForm, $cfAccountId)['body'], 'ist ein Pflichtfeld') && $pdo->query("SELECT COUNT(*) FROM provider WHERE account_id = {$cfAccountId}")->fetchColumn() == 0);
+$post('/account/provider', $cfProviderForm + ['custom_fields' => ['slogan' => ['de' => 'Toller Service']]], $cfAccountId);
+$cfProviderId = (int) $pdo->query("SELECT id FROM provider WHERE account_id = {$cfAccountId}")->fetchColumn();
+$pdo->exec("UPDATE provider SET status = 'approved' WHERE id = {$cfProviderId}");
+check('custom fields: a valid provider save stores the value, filled in only the default language', $cfProviderId > 0 && $pdo->query("SELECT value FROM custom_field_provider_value WHERE field_id = {$sloganFieldId} AND provider_id = {$cfProviderId} AND locale = 'de'")->fetchColumn() === 'Toller Service');
+check('custom fields: the stored text value is preselected when editing the profile again', str_contains($get('/account/provider', $cfAccountId)['body'], 'value="Toller Service"'));
+
+$cfOfferForm = ['type' => 'freelancer.service', 'category_id' => $childId, 'text' => ['de' => ['title' => 'CF Testangebot', 'summary' => 's', 'description' => 'd']], 'package' => [1 => ['price' => '10', 'delivery_days' => '1']]];
+check('custom fields: a required select is enforced on a new offer', str_contains($post('/account/offers/new', $cfOfferForm, $cfAccountId)['body'], 'ist ein Pflichtfeld') && (int) $pdo->query("SELECT COUNT(*) FROM offer WHERE provider_id = {$cfProviderId}")->fetchColumn() === 0);
+$post('/account/offers/new', $cfOfferForm + ['custom_fields' => ['liefergebiet' => 'hamburg', 'express' => '1']], $cfAccountId);
+$cfOfferId = (int) $pdo->query("SELECT id FROM offer WHERE provider_id = {$cfProviderId} ORDER BY id DESC LIMIT 1")->fetchColumn();
+check('custom fields: a valid offer save stores a select value and a checked checkbox', $pdo->query("SELECT value FROM custom_field_offer_value WHERE field_id = {$deliveryFieldId} AND offer_id = {$cfOfferId} AND locale = ''")->fetchColumn() === 'hamburg'
+    && $pdo->query("SELECT value FROM custom_field_offer_value WHERE field_id = {$expressFieldId} AND offer_id = {$cfOfferId} AND locale = ''")->fetchColumn() === '1');
+$r = $get('/account/offers/' . $cfOfferId, $cfAccountId);
+check('custom fields: the stored select value and checkbox are preselected when editing the offer again', str_contains($r['body'], 'value="hamburg" selected') && str_contains($r['body'], 'checked'));
+
+$shown = $cfApp->customFields->display('offer', $cfOfferId, 'freelancer.service', 'de');
+check('custom fields: display() shows the translated option label and a checked checkbox', in_array(['label' => 'Liefergebiet', 'value' => 'Hamburg'], $shown, true) && in_array(['label' => 'Express', 'value' => true], $shown, true));
+$pdo->exec("UPDATE custom_field_offer_value SET value = '0' WHERE field_id = {$expressFieldId} AND offer_id = {$cfOfferId}");
+check('custom fields: display() leaves out an unchecked checkbox entirely', array_column($cfApp->customFields->display('offer', $cfOfferId, 'freelancer.service', 'de'), 'label') === ['Liefergebiet']);
+
+// Validation details that do not need a real save: a type without "Liefergebiet" restricted to
+// it, so only the fields meant for this check are in play.
+$trans = fn (string $key, array $params = []) => $cfApp->translator->trans($key, $params);
+$invalid = fn (array $errors, string $needle) => array_filter($errors, fn (string $e) => str_contains($e, $needle)) !== [];
+check('custom fields: an unknown select option is rejected', $invalid($cfApp->customFields->validate('offer', ['liefergebiet' => 'muenchen'], 'freelancer.service', ['de', 'en'], $trans)['errors'], 'ungültigen Wert'));
+check('custom fields: a required text field checks only the default language', $invalid($cfApp->customFields->validate('provider', ['slogan' => ['en' => 'Great service']], null, ['de', 'en'], $trans)['errors'], 'Pflichtfeld'));
+$filled = $cfApp->customFields->validate('provider', ['slogan' => ['de' => 'Toller Service']], null, ['de', 'en'], $trans);
+check('custom fields: filled in the default language is enough, the other language stays unset', $filled['errors'] === [] && ($filled['values'][$sloganFieldId]['de'] ?? null) === 'Toller Service' && !array_key_exists('en', $filled['values'][$sloganFieldId]));
+
+check('custom fields: values exist before the cascade check', (int) $pdo->query("SELECT COUNT(*) FROM custom_field_offer_value WHERE offer_id = {$cfOfferId}")->fetchColumn() > 0
+    && (int) $pdo->query("SELECT COUNT(*) FROM custom_field_provider_value WHERE provider_id = {$cfProviderId}")->fetchColumn() > 0);
+$pdo->exec("DELETE FROM account WHERE id = {$cfAccountId}");
+check('custom fields: deleting the account cascades through the provider and the offer to their custom field values', (int) $pdo->query("SELECT COUNT(*) FROM custom_field_offer_value WHERE offer_id = {$cfOfferId}")->fetchColumn() === 0
+    && (int) $pdo->query("SELECT COUNT(*) FROM custom_field_provider_value WHERE provider_id = {$cfProviderId}")->fetchColumn() === 0);
+
+$post('/admin/custom-fields/' . $expressFieldId . '/delete', [], 3);
+check('custom fields: the admin delete route removes the definition and its translations', (int) $pdo->query("SELECT COUNT(*) FROM custom_field WHERE id = {$expressFieldId}")->fetchColumn() === 0
+    && (int) $pdo->query("SELECT COUNT(*) FROM custom_field_translation WHERE field_id = {$expressFieldId}")->fetchColumn() === 0);
+
+// None of the remaining fixtures in this file expect a custom field, least of all a required
+// one on freelancer.service - clear the rest so later offer/provider saves are unaffected.
+$pdo->exec('DELETE FROM custom_field');
 
 // Pictures: decoded and written anew, never stored as uploaded.
 $uploadDir = $config['app']['uploads'] . '/offers/' . $offerId;
@@ -4595,7 +4681,7 @@ check('themes: the admin theme can never become the site theme', $themes()->acti
 $pdo->exec("DELETE FROM setting WHERE name = 'core.theme'");
 
 // Every template a controller renders must exist in the shipped themes.
-foreach (['default' => ['layout/base.twig', 'home.twig', 'error.twig', 'page.twig', 'auth/login.twig', 'auth/register.twig', 'auth/forgot.twig', 'auth/reset.twig', 'account/index.twig', 'emails/verify_email.txt.twig', 'emails/reset_password.txt.twig', 'emails/already_registered.txt.twig', 'emails/change_email.txt.twig', 'emails/password_changed.txt.twig'], 'admin' => ['layout.twig', 'index.twig', 'settings.twig', 'pages.twig', 'page_edit.twig', 'orders.twig', 'order.twig', 'reviews.twig', 'offers.twig', 'offer.twig', 'categories.twig', 'category_edit.twig', 'providers.twig', 'provider.twig', 'accounts.twig', 'account.twig', 'roles.twig', 'role_edit.twig', 'extensions.twig', 'themes.twig', 'tasks.twig', 'updates.twig']] as $theme => $templates) {
+foreach (['default' => ['layout/base.twig', 'home.twig', 'error.twig', 'page.twig', 'auth/login.twig', 'auth/register.twig', 'auth/forgot.twig', 'auth/reset.twig', 'account/index.twig', 'emails/verify_email.txt.twig', 'emails/reset_password.txt.twig', 'emails/already_registered.txt.twig', 'emails/change_email.txt.twig', 'emails/password_changed.txt.twig'], 'admin' => ['layout.twig', 'index.twig', 'settings.twig', 'pages.twig', 'page_edit.twig', 'orders.twig', 'order.twig', 'reviews.twig', 'offers.twig', 'offer.twig', 'categories.twig', 'category_edit.twig', 'custom_fields.twig', 'custom_field_edit.twig', 'providers.twig', 'provider.twig', 'accounts.twig', 'account.twig', 'roles.twig', 'role_edit.twig', 'extensions.twig', 'themes.twig', 'tasks.twig', 'updates.twig']] as $theme => $templates) {
     foreach ($templates as $template) {
         check("theme {$theme} ships {$template}", is_file("{$root}/themes/{$theme}/templates/{$template}"));
     }

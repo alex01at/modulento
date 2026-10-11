@@ -77,6 +77,8 @@
     {# The fields of the offer's type, supplied by its extension. #}
     {% include type.template %}
 
+    {% include '_custom_fields_form.twig' %}
+
     <button type="submit">{{ trans('core.account.save') }}</button>
 </form>
 

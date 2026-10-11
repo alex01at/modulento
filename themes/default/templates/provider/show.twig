@@ -26,6 +26,8 @@
     {# Plain text typed by the provider: escaped, line breaks kept. #}
     {% if provider.description %}<p>{{ provider.description|nl2br }}</p>{% endif %}
 
+    {% include '_custom_fields.twig' %}
+
     {% for block in extension_blocks %}
         {% include block.template with block.data %}
     {% endfor %}

@@ -30,15 +30,24 @@ final class ProviderController extends Controller
         $existing = $providers->findByAccount($accountId);
 
         $result = $providers->validate($_POST, alreadyCertified: ($existing['self_certified_at'] ?? null) !== null);
+        $custom = $this->app->customFields->validate(
+            'provider',
+            is_array($_POST['custom_fields'] ?? null) ? $_POST['custom_fields'] : [],
+            null,
+            $this->app->locales->enabled(),
+            fn (string $key, array $params = []) => $this->trans($key, $params)
+        );
+        $errors = array_merge($result['errors'], $custom['errors']);
 
-        if ($result['errors'] !== []) {
+        if ($errors !== []) {
             // Show what was typed again, on top of what is stored.
             $typed = ['texts' => $result['texts']] + $result['values'] + ($existing ?? []);
-            $this->renderForm($typed, array_map(fn (string $key) => $this->trans($key), $result['errors']), $existing);
+            $this->renderForm($typed, array_map(fn (string $key) => $this->trans($key), $errors), $existing, is_array($_POST['custom_fields'] ?? null) ? $_POST['custom_fields'] : []);
             return;
         }
 
         $saved = $providers->save($accountId, $result['values'], $result['texts']);
+        $this->app->customFields->saveValues('provider', $saved['id'], $custom['values']);
 
         if ($saved['created'] || $saved['status'] !== ($existing['status'] ?? null)) {
             $this->app->events->dispatch(new ProviderStatusChanged($saved['id'], $accountId, $existing['status'] ?? null, $saved['status']));
@@ -84,6 +93,7 @@ final class ProviderController extends Controller
             'reviews' => ReviewView::all($this->app->reviews->listPublic('provider', (int) $provider['id'], 1, 20)['rows']),
             'account_rating' => Reviews::summary($ratedAccount ?? []),
             'account_ratings' => AccountRatingView::all($this->app->accountRatings->listPublic((int) $provider['account_id'], 1, 20)['rows']),
+            'custom_fields' => $this->app->customFields->display('provider', (int) $provider['id'], null, $this->app->translator->locale()),
             // Templates extensions want shown on this provider's profile, e.g. a freelancer's skills and portfolio.
             'extension_blocks' => array_map(
                 fn (array $section) => ['template' => $section['template'], 'data' => ($section['data'])($provider, $this->app)],
@@ -92,7 +102,8 @@ final class ProviderController extends Controller
         ]);
     }
 
-    private function renderForm(?array $provider, array $errors, ?array $stored = null): void
+    /** @param ?array<string, mixed> $typedCustomFields $_POST['custom_fields'] as sent, after a failed validation; null to show the stored values */
+    private function renderForm(?array $provider, array $errors, ?array $stored = null, ?array $typedCustomFields = null): void
     {
         $stored ??= $provider;
 
@@ -106,6 +117,14 @@ final class ProviderController extends Controller
             'locales' => $this->app->locales->enabled(),
             'countries' => Countries::CODES,
             'approval_required' => $this->app->providers->approvalRequired(),
+            'custom_fields' => $this->app->customFields->formData(
+                'provider',
+                $stored['id'] ?? null,
+                $typedCustomFields,
+                null,
+                $this->app->translator->locale(),
+                $this->app->locales->enabled()
+            ),
         ]);
     }
 }

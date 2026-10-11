@@ -141,6 +141,7 @@ final class OfferController extends Controller
             ],
             'type_template' => $type->detailTemplate(),
             'type_data' => $type->detailData($offer['id'], $locale, $app),
+            'custom_fields' => $app->customFields->display('offer', $offer['id'], $offer['type'], $locale),
             'reviews' => ReviewView::all($app->reviews->listPublic('offer', $offer['id'], 1, 20)['rows']),
             'messages' => $this->offerMessages($offer, $account),
         ]);
@@ -463,7 +464,14 @@ final class OfferController extends Controller
 
         $shared = $app->offers->validate($_POST, array_keys($app->categories->all()));
         $specific = $type->validate($_POST, $offer['id'] ?? null, $app);
-        $errors = array_merge($shared['errors'], $specific['errors']);
+        $custom = $app->customFields->validate(
+            'offer',
+            is_array($_POST['custom_fields'] ?? null) ? $_POST['custom_fields'] : [],
+            $typeId,
+            $app->locales->enabled(),
+            fn (string $key, array $params = []) => $this->trans($key, $params)
+        );
+        $errors = array_merge($shared['errors'], $specific['errors'], $custom['errors']);
 
         if ($errors !== []) {
             $this->renderForm($offer, $typeId, $_POST, array_map(fn (string $key) => $this->trans($key), array_unique($errors)));
@@ -472,6 +480,7 @@ final class OfferController extends Controller
 
         $id = $app->offers->save($offer['id'] ?? null, (int) $provider['id'], $typeId, $shared['category_id'], $shared['texts']);
         $app->offers->setPriceFrom($id, $type->save($id, $specific['values'], $app));
+        $app->customFields->saveValues('offer', $id, $custom['values']);
 
         // The wizard's own route, whether or not it already created a draft
         // row - an edit of an existing offer always has {id} in the route.
@@ -670,6 +679,7 @@ final class OfferController extends Controller
             'categories' => $app->categories->tree($primary),
             'category_name' => $this->categoryName((int) ($values['category_id'] ?? 0), $primary),
             'type_data' => $step === 5 ? $type->formData(null, $values['type_fields'] ?? null, $app, $selected) : [],
+            'custom_fields' => $step === 5 ? $app->customFields->formData('offer', $values['id'] ?? null, $values['type_fields']['custom_fields'] ?? null, $type->id(), $primary, $selected) : [],
             'offer' => $step === 6 && isset($values['id']) ? $this->imageOffer((int) $values['id']) : null,
             'images_available' => OfferImages::available(),
             'max_images' => $this->imageQuota((int) $app->auth->account()['id']),
@@ -753,6 +763,7 @@ final class OfferController extends Controller
             ] : null,
             'type' => ['id' => $typeId, 'label_key' => $type->labelKey(), 'template' => $type->formTemplate()],
             'type_data' => $type->formData($offer['id'] ?? null, $typed, $app),
+            'custom_fields' => $app->customFields->formData('offer', $offer['id'] ?? null, $typed['custom_fields'] ?? null, $typeId, $app->translator->locale(), $app->locales->enabled()),
             'texts' => $texts,
             'category_id' => (int) ($typed['category_id'] ?? $offer['category_id'] ?? 0),
             'categories' => $app->categories->tree($app->translator->locale()),

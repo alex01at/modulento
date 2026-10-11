@@ -7,6 +7,7 @@ namespace Modulento\Core;
 use Modulento\Core\Controller\AccountController;
 use Modulento\Core\Controller\AdminAccountController;
 use Modulento\Core\Controller\AdminCatalogueController;
+use Modulento\Core\Controller\AdminCustomFieldController;
 use Modulento\Core\Controller\AdminController;
 use Modulento\Core\Controller\AdminBadWordsController;
 use Modulento\Core\Controller\AdminHomeController;
@@ -424,6 +425,13 @@ final class Kernel
         $router->post('/admin/categories/{id}', [AdminCatalogueController::class, 'saveCategory'], 'core.categories.manage');
         $router->post('/admin/categories/{id}/delete', [AdminCatalogueController::class, 'deleteCategory'], 'core.categories.manage');
 
+        $router->get('/admin/custom-fields', [AdminCustomFieldController::class, 'index'], 'core.custom_fields.manage');
+        $router->get('/admin/custom-fields/new', [AdminCustomFieldController::class, 'edit'], 'core.custom_fields.manage');
+        $router->post('/admin/custom-fields/new', [AdminCustomFieldController::class, 'save'], 'core.custom_fields.manage');
+        $router->get('/admin/custom-fields/{id}', [AdminCustomFieldController::class, 'edit'], 'core.custom_fields.manage');
+        $router->post('/admin/custom-fields/{id}', [AdminCustomFieldController::class, 'save'], 'core.custom_fields.manage');
+        $router->post('/admin/custom-fields/{id}/delete', [AdminCustomFieldController::class, 'delete'], 'core.custom_fields.manage');
+
         $router->get('/admin/providers', [AdminProviderController::class, 'index'], 'core.providers.manage');
         $router->get('/admin/providers/{id}', [AdminProviderController::class, 'show'], 'core.providers.manage');
         $router->post('/admin/providers/{id}/decide', [AdminProviderController::class, 'decide'], 'core.providers.manage');
@@ -485,6 +493,7 @@ final class Kernel
         $app->addPermission('core.offers.manage', 'core.permission.offers_manage');
         $app->addPermission('core.requests.manage', 'core.permission.requests_manage');
         $app->addPermission('core.categories.manage', 'core.permission.categories_manage');
+        $app->addPermission('core.custom_fields.manage', 'core.permission.custom_fields_manage');
         $app->addPermission('core.providers.manage', 'core.permission.providers_manage');
         $app->addPermission('core.accounts.manage', 'core.permission.accounts_manage');
         $app->addPermission('core.accounts.impersonate', 'core.permission.accounts_impersonate');
@@ -520,6 +529,7 @@ final class Kernel
         }
         $app->addAdminMenu('core.admin.menu.offers', '/admin/offers', 'core.offers.manage', 'marketplace');
         $app->addAdminMenu('core.admin.menu.categories', '/admin/categories', 'core.categories.manage', 'marketplace');
+        $app->addAdminMenu('core.admin.menu.custom_fields', '/admin/custom-fields', 'core.custom_fields.manage', 'marketplace');
         $app->addAdminMenu('core.admin.menu.providers', '/admin/providers', 'core.providers.manage', 'marketplace');
         $app->addAdminMenu('core.admin.menu.accounts', '/admin/accounts', 'core.accounts.manage', 'people');
         $app->addAdminMenu('core.admin.menu.roles', '/admin/roles', 'core.roles.manage', 'people');

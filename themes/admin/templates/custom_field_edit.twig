@@ -1,0 +1,98 @@
+{% extends '@admin/layout.twig' %}
+
+{% block title %}{{ trans('core.admin.custom_fields.title') }} – {{ site_name }}{% endblock %}
+
+{% block admin %}
+{% include '@admin/_page_header.twig' with {
+    heading: field and field.id ? trans('core.admin.custom_fields.edit') : trans('core.admin.custom_fields.new'),
+    crumbs: [{label: trans('core.admin.custom_fields.title'), path: '/admin/custom-fields'}]
+} only %}
+
+{% for error in errors %}
+    <p class="flash flash-error" role="alert">{{ error }}</p>
+{% endfor %}
+
+{% set slots = option_keys|length + 4 %}
+
+<form method="post" action="{{ url(field and field.id ? '/admin/custom-fields/' ~ field.id : '/admin/custom-fields/new') }}">
+    {{ csrf_field() }}
+    <input type="hidden" name="entity" value="{{ entity }}">
+
+    <div class="card-box stack-form wide">
+        <div class="field-grid">
+            <div class="field">
+                <label for="type">{{ trans('core.admin.custom_fields.field_type') }}</label>
+                {% if field and field.id %}
+                    <input type="hidden" name="type" value="{{ field.type }}">
+                    <input id="type" value="{{ trans('core.admin.custom_fields.type.' ~ field.type) }}" disabled>
+                {% else %}
+                    <select id="type" name="type" required>
+                        {% for t in types %}
+                            <option value="{{ t }}" {{ field and field.type == t ? 'selected' }}>{{ trans('core.admin.custom_fields.type.' ~ t) }}</option>
+                        {% endfor %}
+                    </select>
+                {% endif %}
+            </div>
+            <div class="field">
+                <label for="position">{{ trans('core.admin.pages.field.position') }}</label>
+                <input id="position" name="position" type="number" value="{{ field ? field.position : 0 }}">
+            </div>
+            <div class="field">
+                <label class="checkbox">
+                    <input type="checkbox" name="required" value="1" {{ field and field.required ? 'checked' }}>
+                    <span>{{ trans('core.admin.custom_fields.field_required') }}</span>
+                </label>
+            </div>
+        </div>
+    </div>
+
+    <div class="columns">
+        {% for code in locales %}
+            {% set text = field ? (field.translations[code] ?? {}) : {} %}
+            <fieldset class="card-box">
+                <legend>{{ locale_name(code) }}</legend>
+                <div class="field">
+                    <label for="label_{{ code }}">{{ trans('core.admin.custom_fields.field_label') }}</label>
+                    <input id="label_{{ code }}" name="text[{{ code }}][label]" value="{{ text.label ?? '' }}" maxlength="150" lang="{{ code }}" {{ code == default_locale ? 'required' }}>
+                </div>
+
+                <p><small>{{ trans('core.admin.custom_fields.field_options_hint') }}</small></p>
+                {% for i in 0..(slots - 1) %}
+                    {% set key = option_keys[i] ?? null %}
+                    <div class="field">
+                        <input name="text[{{ code }}][options][{{ i }}]" value="{{ key ? (text.option_labels[key] ?? '') : '' }}" maxlength="80" placeholder="{{ trans('core.admin.custom_fields.field_options') }}">
+                    </div>
+                {% endfor %}
+            </fieldset>
+        {% endfor %}
+    </div>
+
+    {% if entity == 'offer' %}
+        <fieldset class="card-box">
+            <legend>{{ trans('core.admin.custom_fields.field_types_restriction') }}</legend>
+            <p><small>{{ trans('core.admin.custom_fields.field_types_restriction_hint') }}</small></p>
+            <div class="check-list">
+                {% for type in offer_types %}
+                    <label class="checkbox">
+                        <input type="checkbox" name="type_ids[]" value="{{ type.id }}" {{ field and type.id in field.type_ids ? 'checked' }}>
+                        <span>{{ type.label }}</span>
+                    </label>
+                {% endfor %}
+            </div>
+        </fieldset>
+    {% endif %}
+
+    <div class="card-box stack-form wide">
+        <button type="submit">{{ trans('core.account.save') }}</button>
+    </div>
+</form>
+
+{% if field and field.id %}
+    <section class="card-box">
+        <form method="post" action="{{ url('/admin/custom-fields/' ~ field.id ~ '/delete') }}?entity={{ entity }}" class="danger-form">
+            {{ csrf_field() }}
+            <button type="submit" class="danger">{{ trans('core.admin.custom_fields.delete') }}</button>
+        </form>
+    </section>
+{% endif %}
+{% endblock %}
