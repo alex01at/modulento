@@ -5427,6 +5427,35 @@ check('card: removing a member deletes the membership and syncs the seat count b
 $removedMemberCard = $get('/card/' . $memberSlug, null);
 check('card: a removed member\'s card survives, just without the organisation\'s branding any more', $removedMemberCard['status'] === 200 && !str_contains($removedMemberCard['body'], 'Fischer Gruppe'));
 
+// --- CSV import: several invitations at once, through the exact same invite() the single form uses ---
+check('card: the import pages require being the team owner, not just a logged-in account', $get('/account/team/import', 32)['status'] === 302);
+
+$cardCsv = tempnam(sys_get_temp_dir(), 'teamcsv');
+file_put_contents($cardCsv, "email,workplace\nkollege1@example.test,Niederlassung Hamburg\nkollege1@example.test,Zweite Zeile\nkollege2@example.test,\n");
+$_FILES = ['file' => ['tmp_name' => $cardCsv, 'error' => UPLOAD_ERR_OK, 'size' => filesize($cardCsv), 'name' => 'team.csv', 'type' => 'text/csv']];
+$r = $post('/account/team/import', [], 30);
+$_FILES = [];
+check('card: a CSV import invites each new row and skips an in-file duplicate address', $r['status'] === 200
+    && str_contains($r['body'], '2 Einladung(en) verschickt') && str_contains($r['body'], 'Diese Adresse steht schon in einer früheren Zeile'));
+check('card: both imported rows are real members, the workplace column was carried over', $pdo->query("SELECT COUNT(*) FROM x_card_organization_member WHERE organization_id = {$cardOrgId} AND role = 'employee'")->fetchColumn() == 2
+    && $pdo->query("SELECT om.workplace FROM x_card_organization_member om JOIN provider p ON p.id = om.provider_id JOIN account a ON a.id = p.account_id WHERE a.email = 'kollege1@example.test'")->fetchColumn() === 'Niederlassung Hamburg');
+check('card: the seat count synced up to match the new total', (int) $pdo->query("SELECT quantity FROM subscription WHERE account_id = 30 AND status = 'active'")->fetchColumn() === 3);
+
+$_FILES = ['file' => ['tmp_name' => $cardCsv, 'error' => UPLOAD_ERR_OK, 'size' => filesize($cardCsv), 'name' => 'team.csv', 'type' => 'text/csv']];
+$r = $post('/account/team/import', [], 30);
+$_FILES = [];
+check('card: re-importing the exact same file invites nobody - every address is already taken', str_contains($r['body'], '0 Einladung(en) verschickt')
+    && $pdo->query("SELECT COUNT(*) FROM x_card_organization_member WHERE organization_id = {$cardOrgId} AND role = 'employee'")->fetchColumn() == 2);
+unlink($cardCsv);
+$cardImportedIds = $pdo->query("SELECT provider_id FROM x_card_organization_member WHERE organization_id = {$cardOrgId} AND role = 'employee'")->fetchAll(PDO::FETCH_COLUMN);
+foreach ($cardImportedIds as $importedProviderId) {
+    $post('/account/team/' . $importedProviderId . '/remove', [], 30);
+}
+check('card: both imported members can be removed again, seat count syncs back down to the owner alone', $pdo->query("SELECT COUNT(*) FROM x_card_organization_member WHERE organization_id = {$cardOrgId}")->fetchColumn() == 1
+    && (int) $pdo->query("SELECT quantity FROM subscription WHERE account_id = 30 AND status = 'active'")->fetchColumn() === 1);
+$pdo->exec("DELETE FROM provider WHERE account_id IN (SELECT id FROM account WHERE email IN ('kollege1@example.test', 'kollege2@example.test'))");
+$pdo->exec("DELETE FROM account WHERE email IN ('kollege1@example.test', 'kollege2@example.test')");
+
 // The landing page, now that a real per-seat plan grants the feature (safe to flip here: every
 // team test above that cares about the seat count/min_quantity clamp has already run).
 $cardFirmaPlan = $cardSubs->plan($cardPlan);
