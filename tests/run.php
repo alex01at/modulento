@@ -5226,6 +5226,12 @@ check('card: the dashboard panel shows the Pro badge, status and quick actions',
 $cardNoProviderApp = new Modulento\Core\App($config, $pdo);
 check('card: the dashboard panel closure shows nothing for an account with no provider at all', Modulento\Card\DashboardPanel::data(['id' => 999999], $cardNoProviderApp) === []);
 
+$cardViewsBeforePreview = (int) $cardRow()['view_count'];
+$r = $get('/account/card/preview', 30);
+check('card: the owner\'s own live preview renders the real design, without counting as a view', $r['status'] === 200 && str_contains($r['body'], 'data-design=') && (int) $cardRow()['view_count'] === $cardViewsBeforePreview);
+check('card: a visitor cannot open someone else\'s preview - it always needs a login of its own', $get('/account/card/preview', null)['status'] !== 200);
+check('card: the dashboard panel embeds the live preview in an iframe', str_contains($get('/account', 30)['body'], 'src="/account/card/preview"'));
+
 $post('/account/card', [
     'company' => 'Fischer Tischlerei', 'category_id' => (string) $cardCatId, 'whatsapp' => '+49 171 9876543',
     'website_url' => 'fischer-tischlerei.de', 'linkedin_url' => 'https://linkedin.com/in/rosa-fischer',
