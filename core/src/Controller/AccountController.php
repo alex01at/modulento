@@ -61,6 +61,10 @@ final class AccountController extends Controller
                 'sales' => $app->orders->tally('provider', $providerId) + ['recent' => $rows('provider', $providerId)],
                 'types' => array_map(fn ($type) => ['id' => $type->id(), 'label_key' => $type->labelKey()], array_values($app->offers->types())),
             ] : null,
+            'dashboard_sections' => array_map(
+                fn (array $section) => ['template' => $section['template'], 'data' => ($section['data'])($account, $app)],
+                $app->dashboardSections()
+            ),
         ]);
     }
 

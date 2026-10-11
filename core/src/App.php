@@ -149,6 +149,8 @@ final class App
     private array $homeSections = [];
     /** @var array<int, array{template: string, data: \Closure}> */
     private array $providerSections = [];
+    /** @var array<int, array{template: string, data: \Closure}> */
+    private array $dashboardSections = [];
     /** @var array<int, array{label_key: string, path: string}> */
     private array $accountLinks = [];
     /** @var array<string, string> permission name => label key */
@@ -334,6 +336,24 @@ final class App
     public function providerSections(): array
     {
         return $this->providerSections;
+    }
+
+    /**
+     * A template an extension wants shown on the logged-in account's own
+     * dashboard - e.g. a digital card extension's status panel. $data gets
+     * the account row and runs only when the dashboard is shown.
+     *
+     * @param \Closure(array<string, mixed>, App): array<string, mixed> $data
+     */
+    public function addDashboardSection(string $template, \Closure $data): void
+    {
+        $this->dashboardSections[] = ['template' => $template, 'data' => $data];
+    }
+
+    /** @return array<int, array{template: string, data: \Closure}> unresolved - the caller supplies the account */
+    public function dashboardSections(): array
+    {
+        return $this->dashboardSections;
     }
 
     /** A link an extension adds to the account area, e.g. to a profile page of its own. */

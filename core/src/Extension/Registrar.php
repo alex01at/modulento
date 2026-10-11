@@ -136,6 +136,21 @@ final class Registrar
         $this->app->addProviderSection($template, $data);
     }
 
+    /**
+     * A section on the logged-in account's own dashboard (/account), e.g. a
+     * digital card extension's status panel. The template is one of this
+     * extension's ("@id/dashboard.twig"); a theme may override it like any
+     * other. $data gets the account row and runs only when the dashboard is
+     * shown; return an empty array to show nothing for an account that has
+     * not used this extension's feature at all.
+     *
+     * @param Closure(array<string, mixed>, App): array<string, mixed> $data
+     */
+    public function dashboardSection(string $template, Closure $data): void
+    {
+        $this->app->addDashboardSection($template, $data);
+    }
+
     /** An entry in the logged-in account's own navigation, e.g. a profile page the extension adds. */
     public function accountLink(string $labelKey, string $path): void
     {
