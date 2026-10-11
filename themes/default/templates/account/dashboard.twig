@@ -74,6 +74,10 @@
     </aside>
 
     <div class="dashboard-main">
+        {% for section in dashboard_sections %}
+            {% include section.template with section.data %}
+        {% endfor %}
+
         <h1>{{ trans('core.dashboard.greeting', {name: name}) }}</h1>
 
         {% if shop %}

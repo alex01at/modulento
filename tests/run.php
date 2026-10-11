@@ -5220,6 +5220,12 @@ $cardSubs->assign(30, $cardPlan);
 $r = $get('/account/card', 30);
 check('card: with a plan, the Pro sections are no longer locked', !str_contains($r['body'], 'Nur mit Pro'));
 
+// --- Dashboard panel (/account): the card's own status/quick-actions section, registered through the new dashboardSection() hook ---
+$r = $get('/account', 30);
+check('card: the dashboard panel shows the Pro badge, status and quick actions', str_contains($r['body'], 'Pro') && str_contains($r['body'], 'Karte bearbeiten') && str_contains($r['body'], 'QR-Code'));
+$cardNoProviderApp = new Modulento\Core\App($config, $pdo);
+check('card: the dashboard panel closure shows nothing for an account with no provider at all', Modulento\Card\DashboardPanel::data(['id' => 999999], $cardNoProviderApp) === []);
+
 $post('/account/card', [
     'company' => 'Fischer Tischlerei', 'category_id' => (string) $cardCatId, 'whatsapp' => '+49 171 9876543',
     'website_url' => 'fischer-tischlerei.de', 'linkedin_url' => 'https://linkedin.com/in/rosa-fischer',
@@ -5319,6 +5325,7 @@ $insertAccount->execute([32, 'cardplain2@example.test', $testHash, 'active']);
 $post('/account/provider', ['type' => 'private', 'name' => 'Plain Card', 'street' => 'Weg 9', 'postal_code' => '10115', 'city' => 'Berlin', 'country' => 'DE'], 32);
 $post('/admin/providers/' . $provider(32)['id'] . '/decide', ['decision' => 'approve'], 3);
 check('card: the statistics page is locked without the feature', str_contains($get('/account/card/stats', 32)['body'], 'Das ist in deinem aktuellen Plan nicht enthalten'));
+check('card: the dashboard panel shows the Free badge and locked stats for a plain account', str_contains($get('/account', 32)['body'], 'Kostenlos') && str_contains($get('/account', 32)['body'], 'Das ist in deinem aktuellen Plan nicht enthalten'));
 
 $r = $get('/account/card/stats', 30);
 check('card: the statistics page shows the real view count once granted', str_contains($r['body'], '<strong>' . $cardRow()['view_count'] . '</strong>'));
@@ -5358,6 +5365,7 @@ $post('/account/team', ['company' => 'Fischer Gruppe'], 30);
 $cardOrgId = (int) $pdo->query("SELECT id FROM x_card_organization WHERE owner_provider_id = {$cardProviderId}")->fetchColumn();
 check('card: founding creates the organisation with the owner as its first member', $cardOrgId > 0
     && $pdo->query("SELECT role FROM x_card_organization_member WHERE organization_id = {$cardOrgId} AND provider_id = {$cardProviderId}")->fetchColumn() === 'owner');
+check('card: the dashboard panel now shows the Firma-owner badge instead of Pro', str_contains($get('/account', 30)['body'], 'Firma (Inhaber:in)'));
 
 $post('/account/team', ['company' => 'Zweite Firma'], 30);
 check('card: an account already in an organisation cannot found a second one', $pdo->query('SELECT COUNT(*) FROM x_card_organization')->fetchColumn() == 1);
@@ -5384,6 +5392,7 @@ check('card: inviting creates an approved provider and an employee membership, n
     && $pdo->query("SELECT name FROM provider WHERE id = {$memberProviderId}")->fetchColumn() === 'Kollege'
     && $pdo->query("SELECT role FROM x_card_organization_member WHERE provider_id = {$memberProviderId}")->fetchColumn() === 'employee');
 check('card: the seat count synced to the subscription (even a flat plan tracks it; only a per-seat plan bills by it)', (int) $pdo->query("SELECT quantity FROM subscription WHERE account_id = 30 AND status = 'active'")->fetchColumn() === 2);
+check('card: the member\'s own dashboard panel shows the team badge with the company name', str_contains($get('/account', $memberAccountId)['body'], 'Team: Fischer Gruppe'));
 
 $inviteMail = lastMail($mailLog, 'kollege@example.test');
 check('card: the invited member gets a set-password mail naming the company', $inviteMail !== null && str_contains($inviteMail['subject'], 'Fischer Gruppe') && str_starts_with($inviteMail['link'], '/reset-password/'));
