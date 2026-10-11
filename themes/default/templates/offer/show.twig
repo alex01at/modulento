@@ -28,6 +28,8 @@
             {% include 'offer/_block_' ~ block.type ~ '.twig' with {block: block} %}
         {% endif %}
     {% endfor %}
+
+    {% include '_custom_fields.twig' %}
 </article>
 
 {# Reporting has to be easy to find where the content is. #}

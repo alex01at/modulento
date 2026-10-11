@@ -91,6 +91,7 @@
         <input type="hidden" name="type" value="{{ type.id }}">
         <input type="hidden" name="wizard_step" value="5">
         {% include type.template %}
+        {% include '_custom_fields_form.twig' with {locales: selected} %}
         <button type="submit">{{ trans('core.offer.wizard.next') }}</button>
     </form>
 

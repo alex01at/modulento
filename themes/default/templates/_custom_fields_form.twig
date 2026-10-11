@@ -1,0 +1,38 @@
+{# The operator's own fields (Administration → Custom fields). Shared by the offer form
+   and the provider profile form - "custom_fields" and "locales" are set by the controller. #}
+{% if custom_fields is not empty %}
+    <fieldset>
+        <legend>{{ trans('core.custom_field.section') }}</legend>
+        {% for field in custom_fields %}
+            {% if field.translatable %}
+                {% for code in locales %}
+                    <label for="cf_{{ field.key }}_{{ code }}">{{ field.label }} – {{ locale_name(code) }}</label>
+                    {% if field.type == 'textarea' %}
+                        <textarea id="cf_{{ field.key }}_{{ code }}" name="custom_fields[{{ field.key }}][{{ code }}]" rows="4" maxlength="5000" lang="{{ code }}" {{ field.required and loop.first ? 'required' }}>{{ field.value[code] ?? '' }}</textarea>
+                    {% else %}
+                        <input id="cf_{{ field.key }}_{{ code }}" name="custom_fields[{{ field.key }}][{{ code }}]" value="{{ field.value[code] ?? '' }}" maxlength="500" lang="{{ code }}" {{ field.required and loop.first ? 'required' }}>
+                    {% endif %}
+                {% endfor %}
+            {% elseif field.type == 'select' %}
+                <label for="cf_{{ field.key }}">{{ field.label }}</label>
+                <select id="cf_{{ field.key }}" name="custom_fields[{{ field.key }}]" {{ field.required ? 'required' }}>
+                    <option value=""></option>
+                    {% for key, label in field.options %}
+                        <option value="{{ key }}" {{ field.value == key ? 'selected' }}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            {% elseif field.type == 'checkbox' %}
+                <label class="checkbox">
+                    <input type="checkbox" name="custom_fields[{{ field.key }}]" value="1" {{ field.value ? 'checked' }} {{ field.required ? 'required' }}>
+                    <span>{{ field.label }}</span>
+                </label>
+            {% elseif field.type == 'date' %}
+                <label for="cf_{{ field.key }}">{{ field.label }}</label>
+                <input id="cf_{{ field.key }}" type="date" name="custom_fields[{{ field.key }}]" value="{{ field.value }}" {{ field.required ? 'required' }}>
+            {% else %}
+                <label for="cf_{{ field.key }}">{{ field.label }}</label>
+                <input id="cf_{{ field.key }}" type="number" step="any" name="custom_fields[{{ field.key }}]" value="{{ field.value }}" {{ field.required ? 'required' }}>
+            {% endif %}
+        {% endfor %}
+    </fieldset>
+{% endif %}

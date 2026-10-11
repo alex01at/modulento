@@ -18,6 +18,7 @@ use Modulento\Core\Account\Preferences;
 use Modulento\Core\Account\Roles;
 use Modulento\Core\Account\Tokens;
 use Modulento\Core\Catalogue\Categories;
+use Modulento\Core\CustomField\CustomFields;
 use Modulento\Core\Catalogue\OfferImages;
 use Modulento\Core\Catalogue\OfferMessages;
 use Modulento\Core\Content\HomeLayout;
@@ -93,6 +94,7 @@ final class App
     public readonly Providers $providers;
     public readonly Roles $roles;
     public readonly Categories $categories;
+    public readonly CustomFields $customFields;
     public readonly Offers $offers;
     public readonly OfferImages $offerImages;
     public readonly Orders $orders;
@@ -169,6 +171,7 @@ final class App
         $this->providers = new Providers($db, $this->settings, $this->locales);
         $this->roles = new Roles($db);
         $this->categories = new Categories($db, $this->locales);
+        $this->customFields = new CustomFields($db, $this->locales);
         $this->offers = new Offers($db, $this->settings, $this->locales);
         $this->orders = new Orders($db);
         $this->requests = new Requests($db, $this->settings);
