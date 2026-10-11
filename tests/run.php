@@ -5208,6 +5208,10 @@ check('card: formatAddress() joins street, postal code + city, and the country n
 check('card: formatAddress() is null with nothing to show', Modulento\Card\Cards::formatAddress(['street' => '', 'postal_code' => '', 'city' => '', 'country' => ''], fn ($c) => $c) === null);
 check('card: vCard is refused without the Pro feature', $get('/card/' . $cardSlug . '/vcard.vcf', null)['status'] === 404);
 
+// --- Firma/team landing page (/firma): public, live preview of whichever plan(s) grant the feature ---
+check('card: the landing page is linked from the public navigation of any theme', str_contains($get('/', null)['body'], 'href="/firma"'));
+check('card: with no plan granting the team feature yet, the landing page says so plainly', str_contains($get('/firma', null)['body'], 'kein Plan eingerichtet'));
+
 // Grant every card feature through a real plan, exactly the way an operator would.
 $cardPlan = $cardSubs->createPlan('card-pro', 'Karte Pro', 900, 'EUR', 1,
     ['card.feature.design', 'card.feature.colors', 'card.feature.gallery', 'card.feature.offerings', 'card.feature.booking', 'card.feature.vcard', 'card.feature.stats', 'card.feature.team']);
@@ -5422,6 +5426,19 @@ check('card: removing a member deletes the membership and syncs the seat count b
     && (int) $pdo->query("SELECT quantity FROM subscription WHERE account_id = 30 AND status = 'active'")->fetchColumn() === 1);
 $removedMemberCard = $get('/card/' . $memberSlug, null);
 check('card: a removed member\'s card survives, just without the organisation\'s branding any more', $removedMemberCard['status'] === 200 && !str_contains($removedMemberCard['body'], 'Fischer Gruppe'));
+
+// The landing page, now that a real per-seat plan grants the feature (safe to flip here: every
+// team test above that cares about the seat count/min_quantity clamp has already run).
+$cardFirmaPlan = $cardSubs->plan($cardPlan);
+$cardSubs->updatePlan($cardPlan, $cardFirmaPlan['name'], $cardFirmaPlan['price_cents'], $cardFirmaPlan['currency'], $cardFirmaPlan['period_months'],
+    $cardFirmaPlan['features'], true, $cardFirmaPlan['offer_limits'], $cardFirmaPlan['max_images_per_offer'], true, 5);
+
+$r = $get('/firma', null);
+check('card: the landing page shows the real plan with its price per seat and the minimum total', $r['status'] === 200
+    && str_contains($r['body'], 'Karte Pro') && str_contains($r['body'], '9,00 €') && str_contains($r['body'], '45,00 €'));
+check('card: as a guest, the call to action leads to registration, with a login link next to it', str_contains($r['body'], 'href="/register"') && str_contains($r['body'], 'href="/login"'));
+
+check('card: signed in, the call to action leads to the team area instead', str_contains($get('/firma', 30)['body'], 'href="/account/team"'));
 
 // Cleanup (team).
 $pdo->exec("DELETE FROM x_card_profile WHERE provider_id = {$memberProviderId}");
