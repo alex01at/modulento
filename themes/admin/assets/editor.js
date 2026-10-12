@@ -19,6 +19,12 @@
         ['html', null]
     ];
 
+    // Mirrors Modulento\Core\Support\Design::FONTS's keys and
+    // Modulento\Core\Support\HtmlSanitizer::SPAN_CLASSES - a span with one
+    // of these classes is the only font/size formatting the server keeps.
+    var FONTS = ['system', 'serif', 'humanist', 'mono'];
+    var SIZES = ['sm', 'md', 'lg', 'xl'];
+
     // Element => allowed attributes, kept when pasting - the same elements
     // core/src/Support/HtmlSanitizer.php keeps when the field is saved, minus
     // pictures (only the media library's picker inserts those, with a src the
@@ -30,7 +36,8 @@
         ul: [], ol: [], li: [],
         blockquote: [], pre: [], code: [],
         a: ['href'],
-        table: [], thead: [], tbody: [], tr: [], th: ['colspan', 'rowspan'], td: ['colspan', 'rowspan']
+        table: [], thead: [], tbody: [], tr: [], th: ['colspan', 'rowspan'], td: ['colspan', 'rowspan'],
+        span: ['class', 'style']
     };
 
     // Keeps only PASTE_ALLOWED elements and attributes; an element not on the
@@ -92,6 +99,65 @@
             var escaped = paragraph.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
             return '<p>' + escaped.replace(/\r?\n/g, '<br>') + '</p>';
         }).join('');
+    }
+
+    // Wraps the current selection (inside area) in a new span - font/size/colour
+    // formatting, which execCommand cannot produce with an arbitrary class. Does
+    // nothing to a collapsed selection (nothing picked to format).
+    function wrapSelection(area, attrs) {
+        var selection = window.getSelection();
+        if (!selection.rangeCount || selection.isCollapsed) {
+            return;
+        }
+        var range = selection.getRangeAt(0);
+        if (!area.contains(range.commonAncestorContainer)) {
+            return;
+        }
+        var span = document.createElement('span');
+        if (attrs.className) {
+            span.className = attrs.className;
+        }
+        if (attrs.style) {
+            span.setAttribute('style', attrs.style);
+        }
+        span.appendChild(range.extractContents());
+        range.insertNode(span);
+        selection.removeAllRanges();
+        var after = document.createRange();
+        after.selectNodeContents(span);
+        selection.addRange(after);
+    }
+
+    // Removes every text-formatting span (font/size/colour) from the selection,
+    // keeping its text - the same "unwrap" rule the server's sanitizer applies
+    // to a span that ends up with neither a known class nor a colour.
+    function unwrapFormatting(node) {
+        Array.prototype.slice.call(node.childNodes).forEach(function (child) {
+            if (child.nodeType !== Node.ELEMENT_NODE) {
+                return;
+            }
+            unwrapFormatting(child);
+            if (child.nodeName.toLowerCase() === 'span' && (child.className || child.getAttribute('style'))) {
+                while (child.firstChild) {
+                    node.insertBefore(child.firstChild, child);
+                }
+                node.removeChild(child);
+            }
+        });
+    }
+
+    function stripSelectionFormatting(area) {
+        var selection = window.getSelection();
+        if (!selection.rangeCount || selection.isCollapsed) {
+            return;
+        }
+        var range = selection.getRangeAt(0);
+        if (!area.contains(range.commonAncestorContainer)) {
+            return;
+        }
+        var fragment = range.extractContents();
+        unwrapFormatting(fragment);
+        range.insertNode(fragment);
     }
 
     // The editors on this page by the id of their textarea.
@@ -168,6 +234,97 @@
             }
             bar.appendChild(button);
         });
+
+        // Font and size: one button per value, previewed on the button's own
+        // text - not a <select>, so the existing mousedown-preventDefault trick
+        // keeps the selection in the editable area exactly like the buttons above.
+        FONTS.forEach(function (font) {
+            var button = document.createElement('button');
+            button.type = 'button';
+            // Reuses the exact class the server keeps (HtmlSanitizer::SPAN_CLASSES)
+            // and Design::textFormatting() styles, so the preview matches the result.
+            button.className = 'editor-button editor-font text-font-' + font;
+            button.textContent = 'Aa';
+            button.setAttribute('aria-label', labels['font_' + font]);
+            button.title = labels['font_' + font];
+            button.addEventListener('mousedown', function (event) {
+                event.preventDefault();
+            });
+            button.addEventListener('click', function () {
+                if (source) {
+                    return;
+                }
+                wrapSelection(area, {className: 'text-font-' + font});
+                sync();
+            });
+            bar.appendChild(button);
+        });
+        SIZES.forEach(function (size) {
+            var button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'editor-button editor-size text-size-' + size;
+            button.textContent = 'A';
+            button.setAttribute('aria-label', labels['size_' + size]);
+            button.title = labels['size_' + size];
+            button.addEventListener('mousedown', function (event) {
+                event.preventDefault();
+            });
+            button.addEventListener('click', function () {
+                if (source) {
+                    return;
+                }
+                wrapSelection(area, {className: 'text-size-' + size});
+                sync();
+            });
+            bar.appendChild(button);
+        });
+
+        // Colour needs its own native picker, so it cannot keep the selection the
+        // mousedown trick's way - the selection is saved on its own and restored
+        // right before wrapping it.
+        var savedRange = null;
+        area.addEventListener('mouseup', saveRange);
+        area.addEventListener('keyup', saveRange);
+        function saveRange() {
+            var selection = window.getSelection();
+            if (selection.rangeCount && !selection.isCollapsed && area.contains(selection.getRangeAt(0).commonAncestorContainer)) {
+                savedRange = selection.getRangeAt(0).cloneRange();
+            }
+        }
+        var colour = document.createElement('input');
+        colour.type = 'color';
+        colour.className = 'editor-color';
+        colour.setAttribute('aria-label', labels.format_color);
+        colour.title = labels.format_color;
+        colour.addEventListener('input', function () {
+            if (source || !savedRange) {
+                return;
+            }
+            var selection = window.getSelection();
+            selection.removeAllRanges();
+            selection.addRange(savedRange);
+            wrapSelection(area, {style: 'color: ' + colour.value});
+            sync();
+        });
+        bar.appendChild(colour);
+
+        var clearButton = document.createElement('button');
+        clearButton.type = 'button';
+        clearButton.className = 'editor-button editor-clear';
+        clearButton.textContent = '✕';
+        clearButton.setAttribute('aria-label', labels.format_clear);
+        clearButton.title = labels.format_clear;
+        clearButton.addEventListener('mousedown', function (event) {
+            event.preventDefault();
+        });
+        clearButton.addEventListener('click', function () {
+            if (source) {
+                return;
+            }
+            stripSelectionFormatting(area);
+            sync();
+        });
+        bar.appendChild(clearButton);
 
         // Pasted text keeps paragraphs and the formatting this field allows (the same
         // elements HtmlSanitizer keeps on the server, so what is shown here matches

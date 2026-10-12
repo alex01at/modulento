@@ -13,6 +13,12 @@ use DOMNode;
  * of formatting elements. Whatever is not on the list is removed: scripts,
  * styles, frames, forms, event handlers, "javascript:" links. The text is
  * cleaned once, when it is saved, and can then be output as it is.
+ *
+ * `class` and `style` are the one exception to plain attribute filtering:
+ * general CSS would be an injection surface (fixed overlays, UI redressing),
+ * so a `span`'s class is rebuilt from SPAN_CLASSES and its style from a
+ * single validated `color: #rrggbb` declaration - never the submitted
+ * string itself. See cleanSpanClass()/cleanSpanStyle().
  */
 final class HtmlSanitizer
 {
@@ -27,9 +33,14 @@ final class HtmlSanitizer
         // Only pictures of the media library, see cleanImage().
         'img' => ['src', 'alt', 'width', 'height'],
         'table' => [], 'thead' => [], 'tbody' => [], 'tr' => [], 'th' => ['scope', 'colspan', 'rowspan'], 'td' => ['colspan', 'rowspan'],
+        // class/style are not just filtered - cleanSpanClass()/cleanSpanStyle()
+        // rebuild them from a fixed allow-list, see the class docblock.
+        'span' => ['class', 'style'],
     ];
     /** Removed together with everything inside them. */
     private const DROP_WITH_CONTENT = ['script', 'style', 'iframe', 'object', 'embed', 'form', 'template', 'svg', 'math', 'noscript', 'head', 'title'];
+    /** The only span classes a text-formatting toolbar may produce (font, then size) - see Design::FONTS for the font keys. */
+    private const SPAN_CLASSES = ['text-font-system', 'text-font-serif', 'text-font-humanist', 'text-font-mono', 'text-size-sm', 'text-size-md', 'text-size-lg', 'text-size-xl'];
 
     public static function clean(string $html): string
     {
@@ -104,7 +115,60 @@ final class HtmlSanitizer
             if ($name === 'a') {
                 self::cleanLink($child);
             }
+            if ($name === 'span') {
+                self::cleanSpan($node, $child);
+            }
         }
+    }
+
+    /**
+     * Rebuilds a span's class/style from the submitted string - never keeps
+     * it as is, that string is exactly the CSS-injection surface this class
+     * otherwise refuses by never allowing `style`/`class` at all. A span
+     * left with neither, once rebuilt, is unwrapped like an unknown element.
+     */
+    private static function cleanSpan(DOMNode $parent, DOMElement $span): void
+    {
+        $classes = array_values(array_intersect(
+            preg_split('/\s+/', trim($span->getAttribute('class'))) ?: [],
+            self::SPAN_CLASSES
+        ));
+        if ($classes !== []) {
+            $span->setAttribute('class', implode(' ', $classes));
+        } else {
+            $span->removeAttribute('class');
+        }
+
+        $colour = self::spanColour($span->getAttribute('style'));
+        if ($colour !== null) {
+            $span->setAttribute('style', 'color: ' . $colour);
+        } else {
+            $span->removeAttribute('style');
+        }
+
+        if (!$span->hasAttributes()) {
+            while ($span->firstChild !== null) {
+                $parent->insertBefore($span->firstChild, $span);
+            }
+            $parent->removeChild($span);
+        }
+    }
+
+    /** The one declaration a span's style may carry, read out of the submitted string - or null. */
+    private static function spanColour(string $style): ?string
+    {
+        foreach (explode(';', $style) as $declaration) {
+            [$property, $value] = array_pad(explode(':', $declaration, 2), 2, '');
+            if (strtolower(trim($property)) !== 'color') {
+                continue;
+            }
+            $value = strtolower(trim($value));
+            if (preg_match('/^#[0-9a-f]{6}$/', $value) === 1) {
+                return $value;
+            }
+        }
+
+        return null;
     }
 
     /** A picture of the media library: the random name it was given, and nothing else. */

@@ -1,5 +1,5 @@
 {# Receives block: texts (title, text, button_label, button_url). The title and the text are edited on the spot. #}
-<section class="home-hero">
+<section data-home-block="{{ block.id }}" class="home-hero">
     <h1 data-field="title">{{ block.texts.title }}</h1>
     {% if block.texts.text or edit_mode() %}<p data-field="text">{{ block.texts.text }}</p>{% endif %}
     {% if block.texts.button_label and block.texts.button_url %}
