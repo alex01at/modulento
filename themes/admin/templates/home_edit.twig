@@ -43,6 +43,36 @@
                 </div>
             {% endif %}
 
+            <fieldset>
+                <legend>{{ trans('core.home.background') }}</legend>
+                <div class="field">
+                    <label for="bg-type-{{ id }}">{{ trans('core.home.background_type') }}</label>
+                    <select id="bg-type-{{ id }}" name="blocks[{{ id }}][settings][background_type]" data-background-toggle>
+                        <option value="" {{ (block.settings.background_type ?? '') == '' ? 'selected' }}>{{ trans('core.home.background_option_none') }}</option>
+                        <option value="color" {{ (block.settings.background_type ?? '') == 'color' ? 'selected' }}>{{ trans('core.home.background_option_color') }}</option>
+                        <option value="gradient" {{ (block.settings.background_type ?? '') == 'gradient' ? 'selected' }}>{{ trans('core.home.background_option_gradient') }}</option>
+                        <option value="image" {{ (block.settings.background_type ?? '') == 'image' ? 'selected' }}>{{ trans('core.home.background_option_image') }}</option>
+                    </select>
+                </div>
+                <div class="field" data-background-field="color gradient">
+                    <label for="bg-color-{{ id }}">{{ trans('core.home.background_color') }}</label>
+                    <input id="bg-color-{{ id }}" type="color" name="blocks[{{ id }}][settings][background_color]" value="{{ block.settings.background_color ?? '#ffffff' }}">
+                </div>
+                <div class="field" data-background-field="gradient">
+                    <label for="bg-color2-{{ id }}">{{ trans('core.home.background_color2') }}</label>
+                    <input id="bg-color2-{{ id }}" type="color" name="blocks[{{ id }}][settings][background_color2]" value="{{ block.settings.background_color2 ?? '#ffffff' }}">
+                </div>
+                <div class="field" data-background-field="image">
+                    <label for="bg-media-{{ id }}">{{ trans('core.home.picture') }}</label>
+                    <select id="bg-media-{{ id }}" name="blocks[{{ id }}][settings][background_media]">
+                        <option value="">{{ trans('core.home.picture_none') }}</option>
+                        {% for picture in pictures %}
+                            <option value="{{ picture.url }}" {{ picture.url == (block.settings.background_media ?? '') ? 'selected' }}>{{ picture.title ?: picture.url }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </fieldset>
+
             {% set locale = locale %}
             <fieldset class="home-language" lang="{{ locale }}">
                 <legend>{{ locale_name(locale) }}</legend>

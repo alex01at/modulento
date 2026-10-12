@@ -1,7 +1,7 @@
 {# Receives block: texts (heading), count. #}
 {% set providers = top_providers(block.count) %}
 {% if providers %}
-<section>
+<section data-home-block="{{ block.id }}">
     <h2 data-field="heading">{{ block.texts.heading }}</h2>
     <ul class="plain-list">
         {% for provider in providers %}

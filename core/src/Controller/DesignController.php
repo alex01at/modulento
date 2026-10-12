@@ -15,7 +15,10 @@ final class DesignController extends Controller
     {
         header('Content-Type: text/css; charset=utf-8');
         header('Cache-Control: public, max-age=300');
-        echo $this->app->design->css();
+        // The home layout's own block backgrounds are served together with the
+        // design values - one stylesheet every theme already loads on every page,
+        // and the one place inline style is allowed to live under this site's CSP.
+        echo $this->app->design->css() . $this->app->homeLayout->backgroundCss();
     }
 
     public function index(array $params): void

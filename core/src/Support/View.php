@@ -218,10 +218,19 @@ final class View
         // whatever else the extensions bring.
         // The wording of the text editor (editor.js), as a JSON object for
         // the data-editor attribute of an HTML text field.
-        $this->twig->addFunction(new TwigFunction('editor', fn () => json_encode(array_combine(
-            ['toolbar', 'area', 'p', 'h2', 'h3', 'bold', 'italic', 'ul', 'ol', 'quote', 'link', 'unlink', 'html', 'link_prompt'],
-            array_map(fn (string $key) => $translator->trans('core.editor.' . $key), ['toolbar', 'area', 'p', 'h2', 'h3', 'bold', 'italic', 'ul', 'ol', 'quote', 'link', 'unlink', 'html', 'link_prompt'])
-        ), JSON_UNESCAPED_UNICODE)));
+        $this->twig->addFunction(new TwigFunction('editor', function () use ($translator): string {
+            $keys = ['toolbar', 'area', 'p', 'h2', 'h3', 'bold', 'italic', 'ul', 'ol', 'quote', 'link', 'unlink', 'html', 'link_prompt', 'format_clear', 'format_color'];
+            $labels = array_combine($keys, array_map(fn (string $key) => $translator->trans('core.editor.' . $key), $keys));
+            // The font buttons reuse the Design settings page's own font names, so the two never drift apart.
+            foreach (array_keys(Design::FONTS) as $font) {
+                $labels['font_' . $font] = $translator->trans('core.design.font.' . $font);
+            }
+            foreach (['sm', 'md', 'lg', 'xl'] as $size) {
+                $labels['size_' . $size] = $translator->trans('core.editor.size_' . $size);
+            }
+
+            return json_encode($labels, JSON_UNESCAPED_UNICODE);
+        }));
         // Whether an optional function of the core is switched on (Administration → Modules).
         $this->twig->addFunction(new TwigFunction('module', fn (string $id) => $app->modules->enabled($id)));
         // Whether the visitor may use a feature of a plan: the same answer the route gives. A visitor has none unless the module is off.
@@ -279,7 +288,10 @@ final class View
             return ['name' => ($account['display_name'] ?? '') !== '' ? $account['display_name'] : $account['email']];
         }));
         // The stylesheet of the design values, named after its content: "/design/<name>.css".
-        $this->twig->addFunction(new TwigFunction('design_url', fn (): string => '/design/' . $app->design->fileName()));
+        // The name includes the home layout's own backgrounds too (served together,
+        // see DesignController::stylesheet()), so either changing busts the cache.
+        $this->twig->addFunction(new TwigFunction('design_url', fn (): string => '/design/'
+            . substr(sha1($app->design->css() . $app->homeLayout->backgroundCss()), 0, 16) . '.css'));
         // The blocks of the home page, in the current language, enabled ones only.
         $this->twig->addFunction(new TwigFunction('home_blocks', fn (bool $all = false): array => $app->homeLayout->view(
             $app->translator->locale(),

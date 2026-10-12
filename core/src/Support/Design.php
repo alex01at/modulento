@@ -189,7 +189,8 @@ CSS;
         return ":root {\n    --font: " . self::FONTS[$v['font']] . ";\n    --radius: " . $v['radius'] . "px;\n}\n"
             . "@media (prefers-color-scheme: light) {\n    :root:not([data-theme=\"dark\"]) {\n" . $this->colours($v) . "    }\n}\n"
             . ":root[data-theme=\"light\"] {\n" . $this->colours($v) . "}\n"
-            . $this->controls();
+            . $this->controls()
+            . self::textFormatting();
     }
 
     /** A name for the stylesheet that changes with its content, so a new design is never served from a cache. */
@@ -219,5 +220,23 @@ CSS;
     private static function validColour(string $value): bool
     {
         return preg_match('/^#[0-9a-fA-F]{6}$/', $value) === 1;
+    }
+
+    /**
+     * The classes HtmlSanitizer::SPAN_CLASSES lets a formatted span keep,
+     * written once here - every theme already loads this stylesheet, so
+     * none of them need their own copy of these rules.
+     */
+    private static function textFormatting(): string
+    {
+        $css = '';
+        foreach (self::FONTS as $key => $stack) {
+            $css .= ".text-font-{$key} { font-family: {$stack}; }\n";
+        }
+        foreach (['sm' => '.85em', 'md' => '1em', 'lg' => '1.25em', 'xl' => '1.6em'] as $key => $size) {
+            $css .= ".text-size-{$key} { font-size: {$size}; }\n";
+        }
+
+        return $css;
     }
 }

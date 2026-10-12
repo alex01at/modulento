@@ -1,7 +1,7 @@
 {# Receives block: texts (heading). The category tree. #}
 {% set tree = categories() %}
 {% if tree %}
-<section>
+<section data-home-block="{{ block.id }}">
     <h2 data-field="heading">{{ block.texts.heading }}</h2>
     <ul class="plain-list">
         {% for top in tree %}

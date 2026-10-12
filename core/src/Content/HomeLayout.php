@@ -119,6 +119,13 @@ final class HomeLayout
                 'count' => max(1, min(12, (int) ($block['settings']['count'] ?? 6))),
                 'media' => (string) ($block['settings']['media'] ?? ''),
                 'links' => self::links($texts['items'] ?? ''),
+                // The raw values, for the admin form to show what is set - the computed
+                // CSS itself is never inline (the site's CSP has no style-src 'unsafe-inline'),
+                // it lives in backgroundCss() below, served as part of the design stylesheet.
+                'background_type' => (string) ($block['settings']['background_type'] ?? ''),
+                'background_color' => (string) ($block['settings']['background_color'] ?? ''),
+                'background_color2' => (string) ($block['settings']['background_color2'] ?? ''),
+                'background_media' => (string) ($block['settings']['background_media'] ?? ''),
             ];
         }
 
@@ -302,6 +309,50 @@ final class HomeLayout
     public static function validUrl(string $url): bool
     {
         return preg_match('#^(/(?!/)|https://)[^\s"<>]{0,500}$#', $url) === 1;
+    }
+
+    public static function validColour(string $value): bool
+    {
+        return preg_match('/^#[0-9a-f]{6}$/', $value) === 1;
+    }
+
+    /**
+     * CSS rules for every block that has its own background, one rule per
+     * block targeted by `[data-home-block="{id}"]` (an attribute, not an id -
+     * a theme's own block may already carry a fixed id of its own, e.g. as a
+     * page anchor, and must not collide with this one) - never an inline
+     * `style=""` (the site's Content-Security-Policy allows no
+     * `style-src 'unsafe-inline'`, only same-origin stylesheets). Meant to be
+     * appended to the design stylesheet, which every theme already loads on
+     * every page.
+     */
+    public function backgroundCss(): string
+    {
+        $css = '';
+        foreach ($this->blocks() as $block) {
+            $style = self::backgroundStyle($block['settings']);
+            if ($style !== '') {
+                $css .= '[data-home-block="' . $block['id'] . '"] {' . "\n    " . $style . "\n}\n";
+            }
+        }
+
+        return $css;
+    }
+
+    /** The background a block's own settings ask for, as a ready "property: value;" string - empty for none. */
+    private static function backgroundStyle(array $settings): string
+    {
+        $type = $settings['background_type'] ?? null;
+        $colour = fn (string $key) => is_string($settings[$key] ?? null) && self::validColour($settings[$key]) ? $settings[$key] : null;
+
+        return match (true) {
+            $type === 'color' && $colour('background_color') !== null => 'background: ' . $colour('background_color') . ';',
+            $type === 'gradient' && $colour('background_color') !== null && $colour('background_color2') !== null
+                => 'background: linear-gradient(135deg, ' . $colour('background_color') . ', ' . $colour('background_color2') . ');',
+            $type === 'image' && self::cleanMedia((string) ($settings['background_media'] ?? '')) !== ''
+                => 'background-image: url(' . self::cleanMedia((string) $settings['background_media']) . '); background-size: cover; background-position: center;',
+            default => '',
+        };
     }
 
     /** @return list<array{title: string, url: string}> */

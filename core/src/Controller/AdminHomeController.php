@@ -133,6 +133,27 @@ final class AdminHomeController extends Controller
                 $settings['media'] = HomeLayout::cleanMedia((string) ($input['settings']['media'] ?? ''));
             }
 
+            // The background applies to every block type, not just "image" above.
+            $backgroundType = (string) ($input['settings']['background_type'] ?? '');
+            if (in_array($backgroundType, ['color', 'gradient', 'image'], true)) {
+                $settings['background_type'] = $backgroundType;
+                if ($backgroundType !== 'image') {
+                    $colour = strtolower(trim((string) ($input['settings']['background_color'] ?? '')));
+                    if (HomeLayout::validColour($colour)) {
+                        $settings['background_color'] = $colour;
+                    }
+                }
+                if ($backgroundType === 'gradient') {
+                    $colour2 = strtolower(trim((string) ($input['settings']['background_color2'] ?? '')));
+                    if (HomeLayout::validColour($colour2)) {
+                        $settings['background_color2'] = $colour2;
+                    }
+                }
+                if ($backgroundType === 'image') {
+                    $settings['background_media'] = HomeLayout::cleanMedia((string) ($input['settings']['background_media'] ?? ''));
+                }
+            }
+
             $blocks[] = [
                 'id' => $id,
                 'type' => $type,

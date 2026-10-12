@@ -923,6 +923,10 @@ check('sanitizer: protocol-relative link loses its target', HtmlSanitizer::clean
 check('sanitizer: external link is kept and marked', HtmlSanitizer::clean('<a href="https://a.test/?x=1&y=2" target="_blank">y</a>') === '<a href="https://a.test/?x=1&amp;y=2" rel="noopener noreferrer">y</a>');
 check('sanitizer: unknown elements keep their text', HtmlSanitizer::clean('<div><span style="x">Text</span><img src=x onerror=alert(1)></div><iframe src=x></iframe>') === 'Text');
 check('sanitizer: tables and headings survive, h1 does not', HtmlSanitizer::clean('<h1>T</h1><h2>U</h2><table><tr><td colspan="2" style="a">1</td></tr></table>') === 'T<h2>U</h2><table><tr><td colspan="2">1</td></tr></table>');
+check('sanitizer: a span keeps an allowed class and a valid colour', HtmlSanitizer::clean('<p><span class="text-font-serif text-size-lg" style="color: #112233">x</span></p>') === '<p><span class="text-font-serif text-size-lg" style="color: #112233">x</span></p>');
+check('sanitizer: an unknown class and any other style property are dropped, the valid parts kept', HtmlSanitizer::clean('<span class="text-font-serif evil" style="color: #112233; position: fixed">x</span>') === '<span class="text-font-serif" style="color: #112233">x</span>');
+check('sanitizer: a span left with neither a known class nor a colour is unwrapped, its text stays', HtmlSanitizer::clean('<p><span class="nope" style="background: red">x</span></p>') === '<p>x</p>');
+check('sanitizer: an invalid colour value is refused', HtmlSanitizer::clean('<span style="color: red">x</span>') === 'x');
 
 use Modulento\Core\Content\Pages;
 
@@ -4220,6 +4224,28 @@ check('home editor: a picture outside the library and a link without a safe addr
     && $lastBlocks[count($lastBlocks) - 2]['texts']['de']['items'] === "Impressum | /impressum\nExtern | https://example.org");
 $body = $get('/', null)['body'];
 check('home: links of the list are shown, paths in the language of the page', str_contains($body, 'href="/impressum"') && str_contains($body, 'href="https://example.org"') && !str_contains($body, 'javascript:x'));
+
+// --- A block's own background: colour/gradient/image, never inline (the site's CSP has no style-src 'unsafe-inline') ---
+// The hero always renders regardless of its text, unlike "links" (empty without items) - a settings-only
+// save (no "texts" key at all) would otherwise wipe its text fields back to empty, per fromForm()'s own rule.
+$post('/admin/home', ['action' => 'save', 'blocks' => ['default-hero' => ['enabled' => '1', 'settings' => [
+    'background_type' => 'gradient', 'background_color' => '#112233', 'background_color2' => '#445566',
+], 'texts' => ['de' => ['title' => 'Hallo']]]]], 3);
+$heroBlock = array_values(array_filter($homeBlocks(), fn (array $b) => $b['id'] === 'default-hero'))[0];
+check('home editor: a background is saved for any block type, not gated by its text fields', $heroBlock['settings']['background_type'] === 'gradient'
+    && $heroBlock['settings']['background_color'] === '#112233' && $heroBlock['settings']['background_color2'] === '#445566');
+
+$homePage = $get('/', null)['body'];
+check('home: the block carries a data attribute (not an id, a theme may already have its own), for the background rule to target', str_contains($homePage, 'data-home-block="default-hero"'));
+preg_match('#href="(/design/[a-f0-9]+\.css)"#', $homePage, $cssMatch);
+$designCss = $get($cssMatch[1], null)['body'];
+check('home: the design stylesheet carries the block\'s gradient, scoped to its own attribute - never an inline style attribute', str_contains($designCss, '[data-home-block="default-hero"] {')
+    && str_contains($designCss, 'background: linear-gradient(135deg, #112233, #445566);') && !str_contains($homePage, 'style="'));
+
+$post('/admin/home', ['action' => 'save', 'blocks' => ['default-hero' => ['enabled' => '1', 'settings' => ['background_type' => 'color', 'background_color' => 'not-a-colour'], 'texts' => ['de' => ['title' => 'Hallo']]]]], 3);
+$heroBlock = array_values(array_filter($homeBlocks(), fn (array $b) => $b['id'] === 'default-hero'))[0];
+check('home editor: an invalid colour is refused, nothing stored for it', !isset($heroBlock['settings']['background_color']));
+
 check('home editor: the form shows the language of the header only, no language tabs', str_contains($get('/admin/home', 3)['body'], '[texts][de][title]')
     && !str_contains($get('/admin/home', 3)['body'], '[texts][en]') && str_contains($get('/en/admin/home', 3)['body'], '[texts][en][title]')
     && !str_contains($get('/en/admin/home', 3)['body'], '[texts][de]') && str_contains($get('/en/admin/home', 3)['body'], 'placeholder="Hallo"'));
