@@ -322,6 +322,10 @@ $pdo->exec("ALTER TABLE provider ADD COLUMN rating_count INTEGER NOT NULL DEFAUL
 $pdo->exec("ALTER TABLE provider ADD COLUMN rating_sum INTEGER NOT NULL DEFAULT 0");
 $pdo->exec("ALTER TABLE account ADD COLUMN rating_count INTEGER NOT NULL DEFAULT 0");
 $pdo->exec("ALTER TABLE account ADD COLUMN rating_sum INTEGER NOT NULL DEFAULT 0");
+$pdo->exec("ALTER TABLE account ADD COLUMN is_demo INTEGER NOT NULL DEFAULT 0");
+$pdo->exec("ALTER TABLE provider ADD COLUMN is_demo INTEGER NOT NULL DEFAULT 0");
+$pdo->exec("ALTER TABLE offer ADD COLUMN is_demo INTEGER NOT NULL DEFAULT 0");
+$pdo->exec("ALTER TABLE request ADD COLUMN is_demo INTEGER NOT NULL DEFAULT 0");
 $pdo->exec("CREATE TABLE account_rating (id INTEGER PRIMARY KEY, rater_id INTEGER REFERENCES account (id) ON DELETE SET NULL, rater_name TEXT,
     rated_id INTEGER REFERENCES account (id) ON DELETE CASCADE, rating INTEGER, body TEXT, locale TEXT, status TEXT DEFAULT 'published',
     status_note TEXT, reply TEXT, replied_at TEXT, created_at TEXT, UNIQUE (rater_id, rated_id))");
@@ -5762,6 +5766,39 @@ $googleHttp->answer(200, ['sub' => 'g-5', 'email' => 'unverified@example.test', 
 $ggGet('/login/google/callback?code=x&state=s4', false);
 check('google callback: an address Google will not vouch for signs in nowhere, and nothing is created for it', ($_SESSION['account_id'] ?? null) === null
     && str_contains($_SESSION['_flash']['error'] ?? '', 'nicht geklappt') && $pdo->query("SELECT COUNT(*) FROM account WHERE email = 'unverified@example.test'")->fetchColumn() == 0);
+
+// --- Demo data: accounts, approved provider profiles, requests and (via the ---
+// --- freelancer extension's demoOffers() registration) published offers ------
+$pdo->exec("DELETE FROM extension");
+$pdo->exec("INSERT INTO extension VALUES ('freelancer', '0.1.0', 1)");
+$pdo->exec("DELETE FROM setting WHERE name = 'core.modules_disabled'");
+$pdo->exec("INSERT INTO setting (name, value) VALUES ('core.modules_disabled', '')");
+$demoCounts = fn () => [
+    'accounts' => (int) $pdo->query('SELECT COUNT(*) FROM account WHERE is_demo = 1')->fetchColumn(),
+    'providers' => (int) $pdo->query('SELECT COUNT(*) FROM provider WHERE is_demo = 1')->fetchColumn(),
+    'offers' => (int) $pdo->query('SELECT COUNT(*) FROM offer WHERE is_demo = 1')->fetchColumn(),
+    'requests' => (int) $pdo->query('SELECT COUNT(*) FROM request WHERE is_demo = 1')->fetchColumn(),
+];
+check('demo data: needs its permission', $get('/admin/demo-data', 1)['status'] === 403 && $post('/admin/demo-data/generate', [], 1)['status'] === 403);
+check('demo data: none yet', $get('/admin/demo-data', 3)['status'] === 200 && str_contains($get('/admin/demo-data', 3)['body'], 'Noch keine Demodaten'));
+$post('/admin/demo-data/generate', [], 3);
+$counts = $demoCounts();
+check('demo data: accounts, approved providers and published requests are created', $counts['accounts'] === 6 && $counts['providers'] === 4 && $counts['requests'] === 2
+    && (int) $pdo->query("SELECT COUNT(*) FROM provider WHERE is_demo = 1 AND status = 'approved'")->fetchColumn() === 4
+    && (int) $pdo->query("SELECT COUNT(*) FROM request WHERE is_demo = 1 AND status = 'published'")->fetchColumn() === 2);
+check('demo data: the registered freelancer offer generator ran twice per demo provider, published', $counts['offers'] === 8
+    && (int) $pdo->query("SELECT COUNT(*) FROM offer WHERE is_demo = 1 AND status = 'published' AND type = 'freelancer.service'")->fetchColumn() === 8);
+check('demo data: shown as demo in the accounts list', str_contains($get('/admin/accounts', 3)['body'], 'demo.mara@example.test') && str_contains($get('/admin/accounts', 3)['body'], '<span class="badge">Demo</span>'));
+$post('/admin/demo-data/generate', [], 3);
+check('demo data: generating again while some already exists changes nothing', $demoCounts() === $counts && str_contains($_SESSION['_flash']['error'] ?? '', 'bereits'));
+$post('/admin/demo-data/clear', [], 3);
+check('demo data: clearing removes every bit of it - deleting the demo accounts was enough, the rest followed by its foreign key',
+    $demoCounts() === ['accounts' => 0, 'providers' => 0, 'offers' => 0, 'requests' => 0]
+    && (int) $pdo->query("SELECT COUNT(*) FROM account WHERE email = 'demo.mara@example.test'")->fetchColumn() === 0);
+$post('/admin/demo-data/generate', [], 3);
+check('demo data: generating again after clearing works', $demoCounts()['accounts'] === 6);
+$post('/admin/demo-data/clear', [], 3);
+$pdo->exec("UPDATE extension SET enabled = 0 WHERE id = 'freelancer'");
 
 foreach ($GLOBALS['failed'] ?? [] as $label) {
     echo "FAIL  {$label}\n";
