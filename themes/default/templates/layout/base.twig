@@ -117,6 +117,9 @@
         {% for link in page_links('footer') %}
             <a href="{{ link.url }}">{{ link.title }}</a>
         {% endfor %}
+        {% for link in footer_links() %}
+            <a href="{{ link.url }}">{{ link.title }}</a>
+        {% endfor %}
     </nav>
     {% set languages = locale_urls() %}
     {% if languages|length > 1 %}

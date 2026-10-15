@@ -501,6 +501,7 @@ check('unknown path: 404', !$r['called'] && $r['status'] === 404 && str_contains
 $r = request($pdo, $config, 'GET', '/example', null);
 $home = request($pdo, $config, 'GET', '/', null)['body'];
 check('enabled extension: its entry in the main menu and its section on the home page', str_contains($home, '<a href="/example">Beispiel</a>') && str_contains($home, 'Aus der Beispiel-Erweiterung'));
+check('enabled extension: its footer link too', str_contains($home, '<a href="/example">Beispiel-Footer-Link</a>'));
 check('without an extension that adds offers the site shows no catalogue links', !str_contains($home, 'href="/offers"') && !str_contains($home, 'href="/providers"')
     && !str_contains(request($pdo, $config, 'GET', '/account', 1)['body'], 'Anbieter werden'));
 check('enabled extension: route, template and language file work', $r['status'] === 200 && str_contains($r['body'], 'Diese Seite stammt aus der Erweiterung'));

@@ -151,6 +151,8 @@ final class App
     private array $adminMenu = [];
     /** @var array<int, array{label_key: string, path: string}> */
     private array $navigation = [];
+    /** @var array<int, array{label_key: string, path: string}> */
+    private array $footerLinks = [];
     /** @var array<int, array{template: string, data: ?\Closure}> */
     private array $homeSections = [];
     /** @var array<int, array{template: string, data: \Closure}> */
@@ -318,6 +320,18 @@ final class App
     public function navigation(): array
     {
         return $this->navigation;
+    }
+
+    /** An entry of the site's footer that an extension brings along, e.g. a link to "FAQ". */
+    public function addFooterLink(string $labelKey, string $path): void
+    {
+        $this->footerLinks[] = ['label_key' => $labelKey, 'path' => $path];
+    }
+
+    /** @return array<int, array{label_key: string, path: string}> */
+    public function footerLinks(): array
+    {
+        return $this->footerLinks;
     }
 
     /**
