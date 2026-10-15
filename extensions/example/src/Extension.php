@@ -9,6 +9,7 @@ use Modulento\Core\Event\AccountExport;
 use Modulento\Core\Event\AccountLoggedIn;
 use Modulento\Core\Extension\Extension as ExtensionContract;
 use Modulento\Core\Extension\Registrar;
+use Modulento\Core\Subscription\SubscriptionProvider;
 use Modulento\Core\Support\Clock;
 use Modulento\Core\Support\Router;
 
@@ -20,6 +21,18 @@ use Modulento\Core\Support\Router;
  */
 final class Extension implements ExtensionContract
 {
+    /**
+     * A real billing addon (modulento-ext-abos) would never swap its own
+     * provider out like this - this exists so the core's own test suite can
+     * register a provider of its choosing and see the whole mechanism (the
+     * core's Subscriptions facade, Router::FEATURE, OfferController's
+     * quotas, the catalogue's badge and placement bonus) work end to end,
+     * without a real billing addon in the test fixture. Unset, this
+     * extension still demonstrates the hook itself with a harmless one
+     * that grants and limits nothing.
+     */
+    public static ?SubscriptionProvider $subscriptionProvider = null;
+
     public function register(Registrar $registrar): void
     {
         $registrar->permission('example.logins.view', 'example.permission.logins_view');
@@ -42,6 +55,17 @@ final class Extension implements ExtensionContract
             'site' => $app->siteName(),
             'offer_id' => $offer['id'],
         ]);
+        $registrar->subscriptionProvider(self::$subscriptionProvider ?? new class implements SubscriptionProvider {
+            public function allows(int $accountId, string $feature): bool { return false; }
+            public function grants(int $accountId, string $feature): bool { return false; }
+            public function offerLimit(int $accountId, string $offerType): ?int { return 0; }
+            public function imageLimit(int $accountId): ?int { return 0; }
+            public function accountIdsWithFeature(string $feature): array { return []; }
+            public function activePlans(): array { return []; }
+            public function plans(): array { return []; }
+            public function current(int $accountId): ?array { return null; }
+            public function setQuantity(int $accountId, int $quantity): void { }
+        });
 
         $registrar->listen(AccountLoggedIn::class, function (AccountLoggedIn $event, App $app): void {
             $stmt = $app->db->prepare('INSERT INTO x_example_login (account_id, logged_in_at) VALUES (:id, :now)');

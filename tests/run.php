@@ -338,7 +338,7 @@ $pdo->exec("CREATE TABLE extension (id TEXT PRIMARY KEY, version TEXT, enabled I
 $pdo->exec("CREATE TABLE setting (name TEXT PRIMARY KEY, value TEXT)");
 // Mirrors what a fresh install's own installer now does: every module on
 // except subscriptions, so a plain site keeps making offers without plans.
-$pdo->exec("INSERT INTO setting VALUES ('core.languages', 'de,en'), ('core.default_language', 'de'), ('core.modules_disabled', 'subscriptions')");
+$pdo->exec("INSERT INTO setting VALUES ('core.languages', 'de,en'), ('core.default_language', 'de')");
 $testHash = password_hash('correct horse battery', PASSWORD_BCRYPT, ['cost' => 4]);
 $insertAccount = $pdo->prepare("INSERT INTO account (id, email, password_hash, status, email_verified_at, locale, created_at) VALUES (?, ?, ?, ?, '2026-01-01 00:00:00', 'de', '2026-01-01 00:00:00')");
 foreach ([[1, 'plain@example.test', 'active'], [2, 'editor@example.test', 'active'], [3, 'admin@example.test', 'active'], [4, 'blocked@example.test', 'blocked']] as [$id, $email, $status]) {
@@ -921,9 +921,9 @@ $pdo->exec("DELETE FROM account WHERE email = 'english@example.test'");
 
 // --- Handbook --------------------------------------------------------------
 $slugs = array_keys(Modulento\Core\Support\Handbook::CHAPTERS);
-check('handbook: fourteen chapters, in the order they are meant to be read', count($slugs) === 14 && $slugs[0] === 'intro' && end($slugs) === 'glossary');
+check('handbook: thirteen chapters, in the order they are meant to be read', count($slugs) === 13 && $slugs[0] === 'intro' && end($slugs) === 'glossary');
 $r = $get('/handbook', null);
-check('handbook: the overview lists every chapter, in German by default', $r['status'] === 200 && substr_count($r['body'], '<a href="/handbook/') === 14 && str_contains($r['body'], 'Zahlungsarten für Bestellungen'));
+check('handbook: the overview lists every chapter, in German by default', $r['status'] === 200 && substr_count($r['body'], '<a href="/handbook/') === 13 && str_contains($r['body'], 'Zahlungsarten für Bestellungen'));
 $r = $get('/en/handbook', null);
 check('handbook: the same overview in English', $r['status'] === 200 && str_contains($r['body'], '<h1>Handbook</h1>') && str_contains($r['body'], 'Payment methods for orders'));
 $r = $get('/handbook/intro', null);
@@ -1845,61 +1845,196 @@ $ids = array_map(fn (array $block) => $block['id'], Modulento\Core\Content\HomeL
 check('order: the listed order wins, unknown and repeated ids are ignored', $ids === ['c', 'a', 'b']);
 check('order: a list left out keeps every block', count(Modulento\Core\Content\HomeLayout::ordered($three, [])) === 3);
 
-// Subscriptions: plans, what an account may use, and the module that switches all of it off.
-// Off by default for the rest of the suite (see the setting inserted at the
-// very start) - on here, since this whole section is about it.
-$subModules = new Modulento\Core\Support\Modules(new Modulento\Core\Support\Settings($pdo));
-$subModules->save(array_keys(Modulento\Core\Support\Modules::ALL));
-$subs = new Modulento\Core\Subscription\Subscriptions($pdo, $subModules);
-// subscription_plan and subscription themselves are created much earlier
-// (see the comment there) - the rest of migration 022 onward follows here.
-$pdo->exec("CREATE TABLE subscription_order (id INTEGER PRIMARY KEY, account_id INTEGER REFERENCES account (id) ON DELETE CASCADE, plan_id INTEGER REFERENCES subscription_plan (id), quantity INTEGER NOT NULL DEFAULT 1, method TEXT, status TEXT, reference TEXT UNIQUE, amount_cents INTEGER, currency TEXT, stripe_session TEXT NULL, created_at TEXT, paid_at TEXT NULL)");
-$pdo->exec("CREATE TABLE subscription_billing_address (account_id INTEGER PRIMARY KEY REFERENCES account (id) ON DELETE CASCADE, name TEXT, street TEXT, postal_code TEXT, city TEXT, country TEXT, updated_at TEXT)");
-$pdo->exec("CREATE TABLE subscription_invoice (id INTEGER PRIMARY KEY, number TEXT UNIQUE, year INTEGER, seq INTEGER, source_ref TEXT UNIQUE, account_id INTEGER NULL REFERENCES account (id) ON DELETE SET NULL, plan_name TEXT, months INTEGER, currency TEXT, net_cents INTEGER, tax_rate INTEGER, tax_cents INTEGER, gross_cents INTEGER, buyer_name TEXT, buyer_street TEXT, buyer_postal_code TEXT, buyer_city TEXT, buyer_country TEXT, issuer TEXT, issued_at TEXT, UNIQUE (year, seq))");
-$pdo->exec("INSERT INTO account (email, password_hash, created_at) VALUES ('abo-test@example.test', 'x', '" . Modulento\Core\Support\Clock::now() . "')");
-$subAccount = (int) $pdo->lastInsertId();
-$subPlan = $subs->createPlan('abo-test', 'Testabo', 900, 'EUR', 1, ['abo.test.one', 'abo.test.two']);
-$refused = 0;
-foreach ([fn () => $subs->createPlan('Bad Slug', 'x', 1, 'EUR', 1, []), fn () => $subs->createPlan('abo-test', 'Doppelt', 1, 'EUR', 1, []), fn () => $subs->createPlan('abo-x', 'x', 1, 'eur', 1, [])] as $try) {
+// --- Subscriptions: the thin facade core keeps once the feature itself moved to an addon ---
+// (modulento-ext-abos, Registrar::subscriptionProvider()) - plan CRUD, checkout,
+// Stripe billing and invoices are tested there, against the real provider. Core's
+// own job is: behave openly with none installed, and faithfully ask whichever one
+// is, at the right moment (OfferController's quotas, the catalogue's bonus,
+// Router::FEATURE). A small provider of this suite's own, backed by the real
+// subscription/subscription_plan tables, stands in for the addon - see
+// TestSubscriptionProvider below and extensions/example's own use of the hook.
+check('subscriptions: without a provider installed, every feature is open, nothing is granted, nothing is limited', $app->subscriptions->allows(1, 'anything')
+    && !$app->subscriptions->grants(1, 'anything') && $app->subscriptions->offerLimit(1, 'freelancer.service') === null
+    && $app->subscriptions->imageLimit(1) === null && $app->subscriptions->accountIdsWithFeature('anything') === []
+    && $app->subscriptions->activePlans() === [] && $app->subscriptions->plans() === [] && $app->subscriptions->current(1) === null
+    && !$app->subscriptions->hasProvider());
+
+$subs = new Modulento\Core\Subscription\Subscriptions();
+check('subscriptions: declareFeature()/declaredFeatures() work before any provider is registered - an extension declares what it sells regardless', (function () use ($subs): bool {
+    $subs->declareFeature('abo.declared', 'core.module.subscriptions.name');
+    if ($subs->declaredFeatures() !== ['abo.declared' => 'core.module.subscriptions.name']) {
+        return false;
+    }
     try {
-        $try();
+        $subs->declareFeature('Bad Key', 'x');
+        return false;
     } catch (InvalidArgumentException) {
-        $refused++;
+        return true;
+    }
+})());
+$dummyProvider = new class implements Modulento\Core\Subscription\SubscriptionProvider {
+    public function allows(int $accountId, string $feature): bool { return true; }
+    public function grants(int $accountId, string $feature): bool { return true; }
+    public function offerLimit(int $accountId, string $offerType): ?int { return null; }
+    public function imageLimit(int $accountId): ?int { return null; }
+    public function accountIdsWithFeature(string $feature): array { return [1]; }
+    public function activePlans(): array { return [['id' => 1]]; }
+    public function plans(): array { return [['id' => 1]]; }
+    public function current(int $accountId): ?array { return ['id' => 1]; }
+    public function setQuantity(int $accountId, int $quantity): void { }
+};
+$subs->registerProvider($dummyProvider);
+check('subscriptions: registerProvider()/hasProvider() wire a provider in, delegating every call', $subs->hasProvider() && $subs->allows(1, 'x') && $subs->grants(1, 'x')
+    && $subs->offerLimit(1, 'x') === null && $subs->imageLimit(1) === null && $subs->accountIdsWithFeature('x') === [1]
+    && $subs->activePlans() === [['id' => 1]] && $subs->plans() === [['id' => 1]] && $subs->current(1) === ['id' => 1]);
+
+// A fuller provider for the integration tests below: backed by the real
+// subscription/subscription_plan tables (just as modulento-ext-abos's own
+// will be), registered through the example extension so that a real,
+// freshly-dispatched request sees it exactly as it would see a real addon.
+final class TestSubscriptionProvider implements Modulento\Core\Subscription\SubscriptionProvider
+{
+    public function __construct(private PDO $db)
+    {
+    }
+
+    public function current(int $accountId): ?array
+    {
+        $stmt = $this->db->prepare(
+            "SELECT s.id, s.quantity, s.stripe_item_ref, p.features, p.offer_limits, p.max_images_per_offer, p.per_seat, p.min_quantity
+             FROM subscription s JOIN subscription_plan p ON p.id = s.plan_id
+             WHERE s.account_id = :account AND s.status IN ('trialing', 'active', 'past_due') AND (s.period_end IS NULL OR s.period_end > :now)
+             ORDER BY s.id DESC LIMIT 1"
+        );
+        $stmt->execute(['account' => $accountId, 'now' => Modulento\Core\Support\Clock::now()]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        return $row === false ? null : [
+            'id' => (int) $row['id'], 'quantity' => (int) $row['quantity'], 'stripe_item_ref' => $row['stripe_item_ref'],
+            'features' => $this->features($row['features']), 'offer_limits' => $this->offerLimits($row['offer_limits']),
+            'max_images_per_offer' => $row['max_images_per_offer'] !== null ? (int) $row['max_images_per_offer'] : null,
+            'per_seat' => (bool) $row['per_seat'], 'min_quantity' => (int) $row['min_quantity'],
+        ];
+    }
+
+    public function allows(int $accountId, string $feature): bool
+    {
+        $current = $this->current($accountId);
+
+        return $current !== null && in_array($feature, $current['features'], true);
+    }
+
+    public function grants(int $accountId, string $feature): bool
+    {
+        return $this->allows($accountId, $feature);
+    }
+
+    public function offerLimit(int $accountId, string $offerType): ?int
+    {
+        $current = $this->current($accountId);
+
+        return $current === null ? 0 : ($current['offer_limits'][$offerType] ?? null);
+    }
+
+    public function imageLimit(int $accountId): ?int
+    {
+        $current = $this->current($accountId);
+
+        return $current === null ? 0 : $current['max_images_per_offer'];
+    }
+
+    public function accountIdsWithFeature(string $feature): array
+    {
+        $stmt = $this->db->prepare(
+            "SELECT s.account_id, p.features FROM subscription s JOIN subscription_plan p ON p.id = s.plan_id
+             WHERE s.status IN ('trialing', 'active', 'past_due') AND (s.period_end IS NULL OR s.period_end > :now)"
+        );
+        $stmt->execute(['now' => Modulento\Core\Support\Clock::now()]);
+        $ids = [];
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            if (in_array($feature, $this->features($row['features']), true)) {
+                $ids[] = (int) $row['account_id'];
+            }
+        }
+
+        return array_values(array_unique($ids));
+    }
+
+    public function plans(): array
+    {
+        $rows = $this->db->query('SELECT * FROM subscription_plan ORDER BY price_cents, id')->fetchAll(PDO::FETCH_ASSOC);
+
+        return array_map(fn (array $row) => [
+            'id' => (int) $row['id'], 'slug' => $row['slug'], 'name' => $row['name'], 'price_cents' => (int) $row['price_cents'],
+            'currency' => $row['currency'], 'period_months' => (int) $row['period_months'], 'features' => $this->features($row['features']),
+            'offer_limits' => $this->offerLimits($row['offer_limits']),
+            'max_images_per_offer' => $row['max_images_per_offer'] !== null ? (int) $row['max_images_per_offer'] : null,
+            'per_seat' => (bool) $row['per_seat'], 'min_quantity' => (int) $row['min_quantity'], 'active' => (bool) $row['active'],
+        ], $rows);
+    }
+
+    public function activePlans(): array
+    {
+        return array_values(array_filter($this->plans(), fn (array $plan) => $plan['active']));
+    }
+
+    public function setQuantity(int $accountId, int $quantity): void
+    {
+        $current = $this->current($accountId);
+        if ($current === null) {
+            throw new InvalidArgumentException('subscription: none active');
+        }
+        $quantity = max($quantity, $current['min_quantity']);
+        if ($quantity === $current['quantity']) {
+            return;
+        }
+        $this->db->prepare('UPDATE subscription SET quantity = :quantity, updated_at = :now WHERE id = :id')
+            ->execute(['quantity' => $quantity, 'now' => Modulento\Core\Support\Clock::now(), 'id' => $current['id']]);
+    }
+
+    /** @return list<string> */
+    private function features(string $list): array
+    {
+        return array_values(array_filter(explode(',', $list), fn (string $f) => $f !== ''));
+    }
+
+    /** @return array<string, int> */
+    private function offerLimits(string $json): array
+    {
+        $decoded = json_decode($json, true);
+
+        return is_array($decoded) ? array_map('intval', $decoded) : [];
     }
 }
-check('subscriptions: a plan with a bad slug, a taken slug or a bad currency is refused', $refused === 3);
-check('subscriptions: a plan lists its features', in_array(['abo.test.one', 'abo.test.two'], array_column($subs->plans(), 'features'), true));
-check('subscriptions: with the module on, a feature needs a plan', $subModules->enabled('subscriptions') && $subs->allows($subAccount, 'abo.test.one') === false);
-$subs->assign($subAccount, $subPlan);
-check('subscriptions: a plan grants its features only', $subs->allows($subAccount, 'abo.test.one') && $subs->allows($subAccount, 'abo.test.two') && !$subs->allows($subAccount, 'abo.other'));
-$subs->assign($subAccount, $subPlan, Modulento\Core\Support\Clock::now(-60));
-check('subscriptions: a plan whose period is over grants nothing', $subs->current($subAccount) === null && !$subs->allows($subAccount, 'abo.test.one'));
-$subs->assign($subAccount, $subPlan, Modulento\Core\Support\Clock::now(3600));
-check('subscriptions: a plan within its period grants its features', $subs->allows($subAccount, 'abo.test.one'));
-$subs->assign($subAccount, null);
-check('subscriptions: removing the plan cancels it and keeps the history', $subs->current($subAccount) === null && (int) $pdo->query("SELECT COUNT(*) FROM subscription WHERE account_id = $subAccount AND status = 'canceled'")->fetchColumn() >= 3);
 
-// The first restriction a plan actually enforces: how many offers of a type,
-// and how many pictures per offer - checked through the real wizard/upload
-// routes, not just the service, since OfferController works out the number.
+Modulento\Example\Extension::$subscriptionProvider = new TestSubscriptionProvider($pdo);
+$pdo->exec("UPDATE extension SET enabled = 1 WHERE id = 'example'");
+
+// Offer and image quotas: OfferController asks Subscriptions, not a plan directly.
 $quotaId = $accounts->create('abo-quota@example.test', $pw, 'de', verified: true);
 $post('/account/provider', $private, $quotaId);
 $pdo->exec("UPDATE provider SET status = 'approved' WHERE account_id = $quotaId");
-$get('/account/offers/new?type=freelancer.service', $quotaId);
-$post('/account/offers/wizard', ['type' => 'freelancer.service', 'wizard_step' => 1, 'locales' => []], false);
-check('offer quota: with the module on and no plan, no draft is created at all', $pdo->query("SELECT COUNT(*) FROM offer WHERE provider_id = (SELECT id FROM provider WHERE account_id = $quotaId)")->fetchColumn() == 0
-    && str_contains($_SESSION['_flash']['error'] ?? '', 'Höchstzahl von 0'));
-$quotaPlan = $subs->createPlan('abo-quota', 'Quotenplan', 500, 'EUR', 1, []);
-$subs->updatePlan($quotaPlan, 'Quotenplan', 500, 'EUR', 1, [], true, ['freelancer.service' => 1], 1, false, 1);
-$subs->assign($quotaId, $quotaPlan);
+$quotaPlan = (function () use ($pdo): int {
+    $pdo->prepare("INSERT INTO subscription_plan (slug, name, price_cents, currency, period_months, features, offer_limits, max_images_per_offer, active)
+        VALUES ('abo-quota', 'Quotenplan', 500, 'EUR', 1, '', :limits, 1, 1)")
+        ->execute(['limits' => json_encode(['freelancer.service' => 1])]);
+
+    return (int) $pdo->lastInsertId();
+})();
+$assignPlan = function (int $accountId, int $planId, ?string $periodEnd = null) use ($pdo): void {
+    $pdo->prepare("UPDATE subscription SET status = 'canceled', updated_at = :now WHERE account_id = :account AND status <> 'canceled'")
+        ->execute(['now' => Modulento\Core\Support\Clock::now(), 'account' => $accountId]);
+    $pdo->prepare("INSERT INTO subscription (account_id, plan_id, status, period_end, quantity, created_at, updated_at) VALUES (:account, :plan, 'active', :end, 1, :now, :now2)")
+        ->execute(['account' => $accountId, 'plan' => $planId, 'end' => $periodEnd, 'now' => Modulento\Core\Support\Clock::now(), 'now2' => Modulento\Core\Support\Clock::now()]);
+};
+$assignPlan($quotaId, $quotaPlan);
 $get('/account/offers/new?type=freelancer.service', $quotaId);
 $post('/account/offers/wizard', ['type' => 'freelancer.service', 'wizard_step' => 1, 'locales' => []], false);
 $quotaOfferId = (int) $pdo->query("SELECT id FROM offer WHERE provider_id = (SELECT id FROM provider WHERE account_id = $quotaId)")->fetchColumn();
 check('offer quota: a plan with freelancer.service = 1 lets the first draft through', $quotaOfferId > 0);
 $get('/account/offers/new?type=freelancer.service', $quotaId);
 $post('/account/offers/wizard', ['type' => 'freelancer.service', 'wizard_step' => 1, 'locales' => []], false);
-check('offer quota: the second one is refused once the plan\'s number is reached', $pdo->query("SELECT COUNT(*) FROM offer WHERE provider_id = (SELECT id FROM provider WHERE account_id = $quotaId)")->fetchColumn() == 1
-    && str_contains($_SESSION['_flash']['error'] ?? '', 'Höchstzahl von 1'));
+check('offer quota: the second one is refused once the plan\'s number is reached', $pdo->query("SELECT COUNT(*) FROM offer WHERE provider_id = (SELECT id FROM provider WHERE account_id = $quotaId)")->fetchColumn() == 1);
 $quotaImage = tempnam(sys_get_temp_dir(), 'img');
 imagepng(imagecreatetruecolor(50, 50), $quotaImage);
 $_FILES = ['image' => ['tmp_name' => $quotaImage, 'error' => UPLOAD_ERR_OK, 'size' => filesize($quotaImage), 'name' => 'x.png', 'type' => 'image/png']];
@@ -1907,38 +2042,17 @@ $post('/account/offers/' . $quotaOfferId . '/images', [], $quotaId);
 check('image quota: the plan\'s max_images_per_offer = 1 lets the first picture through', $pdo->query("SELECT COUNT(*) FROM offer_image WHERE offer_id = $quotaOfferId")->fetchColumn() == 1);
 $post('/account/offers/' . $quotaOfferId . '/images', [], $quotaId);
 check('image quota: a second picture is refused at that same number', $pdo->query("SELECT COUNT(*) FROM offer_image WHERE offer_id = $quotaOfferId")->fetchColumn() == 1);
-$subs->assign($quotaId, null);
-$quotaApp = new Modulento\Core\App($config, $pdo);
-$quotaApp->offerImages->deleteAll($quotaOfferId);
-$quotaApp->offers->delete($quotaOfferId);
-$pdo->exec("DELETE FROM subscription WHERE plan_id = $quotaPlan");
-$pdo->exec("DELETE FROM subscription_plan WHERE id = $quotaPlan");
+unset($_FILES);
 
-// Three bonuses a plan can grant on top of the baseline: skip review, a
-// badge, and placed first - the opposite default of allows(): nobody gets
-// a bonus just because the module happens to be off (grants(), not allows()).
-check('subscriptions: grants() is false without the module, false without a plan - unlike allows()', !$subs->grants($quotaId, 'core.offer.auto_approve')
-    && (function () use ($subModules, $subs, $quotaId) {
-        $subModules->save(array_keys(Modulento\Core\Support\Modules::ALL));
-        $r = !$subs->grants($quotaId, 'core.offer.auto_approve');
-        return $r;
-    })());
-$bonusPlan = $subs->createPlan('abo-bonus', 'Bonusplan', 500, 'EUR', 1, ['core.offer.auto_approve', 'core.provider.featured_badge', 'core.catalogue.priority_placement']);
-$subs->updatePlan($bonusPlan, 'Bonusplan', 500, 'EUR', 1, ['core.offer.auto_approve', 'core.provider.featured_badge', 'core.catalogue.priority_placement'], true, ['freelancer.service' => 1], null, false, 1);
-$subs->assign($quotaId, $bonusPlan);
-check('subscriptions: grants() is true once a plan with that feature is active', $subs->grants($quotaId, 'core.offer.auto_approve') && $subs->grants($quotaId, 'core.provider.featured_badge'));
-check('subscriptions: accountIdsWithFeature() finds it for placement, without needing one account id to ask about', in_array($quotaId, $subs->accountIdsWithFeature('core.catalogue.priority_placement'), true));
+// Three bonuses a plan can grant on top of the baseline: skip review, a badge, placed first.
+$bonusPlan = (function () use ($pdo): int {
+    $pdo->prepare("INSERT INTO subscription_plan (slug, name, price_cents, currency, period_months, features, offer_limits, max_images_per_offer, active)
+        VALUES ('abo-bonus', 'Bonusplan', 500, 'EUR', 1, 'core.offer.auto_approve,core.provider.featured_badge,core.catalogue.priority_placement', '{}', NULL, 1)")
+        ->execute();
 
-// An administrator can hand a plan to an approved provider by hand, right
-// from that account's own page - not just through the general subscriptions
-// page with its own e-mail field.
-$r = $get('/admin/accounts/' . $quotaId, 3);
-check('admin account page: an approved provider can be given a plan from their own page, the current one pre-selected', str_contains($r['body'], 'Plan einem Konto geben')
-    && str_contains($r['body'], 'Bonusplan') && preg_match('/value="' . $bonusPlan . '"\s+selected/', $r['body']) === 1);
-check('admin account page: an account that is no provider gets no plan-assignment form at all', !str_contains($get('/admin/accounts/3', 3)['body'], 'Plan einem Konto geben'));
-$post('/admin/subscriptions/assign', ['email' => 'abo-quota@example.test', 'plan' => '', 'return' => '/admin/accounts/' . $quotaId], 3);
-check('admin account page: the form removes the plan just like the general one does, using the same route', $subs->current($quotaId) === null);
-$subs->assign($quotaId, $bonusPlan);
+    return (int) $pdo->lastInsertId();
+})();
+$assignPlan($quotaId, $bonusPlan);
 
 $get('/account/offers/new?type=freelancer.service', $quotaId);
 $post('/account/offers/wizard', ['type' => 'freelancer.service', 'wizard_step' => 1, 'locales' => []], false);
@@ -1951,92 +2065,22 @@ $post('/account/offers/new', ['type' => 'freelancer.service', 'category_id' => (
     'text' => ['de' => ['title' => 'Bonus-Angebot', 'summary' => '']], 'package' => [1 => ['price' => '10', 'delivery_days' => '1']]], false);
 $bonusOfferId = (int) $pdo->query("SELECT id FROM offer WHERE provider_id = (SELECT id FROM provider WHERE account_id = $quotaId) ORDER BY id DESC LIMIT 1")->fetchColumn();
 $post('/account/offers/' . $bonusOfferId . '/submit', [], false);
-check('offer auto-approve: published at once, no admin decision needed', $pdo->query("SELECT status FROM offer WHERE id = {$bonusOfferId}")->fetchColumn() === 'published');
+check('offer auto-approve: a plan granting core.offer.auto_approve publishes at once, no admin decision needed', $pdo->query("SELECT status FROM offer WHERE id = {$bonusOfferId}")->fetchColumn() === 'published');
 
 $providerSlug = $pdo->query("SELECT slug FROM provider WHERE account_id = $quotaId")->fetchColumn();
-check('provider: the plan\'s own badge shows on the profile, kept apart from earned badges', str_contains($get('/providers/' . $providerSlug, null)['body'], 'Empfohlener Anbieter'));
-check('catalogue: the plan\'s badge shows on its offer cards too', str_contains($get('/offers', null)['body'], 'Empfohlener Anbieter'));
-
+check('provider: core.provider.featured_badge shows on the profile, kept apart from earned badges', str_contains($get('/providers/' . $providerSlug, null)['body'], 'Empfohlener Anbieter'));
 $ratingSorted = $get('/offers?sort=rating', null)['body'];
-$bonusPos = strpos($ratingSorted, 'Bonus-Angebot');
-$otherPos = strpos($ratingSorted, 'Ich gestalte dein Logo');
-check('catalogue: priority placement puts an unrated featured offer ahead of a rated one, only under this plan', $bonusPos !== false && $otherPos !== false && $bonusPos < $otherPos);
+check('catalogue: core.catalogue.priority_placement puts an unrated featured offer ahead of a rated one', strpos($ratingSorted, 'Bonus-Angebot') !== false
+    && strpos($ratingSorted, 'Bonus-Angebot') < strpos($ratingSorted, 'Ich gestalte dein Logo'));
 
-$subs->assign($quotaId, null);
-$pdo->exec("DELETE FROM subscription WHERE plan_id = $bonusPlan");
-$pdo->exec("DELETE FROM subscription_plan WHERE id = $bonusPlan");
-$bonusApp = new Modulento\Core\App($config, $pdo);
-$bonusApp->offerImages->deleteAll($bonusOfferId);
-$bonusApp->offers->delete($bonusOfferId);
-check('catalogue: without the plan, no more badge and no more boost', !str_contains($get('/providers/' . $providerSlug, null)['body'], 'Empfohlener Anbieter'));
+$pdo->exec("UPDATE subscription SET status = 'canceled' WHERE account_id = $quotaId");
+$testApp->offerImages->deleteAll($quotaOfferId);
+$testApp->offers->delete($quotaOfferId);
+$testApp->offerImages->deleteAll($bonusOfferId);
+$testApp->offers->delete($bonusOfferId);
+check('catalogue: without a plan granting it, no more badge and no more boost', !str_contains($get('/providers/' . $providerSlug, null)['body'], 'Empfohlener Anbieter'));
 
-$subModules->save(array_values(array_diff(array_keys(Modulento\Core\Support\Modules::ALL), ['subscriptions'])));
-check('subscriptions: switched off, every feature is open to everyone', !$subModules->enabled('subscriptions') && $subs->allows($subAccount, 'abo.test.one') && $subs->allows(999999, 'abo.other'));
-$subModules->save(array_keys(Modulento\Core\Support\Modules::ALL));
-check('subscriptions: switched on again, the plans apply again', $subModules->enabled('subscriptions') && !$subs->allows($subAccount, 'abo.test.one'));
-$adminPage = $get('/admin/subscriptions', 3);
-check('subscriptions admin: the page is there with the module on', $adminPage['status'] === 200 && str_contains($adminPage['body'], 'Testabo'));
-check('subscriptions admin: the page needs the settings permission', $get('/admin/subscriptions', 1)['status'] === 403);
-$subModules->save(array_values(array_diff(array_keys(Modulento\Core\Support\Modules::ALL), ['subscriptions'])));
-check('subscriptions admin: with the module off there is no page and no action', $get('/admin/subscriptions', 3)['status'] === 404 && $post('/admin/subscriptions/plans', ['name' => 'x', 'slug' => 'abo-off', 'price' => '1', 'currency' => 'EUR', 'period_months' => 1], 3)['status'] === 404);
-$subModules->save(array_keys(Modulento\Core\Support\Modules::ALL));
-$post('/admin/subscriptions/plans', ['name' => 'Admin-Test', 'slug' => 'abo-admin', 'price' => '9,90', 'currency' => 'eur', 'period_months' => 1, 'features' => 'abo.test.one, abo.admin'], 3);
-$adminPlan = array_values(array_filter($subs->plans(), fn ($p) => $p['slug'] === 'abo-admin'))[0] ?? null;
-check('subscriptions admin: a plan is created from the form with its price in cents and its features', $adminPlan !== null && $adminPlan['price_cents'] === 990 && $adminPlan['currency'] === 'EUR' && $adminPlan['features'] === ['abo.test.one', 'abo.admin']);
-$post('/admin/subscriptions/assign', ['email' => 'nobody@example.test', 'plan' => $adminPlan['id'], 'until' => '2099-12-31'], 3);
-check('subscriptions admin: an unknown address grants nothing', $subs->current($subAccount) === null);
-$post('/admin/subscriptions/assign', ['email' => 'abo-test@example.test', 'plan' => $adminPlan['id'], 'until' => '2099-12-31'], 3);
-$granted = $subs->current($subAccount);
-check('subscriptions admin: a grant runs to the end of the given day and is logged', $granted !== null && $granted['name'] === 'Admin-Test' && $granted['period_end'] === '2099-12-31 23:59:59' && $pdo->query("SELECT COUNT(*) FROM admin_log WHERE action = 'subscription_assign' AND target_id = $subAccount")->fetchColumn() >= 1);
-$post('/admin/subscriptions/assign', ['email' => 'abo-test@example.test', 'plan' => '', 'until' => ''], 3);
-check('subscriptions admin: an empty plan removes the grant', $subs->current($subAccount) === null);
-$pdo->exec("DELETE FROM subscription WHERE plan_id = {$adminPlan['id']}");
-$pdo->exec("DELETE FROM subscription_plan WHERE id = {$adminPlan['id']}");
-$subs->declareFeature('abo.declared', 'core.module.subscriptions.name');
-check('subscriptions: an extension declares a feature with its name key; a bad key is refused', $subs->declaredFeatures() === ['abo.declared' => 'core.module.subscriptions.name'] && (function () use ($subs) { try { $subs->declareFeature('Bad Key', 'x'); return false; } catch (InvalidArgumentException) { return true; } })());
-$editId = $subs->createPlan('abo-edit', 'Vorher', 500, 'EUR', 1, ['abo.test.one']);
-$newPlan = $subs->plan($editId);
-check('subscriptions: a new plan starts without limits (unlimited)', $newPlan['offer_limits'] === [] && $newPlan['max_images_per_offer'] === null);
-$subs->updatePlan($editId, 'Nachher', 1200, 'EUR', 3, ['abo.test.two', 'abo.declared'], true, ['freelancer.service' => 2, 'auction.lot' => 0], 5, false, 1);
-$edited = $subs->plan($editId);
-check('subscriptions: a plan is changed, its key stays', $edited['name'] === 'Nachher' && $edited['price_cents'] === 1200 && $edited['period_months'] === 3 && $edited['features'] === ['abo.test.two', 'abo.declared'] && $edited['slug'] === 'abo-edit');
-check('subscriptions: its limits are stored too - a type left out stays unlimited, one set to 0 is kept as 0', $edited['offer_limits'] === ['freelancer.service' => 2, 'auction.lot' => 0] && $edited['max_images_per_offer'] === 5);
-$subs->assign($subAccount, $editId);
-check('subscriptions: a change applies at once to an account that has the plan', $subs->allows($subAccount, 'abo.declared') && !$subs->allows($subAccount, 'abo.test.one'));
-check('subscriptions: offerLimit()/imageLimit() read the active plan - missing type unlimited, 0 kept, module off ignores all of it', $subs->offerLimit($subAccount, 'freelancer.service') === 2 && $subs->offerLimit($subAccount, 'auction.lot') === 0
-    && $subs->offerLimit($subAccount, 'unknown.type') === null && $subs->imageLimit($subAccount) === 5);
-$subs->updatePlan($editId, 'Nachher', 1200, 'EUR', 3, ['abo.test.two', 'abo.declared'], false, [], null, false, 1);
-check('subscriptions: an inactive plan is not offered, but its holders keep it', !in_array('abo-edit', array_column($subs->activePlans(), 'slug'), true) && $subs->allows($subAccount, 'abo.declared'));
-$refusedDelete = false;
-try {
-    $subs->deletePlan($editId);
-} catch (InvalidArgumentException) {
-    $refusedDelete = true;
-}
-check('subscriptions: a plan with a history cannot be deleted', $refusedDelete && $subs->plan($editId) !== null);
-$subs->assign($subAccount, null);
-check('subscriptions: a plan that has had a holder stays, even after the holder left it', (function () use ($subs, $editId) { try { $subs->deletePlan($editId); return false; } catch (InvalidArgumentException) { return $subs->plan($editId) !== null; } })());
-$unused = $subs->createPlan('abo-unused', 'Ungenutzt', 100, 'EUR', 1, []);
-$subs->deletePlan($unused);
-check('subscriptions: a plan nobody has had is deleted', $subs->plan($unused) === null);
-$overview = $get('/subscriptions', null);
-check('subscriptions: the overview is public, with the active plans only', $overview['status'] === 200 && str_contains($overview['body'], 'Testabo') && !str_contains($overview['body'], 'Nachher'));
-$accountPage = $get('/account/subscription', 2);
-check('subscriptions: an account sees its own subscription page', $accountPage['status'] === 200 && str_contains($accountPage['body'], 'Mein Abo'));
-$adminEdit = $get('/admin/subscriptions/plans/' . $subPlan, 3);
-check('subscriptions admin: the plan page shows the features, and needs the permission', $adminEdit['status'] === 200 && str_contains($adminEdit['body'], 'abo.test.one') && $get('/admin/subscriptions/plans/' . $subPlan, 1)['status'] === 403 && $get('/admin/subscriptions/plans/999999', 3)['status'] === 404);
-check('subscriptions admin: the plan page has a limit field per offer type', str_contains($adminEdit['body'], 'name="offer_limits[freelancer.service]"') && str_contains($adminEdit['body'], 'name="max_images_per_offer"'));
-$post('/admin/subscriptions/plans/' . $subPlan, ['name' => 'Testabo neu', 'price' => '12,50', 'currency' => 'EUR', 'period_months' => 3, 'custom_features' => ['abo.test.one', 'abo.typed', 'abo.test.two'], 'active' => '1',
-    'offer_limits' => ['freelancer.service' => '4', 'auction.lot' => ''], 'max_images_per_offer' => '6'], 3);
-$changedByForm = $subs->plan($subPlan);
-check('subscriptions admin: the form saves the plan with its own, free-typed features - one row each', $changedByForm['name'] === 'Testabo neu' && $changedByForm['price_cents'] === 1250 && $changedByForm['features'] === ['abo.test.one', 'abo.typed', 'abo.test.two']);
-$post('/admin/subscriptions/plans/' . $subPlan, ['name' => 'Testabo neu', 'price' => '12,50', 'currency' => 'EUR', 'period_months' => 3, 'custom_features' => ['abo.renamed', '', 'abo.test.two'], 'active' => '1'], 3);
-check('subscriptions admin: editing a row renames it, clearing one removes it', $subs->plan($subPlan)['features'] === ['abo.renamed', 'abo.test.two']);
-check('subscriptions admin: the form saves the new limits too - a blank field leaves that type unlimited', $changedByForm['offer_limits'] === ['freelancer.service' => 4] && $changedByForm['max_images_per_offer'] === 6);
-$subModules->save(array_values(array_diff(array_keys(Modulento\Core\Support\Modules::ALL), ['subscriptions'])));
-check('subscriptions: switched off, the overview and the account page are gone', $get('/subscriptions', null)['status'] === 404 && $get('/account/subscription', 2)['status'] === 404);
-$subModules->save(array_keys(Modulento\Core\Support\Modules::ALL));
-// A route that needs a feature of a plan: "feature:<key>" as its access.
+// A route gated by "feature:<key>" - Router::FEATURE, baked into Router::allowed().
 $featureRoute = function (?int $as) use ($pdo, $config): array {
     $_SESSION = [];
     if ($as !== null) {
@@ -2047,10 +2091,11 @@ $featureRoute = function (?int $as) use ($pdo, $config): array {
     $app = new Modulento\Core\App($config, $pdo);
     $app->translator->load($config['app']['root'] . '/core/lang', 'core');
     Modulento\Core\Kernel::registerCore($app);
+    $app->extensions->loadEnabled($app);
     $called = false;
     $app->router->get('/abo-feature', function () use (&$called): void {
         $called = true;
-    }, 'feature:abo.test.one');
+    }, 'feature:core.offer.auto_approve');
     Modulento\Core\Kernel::registerLast($app);
     Modulento\Core\Kernel::loadThemeTexts($app);
     Modulento\Core\Kernel::prepareRequest($app, '/abo-feature', startSession: false);
@@ -2061,23 +2106,16 @@ $featureRoute = function (?int $as) use ($pdo, $config): array {
 
     return ['called' => $called, 'status' => (int) http_response_code()];
 };
-$featurePlan = $subs->createPlan('abo-route', 'Routenplan', 100, 'EUR', 1, ['abo.test.one']);
-$featureNone = $featureRoute(3);
-check('feature routes: an account without the feature gets a refusal, the route does not run', $featureNone['called'] === false && $featureNone['status'] === 403);
-$subs->assign(3, $featurePlan, Modulento\Core\Support\Clock::now(30 * 86400));
-$featureOk = $featureRoute(3);
+check('feature routes: an account without the feature gets a refusal, the route does not run', $featureRoute(3)['called'] === false && $featureRoute(3)['status'] === 403);
+$assignPlan($quotaId, $bonusPlan);
+$featureOk = $featureRoute($quotaId);
 check('feature routes: an account whose plan lists the feature gets the route', $featureOk['called'] === true);
 check('feature routes: a visitor gets no route either', $featureRoute(null)['called'] === false);
-$subs->assign(3, null);
-$subModules->save(array_values(array_diff(array_keys(Modulento\Core\Support\Modules::ALL), ['subscriptions'])));
-check('feature routes: switched off, every feature route is open', $featureRoute(3)['called'] === true);
-// Back to the suite's default state (see the setting inserted at the very
-// start): subscriptions off, so offers elsewhere keep working unplanned.
-$subModules->save(array_values(array_diff(array_keys(Modulento\Core\Support\Modules::ALL), ['subscriptions'])));
-$pdo->exec("DELETE FROM subscription WHERE plan_id = $featurePlan");
-$pdo->exec("DELETE FROM subscription_plan WHERE id = $featurePlan");
-$pdo->exec("DELETE FROM account WHERE id = $subAccount");
-$pdo->exec("DELETE FROM subscription_plan WHERE slug IN ('abo-test', 'abo-edit')");
+
+$pdo->exec("DELETE FROM subscription WHERE plan_id IN ($quotaPlan, $bonusPlan)");
+$pdo->exec("DELETE FROM subscription_plan WHERE id IN ($quotaPlan, $bonusPlan)");
+$pdo->exec("UPDATE extension SET enabled = 0 WHERE id = 'example'");
+Modulento\Example\Extension::$subscriptionProvider = null;
 
 // Pictures of the media library: only those, in pages.
 $library = '/media/library/' . str_repeat('a', 32) . '.webp';
@@ -2874,21 +2912,26 @@ check('request: a review is stored with the provider, but no offer, behind it', 
 
 // A subscription bonus: a provider whose plan grants core.request.notify
 // hears about a newly published request at once, another provider without
-// that plan does not. Subscriptions are off by default for the rest of the
-// suite's sake - switched on just for this check, then off again.
-$subModules->save(array_keys(Modulento\Core\Support\Modules::ALL));
-$notifyPlan = $subs->createPlan('abo-request-notify', 'Anfragen-Alarm', 300, 'EUR', 1, ['core.request.notify']);
-$subs->assign(9, $notifyPlan);
+// that plan does not.
+$notifyPlan = (function () use ($pdo): int {
+    $pdo->prepare("INSERT INTO subscription_plan (slug, name, price_cents, currency, period_months, features, offer_limits, max_images_per_offer, active)
+        VALUES ('abo-request-notify', 'Anfragen-Alarm', 300, 'EUR', 1, 'core.request.notify', '{}', NULL, 1)")->execute();
+
+    return (int) $pdo->lastInsertId();
+})();
+$assignPlan(9, $notifyPlan);
+Modulento\Example\Extension::$subscriptionProvider = new TestSubscriptionProvider($pdo);
+$pdo->exec("UPDATE extension SET enabled = 1 WHERE id = 'example'");
 $post('/admin/settings', $settings + ['request_approval' => 'off'], 3);
 $post('/account/requests/new', ['category_id' => (string) $requestCatId, 'title' => 'Logo gesucht', 'description' => 'Ein einfaches Logo bitte.'], 8);
 check('request: with approval switched off, a new request is public at once', $requestRow()['status'] === 'published' && $requestRow()['published_at'] !== null);
 check('request: a subscribed provider with the notify feature hears about it at once, one without the plan does not',
     $pdo->query("SELECT COUNT(*) FROM notification WHERE type = 'request_new' AND account_id = 9")->fetchColumn() == 1
     && $pdo->query("SELECT COUNT(*) FROM notification WHERE type = 'request_new' AND account_id = 1")->fetchColumn() == 0);
-$subs->assign(9, null);
-$pdo->exec("DELETE FROM subscription WHERE plan_id = {$notifyPlan}");
-$pdo->exec("DELETE FROM subscription_plan WHERE id = {$notifyPlan}");
-$subModules->save(array_values(array_diff(array_keys(Modulento\Core\Support\Modules::ALL), ['subscriptions'])));
+$pdo->exec("UPDATE extension SET enabled = 0 WHERE id = 'example'");
+Modulento\Example\Extension::$subscriptionProvider = null;
+$pdo->exec("DELETE FROM subscription WHERE plan_id = $notifyPlan");
+$pdo->exec("DELETE FROM subscription_plan WHERE id = $notifyPlan");
 $post('/admin/settings', $settings + ['request_approval' => 'required'], 3);
 $post('/account/requests/' . (int) $requestRow()['id'] . '/delete', [], 8);
 $pdo->exec('DELETE FROM request');
@@ -3882,190 +3925,12 @@ ini_restore('error_log');
 @rmdir(dirname($keyPath));
 @unlink($mailLog);
 
-// --- Subscriptions paid: by transfer to the operator, or by Stripe on the platform's account ---
-$subModules->save(array_keys(Modulento\Core\Support\Modules::ALL));
-$payBilling = fn ($app) => $app->subscriptionBilling;
-$addr = ['name' => 'Kundin Test', 'street' => 'Ringweg 4', 'postal_code' => '20095', 'city' => 'Hamburg', 'country' => 'DE'];
-$payApp()->payments->setEnabled(Modulento\Core\Payment\Payments::TRANSFER, true);
-$payApp()->payments->setEnabled(Modulento\Core\Payment\Payments::STRIPE, true);
-$payApp()->payments->saveStripeKeys('sk_test_subscriptions', $webhookSecret);
-$payApp()->invoices->saveIssuer(['name' => 'Modulento Betrieb', 'street' => 'Musterweg 1', 'postal_code' => '10115', 'city' => 'Berlin', 'country' => 'de', 'vat_id' => 'DE123456789', 'tax_rate' => '19', 'note' => '']);
-$pdo->exec("INSERT INTO account (email, password_hash, status, created_at, email_verified_at, terms_accepted_at) VALUES ('abo-pay@example.test', 'x', 'active', '" . Modulento\Core\Support\Clock::now() . "', '" . Modulento\Core\Support\Clock::now() . "', '" . Modulento\Core\Support\Clock::now() . "')");
-$payAccount = (int) $pdo->lastInsertId();
-$payPlan = $payApp()->subscriptions->createPlan('abo-pay', 'Zahlabo', 900, 'EUR', 1, ['abo.pay.one']);
-$bankRefused = (function () use ($payApp) { try { $payApp()->subscriptionBilling->saveBank('Kasse', 'DE00000000000000000000', ''); return false; } catch (InvalidArgumentException) { return true; } })();
-$payApp()->subscriptionBilling->saveBank('Modulento Betrieb', 'DE89 3704 0044 0532 0130 00', 'COBADEFFXXX');
-check('subscription billing: the operator bank account is checked and stored normalised', $bankRefused && $payApp()->subscriptionBilling->bank()['iban'] === 'DE89370400440532013000' && $payApp()->subscriptionBilling->methods()['transfer'] === true);
-
-$http->reset();
-$pPost('/subscriptions/' . $payPlan . '/checkout', $addr + ['method' => 'transfer'], $payAccount);
-$transfer = $pdo->query("SELECT id, status, reference, method, amount_cents FROM subscription_order WHERE account_id = $payAccount")->fetch();
-check('subscription billing: an order by transfer waits for its money, with a reference and the price', $transfer['method'] === 'transfer' && $transfer['status'] === 'pending' && preg_match('/^ABO-[A-F0-9]{8}$/', $transfer['reference']) === 1 && (int) $transfer['amount_cents'] === 900);
-check('subscription billing: the order page shows the reference to the account that ordered it, and not to another', $get('/subscriptions/orders/' . $transfer['id'], $payAccount)['status'] === 200 && str_contains($get('/subscriptions/orders/' . $transfer['id'], $payAccount)['body'], $transfer['reference']) && $get('/subscriptions/orders/' . $transfer['id'], 3)['status'] === 404);
-$post('/admin/subscriptions/orders/' . $transfer['id'] . '/paid', [], 3);
-$transferPaid = $pdo->query("SELECT status FROM subscription_order WHERE id = {$transfer['id']}")->fetchColumn();
-$payGranted = $payApp()->subscriptions->current($payAccount);
-check('subscription billing: confirming the money gives the plan for one month, once', $transferPaid === 'paid' && $payGranted !== null && $payGranted['name'] === 'Zahlabo' && $payGranted['provider_ref'] === null && $payGranted['period_end'] > Modulento\Core\Support\Clock::now(20 * 86400) && $payGranted['period_end'] < Modulento\Core\Support\Clock::now(40 * 86400));
-$post('/admin/subscriptions/orders/' . $transfer['id'] . '/paid', [], 3);
-check('subscription billing: a second confirmation changes nothing', $pdo->query("SELECT COUNT(*) FROM subscription WHERE account_id = $payAccount AND status = 'active'")->fetchColumn() == 1);
-
-$http->reset();
-$http->answer(200, ['id' => 'cs_test_SUB1', 'url' => 'https://checkout.stripe.com/c/pay/cs_test_SUB1']);
-$pPost('/subscriptions/' . $payPlan . '/checkout', $addr + ['method' => 'stripe'], $payAccount);
-$checkoutRequest = $http->requests[0] ?? null;
-check('subscription billing: Stripe gets a subscription checkout on the platform account, with the reference', $checkoutRequest !== null && str_contains($checkoutRequest['body'] ?? '', 'mode=subscription') && str_contains($checkoutRequest['body'] ?? '', '%5Binterval%5D=month') && !isset($checkoutRequest['headers']['Stripe-Account']));
-$stripeOrder = $pdo->query("SELECT id, reference, status, stripe_session FROM subscription_order WHERE account_id = $payAccount AND method = 'stripe'")->fetch();
-check('subscription billing: the order waits for Stripe and remembers the session', $stripeOrder['status'] === 'pending' && $stripeOrder['stripe_session'] === 'cs_test_SUB1');
-
-$subBody = fn (string $type, array $object) => (string) json_encode(['id' => 'evt_sub_' . bin2hex(random_bytes(3)), 'type' => $type, 'data' => ['object' => $object]]);
-$paidSession = $subBody('checkout.session.completed', ['id' => 'cs_test_SUB1', 'mode' => 'subscription', 'payment_status' => 'paid', 'amount_total' => 900, 'currency' => 'eur', 'subscription' => 'sub_TEST1', 'client_reference_id' => $stripeOrder['reference'], 'metadata' => ['subscription_order' => $stripeOrder['reference']]]);
-check('subscription billing: an unsigned notification changes nothing', $hook($paidSession, '') === 400 && $pdo->query("SELECT status FROM subscription_order WHERE id = {$stripeOrder['id']}")->fetchColumn() === 'pending');
-$hook($paidSession, $sign($paidSession, $webhookSecret));
-$stripeGranted = $payApp()->subscriptions->current($payAccount);
-check('subscription billing: a signed, paid checkout gives the plan and keeps the Stripe subscription id', $pdo->query("SELECT status FROM subscription_order WHERE id = {$stripeOrder['id']}")->fetchColumn() === 'paid' && $stripeGranted['provider_ref'] === 'sub_TEST1');
-$hook($paidSession, $sign($paidSession, $webhookSecret));
-check('subscription billing: the same notification twice changes nothing', $pdo->query("SELECT COUNT(*) FROM subscription WHERE account_id = $payAccount AND status = 'active'")->fetchColumn() == 1);
-
-$firstInvoice = $subBody('invoice.paid', ['subscription' => 'sub_TEST1', 'billing_reason' => 'subscription_create']);
-$hook($firstInvoice, $sign($firstInvoice, $webhookSecret));
-$endBefore = $payApp()->subscriptions->current($payAccount)['period_end'];
-check('subscription billing: the first invoice is the checkout itself and extends nothing', $endBefore === $stripeGranted['period_end']);
-$renewal = $subBody('invoice.paid', ['subscription' => 'sub_TEST1', 'billing_reason' => 'subscription_cycle']);
-$hook($renewal, $sign($renewal, $webhookSecret));
-$endAfter = $payApp()->subscriptions->current($payAccount)['period_end'];
-check('subscription billing: a paid renewal runs the plan on for its months', $endAfter > $endBefore && $endAfter > Modulento\Core\Support\Clock::now(50 * 86400));
-$payApp()->subscriptions->setStatusByProviderRef('sub_TEST1', 'past_due');
-$payPast = $payApp()->subscriptions->current($payAccount);
-check('subscription billing: an overdue subscription still counts until its period ends', $payPast !== null && $payPast['status'] === 'past_due');
-
-$http->reset();
-$http->answer(200, ['id' => 'sub_TEST1', 'status' => 'active', 'cancel_at_period_end' => true]);
-$pPost('/account/subscription/cancel', [], $payAccount);
-$cancelRequest = $http->requests[0] ?? null;
-check('subscription billing: ending the renewal asks Stripe to stop at the end of the period', $cancelRequest !== null && str_ends_with($cancelRequest['url'], '/v1/subscriptions/sub_TEST1') && str_contains($cancelRequest['body'] ?? '', 'cancel_at_period_end=true'));
-$ended = $subBody('customer.subscription.deleted', ['id' => 'sub_TEST1']);
-$hook($ended, $sign($ended, $webhookSecret));
-check('subscription billing: the end reported by Stripe cancels the subscription', $payApp()->subscriptions->current($payAccount) === null);
-
-$http->reset();
-$pPost('/subscriptions/' . $payPlan . '/checkout', $addr + ['method' => 'stripe'], $payAccount + 1000);
-check('subscription billing: an order is refused without a plan that is offered', $http->requests === []);
-$checkoutPage = $pPost('/subscriptions/' . $payPlan . '/checkout', ['method' => 'nothing'], $payAccount);
-check('subscription billing: an order without a complete address is refused and changes nothing', $checkoutPage['status'] === 302 && $pdo->query("SELECT COUNT(*) FROM subscription_order WHERE account_id = $payAccount AND method = 'transfer'")->fetchColumn() == 1);
-check('subscription billing: the checkout page is there and remembers the address', $get('/subscriptions/' . $payPlan . '/checkout', $payAccount)['status'] === 200 && str_contains($get('/subscriptions/' . $payPlan . '/checkout', $payAccount)['body'], 'Ringweg 4'));
-
-$invoice = $pdo->query("SELECT id, number, net_cents, tax_cents, gross_cents, tax_rate, buyer_name, source_ref FROM subscription_invoice WHERE source_ref = 'order:" . $transfer['reference'] . "'")->fetch();
-check('invoices: a transfer confirmed gets its invoice, numbered and with the operator\'s VAT taken out of the gross price', $invoice !== false && preg_match('/^RE-\d{4}-\d{6}$/', $invoice['number']) === 1 && (int) $invoice['gross_cents'] === 900 && (int) $invoice['tax_rate'] === 19 && (int) $invoice['net_cents'] + (int) $invoice['tax_cents'] === 900 && $invoice['buyer_name'] === 'Kundin Test');
-check('invoices: the account sees its own invoice, another account does not', $get('/account/subscription/invoices/' . $invoice['id'], $payAccount)['status'] === 200 && str_contains($get('/account/subscription/invoices/' . $invoice['id'], $payAccount)['body'], $invoice['number']) && $get('/account/subscription/invoices/' . $invoice['id'], 3)['status'] === 404);
-check('invoices: the administration shows the invoice to support', $get('/admin/subscriptions/invoices/' . $invoice['id'], 3)['status'] === 200 && $get('/admin/subscriptions/invoices/' . $invoice['id'], 1)['status'] === 403);
-$numbers = $payApp()->invoices->recent(10);
-check('invoices: an invoice that is issued twice is the same invoice', $payApp()->invoices->issue($payAccount, 'order:' . $transfer['reference'], 'x', 1, 1, 'EUR')['number'] === $invoice['number'] && count($numbers) >= 2);
-
-$hookInvoices = $pdo->query("SELECT COUNT(*) FROM subscription_invoice WHERE source_ref = 'order:" . $stripeOrder['reference'] . "'")->fetchColumn();
-check('invoices: a Stripe payment gets exactly one invoice, even when the notification comes twice', (int) $hookInvoices === 1);
-$renewals = $pdo->query("SELECT COUNT(*) FROM subscription_invoice WHERE source_ref LIKE 'stripe:%' AND account_id = $payAccount")->fetchColumn();
-check('invoices: a paid renewal gets its own invoice', (int) $renewals === 1);
-
-$pdo->exec("UPDATE subscription SET provider_ref = NULL WHERE account_id = $payAccount");
-$payApp()->subscriptions->assign($payAccount, $payPlan, Modulento\Core\Support\Clock::now(3 * 86400));
-$reminded = $payApp()->subscriptionBilling->sendReminders();
-check('reminders: a transfer subscription that ends within a week gets one reminder', $reminded === 1 && $payApp()->subscriptionBilling->sendReminders() === 0);
-$payApp()->subscriptions->assign($payAccount, $payPlan, Modulento\Core\Support\Clock::now(30 * 86400));
-check('reminders: a subscription that runs longer gets none', $payApp()->subscriptionBilling->sendReminders() === 0);
-$payApp()->subscriptions->assign($payAccount, $payPlan, Modulento\Core\Support\Clock::now(3 * 86400));
-check('reminders: a renewal of a transfer keeps the days left, from the end of the current plan', (function () use ($payApp, $payAccount, $payPlan, $pPost, $pdo) {
-    $before = $payApp()->subscriptions->current($payAccount)['period_end'];
-    $pdo->exec("INSERT INTO subscription_order (account_id, plan_id, method, status, reference, amount_cents, currency, created_at) VALUES ($payAccount, $payPlan, 'transfer', 'pending', 'ABO-RENEW01', 900, 'EUR', '" . Modulento\Core\Support\Clock::now() . "')");
-    $orderId = (int) $pdo->lastInsertId();
-    $payApp()->subscriptionBilling->confirmTransfer($orderId);
-    $after = $payApp()->subscriptions->current($payAccount)['period_end'];
-    return $after > $before && $after >= Modulento\Core\Support\Clock::now(30 * 86400);
-})());
-// --- Per-seat plans: price_cents is per seat, a plan has a floor, and the seat count syncs live to Stripe ---
-$seatPlan = $payApp()->subscriptions->createPlan('abo-seat', 'Teamplan', 200, 'EUR', 1, ['abo.pay.one']);
-$seatForm = $get('/admin/subscriptions/plans/' . $seatPlan, 3);
-check('per-seat plans: the plan form offers the per-seat checkbox and a minimum field', str_contains($seatForm['body'], 'name="per_seat"') && str_contains($seatForm['body'], 'name="min_quantity"'));
-$post('/admin/subscriptions/plans/' . $seatPlan, ['name' => 'Teamplan', 'price' => '2,00', 'currency' => 'EUR', 'period_months' => '1', 'active' => '1', 'per_seat' => '1', 'min_quantity' => '5'], 3);
-$seatPlanRow = $payApp()->subscriptions->plan($seatPlan);
-check('per-seat plans: the admin form saves per_seat and the minimum', $seatPlanRow['per_seat'] === true && $seatPlanRow['min_quantity'] === 5);
-
-$pdo->exec("INSERT INTO account (email, password_hash, status, created_at, email_verified_at, terms_accepted_at) VALUES ('abo-seat@example.test', 'x', 'active', '" . Modulento\Core\Support\Clock::now() . "', '" . Modulento\Core\Support\Clock::now() . "', '" . Modulento\Core\Support\Clock::now() . "')");
-$seatAccount = (int) $pdo->lastInsertId();
-
-$checkoutPage = $get('/subscriptions/' . $seatPlan . '/checkout', $seatAccount);
-check('per-seat plans: the checkout page offers a quantity field defaulting to the minimum', str_contains($checkoutPage['body'], 'name="quantity"') && str_contains($checkoutPage['body'], 'min="5"'));
-
-$http->reset();
-$pPost('/subscriptions/' . $seatPlan . '/checkout', $addr + ['method' => 'transfer', 'quantity' => '3'], $seatAccount);
-$seatOrder = $pdo->query("SELECT id, quantity, amount_cents FROM subscription_order WHERE account_id = $seatAccount AND method = 'transfer'")->fetch();
-check('per-seat plans: an order below the minimum is clamped up to it, and the amount is price times quantity', (int) $seatOrder['quantity'] === 5 && (int) $seatOrder['amount_cents'] === 1000);
-$post('/admin/subscriptions/orders/' . $seatOrder['id'] . '/paid', [], 3);
-$seatGranted = $payApp()->subscriptions->current($seatAccount);
-check('per-seat plans: a paid transfer order grants the seat count it was placed for', $seatGranted !== null && $seatGranted['quantity'] === 5 && $seatGranted['per_seat'] === true && $seatGranted['min_quantity'] === 5);
-
-$http->reset();
-$http->answer(200, ['id' => 'cs_test_SEAT1', 'url' => 'https://checkout.stripe.com/c/pay/cs_test_SEAT1']);
-$pPost('/subscriptions/' . $seatPlan . '/checkout', $addr + ['method' => 'stripe', 'quantity' => '9'], $seatAccount);
-$seatCheckoutRequest = $http->requests[0] ?? null;
-check('per-seat plans: Stripe gets the real quantity as the line item quantity, priced per seat', $seatCheckoutRequest !== null && str_contains($seatCheckoutRequest['body'] ?? '', '%5Bquantity%5D=9') && str_contains($seatCheckoutRequest['body'] ?? '', '%5Bunit_amount%5D=200'));
-$seatStripeOrder = $pdo->query("SELECT id, reference, quantity, amount_cents FROM subscription_order WHERE account_id = $seatAccount AND method = 'stripe'")->fetch();
-check('per-seat plans: the Stripe order itself keeps the full amount for the invoice', (int) $seatStripeOrder['quantity'] === 9 && (int) $seatStripeOrder['amount_cents'] === 1800);
-
-$http->reset();
-$http->answer(200, ['items' => ['data' => [['id' => 'si_TEST1']]]]);
-$seatSession = $subBody('checkout.session.completed', ['id' => 'cs_test_SEAT1', 'mode' => 'subscription', 'payment_status' => 'paid', 'amount_total' => 1800, 'currency' => 'eur', 'subscription' => 'sub_SEAT1', 'client_reference_id' => $seatStripeOrder['reference'], 'metadata' => ['subscription_order' => $seatStripeOrder['reference']]]);
-$hook($seatSession, $sign($seatSession, $webhookSecret));
-$seatStripeGranted = $pdo->query("SELECT quantity, stripe_item_ref FROM subscription WHERE account_id = $seatAccount AND status = 'active' ORDER BY id DESC LIMIT 1")->fetch();
-check('per-seat plans: a paid Stripe checkout grants the quantity it was for, and captures the subscription item id', (int) $seatStripeGranted['quantity'] === 9 && $seatStripeGranted['stripe_item_ref'] === 'si_TEST1');
-
-$http->reset();
-$http->answer(200, ['id' => 'si_TEST1', 'quantity' => 12]);
-$payApp()->subscriptionBilling->setQuantity($seatAccount, 12);
-$afterGrow = $pdo->query("SELECT quantity FROM subscription WHERE account_id = $seatAccount AND status = 'active'")->fetchColumn();
-$quantityRequest = $http->requests[0] ?? null;
-check('per-seat plans: growing the seat count updates the row and pushes the new quantity to Stripe live', (int) $afterGrow === 12 && $quantityRequest !== null && str_ends_with($quantityRequest['url'], '/v1/subscription_items/si_TEST1') && str_contains($quantityRequest['body'] ?? '', 'quantity=12'));
-
-$http->reset();
-$http->answer(200, ['id' => 'si_TEST1', 'quantity' => 5]);
-$payApp()->subscriptionBilling->setQuantity($seatAccount, 2);
-$afterShrink = $pdo->query("SELECT quantity FROM subscription WHERE account_id = $seatAccount AND status = 'active'")->fetchColumn();
-check('per-seat plans: shrinking below the plan\'s minimum is clamped up to it, never billing fewer seats than guaranteed', (int) $afterShrink === 5);
-
-$http->reset();
-$payApp()->subscriptionBilling->setQuantity($seatAccount, 5);
-check('per-seat plans: setting the same quantity again touches neither the row nor Stripe', $http->requests === []);
-
-$pdo->exec("UPDATE subscription SET stripe_item_ref = NULL, provider_ref = NULL WHERE account_id = $seatAccount");
-$http->reset();
-$payApp()->subscriptionBilling->setQuantity($seatAccount, 6);
-check('per-seat plans: without a captured Stripe item (e.g. a transfer subscription), only the local count moves', (int) $pdo->query("SELECT quantity FROM subscription WHERE account_id = $seatAccount AND status = 'active'")->fetchColumn() === 6 && $http->requests === []);
-
-$noSubscriptionRefused = (function () use ($payApp) { try { $payApp()->subscriptionBilling->setQuantity(999999, 5); return false; } catch (InvalidArgumentException) { return true; } })();
-check('per-seat plans: changing the quantity of an account without an active subscription is refused', $noSubscriptionRefused);
-
-$pdo->exec("DELETE FROM subscription_order WHERE account_id = $seatAccount");
-$pdo->exec("DELETE FROM subscription WHERE account_id = $seatAccount");
-$pdo->exec("DELETE FROM account WHERE id = $seatAccount");
-$pdo->exec("DELETE FROM subscription_plan WHERE slug = 'abo-seat'");
-
-$pdo->exec("DELETE FROM subscription_order WHERE account_id = $payAccount");
-$pdo->exec("DELETE FROM subscription WHERE account_id = $payAccount");
-$pdo->exec("DELETE FROM account WHERE id = $payAccount");
-$pdo->exec("DELETE FROM subscription_plan WHERE slug = 'abo-pay'");
-$payApp()->subscriptionBilling->saveBank('', '', '');
-$payApp()->payments->setEnabled(Modulento\Core\Payment\Payments::TRANSFER, false);
-$payApp()->payments->saveStripeKeys('', '');
-$subModules->save(array_values(array_diff(array_keys(Modulento\Core\Support\Modules::ALL), ['subscriptions'])));
-
 // --- Modules: optional functions of the core ------------------------------------
-// Subscriptions was switched off above for the rest of the suite's sake; back
-// on here so this section's own premise (everything on until switched off) holds.
-$subModules->save(array_keys(Modulento\Core\Support\Modules::ALL));
 check('modules: the page needs the settings permission', $get('/admin/modules', 1)['status'] === 403 && $post('/admin/modules', ['modules' => []], 2)['status'] === 403);
 $r = $get('/admin/modules', 3);
-check('modules: everything is on until switched off', $r['status'] === 200 && substr_count($r['body'], 'name="modules[]"') === 10 && substr_count($r['body'], ' checked') === 10);
+check('modules: everything is on until switched off', $r['status'] === 200 && substr_count($r['body'], 'name="modules[]"') === 9 && substr_count($r['body'], ' checked') === 9);
 $post('/admin/modules', ['modules' => ['contact', 'avatars', 'nonsense', ['x']]], 3);
-check('modules: switched off is stored, unknown names are ignored', $pdo->query("SELECT value FROM setting WHERE name = 'core.modules_disabled'")->fetchColumn() === 'reviews,withdrawal,reports,remember_login,subscriptions,inbox,notifications,requests');
+check('modules: switched off is stored, unknown names are ignored', $pdo->query("SELECT value FROM setting WHERE name = 'core.modules_disabled'")->fetchColumn() === 'reviews,withdrawal,reports,remember_login,inbox,notifications,requests');
 check('modules: without inbox there is no envelope, no overview page, no unread polling, and no account-nav link', !str_contains($get('/account', 1)['body'], 'href="/account/messages"') && !str_contains($get('/account', 1)['body'], 'data-unread')
     && $get('/account/messages', 1)['status'] === 404 && $get('/account/unread', 1)['status'] === 404 && !str_contains($get('/account/settings', 1)['body'], 'href="/account/messages"'));
 check('modules: without notifications there is no bell, no overview page, no unread polling, and no account-nav link', !str_contains($get('/account', 1)['body'], 'href="/account/notifications"')
@@ -4930,11 +4795,6 @@ check('update refuses to touch a git working copy', !$result['success'] && $resu
 check('updater is off without a repository', !(new Modulento\Core\Support\Updater($dir, '', '', fn () => null))->isEnabled());
 
 // --- Shop: a single-provider shop with variants, a cart spanning several products, one checkout ---
-// The modules test above deleted core.modules_disabled outright and never put
-// it back (subscriptions is "on" by default otherwise) - offer quotas then
-// come from Subscriptions::offerLimit() instead of the plain approved/not
-// constants, which is not what this section means to exercise.
-$subModules->save(array_values(array_diff(array_keys(Modulento\Core\Support\Modules::ALL), ['subscriptions'])));
 // A mock "shop" extension/package row was created above (package installer
 // tests) in the same shared tables this uses for real - clear it first.
 $pdo->exec("DELETE FROM extension WHERE id = 'shop'");
@@ -5261,12 +5121,12 @@ $pdo->exec('DELETE FROM account WHERE id IN (10, 11)');
 $pdo->exec("UPDATE extension SET enabled = 0 WHERE id = 'shop'");
 
 // --- Card: turns an approved provider's profile into a shareable digital business card ---
-// Subscriptions was switched off at the top of the Shop section above; this
-// section is precisely about Pro-gating, so it needs it on again - nothing
-// runs after this section, so there is nothing to put back afterward.
-$cardModules = new Modulento\Core\Support\Modules(new Modulento\Core\Support\Settings($pdo));
-$cardModules->save(array_keys(Modulento\Core\Support\Modules::ALL));
-$cardSubs = new Modulento\Core\Subscription\Subscriptions($pdo, $cardModules);
+// This section is precisely about Pro-gating, so the example extension's
+// test provider (see the Subscriptions section far above) is wired in
+// again - nothing runs after this section, so there is nothing to put
+// back afterward.
+Modulento\Example\Extension::$subscriptionProvider = new TestSubscriptionProvider($pdo);
+$pdo->exec("UPDATE extension SET enabled = 1 WHERE id = 'example'");
 $pdo->exec("DELETE FROM extension WHERE id = 'card'");
 $pdo->exec("CREATE TABLE x_card_profile (id INTEGER PRIMARY KEY, provider_id INTEGER UNIQUE REFERENCES provider (id) ON DELETE CASCADE,
     company TEXT, category_id INTEGER REFERENCES category (id) ON DELETE SET NULL, logo_name TEXT, logo_extension TEXT,
@@ -5356,9 +5216,13 @@ check('card: the landing page is linked from the public navigation of any theme'
 check('card: with no plan granting the team feature yet, the landing page says so plainly', str_contains($get('/firma', null)['body'], 'kein Plan eingerichtet'));
 
 // Grant every card feature through a real plan, exactly the way an operator would.
-$cardPlan = $cardSubs->createPlan('card-pro', 'Karte Pro', 900, 'EUR', 1,
-    ['card.feature.design', 'card.feature.colors', 'card.feature.gallery', 'card.feature.offerings', 'card.feature.booking', 'card.feature.vcard', 'card.feature.stats', 'card.feature.team']);
-$cardSubs->assign(30, $cardPlan);
+$cardPlan = (function () use ($pdo): int {
+    $pdo->prepare("INSERT INTO subscription_plan (slug, name, price_cents, currency, period_months, features, offer_limits, max_images_per_offer, per_seat, min_quantity, active)
+        VALUES ('card-pro', 'Karte Pro', 900, 'EUR', 1, 'card.feature.design,card.feature.colors,card.feature.gallery,card.feature.offerings,card.feature.booking,card.feature.vcard,card.feature.stats,card.feature.team', '{}', NULL, 0, 1, 1)")->execute();
+
+    return (int) $pdo->lastInsertId();
+})();
+$assignPlan(30, $cardPlan);
 
 $r = $get('/account/card', 30);
 check('card: with a plan, the Pro sections are no longer locked', !str_contains($r['body'], 'Nur mit Pro'));
@@ -5616,9 +5480,7 @@ $pdo->exec("DELETE FROM account WHERE email IN ('kollege1@example.test', 'kolleg
 
 // The landing page, now that a real per-seat plan grants the feature (safe to flip here: every
 // team test above that cares about the seat count/min_quantity clamp has already run).
-$cardFirmaPlan = $cardSubs->plan($cardPlan);
-$cardSubs->updatePlan($cardPlan, $cardFirmaPlan['name'], $cardFirmaPlan['price_cents'], $cardFirmaPlan['currency'], $cardFirmaPlan['period_months'],
-    $cardFirmaPlan['features'], true, $cardFirmaPlan['offer_limits'], $cardFirmaPlan['max_images_per_offer'], true, 5);
+$pdo->prepare('UPDATE subscription_plan SET per_seat = 1, min_quantity = 5 WHERE id = :id')->execute(['id' => $cardPlan]);
 
 $r = $get('/firma', null);
 check('card: the landing page shows the real plan with its price per seat and the minimum total', $r['status'] === 200

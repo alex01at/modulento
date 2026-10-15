@@ -26,9 +26,6 @@
             <a href="{{ url('/account/requests') }}">{{ trans('core.request.mine.title') }}</a>
         {% endif %}
     {% endif %}
-    {% if module('subscriptions') %}
-        <a href="{{ url('/account/subscription') }}">{{ trans('core.account.subscription.nav') }}</a>
-    {% endif %}
     {% if module('reviews') %}
         <a href="{{ url('/account/ratings') }}">{{ trans('core.account_rating.nav') }}</a>
     {% endif %}
