@@ -15,7 +15,50 @@ final class AdminController extends Controller
 {
     public function index(array $params): void
     {
-        $this->render('@admin/index.twig', ['stats' => $this->stats(), 'update' => $this->updateStatus()]);
+        $app = $this->app;
+        $stats = $this->stats();
+
+        $this->render('@admin/index.twig', [
+            'update' => $this->updateStatus(),
+            'action_queue' => array_values(array_filter($stats, fn (array $stat) => $stat['pending'] !== null && $stat['pending'] > 0)),
+            'recent_orders' => $app->auth->can('core.orders.manage')
+                ? array_map(
+                    fn (array $order) => $order + ['path' => '/admin/orders/' . $order['id']],
+                    $app->orders->list('admin', null, null, 1, 5)['rows']
+                )
+                : [],
+            'quick_actions' => array_values(array_filter([
+                ['label_key' => 'core.admin.dashboard.quick.page', 'path' => '/admin/pages/new', 'permission' => 'core.pages.manage'],
+                ['label_key' => 'core.admin.dashboard.quick.account', 'path' => '/admin/accounts/new', 'permission' => 'core.accounts.manage'],
+                ['label_key' => 'core.admin.dashboard.quick.media', 'path' => '/admin/media', 'permission' => 'core.media.manage'],
+                ['label_key' => 'core.admin.dashboard.quick.settings', 'path' => '/admin/settings', 'permission' => 'core.settings.manage'],
+            ], fn (array $action) => $app->auth->can($action['permission']))),
+            'system_health' => $this->systemHealth(),
+        ]);
+    }
+
+    /** @return array{version: string, account_count: int, apps: list<string>, addons: list<string>, cron_last: ?string} */
+    private function systemHealth(): array
+    {
+        $app = $this->app;
+        $discovered = $app->extensions->discover();
+        $apps = [];
+        $addons = [];
+        foreach ($app->extensions->enabledIds() as $id) {
+            if (($discovered[$id]->type ?? 'app') === 'addon') {
+                $addons[] = $id;
+            } else {
+                $apps[] = $id;
+            }
+        }
+
+        return [
+            'version' => $app->coreVersion(),
+            'account_count' => $app->accounts->list('', 1, 1)['total'],
+            'apps' => $apps,
+            'addons' => $addons,
+            'cron_last' => $app->db->query('SELECT MAX(last_finished_at) FROM task_run')->fetchColumn() ?: null,
+        ];
     }
 
     public function modules(array $params): void

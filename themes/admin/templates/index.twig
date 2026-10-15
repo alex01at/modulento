@@ -6,58 +6,98 @@
 {% block admin %}
 {% include '@admin/_page_header.twig' with {heading: trans('core.admin.dashboard.title')} only %}
 
-{% if stats or update %}
-    <p>{{ trans('core.admin.dashboard.intro') }}</p>
-    <ul class="stats">
-        {% if update %}
-            {# Every component that has a newer release, counted; the card leads to the one Updates page. #}
-            <li class="card-box stat-card{{ update.count > 0 ? ' is-pending' }}">
-                <span class="stat-value">{{ update.count }}</span>
-                <a class="stat-label" href="{{ url('/admin/updates') }}">{{ trans('core.admin.dashboard.updates') }}</a>
-                <span class="stat-icon">{{ icons.menu('/admin/updates') }}</span>
-                <span class="stat-note">
+{% if action_queue is not empty %}
+    <div class="dashboard-banner">
+        <p><strong>{{ trans('core.admin.dashboard.banner', {count: action_queue|length}) }}</strong></p>
+        <a href="#action-queue" class="btn-sm">{{ trans('core.admin.dashboard.banner_link') }}</a>
+    </div>
+{% endif %}
+
+<div class="dashboard-columns">
+    <div>
+        {% if action_queue is not empty %}
+            <section class="card-box" id="action-queue">
+                <h2>{{ trans('core.admin.dashboard.queue') }}</h2>
+                {% for stat in action_queue %}
+                    <div class="dashboard-row">
+                        <p>{{ icons.menu(stat.path) }} {{ trans(stat.label_key) }}</p>
+                        <a href="{{ url(stat.path) }}?status=pending" class="badge badge-pending">{{ trans('core.admin.dashboard.pending', {count: stat.pending}) }}</a>
+                    </div>
+                {% endfor %}
+            </section>
+        {% endif %}
+
+        {% if recent_orders is not empty %}
+            <section class="card-box">
+                <div class="dashboard-section-head">
+                    <h2>{{ trans('core.admin.dashboard.recent_orders') }}</h2>
+                    <a href="{{ url('/admin/orders') }}">{{ trans('core.admin.dashboard.all_orders') }}</a>
+                </div>
+                {% for order in recent_orders %}
+                    <div class="dashboard-row">
+                        <p>
+                            <a href="{{ url(order.path) }}">#{{ order.id }}</a> – {{ money(order.total, order.currency) }}
+                            <br><small>{{ order.buyer_name }} · {{ order.offer_title }}</small>
+                        </p>
+                        <span class="badge badge-{{ order.payment_state }}">{{ trans('core.order.payment_state.' ~ order.payment_state) }}</span>
+                    </div>
+                {% endfor %}
+            </section>
+        {% endif %}
+
+        {% if action_queue is empty and recent_orders is empty %}
+            <section class="card-box">
+                {% if admin_menu is empty %}
+                    <p>{{ trans('core.admin.intro') }}</p>
+                {% else %}
+                    <p>{{ trans('core.admin.dashboard.all_clear') }}</p>
+                {% endif %}
+            </section>
+        {% endif %}
+    </div>
+
+    <div>
+        {% if quick_actions is not empty %}
+            <section class="card-box">
+                <h2>{{ trans('core.admin.dashboard.quick_actions') }}</h2>
+                <ul class="area-list">
+                    {% for action in quick_actions %}
+                        <li><a href="{{ url(action.path) }}">{{ icons.menu(action.path) }}<span>{{ trans(action.label_key) }}</span></a></li>
+                    {% endfor %}
+                </ul>
+            </section>
+        {% endif %}
+
+        <section class="card-box">
+            <h2>{{ trans('core.admin.dashboard.health') }}</h2>
+            <dl class="dashboard-health">
+                <dt>{{ trans('core.admin.dashboard.health_version') }}</dt>
+                <dd>{{ system_health.version }}</dd>
+                <dt>{{ trans('core.admin.dashboard.health_accounts') }}</dt>
+                <dd>{{ system_health.account_count }}</dd>
+                <dt>{{ trans('core.admin.dashboard.health_extensions') }}</dt>
+                <dd>
+                    {{ system_health.apps is empty ? trans('core.admin.dashboard.health_no_app') : system_health.apps|join(', ') }}
+                    {% if system_health.addons is not empty %}· {{ system_health.addons|join(', ') }}{% endif %}
+                </dd>
+                <dt>{{ trans('core.admin.dashboard.health_cron') }}</dt>
+                <dd>{{ system_health.cron_last ?? trans('core.admin.tasks.never') }}</dd>
+            </dl>
+
+            {% if update %}
+                <div class="dashboard-row">
+                    <p>{{ trans('core.admin.dashboard.updates') }}</p>
                     {% if update.count > 0 %}
                         <a class="badge badge-pending" href="{{ url('/admin/updates') }}">{{ update.names|join(', ') }}</a>
                     {% elseif not update.enabled %}
-                        {{ trans('core.admin.dashboard.update_off') }}
-                    {% elseif update.checked_at %}
-                        {{ trans('core.admin.dashboard.update_current', {date: update.checked_at}) }}
+                        <span class="badge">{{ trans('core.admin.dashboard.update_off') }}</span>
                     {% else %}
-                        {{ trans('core.admin.dashboard.update_unchecked') }}
+                        <span class="badge badge-ok">{{ trans('core.admin.dashboard.update_current_short') }}</span>
                     {% endif %}
-                </span>
-            </li>
-        {% endif %}
-        {% for stat in stats %}
-            {% set waiting = stat.pending is not null and stat.pending > 0 %}
-            <li class="card-box stat-card{{ waiting ? ' is-pending' }}">
-                <span class="stat-value">{{ stat.total }}</span>
-                <a class="stat-label" href="{{ url(stat.path) }}">{{ trans(stat.label_key) }}</a>
-                <span class="stat-icon">{{ icons.menu(stat.path) }}</span>
-                <span class="stat-note">
-                    {% if waiting %}
-                        <a class="badge badge-pending" href="{{ url(stat.path) }}?status=pending">{{ trans('core.admin.dashboard.pending', {count: stat.pending}) }}</a>
-                    {% elseif stat.pending is not null %}
-                        {{ trans('core.admin.dashboard.none_pending') }}
-                    {% else %}
-                        {{ trans('core.admin.dashboard.total') }}
-                    {% endif %}
-                </span>
-            </li>
-        {% endfor %}
-    </ul>
-{% endif %}
-
-<section class="card-box">
-    <h2>{{ trans('core.admin.dashboard.areas') }}</h2>
-    {% if admin_menu is empty %}
-        <p>{{ trans('core.admin.intro') }}</p>
-    {% else %}
-        <ul class="area-list">
-            {% for item in admin_menu %}
-                <li><a href="{{ url(item.path) }}">{{ icons.menu(item.path) }}<span>{{ trans(item.label_key) }}</span></a></li>
-            {% endfor %}
-        </ul>
-    {% endif %}
-</section>
+                </div>
+            {% endif %}
+            <a href="{{ url('/admin/updates') }}" class="btn-outline btn-sm btn-block">{{ trans('core.admin.dashboard.updates_check') }}</a>
+        </section>
+    </div>
+</div>
 {% endblock %}
