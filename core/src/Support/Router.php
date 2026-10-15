@@ -76,6 +76,11 @@ final class Router
             $path = '/';
         }
 
+        if ($this->maintenanceBlocks($path)) {
+            $this->showMaintenance();
+            return;
+        }
+
         foreach ($this->routes as $route) {
             if ($route['method'] !== $method || !preg_match($route['regex'], $path, $matches)) {
                 continue;
@@ -193,6 +198,40 @@ final class Router
     {
         return ($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'XMLHttpRequest'
             || str_contains((string) ($_SERVER['HTTP_ACCEPT'] ?? ''), 'application/json');
+    }
+
+    /**
+     * Blocks everything but logging in, assets, and anything that never had
+     * a session to begin with (prepareRequest() answers those without
+     * reading auth at all) - an administrator keeps the whole site as it
+     * always was, everyone else sees the maintenance page.
+     */
+    private function maintenanceBlocks(string $path): bool
+    {
+        if ($this->app->settings->get('core.maintenance_enabled') !== '1') {
+            return false;
+        }
+        if (preg_match('#^/(assets|cron|media|webhooks|design)/#', $path) === 1
+            || in_array($path, ['/login', '/login/google', '/login/google/callback', '/logout'], true)) {
+            return false;
+        }
+
+        return !$this->app->auth->can('core.admin.access');
+    }
+
+    private function showMaintenance(): void
+    {
+        http_response_code(503);
+        header('Retry-After: 3600');
+
+        if ($this->isAjax()) {
+            echo '503 - ' . $this->app->translator->trans('core.maintenance.title');
+            return;
+        }
+
+        echo $this->app->view()->render('maintenance.twig', [
+            'message' => $this->app->settings->get('core.maintenance_message'),
+        ]);
     }
 
     private function fail(int $status, string $messageKey): void

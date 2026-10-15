@@ -132,6 +132,36 @@
         </div>
     </fieldset>
 
+    <section class="card-box" id="login" {{ tab != 'login' ? 'hidden' }}>
+        <h2>{{ trans('core.admin.settings.section.login') }}</h2>
+        <p><small>{{ trans('core.admin.settings.google_hint') }}</small></p>
+        <div class="field-grid">
+            <div class="field">
+                <label for="google_client_id">{{ trans('core.admin.settings.google_client_id') }}</label>
+                <input id="google_client_id" name="google_client_id" value="{{ settings.google_client_id }}">
+            </div>
+            <div class="field">
+                <label for="google_client_secret">{{ trans('core.admin.settings.google_client_secret') }}</label>
+                <input id="google_client_secret" name="google_client_secret" type="password" autocomplete="off"
+                    placeholder="{{ settings.google_client_secret_hint ? trans('core.admin.settings.google_client_secret_set', {hint: settings.google_client_secret_hint}) : '' }}">
+                <small>{{ trans('core.admin.settings.google_client_secret_hint') }}</small>
+            </div>
+        </div>
+    </section>
+
+    <section class="card-box" id="maintenance" {{ tab != 'maintenance' ? 'hidden' }}>
+        <h2>{{ trans('core.admin.settings.section.maintenance') }}</h2>
+        <label class="checkbox">
+            <input type="checkbox" name="maintenance_enabled" value="1" {{ settings.maintenance_enabled ? 'checked' }}>
+            <span>{{ trans('core.admin.settings.maintenance_enabled') }}</span>
+        </label>
+        <p><small>{{ trans('core.admin.settings.maintenance_hint') }}</small></p>
+        <div class="field field-wide">
+            <label for="maintenance_message">{{ trans('core.admin.settings.maintenance_message') }}</label>
+            <textarea id="maintenance_message" name="maintenance_message" rows="3" maxlength="2000">{{ settings.maintenance_message }}</textarea>
+        </div>
+    </section>
+
     <div class="button-row">
         <button type="submit">{{ trans('core.account.save') }}</button>
     </div>

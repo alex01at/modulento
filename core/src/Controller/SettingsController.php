@@ -10,11 +10,13 @@ use Modulento\Core\Support\Session;
 final class SettingsController extends Controller
 {
     /** The tabs of this page; every one is in the same form, so saving keeps all of them. */
-    public const TABS = ['general', 'catalogue', 'languages'];
+    public const TABS = ['general', 'catalogue', 'languages', 'login', 'maintenance'];
 
     public function index(array $params): void
     {
         $app = $this->app;
+        $encryptedSecret = $app->settings->get('core.social_login.google_client_secret');
+        $secret = $encryptedSecret !== '' ? $app->secrets->decrypt($encryptedSecret) : null;
 
         $this->render('@admin/settings.twig', [
             'tab' => $this->tab(self::TABS),
@@ -33,6 +35,11 @@ final class SettingsController extends Controller
                 'badge_top_rated_min_count' => $app->badges->topRatedMinCount(),
                 'badge_fast_responder_max_minutes' => $app->badges->fastResponderMaxMinutes(),
                 'badge_fast_responder_min_sample' => $app->badges->fastResponderMinSample(),
+                'google_client_id' => $app->settings->get('core.social_login.google_client_id'),
+                // The last characters only, to show a secret is set - never the value itself.
+                'google_client_secret_hint' => $secret !== null ? substr($secret, -4) : null,
+                'maintenance_enabled' => $app->settings->get('core.maintenance_enabled') === '1',
+                'maintenance_message' => $app->settings->get('core.maintenance_message'),
             ],
             'available_locales' => $app->locales->available(),
             'enabled_locales' => $app->locales->enabled(),
@@ -104,6 +111,22 @@ final class SettingsController extends Controller
         $app->settings->set('core.badge.top_rated.min_count', (string) max(1, min(1000, (int) ($_POST['badge_top_rated_min_count'] ?? 5))));
         $app->settings->set('core.badge.fast_responder.max_minutes', (string) max(1, min(100000, (int) ($_POST['badge_fast_responder_max_minutes'] ?? 120))));
         $app->settings->set('core.badge.fast_responder.min_sample', (string) max(1, min(1000, (int) ($_POST['badge_fast_responder_min_sample'] ?? 5))));
+
+        $googleClientId = trim((string) ($_POST['google_client_id'] ?? ''));
+        $app->settings->set('core.social_login.google_client_id', $googleClientId);
+        // An empty secret field changes nothing (the hint on the form never
+        // carries the value), so a client id can be edited without
+        // re-typing a secret that is already set; typing one replaces it,
+        // and clearing the id also clears the secret.
+        $googleClientSecret = trim((string) ($_POST['google_client_secret'] ?? ''));
+        if ($googleClientId === '') {
+            $app->settings->set('core.social_login.google_client_secret', '');
+        } elseif ($googleClientSecret !== '') {
+            $app->settings->set('core.social_login.google_client_secret', $app->secrets->encrypt($googleClientSecret));
+        }
+
+        $app->settings->set('core.maintenance_enabled', isset($_POST['maintenance_enabled']) ? '1' : '');
+        $app->settings->set('core.maintenance_message', mb_substr(trim((string) ($_POST['maintenance_message'] ?? '')), 0, 2000));
 
         // The administrator's own language may just have been switched off,
         // or the default - and with it every address - may have changed.

@@ -170,6 +170,8 @@ final class Kernel
         $router->get('/login', [AuthController::class, 'showLogin'], Router::PUBLIC);
         $router->post('/login', [AuthController::class, 'login'], Router::PUBLIC);
         $router->post('/logout', [AuthController::class, 'logout']);
+        $router->get('/login/google', [AuthController::class, 'googleStart'], Router::PUBLIC);
+        $router->get('/login/google/callback', [AuthController::class, 'googleCallback'], Router::PUBLIC);
 
         $router->get('/register', [RegistrationController::class, 'showRegister'], Router::PUBLIC);
         $router->post('/register', [RegistrationController::class, 'register'], Router::PUBLIC);

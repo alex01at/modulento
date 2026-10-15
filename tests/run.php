@@ -249,6 +249,8 @@ $pdo->exec("CREATE TABLE provider_translation (provider_id INTEGER REFERENCES pr
 $pdo->exec("CREATE TABLE page (id INTEGER PRIMARY KEY, status TEXT, role TEXT UNIQUE, in_header INTEGER, in_footer INTEGER, position INTEGER, created_at TEXT, updated_at TEXT)");
 $pdo->exec("CREATE TABLE page_translation (page_id INTEGER REFERENCES page (id) ON DELETE CASCADE, locale TEXT, title TEXT, slug TEXT,
     meta_description TEXT, body TEXT, PRIMARY KEY (page_id, locale), UNIQUE (locale, slug))");
+$pdo->exec("CREATE TABLE account_identity (id INTEGER PRIMARY KEY, account_id INTEGER REFERENCES account (id) ON DELETE CASCADE,
+    provider TEXT, subject TEXT, created_at TEXT, UNIQUE (provider, subject))");
 $pdo->exec("CREATE TABLE account_token (id INTEGER PRIMARY KEY, account_id INTEGER REFERENCES account (id) ON DELETE CASCADE,
     purpose TEXT, token_hash TEXT UNIQUE, payload TEXT, expires_at TEXT, created_at TEXT)");
 $pdo->exec("CREATE TABLE account_login_token (id INTEGER PRIMARY KEY, account_id INTEGER REFERENCES account (id) ON DELETE CASCADE,
@@ -1221,6 +1223,35 @@ check('badge: "fast responder" appears once the figure is computed and within th
 $pdo->exec("DELETE FROM offer WHERE id = {$badgeOfferId}");
 $pdo->exec("UPDATE provider SET avg_response_minutes = NULL, response_sample_count = 0, rating_count = 0, rating_sum = 0 WHERE id = {$providerId}");
 $post('/admin/settings', $settings + ['badge_top_rated_min_average' => '4.5', 'badge_top_rated_min_count' => '5', 'badge_fast_responder_max_minutes' => '120', 'badge_fast_responder_min_sample' => '5'], 3);
+
+// --- Settings: Google client id/secret, and the maintenance toggle ---------------
+check('settings: the login tab has no secret yet', !str_contains($get('/admin/settings?tab=login', 3)['body'], 'Gespeichert, endet auf'));
+$post('/admin/settings', $settings + ['google_client_id' => 'abc.apps.googleusercontent.com', 'google_client_secret' => 'super-secret-value'], 3);
+check('settings: the id is stored in the open, the secret only encrypted', $pdo->query("SELECT value FROM setting WHERE name = 'core.social_login.google_client_id'")->fetchColumn() === 'abc.apps.googleusercontent.com'
+    && !str_contains((string) $pdo->query("SELECT value FROM setting WHERE name = 'core.social_login.google_client_secret'")->fetchColumn(), 'super-secret-value'));
+check('settings: the form shows a hint of the secret, never the value itself', str_contains($get('/admin/settings?tab=login', 3)['body'], 'Gespeichert, endet auf „alue“')
+    && !str_contains($get('/admin/settings?tab=login', 3)['body'], 'super-secret-value'));
+$post('/admin/settings', $settings + ['google_client_id' => 'abc.apps.googleusercontent.com'], 3);
+check('settings: an empty secret field on save keeps the one already stored, so the id can be edited alone', str_contains($get('/admin/settings?tab=login', 3)['body'], 'Gespeichert, endet auf „alue“'));
+$post('/admin/settings', $settings + ['google_client_id' => ''], 3);
+check('settings: clearing the client id clears the secret with it', $pdo->query("SELECT value FROM setting WHERE name = 'core.social_login.google_client_id'")->fetchColumn() === ''
+    && $pdo->query("SELECT value FROM setting WHERE name = 'core.social_login.google_client_secret'")->fetchColumn() === '');
+
+check('settings: maintenance mode is off by default, the message field is empty', !str_contains($get('/admin/settings?tab=maintenance', 3)['body'], 'name="maintenance_enabled" value="1" checked')
+    && str_contains($get('/admin/settings?tab=maintenance', 3)['body'], '<textarea id="maintenance_message" name="maintenance_message" rows="3" maxlength="2000"></textarea>'));
+$post('/admin/settings', $settings + ['maintenance_enabled' => '1', 'maintenance_message' => 'Gleich geht es weiter.'], 3);
+check('settings: maintenance mode saved, on with its message', $pdo->query("SELECT value FROM setting WHERE name = 'core.maintenance_enabled'")->fetchColumn() === '1'
+    && $pdo->query("SELECT value FROM setting WHERE name = 'core.maintenance_message'")->fetchColumn() === 'Gleich geht es weiter.');
+
+// --- Maintenance mode: everyone but an administrator sees the maintenance page -----
+check('maintenance: a visitor sees the maintenance page, not the site', $get('/', null)['status'] === 503 && str_contains($get('/', null)['body'], 'Gleich geht es weiter.'));
+check('maintenance: a logged-in account without admin access sees it too', $get('/account', 1)['status'] === 503);
+check('maintenance: an administrator keeps using the site and the administration as usual', $get('/', 3)['status'] === 200 && $get('/admin', 3)['status'] === 200);
+check('maintenance: logging in is still possible, for everyone', $get('/login', null)['status'] === 200);
+preg_match('#href="(/design/[a-f0-9]+\.css)"#', $get('/', 3)['body'], $cssMatch);
+check('maintenance: the design stylesheet an administrator\'s page needs still loads for a visitor too', $get($cssMatch[1], null)['status'] === 200);
+$post('/admin/settings', $settings, 3);
+check('maintenance: switching it off restores the site for everyone', $get('/', null)['status'] === 200 && $get('/', 1)['status'] === 200);
 
 // --- The two generic extension hooks: a block on the provider page, a link in the account nav ---
 $pdo->exec("UPDATE extension SET enabled = 1 WHERE id = 'example'");
@@ -5583,6 +5614,121 @@ $pdo->exec("DELETE FROM provider WHERE account_id IN (30, 32)");
 $pdo->exec('DELETE FROM category WHERE id = ' . $cardCatId);
 $pdo->exec('DELETE FROM account WHERE id IN (30, 31, 32)');
 $pdo->exec("UPDATE extension SET enabled = 0 WHERE id = 'card'");
+
+// --- Social login: Google ---------------------------------------------------
+// No check here reaches the network: Google's token and userinfo endpoints
+// are replaced by something that records what was asked and answers from a script.
+$googleHttp = new class implements Modulento\Core\Support\HttpClient {
+    /** @var array<int, array{method: string, url: string, headers: array<string, string>, body: ?string}> */
+    public array $requests = [];
+    /** @var array<int, array{status: int, body: string}> */
+    private array $answers = [];
+
+    public function request(string $method, string $url, array $headers = [], ?string $body = null): array
+    {
+        $this->requests[] = ['method' => $method, 'url' => $url, 'headers' => $headers, 'body' => $body];
+
+        return array_shift($this->answers) ?? ['status' => 0, 'body' => ''];
+    }
+
+    public function answer(int $status, array|string $body): void
+    {
+        $this->answers[] = ['status' => $status, 'body' => is_array($body) ? (string) json_encode($body) : $body];
+    }
+
+    public function reset(): void
+    {
+        $this->requests = [];
+        $this->answers = [];
+    }
+};
+$googleConfig = $config;
+$googleConfig['app']['secret_key'] = sys_get_temp_dir() . '/modulento-test-google-key-' . bin2hex(random_bytes(4)) . '/secret.key';
+$googleConfig['social_login'] = ['http' => $googleHttp];
+$ggGet = fn (string $path, int|false|null $as = false) => request($pdo, $googleConfig, 'GET', $path, $as);
+$ggApp = function () use ($pdo, $googleConfig): Modulento\Core\App {
+    $app = new Modulento\Core\App($googleConfig, $pdo, 'de');
+    $app->translator->load($googleConfig['app']['root'] . '/core/lang', 'core');
+
+    return $app;
+};
+
+check('google login: unconfigured, the login page shows no button', !str_contains($ggGet('/login', null)['body'], 'login/google')
+    && $ggApp()->googleLogin() === null);
+$ggGet('/login/google', null);
+check('google login: starting it without a configured client goes nowhere near Google', $googleHttp->requests === []);
+
+$ggSettingsApp = $ggApp();
+$ggSettingsApp->settings->set('core.social_login.google_client_id', 'client-123.apps.googleusercontent.com');
+$ggSettingsApp->settings->set('core.social_login.google_client_secret', $ggSettingsApp->secrets->encrypt('shh-client-secret'));
+check('google login: configured, the login page shows the button', str_contains($ggGet('/login', null)['body'], 'login/google'));
+
+$google = $ggApp()->googleLogin();
+check('GoogleLogin: the authorization address carries the client id, the redirect and a state', $google !== null
+    && str_contains($google->authUrl('xyz'), 'client_id=client-123.apps.googleusercontent.com')
+    && str_contains($google->authUrl('xyz'), 'redirect_uri=' . rawurlencode('https://example.test/login/google/callback'))
+    && str_contains($google->authUrl('xyz'), 'state=xyz'));
+
+$googleHttp->answer(0, '');
+check('GoogleLogin: no answer from the token endpoint fails closed', $google->exchange('code') === null);
+$googleHttp->answer(200, ['access_token' => 'tok']);
+$googleHttp->answer(200, ['sub' => '']);
+check('GoogleLogin: a userinfo answer without an email fails too', $google->exchange('code') === null);
+$googleHttp->reset();
+$googleHttp->answer(200, ['access_token' => 'tok']);
+$googleHttp->answer(200, ['sub' => 'g-1', 'email' => 'Someone@Example.test', 'email_verified' => true, 'name' => 'Someone']);
+$identity = $google->exchange('code');
+check('GoogleLogin: a full answer is parsed, the address lower-cased', $identity === ['subject' => 'g-1', 'email' => 'someone@example.test', 'email_verified' => true, 'name' => 'Someone']);
+check('GoogleLogin: the token exchange carries the client secret, the userinfo call the bearer token', $googleHttp->requests[0]['url'] === 'https://oauth2.googleapis.com/token'
+    && str_contains((string) $googleHttp->requests[0]['body'], 'client_secret=shh-client-secret') && $googleHttp->requests[1]['headers']['Authorization'] === 'Bearer tok');
+
+// state must be set by a request this same browser made (googleStart), and match what comes back.
+// Nothing is queued for Google here: a mismatched state is refused before
+// exchange() is ever called, so nothing would be consumed anyway.
+$googleHttp->reset();
+$_SESSION['google_login_state'] = 'the-real-state';
+$r = $ggGet('/login/google/callback?code=x&state=wrong', false);
+check('google callback: a state that does not match the session is refused, nothing is asked of Google', ($_SESSION['account_id'] ?? null) === null
+    && str_contains($_SESSION['_flash']['error'] ?? '', 'nicht geklappt') && $googleHttp->requests === []);
+
+$_SESSION['google_login_state'] = 'the-real-state';
+$googleHttp->answer(200, ['access_token' => 'tok']);
+$googleHttp->answer(200, ['sub' => 'g-3', 'email' => 'brandnew@example.test', 'email_verified' => true, 'name' => 'Brand New']);
+$ggGet('/login/google/callback?code=x&state=the-real-state', false);
+$new = $pdo->query("SELECT * FROM account WHERE email = 'brandnew@example.test'")->fetch();
+check('google callback: an unknown, verified address creates a brand new account, already confirmed', $new !== false
+    && $new['email_verified_at'] !== null && ($_SESSION['account_id'] ?? null) == $new['id']);
+check('google callback: linked by the subject, for next time', $pdo->query("SELECT account_id FROM account_identity WHERE provider = 'google' AND subject = 'g-3'")->fetchColumn() == $new['id']);
+
+// A second sign-in with the same Google account: found by the link, no new account, no second mail etc.
+$_SESSION['google_login_state'] = 's2';
+$googleHttp->answer(200, ['access_token' => 'tok']);
+$googleHttp->answer(200, ['sub' => 'g-3', 'email' => 'brandnew@example.test', 'email_verified' => true]);
+$ggGet('/login/google/callback?code=x&state=s2', false);
+check('google callback: signing in again finds the same account by its link, creates no second one', ($_SESSION['account_id'] ?? null) == $new['id']
+    && $pdo->query("SELECT COUNT(*) FROM account WHERE email = 'brandnew@example.test'")->fetchColumn() == 1);
+
+// An existing, password-based account with the same verified address: linked instead of duplicated.
+$pdo->exec("UPDATE setting SET value = 'open' WHERE name = 'core.registration'");
+$pdo->exec("DELETE FROM rate_limit_attempt WHERE action = 'register'");
+$post('/register', ['email' => 'already@example.test', 'password' => 'a password long enough', 'password_repeat' => 'a password long enough'], null);
+$get(lastMail($mailLog, 'already@example.test')['link']);
+$existing = $pdo->query("SELECT * FROM account WHERE email = 'already@example.test'")->fetch();
+$_SESSION['google_login_state'] = 's3';
+$googleHttp->answer(200, ['access_token' => 'tok']);
+$googleHttp->answer(200, ['sub' => 'g-4', 'email' => 'already@example.test', 'email_verified' => true]);
+$ggGet('/login/google/callback?code=x&state=s3', false);
+check('google callback: a verified address that already has a password-based account is linked to it, not duplicated',
+    ($_SESSION['account_id'] ?? null) == $existing['id'] && $pdo->query("SELECT COUNT(*) FROM account WHERE email = 'already@example.test'")->fetchColumn() == 1);
+
+// Google says the address is not verified: never trusted to link, and never to create either.
+$_SESSION = [];
+$_SESSION['google_login_state'] = 's4';
+$googleHttp->answer(200, ['access_token' => 'tok']);
+$googleHttp->answer(200, ['sub' => 'g-5', 'email' => 'unverified@example.test', 'email_verified' => false]);
+$ggGet('/login/google/callback?code=x&state=s4', false);
+check('google callback: an address Google will not vouch for signs in nowhere, and nothing is created for it', ($_SESSION['account_id'] ?? null) === null
+    && str_contains($_SESSION['_flash']['error'] ?? '', 'nicht geklappt') && $pdo->query("SELECT COUNT(*) FROM account WHERE email = 'unverified@example.test'")->fetchColumn() == 0);
 
 foreach ($GLOBALS['failed'] ?? [] as $label) {
     echo "FAIL  {$label}\n";
