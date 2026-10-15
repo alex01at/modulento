@@ -47,8 +47,6 @@ use Modulento\Core\Provider\Badges;
 use Modulento\Core\Provider\Providers;
 use Modulento\Core\Review\AccountRatings;
 use Modulento\Core\Review\Reviews;
-use Modulento\Core\Subscription\Invoices;
-use Modulento\Core\Subscription\SubscriptionBilling;
 use Modulento\Core\Subscription\Subscriptions;
 use Modulento\Core\Support\Modules;
 use Modulento\Core\Support\Auth;
@@ -117,8 +115,6 @@ final class App
     public readonly Widgets $widgets;
     public readonly MessageSeen $messageSeen;
     public readonly Subscriptions $subscriptions;
-    public readonly Invoices $invoices;
-    public readonly SubscriptionBilling $subscriptionBilling;
     public readonly Preferences $preferences;
     public readonly Reviews $reviews;
     public readonly AccountRatings $accountRatings;
@@ -155,6 +151,8 @@ final class App
     private array $footerLinks = [];
     /** @var array<string, \Closure> offer type id => demo-offer generator */
     private array $demoOfferGenerators = [];
+    /** @var array<int, array{template: string, data: \Closure}> */
+    private array $adminAccountSections = [];
     /** @var array<int, array{template: string, data: ?\Closure}> */
     private array $homeSections = [];
     /** @var array<int, array{template: string, data: \Closure}> */
@@ -208,15 +206,7 @@ final class App
         $this->reports = new Reports($db);
         $this->modules = new Modules($this->settings);
         $this->notifications = new Notifications($db, $this->modules);
-        $this->subscriptions = new Subscriptions($db, $this->modules);
-        $this->invoices = new Invoices($db, $this->settings);
-        // Mails and links are resolved when they are used: the mailer is built further down.
-        $this->subscriptionBilling = new SubscriptionBilling(
-            $db, $this->settings, $this->modules, $this->subscriptions, $this->payments, $this->invoices,
-            fn (string $to, string $template, array $data, string $locale): bool => $this->mailer->send($to, $template, $data, $locale),
-            fn (string $path): string => $this->url($path, null, true)
-        );
-        $this->payments->onStripeEvent(fn (array $event) => $this->subscriptionBilling->stripeEvent($event));
+        $this->subscriptions = new Subscriptions();
         $this->badWords = new BadWords($this->settings);
         $this->homeLayout = new HomeLayout($this->settings, fn (): ?string => $this->themes->activeFile('home-layout.json'));
         $this->widgets = new Widgets($this->settings);
@@ -353,6 +343,25 @@ final class App
     public function demoOfferGenerators(): array
     {
         return $this->demoOfferGenerators;
+    }
+
+    /**
+     * A template an extension wants shown on the administration's own
+     * account detail page (Administration → Accounts → one account) - e.g.
+     * a billing addon's plan-assignment form. $data gets the raw account
+     * row and runs only when that page is shown.
+     *
+     * @param \Closure(array<string, mixed>, App): array<string, mixed> $data
+     */
+    public function addAdminAccountSection(string $template, \Closure $data): void
+    {
+        $this->adminAccountSections[] = ['template' => $template, 'data' => $data];
+    }
+
+    /** @return array<int, array{template: string, data: \Closure}> unresolved - the caller supplies the account */
+    public function adminAccountSections(): array
+    {
+        return $this->adminAccountSections;
     }
 
     /**

@@ -122,13 +122,16 @@ final class AdminAccountController extends Controller
             'roles' => array_values($this->app->roles->all()),
             'role_ids' => $this->app->roles->idsOfAccount((int) $account['id']),
             'provider' => $this->app->providers->findByAccount((int) $account['id']),
-            'subscription' => $this->app->subscriptions->current((int) $account['id']),
-            'plans' => $this->app->subscriptions->plans(),
             'is_self' => (int) $account['id'] === $this->app->auth->account()['id'],
             'is_last_admin' => $this->app->accounts->isLastAdmin((int) $account['id']),
             'can_impersonate' => $this->app->auth->can('core.accounts.impersonate') && (int) $account['id'] !== $this->app->auth->account()['id'],
             'activity' => $this->app->adminLog->forTarget((int) $account['id']),
             'identity_documents' => $this->app->identityVerification->documents((int) $account['id']),
+            // Templates extensions want shown on this account's admin detail page, e.g. a billing addon's plan assignment.
+            'extension_blocks' => array_map(
+                fn (array $section) => ['template' => $section['template'], 'data' => ($section['data'])($account, $this->app)],
+                $this->app->adminAccountSections()
+            ),
         ]);
     }
 

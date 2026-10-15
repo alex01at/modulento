@@ -67,9 +67,6 @@
         {% if module('requests') %}
             <a href="{{ url('/requests') }}">{{ trans('core.nav.requests') }}</a>
         {% endif %}
-        {% if module('subscriptions') %}
-            <a href="{{ url('/subscriptions') }}">{{ trans('core.subscriptions.nav') }}</a>
-        {% endif %}
         {% for link in nav_links() %}
             <a href="{{ link.url }}">{{ link.title }}</a>
         {% endfor %}
