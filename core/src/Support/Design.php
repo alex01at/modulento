@@ -55,6 +55,16 @@ CSS;
 .inline-edit-form .field { display: grid; gap: .25rem; }
 .inline-edit-form input, .inline-edit-form textarea, .inline-edit-form select { width: 100%; }
 
+/* "Text und Einstellungen bearbeiten" as a dialog, built by inline-edit.js - without it, the
+   details element above still unfolds in place, so the page works without scripts either way. */
+.inline-edit-dialog { width: min(34rem, 100% - 2rem); max-height: min(80vh, 100% - 2rem); padding: 1.25rem; border: 0; border-radius: var(--radius); background: var(--ground); color: var(--text); box-shadow: var(--shadow); }
+.inline-edit-dialog::backdrop { background: rgb(0 0 0 / .5); }
+.inline-edit-dialog-head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: .9rem; }
+.inline-edit-dialog-head p { margin: 0; font-weight: 600; }
+.inline-edit-dialog-close { width: 2rem; height: 2rem; padding: 0; border: 0; background: none; color: var(--text); font-size: 1.3rem; line-height: 1; cursor: pointer; }
+.inline-edit-dialog-close:hover, .inline-edit-dialog-close:focus-visible { color: var(--accent); }
+.inline-edit-dialog .inline-edit-form { max-height: calc(80vh - 5rem); overflow-y: auto; }
+
 /* The text editor of the in-place editing (editor.js). */
 .editor { border: 1px solid var(--line); border-radius: 6px; background: var(--card); }
 .editor-bar { display: flex; flex-wrap: wrap; gap: .25rem; padding: .4rem; border-bottom: 1px solid var(--line); background: var(--bg); border-radius: 6px 6px 0 0; }
@@ -71,7 +81,10 @@ CSS;
 /* Texts on the spot, the "+" between blocks, the status line. */
 .inline-editable { border-radius: .2rem; cursor: text; }
 .inline-editable:hover, .inline-editable:focus-visible { outline: 1px dashed var(--accent); outline-offset: .3rem; }
-.inline-editable:hover::after { content: " ✎"; color: var(--accent); font-size: .6em; vertical-align: middle; }
+/* White with a dark halo, not the accent colour: a home block may have a
+   background of its own (see HomeLayout's background feature) in any
+   colour, including one the accent itself would disappear against. */
+.inline-editable:hover::after { content: " ✎"; color: #fff; text-shadow: 0 0 2px #000, 0 0 4px #000; font-size: .6em; vertical-align: middle; }
 .inline-editable.is-editing { outline: 2px solid var(--accent); background: var(--surface); }
 .inline-block { position: relative; }
 .inline-off { margin: .5rem 0; color: var(--muted); font-size: .9rem; }
