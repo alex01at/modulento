@@ -308,6 +308,11 @@ final class View
             fn (array $link) => ['title' => $app->translator->trans($link['label_key']), 'url' => $app->url($link['path']), 'path' => $link['path']],
             $app->navigation()
         )));
+        // Entries extensions add to the site's footer, e.g. a link to "FAQ".
+        $this->twig->addFunction(new TwigFunction('footer_links', fn () => array_map(
+            fn (array $link) => ['title' => $app->translator->trans($link['label_key']), 'url' => $app->url($link['path'])],
+            $app->footerLinks()
+        )));
         // Entries extensions add to the logged-in account's own navigation.
         $this->twig->addFunction(new TwigFunction('account_links', fn () => array_map(
             fn (array $link) => ['title' => $app->translator->trans($link['label_key']), 'url' => $app->url($link['path'])],

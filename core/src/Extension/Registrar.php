@@ -87,6 +87,12 @@ final class Registrar
         $this->app->addNavigation($labelKey, $path);
     }
 
+    /** An entry in the site's footer, e.g. a link to "FAQ". The path is one of this extension's public routes. */
+    public function footerLink(string $labelKey, string $path): void
+    {
+        $this->app->addFooterLink($labelKey, $path);
+    }
+
     /**
      * An optional feature of this extension, switched off and on under
      * Administration → Modules exactly like a core module - call

@@ -12,6 +12,7 @@ return [
     'example.logins.time' => 'Time (UTC)',
     'example.logins.none' => 'Nobody has logged in since this extension was enabled.',
     'example.nav' => 'Example',
+    'example.footer_link' => 'Example footer link',
     'example.home.title' => 'From the example extension',
     'example.account_link' => 'Example account link',
     'example.provider.title' => 'From the example profile block',

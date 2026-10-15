@@ -31,6 +31,7 @@ final class Extension implements ExtensionContract
 
         $registrar->adminMenu('example.admin.menu', '/admin/example', 'example.logins.view');
         $registrar->navigation('example.nav', '/example');
+        $registrar->footerLink('example.footer_link', '/example');
         $registrar->homeSection('@example/home.twig', fn (App $app): array => ['site' => $app->siteName()]);
         $registrar->accountLink('example.account_link', '/example');
         $registrar->providerSection('@example/provider.twig', fn (array $provider, App $app): array => [
