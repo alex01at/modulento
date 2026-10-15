@@ -22,6 +22,11 @@
     <button type="submit">{{ trans('core.login.submit') }}</button>
 </form>
 
+{% if google_login_enabled %}
+    <p class="auth-divider">{{ trans('core.login.or') }}</p>
+    <a href="{{ url('/login/google') }}" class="btn-outline">{{ trans('core.login.google') }}</a>
+{% endif %}
+
 {% if can_resend_verification %}
     <form method="post" action="{{ url('/verify-email/resend') }}">
         {{ csrf_field() }}

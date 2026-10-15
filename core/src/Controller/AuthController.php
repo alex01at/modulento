@@ -31,6 +31,7 @@ final class AuthController extends Controller
 
         $this->render('auth/login.twig', [
             'can_resend_verification' => Session::get('unverified_account_id') !== null,
+            'google_login_enabled' => $this->app->googleLogin() !== null,
         ]);
     }
 
@@ -82,12 +83,98 @@ final class AuthController extends Controller
             return;
         }
 
+        $this->finishLogin($account, isset($_POST['remember']));
+    }
+
+    /**
+     * Starts the redirect to Google, with a one-time state kept in the
+     * session against a forged callback. Nothing happens without a
+     * configured client - the login page shows no Google button then.
+     */
+    public function googleStart(array $params): void
+    {
+        $google = $this->app->googleLogin();
+        if ($google === null) {
+            $this->redirect('/login');
+            return;
+        }
+
+        $state = bin2hex(random_bytes(16));
+        Session::set('google_login_state', $state);
+        header('Location: ' . $google->authUrl($state));
+    }
+
+    public function googleCallback(array $params): void
+    {
+        $google = $this->app->googleLogin();
+        $state = Session::get('google_login_state');
+        Session::remove('google_login_state');
+
+        $code = is_string($_GET['code'] ?? null) ? $_GET['code'] : null;
+        $sentState = is_string($_GET['state'] ?? null) ? $_GET['state'] : null;
+        if ($google === null || $code === null || $state === null || $sentState === null || !hash_equals($state, $sentState)) {
+            Session::flash('error', $this->trans('core.login.google_failed'));
+            $this->redirect('/login');
+            return;
+        }
+
+        $identity = $google->exchange($code);
+        if ($identity === null) {
+            Session::flash('error', $this->trans('core.login.google_failed'));
+            $this->redirect('/login');
+            return;
+        }
+
+        $account = $this->accountForGoogleIdentity($identity);
+        if ($account === null || $account['status'] !== 'active') {
+            Session::flash('error', $this->trans('core.login.google_failed'));
+            $this->redirect('/login');
+            return;
+        }
+
+        $this->finishLogin($account, false);
+    }
+
+    /**
+     * The account a Google identity belongs to: already linked, else -
+     * only while Google itself says the address is verified, never
+     * otherwise - a matching address (linked on the spot) or a brand new,
+     * already-verified account. A Google sign-in never asks for a
+     * password, so an address Google will not vouch for signs in nowhere.
+     */
+    private function accountForGoogleIdentity(array $identity): ?array
+    {
+        $app = $this->app;
+        $linkedId = $app->accountIdentities->findAccountId('google', $identity['subject']);
+        if ($linkedId !== null) {
+            return $app->accounts->findById($linkedId);
+        }
+        if (!$identity['email_verified']) {
+            return null;
+        }
+
+        $existing = $app->accounts->findByEmail($identity['email']);
+        if ($existing !== null) {
+            $app->accountIdentities->link((int) $existing['id'], 'google', $identity['subject']);
+
+            return $existing;
+        }
+
+        $accountId = $app->accounts->create($identity['email'], bin2hex(random_bytes(32)), $app->translator->locale(), true);
+        $app->accountIdentities->link($accountId, 'google', $identity['subject']);
+
+        return $app->accounts->findById($accountId);
+    }
+
+    /** What every successful sign-in does, whatever got it there. */
+    private function finishLogin(array $account, bool $remember): void
+    {
         $returnTo = (string) Session::get('login_return_to', '/');
         $this->app->auth->login((int) $account['id']);
         // Whatever this browser was remembered as before, the box decides
         // anew - also when someone else logs in on it.
         $this->app->loginTokens->forget();
-        if (isset($_POST['remember']) && $this->app->modules->enabled('remember_login')) {
+        if ($remember && $this->app->modules->enabled('remember_login')) {
             $this->app->loginTokens->issue((int) $account['id']);
         }
         Session::remove('login_return_to');

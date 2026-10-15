@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Modulento\Core;
 
 use Modulento\Core\Account\Accounts;
+use Modulento\Core\Account\AccountIdentities;
+use Modulento\Core\Account\GoogleLogin;
 use Modulento\Core\Account\Avatars;
 use Modulento\Core\Account\BillingProfile;
 use Modulento\Core\Account\IdentityVerification;
@@ -52,6 +54,7 @@ use Modulento\Core\Support\Modules;
 use Modulento\Core\Support\Auth;
 use Modulento\Core\Support\CurlHttpClient;
 use Modulento\Core\Support\Events;
+use Modulento\Core\Support\HttpClient;
 use Modulento\Core\Support\Locales;
 use Modulento\Core\Support\Mailer;
 use Modulento\Core\Support\ReleaseClient;
@@ -127,6 +130,9 @@ final class App
     public readonly Notifications $notifications;
     public readonly Requests $requests;
     public readonly RequestApplications $requestApplications;
+    public readonly AccountIdentities $accountIdentities;
+    public readonly Secrets $secrets;
+    private HttpClient $socialLoginHttp;
 
     /** The request path without its language prefix - what routes are matched against. */
     public string $path = '/';
@@ -239,6 +245,9 @@ final class App
         $this->billingProfile = new BillingProfile($db);
         $this->badges = new Badges($db, $this->settings);
         $this->tokens = new Tokens($db);
+        $this->accountIdentities = new AccountIdentities($db);
+        $this->socialLoginHttp = $config['social_login']['http'] ?? new CurlHttpClient();
+        $this->secrets = new Secrets($config['app']['secret_key'] ?? $root . '/var/secret.key');
         $this->loginTokens = new LoginTokens($db);
         $this->mailer = new Mailer($this);
         $this->router = new Router($this);
@@ -386,6 +395,20 @@ final class App
     public function accountLinks(): array
     {
         return $this->accountLinks;
+    }
+
+    /** Null while no Google client id/secret is configured, or the secret cannot be read any more. */
+    public function googleLogin(): ?GoogleLogin
+    {
+        $clientId = $this->settings->get('core.social_login.google_client_id');
+        $encryptedSecret = $this->settings->get('core.social_login.google_client_secret');
+        if ($clientId === '' || $encryptedSecret === '') {
+            return null;
+        }
+
+        $secret = $this->secrets->decrypt($encryptedSecret);
+
+        return $secret === null ? null : new GoogleLogin($clientId, $secret, $this->url('/login/google/callback', absolute: true), $this->socialLoginHttp);
     }
 
     public function addPermission(string $name, string $labelKey): void
