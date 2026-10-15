@@ -20,4 +20,6 @@
 /extensions/blog
 /extensions/shop
 /extensions/card
+/extensions/newsletter
+/extensions/bookmark
 __pycache__/

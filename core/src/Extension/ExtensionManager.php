@@ -94,11 +94,13 @@ final class ExtensionManager
     }
 
     /**
-     * Runs the extension's migrations and marks it enabled. Only one extension is
-     * active at a time: any other that was enabled is switched off (its data stays).
-     * It is loaded from the next request on.
+     * Runs the extension's migrations and marks it enabled. An "app" is
+     * exclusive: any other enabled app is switched off for it (its data
+     * stays). An "addon" never switches anything off - any number of
+     * addons, and one app, can be active together. Loaded from the next
+     * request on.
      *
-     * @return string[] the extensions that were switched off for it
+     * @return string[] the apps that were switched off for it (always empty for an addon)
      */
     public function enable(string $id): array
     {
@@ -122,11 +124,36 @@ final class ExtensionManager
         );
         $stmt->execute(['id' => $manifest->id, 'version' => $manifest->version]);
 
-        $others = array_values(array_diff($this->enabledIds(), [$manifest->id]));
-        $stmt = $this->db->prepare('UPDATE extension SET enabled = 0 WHERE id <> :id AND enabled = 1');
-        $stmt->execute(['id' => $manifest->id]);
+        if ($manifest->type !== 'app') {
+            return [];
+        }
+
+        $others = self::appsToSwitchOff($this->discover(), $this->enabledIds(), $manifest->id);
+        if ($others !== []) {
+            $stmt = $this->db->prepare(
+                'UPDATE extension SET enabled = 0 WHERE enabled = 1 AND id IN (' . implode(',', array_fill(0, count($others), '?')) . ')'
+            );
+            $stmt->execute($others);
+        }
 
         return $others;
+    }
+
+    /**
+     * The currently enabled ids, other than the one being enabled, that are
+     * apps (an id no longer discoverable counts as an app, as every
+     * extension used to be before addons existed - the safe default).
+     *
+     * @param array<string, Manifest> $discovered
+     * @param string[] $enabledIds
+     * @return string[]
+     */
+    public static function appsToSwitchOff(array $discovered, array $enabledIds, string $enablingId): array
+    {
+        return array_values(array_filter(
+            array_diff($enabledIds, [$enablingId]),
+            fn (string $otherId) => ($discovered[$otherId]->type ?? 'app') === 'app'
+        ));
     }
 
     /** Stops loading the extension. Its tables and data stay untouched. */

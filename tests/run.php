@@ -6,6 +6,7 @@ declare(strict_types=1);
 //   php tests/run.php
 // Exit code 0 means every check passed.
 
+use Modulento\Core\Extension\ExtensionManager;
 use Modulento\Core\Extension\Manifest;
 use Modulento\Core\Support\Csrf;
 use Modulento\Core\Support\Events;
@@ -200,6 +201,23 @@ check('manifest rejects id "core"', throws(InvalidArgumentException::class, fn (
 check('manifest rejects path-like id', throws(InvalidArgumentException::class, fn () => Manifest::fromDir(manifestDir('shop', str_replace('"shop"', '"../x"', $valid)))));
 check('manifest rejects string api', throws(InvalidArgumentException::class, fn () => Manifest::fromDir(manifestDir('shop', str_replace('"api":1', '"api":"1"', $valid)))));
 check('example extension manifest is valid', Manifest::fromDir($root . '/extensions/example')->id === 'example');
+check('manifest without "type" is an app, as every extension was before the field existed', $manifest->type === 'app');
+check('manifest reads an addon type', Manifest::fromDir(manifestDir('shop', str_replace('"api":1', '"api":1,"type":"addon"', $valid)))->type === 'addon');
+check('manifest rejects an unknown type', throws(InvalidArgumentException::class, fn () => Manifest::fromDir(manifestDir('shop', str_replace('"api":1', '"api":1,"type":"plugin"', $valid)))));
+
+// --- ExtensionManager: which apps an "enable" switches off, apps vs. addons ---
+$appA = Manifest::fromDir(manifestDir('app_a', str_replace('"shop"', '"app_a"', $valid)));
+$appB = Manifest::fromDir(manifestDir('app_b', str_replace('"shop"', '"app_b"', $valid)));
+$addonA = Manifest::fromDir(manifestDir('addon_a', str_replace('"shop"', '"addon_a"', str_replace('"api":1', '"api":1,"type":"addon"', $valid))));
+$discovered = ['app_a' => $appA, 'app_b' => $appB, 'addon_a' => $addonA];
+check('extension manager: enabling an app switches off every other enabled app, never an addon',
+    ExtensionManager::appsToSwitchOff($discovered, ['app_a', 'addon_a'], 'app_b') === ['app_a']);
+// enable() never calls appsToSwitchOff() for an addon at all (it returns [] on the manifest's own type first) - see ExtensionManager::enable().
+check('extension manager: an addon is never asked what to switch off', $addonA->type === 'addon');
+check('extension manager: an enabled addon is not among what an app enabling switches off',
+    ExtensionManager::appsToSwitchOff($discovered, ['addon_a'], 'app_a') === []);
+check('extension manager: an enabled id whose folder vanished is still treated as an app',
+    ExtensionManager::appsToSwitchOff(['app_b' => $appB], ['gone', 'app_b'], 'app_b') === ['gone']);
 
 // --- Router access control and extension loading -------------------------
 // Runs against an in-memory SQLite database with just the tables Auth and
