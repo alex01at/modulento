@@ -165,6 +165,7 @@ final class AdminController extends Controller
                 'name' => $manifest->name,
                 'version' => $manifest->version,
                 'api' => $manifest->api,
+                'type' => $manifest->type,
                 'compatible' => $manifest->api === App::API_VERSION,
                 'enabled' => in_array($id, $enabled, true),
             ];

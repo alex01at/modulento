@@ -9,6 +9,8 @@ use InvalidArgumentException;
 /** The parsed and validated extension.json of one extension folder. */
 final class Manifest
 {
+    public const TYPES = ['app', 'addon'];
+
     private function __construct(
         public readonly string $id,
         public readonly string $name,
@@ -17,6 +19,8 @@ final class Manifest
         public readonly string $namespace,
         public readonly string $entry,
         public readonly string $dir,
+        /** "app": only one such extension is active at a time; "addon": any number can be. */
+        public readonly string $type,
     ) {
     }
 
@@ -49,6 +53,12 @@ final class Manifest
         if (!isset($data['api']) || !is_int($data['api'])) {
             throw new InvalidArgumentException('extension.json: "api" must be an integer');
         }
+        // Missing, as in every extension written before this field existed, means "app" -
+        // the only behaviour the core ever had, so nothing already installed changes.
+        $type = (string) ($data['type'] ?? 'app');
+        if (!in_array($type, self::TYPES, true)) {
+            throw new InvalidArgumentException('extension.json: "type" must be "app" or "addon"');
+        }
 
         $namespace = rtrim($data['namespace'], '\\') . '\\';
 
@@ -60,6 +70,7 @@ final class Manifest
             $namespace,
             $namespace . 'Extension',
             $dir,
+            $type,
         );
     }
 }
