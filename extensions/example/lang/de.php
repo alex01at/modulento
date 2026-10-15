@@ -12,6 +12,7 @@ return [
     'example.logins.time' => 'Zeitpunkt (UTC)',
     'example.logins.none' => 'Seit dem Aktivieren hat sich noch niemand angemeldet.',
     'example.nav' => 'Beispiel',
+    'example.footer_link' => 'Beispiel-Footer-Link',
     'example.home.title' => 'Aus der Beispiel-Erweiterung',
     'example.account_link' => 'Beispiel-Konto-Link',
     'example.provider.title' => 'Vom Beispiel-Profilblock',
