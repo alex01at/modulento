@@ -17,4 +17,7 @@ return [
     'example.account_link' => 'Example account link',
     'example.provider.title' => 'From the example profile block',
     'example.offer.title' => 'From the example offer block',
+    'example.checkout.title' => 'From the example checkout block',
+    'example.checkout.code' => 'Discount code',
+    'example.checkout.error.invalid_code' => 'This discount code is not valid.',
 ];
