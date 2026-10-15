@@ -249,13 +249,71 @@
             start(field);
             return;
         }
-        var form = link.closest('.inline-block').querySelector('details.inline-edit');
-        if (form) {
-            form.open = true;
-            var input = form.querySelector('input[name$="[button_url]"]') || form.querySelector('input, textarea');
-            if (input) {
-                input.focus();
-            }
+        var details = link.closest('.inline-block').querySelector('details.inline-edit');
+        if (!details) {
+            return;
+        }
+        var input;
+        if (details.editDialog) {
+            details.editDialog.showModal();
+            input = details.editDialog.querySelector('input[name$="[button_url]"]') || details.editDialog.querySelector('input, textarea');
+        } else {
+            details.open = true;
+            input = details.querySelector('input[name$="[button_url]"]') || details.querySelector('input, textarea');
+        }
+        if (input) {
+            input.focus();
         }
     }, true);
+
+    // "Text und Einstellungen bearbeiten" opens as a dialog (a floating box
+    // over the page) instead of unfolding inline at the full width of the
+    // page - the form can be long (every text field, the background
+    // settings) and the page underneath should not jump around while it is
+    // open. Without a browser that has <dialog>, the details element below
+    // still works exactly as it always did, unfolding in place.
+    if (typeof window.HTMLDialogElement === 'function') {
+        Array.prototype.forEach.call(document.querySelectorAll('details.inline-edit'), function (details) {
+            var summary = details.querySelector('summary');
+            var form = details.querySelector('form');
+            if (!summary || !form) {
+                return;
+            }
+
+            var dialog = document.createElement('dialog');
+            dialog.className = 'inline-edit-dialog';
+            var head = document.createElement('div');
+            head.className = 'inline-edit-dialog-head';
+            var heading = document.createElement('p');
+            heading.textContent = summary.textContent;
+            var closeButton = document.createElement('button');
+            closeButton.type = 'button';
+            closeButton.className = 'inline-edit-dialog-close';
+            closeButton.setAttribute('aria-label', labels.close || 'Close');
+            closeButton.innerHTML = '&times;';
+            closeButton.addEventListener('click', function () {
+                dialog.close();
+            });
+            head.appendChild(heading);
+            head.appendChild(closeButton);
+            dialog.appendChild(head);
+            dialog.appendChild(form);
+            document.body.appendChild(dialog);
+            details.editDialog = dialog;
+
+            summary.addEventListener('click', function (event) {
+                event.preventDefault();
+                dialog.showModal();
+            });
+            // A click on the backdrop (the dialog element itself, outside its content) closes it.
+            dialog.addEventListener('click', function (event) {
+                if (event.target === dialog) {
+                    dialog.close();
+                }
+            });
+            dialog.addEventListener('close', function () {
+                details.open = false;
+            });
+        });
+    }
 }());

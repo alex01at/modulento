@@ -929,7 +929,7 @@ check('handbook: the same chapter in English', $r['status'] === 200 && str_conta
 $r = $get('/handbook/glossary', null);
 check('handbook: the last chapter has a "previous", no "next"', $r['status'] === 200 && str_contains($r['body'], '&larr;') && !str_contains($r['body'], '&rarr;'));
 check('handbook: an unknown chapter is a 404, not an error', $get('/handbook/nope', null)['status'] === 404);
-check('handbook: linked from the footer of an ordinary page', str_contains($get('/', null)['body'], 'href="/handbook"'));
+check('handbook: not linked from the public footer any more - it is operator documentation, reachable from the admin menu, not a visitor-facing page', !str_contains($get('/', null)['body'], 'href="/handbook"'));
 
 $pdo->exec("UPDATE setting SET value = 'de' WHERE name = 'core.languages'");
 check('a disabled language is no prefix any more', $get('/en/login', null)['status'] === 404);
@@ -4202,6 +4202,8 @@ $r = $get('/admin/pages/new', 3);
 preg_match('#data-editor="([^"]*)"#', $r['body'], $editor);
 check('editor: the page text gets the editor, its wording in the administrator\'s language', ($editor[1] ?? '') !== '' && (json_decode(html_entity_decode($editor[1]), true)['bold'] ?? null) === 'Fett'
     && str_contains($r['body'], 'editor.js') && file_exists($root . '/themes/admin/assets/editor.js'));
+check('editor: the "close" wording for the in-place edit dialog is in the same labels, and inline-edit.js builds it', (json_decode(html_entity_decode($editor[1]), true)['close'] ?? null) === 'Schließen'
+    && str_contains((string) file_get_contents($root . '/themes/admin/assets/inline-edit.js'), 'inline-edit-dialog'));
 $r = $get('/admin/roles/new', 3);
 check('roles: permissions come grouped like the menu, with an explanation', preg_match('#<legend>Allgemein</legend>.*?value="core.admin.access".*?<legend>Inhalte</legend>.*?value="core.pages.manage".*?<legend>Personen</legend>.*?value="core.roles.manage"#s', $r['body']) === 1
     && str_contains($r['body'], 'Ohne dieses Recht sieht die Rolle die Administration gar nicht'));
@@ -4337,6 +4339,8 @@ check('home editor: a picture background is saved, from the media library only',
 $designCss = $get('/design/' . $app->design->fileName(), null)['body'];
 check('home: the design stylesheet carries the block\'s picture background, as a cover image, never inline', str_contains($designCss, '[data-home-block="default-hero"] {')
     && str_contains($designCss, 'background-image: url(' . $heroImage . '); background-size: cover; background-position: center;') && !str_contains($get('/', null)['body'], 'style="'));
+check('home: the design stylesheet styles the in-place edit dialog, and the hover pencil is white with a dark halo - not the accent colour, which a block\'s own background may clash with',
+    str_contains($designCss, '.inline-edit-dialog {') && str_contains($designCss, '.inline-editable:hover::after { content: " ✎"; color: #fff; text-shadow:'));
 $post('/admin/home', ['action' => 'save', 'blocks' => ['default-hero' => ['enabled' => '1', 'settings' => ['background_type' => 'image', 'background_media' => '/media/library/../evil.png'], 'texts' => ['de' => ['title' => 'Hallo']]]]], 3);
 $heroBlock = array_values(array_filter($homeBlocks(), fn (array $b) => $b['id'] === 'default-hero'))[0];
 check('home editor: a picture background outside the media library is not kept', ($heroBlock['settings']['background_media'] ?? null) === '');
