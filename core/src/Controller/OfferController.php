@@ -603,15 +603,15 @@ final class OfferController extends Controller
     }
 
     /**
-     * How many offers of this type the provider's account may have. With the
-     * subscriptions module off, the old approval-status default applies, as
-     * it always has; with it on, the active plan decides alone - including
+     * How many offers of this type the provider's account may have. Without
+     * a billing addon installed, the old approval-status default applies,
+     * as it always has; with one, the active plan decides alone - including
      * when that plan simply never set a number for this type, which means
      * no limit (unlike having no plan at all, which means none allowed).
      */
     private function offerQuota(array $provider, string $typeId): ?int
     {
-        if (!$this->app->modules->enabled('subscriptions')) {
+        if (!$this->app->subscriptions->hasProvider()) {
             return $provider['status'] === 'approved' ? self::MAX_OFFERS : self::MAX_OFFERS_UNAPPROVED;
         }
 
@@ -621,7 +621,7 @@ final class OfferController extends Controller
     /** Same idea as offerQuota(), for pictures per offer. */
     private function imageQuota(int $accountId): int
     {
-        if (!$this->app->modules->enabled('subscriptions')) {
+        if (!$this->app->subscriptions->hasProvider()) {
             return OfferImages::MAX_PER_OFFER;
         }
 

@@ -186,10 +186,7 @@ final class Installer
             $settings = new Settings($db);
             $settings->set('core.site_name', $values['site_name']);
             (new Locales($settings, $this->root . '/core/lang'))->save($this->translator->locale(), Translator::localesIn($this->root . '/core/lang'));
-            // Every module is on by default except this one: with it on, an
-            // account without a plan could suddenly make no offers at all -
-            // an operator who wants paid plans switches it on deliberately.
-            (new Modules($settings))->save(array_diff(array_keys(Modules::ALL), ['subscriptions']));
+            (new Modules($settings))->save(array_keys(Modules::ALL));
         } catch (Throwable $e) {
             error_log('Installer: ' . $e);
 

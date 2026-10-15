@@ -12,8 +12,6 @@ use Modulento\Core\Controller\AdminController;
 use Modulento\Core\Controller\AdminBadWordsController;
 use Modulento\Core\Controller\AdminHomeController;
 use Modulento\Core\Controller\AdminOfferPageController;
-use Modulento\Core\Controller\AdminSubscriptionController;
-use Modulento\Core\Controller\SubscriptionController;
 use Modulento\Core\Controller\DesignController;
 use Modulento\Core\Controller\AdminMediaController;
 use Modulento\Core\Controller\AdminMessageController;
@@ -308,27 +306,6 @@ final class Kernel
             $router->get('/admin/requests/{id}', [AdminRequestController::class, 'request'], 'core.requests.manage');
             $router->post('/admin/requests/{id}/decide', [AdminRequestController::class, 'decide'], 'core.requests.manage');
         }
-        // Plans and grants: the administration of the subscriptions module only.
-        if ($modules->enabled('subscriptions')) {
-            $router->get('/admin/subscriptions', [AdminSubscriptionController::class, 'index'], 'core.settings.manage');
-            $router->post('/admin/subscriptions/plans', [AdminSubscriptionController::class, 'createPlan'], 'core.settings.manage');
-            $router->post('/admin/subscriptions/assign', [AdminSubscriptionController::class, 'assign'], 'core.settings.manage');
-            $router->get('/admin/subscriptions/plans/{id}', [AdminSubscriptionController::class, 'plan'], 'core.settings.manage');
-            $router->post('/admin/subscriptions/plans/{id}', [AdminSubscriptionController::class, 'updatePlan'], 'core.settings.manage');
-            $router->post('/admin/subscriptions/plans/{id}/delete', [AdminSubscriptionController::class, 'deletePlan'], 'core.settings.manage');
-            // What customers see: the overview of the plans, and the account's own subscription.
-            $router->get('/subscriptions', [SubscriptionController::class, 'overview'], Router::PUBLIC);
-            $router->get('/account/subscription', [SubscriptionController::class, 'account']);
-            $router->get('/subscriptions/{id}/checkout', [SubscriptionController::class, 'checkout']);
-            $router->post('/subscriptions/{id}/checkout', [SubscriptionController::class, 'order']);
-            $router->get('/subscriptions/orders/{id}', [SubscriptionController::class, 'orderPage']);
-            $router->get('/account/subscription/invoices/{id}', [SubscriptionController::class, 'invoice']);
-            $router->get('/admin/subscriptions/invoices/{id}', [AdminSubscriptionController::class, 'invoice'], 'core.settings.manage');
-            $router->post('/admin/subscriptions/invoice-settings', [AdminSubscriptionController::class, 'saveIssuer'], 'core.settings.manage');
-            $router->post('/account/subscription/cancel', [SubscriptionController::class, 'cancel']);
-            $router->post('/admin/subscriptions/bank', [AdminSubscriptionController::class, 'saveBank'], 'core.settings.manage');
-            $router->post('/admin/subscriptions/orders/{id}/paid', [AdminSubscriptionController::class, 'confirmTransfer'], 'core.settings.manage');
-        }
         if ($modules->enabled('contact')) {
             $router->post('/offers/{slug}/contact', [OfferController::class, 'contact']);
             $router->post('/offers/{slug}/contact/{asker}', [OfferController::class, 'reply']);
@@ -514,9 +491,6 @@ final class Kernel
         $app->addAdminMenu('core.admin.menu.pages', '/admin/pages', 'core.pages.manage', 'content');
         $app->addAdminMenu('core.admin.menu.media', '/admin/media', 'core.media.manage', 'content');
         $app->addAdminMenu('core.admin.menu.home', '/admin/home', 'core.settings.manage', 'content');
-        if ($app->modules->enabled('subscriptions')) {
-            $app->addAdminMenu('core.admin.menu.subscriptions', '/admin/subscriptions', 'core.settings.manage', 'marketplace');
-        }
         if ($app->modules->enabled('requests')) {
             $app->addAdminMenu('core.admin.menu.requests', '/admin/requests', 'core.requests.manage', 'moderation');
         }
@@ -567,7 +541,6 @@ final class Kernel
         );
         // Deadlines of orders: what happens when nobody acts in time.
         $app->scheduler->register('core.order-deadlines', 5, fn (App $app) => $app->orders->runDeadlines($app));
-        $app->scheduler->register('core.subscription-reminders', 60, fn (App $app) => $app->subscriptionBilling->sendReminders());
         // Expired mail links and "stay logged in" tokens, and registrations
         // whose address was never confirmed within a week.
         $app->scheduler->register('core.account-cleanup', 60, function (App $app): void {

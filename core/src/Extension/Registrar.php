@@ -10,6 +10,7 @@ use Modulento\Core\App;
 use Modulento\Core\Catalogue\OfferType;
 use Modulento\Core\Order\OrderFlow;
 use Modulento\Core\Order\PaymentMethod;
+use Modulento\Core\Subscription\SubscriptionProvider;
 use Modulento\Core\Support\Router;
 
 /**
@@ -92,6 +93,37 @@ final class Registrar
     public function subscriptionFeature(string $key, string $labelKey): void
     {
         $this->app->subscriptions->declareFeature($key, $labelKey);
+    }
+
+    /**
+     * How this extension answers every question the core (and other
+     * extensions, like a feature sold through subscriptionFeature()) asks
+     * Subscriptions - the other half of a billing addon (modulento-ext-abos).
+     * Only one provider is ever registered; a second call replaces the first.
+     */
+    public function subscriptionProvider(SubscriptionProvider $provider): void
+    {
+        $this->app->subscriptions->registerProvider($provider);
+    }
+
+    /** @param Closure(array): void $handler every verified Stripe webhook notification, whether or not it is about a subscription */
+    public function stripeWebhook(Closure $handler): void
+    {
+        $this->app->payments->onStripeEvent($handler);
+    }
+
+    /**
+     * A template an extension wants shown on the administration's own
+     * account detail page - e.g. a billing addon's plan-assignment form.
+     * The template is one of this extension's ("@id/admin_account.twig");
+     * a theme may override it like any other. $data gets the raw account
+     * row and runs only when that page is shown.
+     *
+     * @param Closure(array<string, mixed>, App): array<string, mixed> $data
+     */
+    public function adminAccountSection(string $template, Closure $data): void
+    {
+        $this->app->addAdminAccountSection($template, $data);
     }
 
     /** An entry in the site's main menu, e.g. "Blog". The path is one of this extension's public routes. */

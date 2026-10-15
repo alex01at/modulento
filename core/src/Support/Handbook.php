@@ -24,7 +24,6 @@ final class Handbook
         'accounts' => 'core.handbook.chapter.accounts',
         'marketplace' => 'core.handbook.chapter.marketplace',
         'payments' => 'core.handbook.chapter.payments',
-        'subscriptions' => 'core.handbook.chapter.subscriptions',
         'extensions' => 'core.handbook.chapter.extensions',
         'themes' => 'core.handbook.chapter.themes',
         'languages' => 'core.handbook.chapter.languages',

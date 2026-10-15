@@ -233,10 +233,10 @@ final class View
         }));
         // Whether an optional function of the core is switched on (Administration → Modules).
         $this->twig->addFunction(new TwigFunction('module', fn (string $id) => $app->modules->enabled($id)));
-        // Whether the visitor may use a feature of a plan: the same answer the route gives. A visitor has none unless the module is off.
+        // Whether the visitor may use a feature of a plan: the same answer the route gives. A visitor has none unless no addon gates it.
         $this->twig->addFunction(new TwigFunction('feature', fn (string $key) => $app->auth->account() !== null
             ? $app->subscriptions->allows((int) $app->auth->account()['id'], $key)
-            : !$app->modules->enabled('subscriptions')));
+            : !$app->subscriptions->hasProvider()));
         // The parts of an offer's page, in the current language, enabled ones only.
         $this->twig->addFunction(new TwigFunction('offer_blocks', fn (bool $all = false): array => $app->offerLayout->view(
             $app->translator->locale(),
