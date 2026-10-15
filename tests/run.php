@@ -4246,6 +4246,31 @@ $post('/admin/home', ['action' => 'save', 'blocks' => ['default-hero' => ['enabl
 $heroBlock = array_values(array_filter($homeBlocks(), fn (array $b) => $b['id'] === 'default-hero'))[0];
 check('home editor: an invalid colour is refused, nothing stored for it', !isset($heroBlock['settings']['background_color']));
 
+$heroImage = '/media/library/' . str_repeat('c', 32) . '.webp';
+$post('/admin/home', ['action' => 'save', 'blocks' => ['default-hero' => ['enabled' => '1', 'settings' => [
+    'background_type' => 'image', 'background_media' => $heroImage,
+], 'texts' => ['de' => ['title' => 'Hallo']]]]], 3);
+$heroBlock = array_values(array_filter($homeBlocks(), fn (array $b) => $b['id'] === 'default-hero'))[0];
+check('home editor: a picture background is saved, from the media library only', $heroBlock['settings']['background_type'] === 'image' && $heroBlock['settings']['background_media'] === $heroImage);
+$designCss = $get('/design/' . $app->design->fileName(), null)['body'];
+check('home: the design stylesheet carries the block\'s picture background, as a cover image, never inline', str_contains($designCss, '[data-home-block="default-hero"] {')
+    && str_contains($designCss, 'background-image: url(' . $heroImage . '); background-size: cover; background-position: center;') && !str_contains($get('/', null)['body'], 'style="'));
+$post('/admin/home', ['action' => 'save', 'blocks' => ['default-hero' => ['enabled' => '1', 'settings' => ['background_type' => 'image', 'background_media' => '/media/library/../evil.png'], 'texts' => ['de' => ['title' => 'Hallo']]]]], 3);
+$heroBlock = array_values(array_filter($homeBlocks(), fn (array $b) => $b['id'] === 'default-hero'))[0];
+check('home editor: a picture background outside the media library is not kept', ($heroBlock['settings']['background_media'] ?? null) === '');
+
+// Text formatting from the editor's toolbar (font, colour, size, as a span) survives a save and reaches the visitor.
+$post('/admin/home', ['action' => 'add', 'add_type' => 'text'], 3);
+$formattedId = $idOf('text');
+$post('/admin/home', ['action' => 'save', 'blocks' => [$formattedId => ['enabled' => '1', 'texts' => ['de' => [
+    'heading' => 'Formatiert', 'body' => '<p><span class="text-font-serif text-size-lg" style="color: #112233">Großer Text</span>, <span class="evil" style="position: fixed">unverändert</span>.</p>',
+]]]]], 3);
+$formattedBlock = array_values(array_filter($homeBlocks(), fn (array $b) => $b['id'] === $formattedId))[0];
+check('home editor: a formatted span (font, size, colour) in a text body is kept, an unknown class and style property are not',
+    $formattedBlock['texts']['de']['body'] === '<p><span class="text-font-serif text-size-lg" style="color: #112233">Großer Text</span>, unverändert.</p>');
+check('home: the visitor sees the formatted span as the editor set it', str_contains($get('/', null)['body'], '<span class="text-font-serif text-size-lg" style="color: #112233">Großer Text</span>'));
+$post('/admin/home', ['action' => 'delete:' . $formattedId], 3);
+
 check('home editor: the form shows the language of the header only, no language tabs', str_contains($get('/admin/home', 3)['body'], '[texts][de][title]')
     && !str_contains($get('/admin/home', 3)['body'], '[texts][en]') && str_contains($get('/en/admin/home', 3)['body'], '[texts][en][title]')
     && !str_contains($get('/en/admin/home', 3)['body'], '[texts][de]') && str_contains($get('/en/admin/home', 3)['body'], 'placeholder="Hallo"'));
@@ -4261,6 +4286,8 @@ $post('/admin/design', ['accent' => '#00aa55', 'ground' => '#fffdf5', 'text' => 
 $css = $get('/design/' . $app->design->fileName(), null)['body'];
 check('design: saved values are written to the stylesheet, for the light scheme only', str_contains($css, '--accent: #00aa55') && str_contains($css, '--radius: 12px')
     && str_contains($css, 'Georgia') && str_contains($css, 'prefers-color-scheme: light') && str_contains($css, 'data-theme="light"'));
+check('design: the stylesheet carries the rules for every span class the text-formatting toolbar may produce, for every theme',
+    str_contains($css, '.text-font-serif { font-family: Georgia') && str_contains($css, '.text-size-lg { font-size: 1.25em; }'));
 $post('/admin/design', ['accent' => 'rot', 'font' => 'Comic', 'radius' => '99', 'ground' => '#abcdef', 'text' => '#111111'], 3);
 $design = fn () => new Modulento\Core\Support\Design(new Modulento\Core\Support\Settings($pdo));
 $values = $design()->values();
