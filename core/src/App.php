@@ -150,6 +150,8 @@ final class App
     /** @var array<int, array{template: string, data: \Closure}> */
     private array $providerSections = [];
     /** @var array<int, array{template: string, data: \Closure}> */
+    private array $offerSections = [];
+    /** @var array<int, array{template: string, data: \Closure}> */
     private array $dashboardSections = [];
     /** @var array<int, array{label_key: string, path: string}> */
     private array $accountLinks = [];
@@ -336,6 +338,24 @@ final class App
     public function providerSections(): array
     {
         return $this->providerSections;
+    }
+
+    /**
+     * A template an extension wants shown on an offer's public page - e.g. a
+     * bookmark star. $data gets the raw offer row and runs only when that
+     * offer's page is shown.
+     *
+     * @param \Closure(array<string, mixed>, App): array<string, mixed> $data
+     */
+    public function addOfferSection(string $template, \Closure $data): void
+    {
+        $this->offerSections[] = ['template' => $template, 'data' => $data];
+    }
+
+    /** @return array<int, array{template: string, data: \Closure}> unresolved - the caller supplies the offer */
+    public function offerSections(): array
+    {
+        return $this->offerSections;
     }
 
     /**
