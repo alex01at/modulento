@@ -137,6 +137,19 @@ final class Registrar
     }
 
     /**
+     * A template an extension wants shown on an offer's public page - e.g. a
+     * bookmark star. The template is one of this extension's
+     * ("@id/offer.twig"); a theme may override it like any other. $data
+     * gets the raw offer row and runs only when that offer's page is shown.
+     *
+     * @param Closure(array<string, mixed>, App): array<string, mixed> $data
+     */
+    public function offerSection(string $template, Closure $data): void
+    {
+        $this->app->addOfferSection($template, $data);
+    }
+
+    /**
      * A section on the logged-in account's own dashboard (/account), e.g. a
      * digital card extension's status panel. The template is one of this
      * extension's ("@id/dashboard.twig"); a theme may override it like any

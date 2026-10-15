@@ -1640,6 +1640,10 @@ $r = $get('/offers/ich-gestalte-dein-logo', null);
 check('offer page: text escaped, packages, extra and requirements shown', $r['status'] === 200 && str_contains($r['body'], '&lt;script&gt;') && str_contains($r['body'], '<strong>Basis</strong>')
     && str_contains($r['body'], '<strong>Komplett</strong>') && str_contains($r['body'], '99,00 €') && str_contains($r['body'], 'Quelldatei: + 20,00 €') && str_contains($r['body'], 'Firmenname und Farben'));
 check('offer page: picture and link to the provider', str_contains($r['body'], "/media/offers/{$offerId}/{$image['name']}") && str_contains($r['body'], 'href="/providers/mueller-design"'));
+$pdo->exec("UPDATE extension SET enabled = 1 WHERE id = 'example'");
+check('offerSection(): the extension\'s block is rendered on the public offer page', str_contains($get('/offers/ich-gestalte-dein-logo', null)['body'], 'Vom Beispiel-Angebotsblock') && str_contains($get('/offers/ich-gestalte-dein-logo', null)['body'], '#' . $offerId));
+$pdo->exec("UPDATE extension SET enabled = 0 WHERE id = 'example'");
+check('offerSection(): disabled again, the block is gone', !str_contains($get('/offers/ich-gestalte-dein-logo', null)['body'], 'Vom Beispiel-Angebotsblock'));
 $r = $get('/en/offers/ich-gestalte-dein-logo', null);
 check('offer page in another language: default text, translated labels', $r['status'] === 200 && str_contains($r['body'], 'Ich gestalte dein Logo') && str_contains($r['body'], '<strong>Basic</strong>') && str_contains($r['body'], 'Delivery in 3 days'));
 check('offer list, home page and provider page show the offer', str_contains($get('/offers', null)['body'], 'ab 49,90 €') && str_contains($get('/', null)['body'], 'Ich gestalte dein Logo')

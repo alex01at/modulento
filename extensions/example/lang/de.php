@@ -15,4 +15,5 @@ return [
     'example.home.title' => 'Aus der Beispiel-Erweiterung',
     'example.account_link' => 'Beispiel-Konto-Link',
     'example.provider.title' => 'Vom Beispiel-Profilblock',
+    'example.offer.title' => 'Vom Beispiel-Angebotsblock',
 ];

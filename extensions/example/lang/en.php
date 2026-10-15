@@ -15,4 +15,5 @@ return [
     'example.home.title' => 'From the example extension',
     'example.account_link' => 'Example account link',
     'example.provider.title' => 'From the example profile block',
+    'example.offer.title' => 'From the example offer block',
 ];

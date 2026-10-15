@@ -144,6 +144,11 @@ final class OfferController extends Controller
             'custom_fields' => $app->customFields->display('offer', $offer['id'], $offer['type'], $locale),
             'reviews' => ReviewView::all($app->reviews->listPublic('offer', $offer['id'], 1, 20)['rows']),
             'messages' => $this->offerMessages($offer, $account),
+            // Templates extensions want shown on this offer's page, e.g. a bookmark star.
+            'extension_blocks' => array_map(
+                fn (array $section) => ['template' => $section['template'], 'data' => ($section['data'])($offer, $app)],
+                $app->offerSections()
+            ),
         ]);
     }
 

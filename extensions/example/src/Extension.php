@@ -37,6 +37,10 @@ final class Extension implements ExtensionContract
             'site' => $app->siteName(),
             'provider_name' => $provider['name'],
         ]);
+        $registrar->offerSection('@example/offer.twig', fn (array $offer, App $app): array => [
+            'site' => $app->siteName(),
+            'offer_id' => $offer['id'],
+        ]);
 
         $registrar->listen(AccountLoggedIn::class, function (AccountLoggedIn $event, App $app): void {
             $stmt = $app->db->prepare('INSERT INTO x_example_login (account_id, logged_in_at) VALUES (:id, :now)');

@@ -18,6 +18,10 @@
 
     {% include 'review/_rating.twig' with {rating: offer.rating} only %}
 
+    {% for block in extension_blocks %}
+        {% include block.template with block.data %}
+    {% endfor %}
+
     {# The rest of the page is in the order and of the parts the administration set (Administration → Offer page).
        While it is edited in place, every part gets its tools from the administration theme. #}
     {% include '@admin/inline/_bar.twig' with {page_path: '/admin/offer-page', add_types: ['text']} only %}
