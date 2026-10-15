@@ -20,7 +20,7 @@ use Modulento\Core\Support\Router;
  */
 final class Registrar
 {
-    public function __construct(private App $app, public readonly Manifest $manifest)
+    public function __construct(public readonly App $app, public readonly Manifest $manifest)
     {
     }
 
@@ -219,6 +219,35 @@ final class Registrar
     public function accountLink(string $labelKey, string $path): void
     {
         $this->app->addAccountLink($labelKey, $path);
+    }
+
+    /**
+     * A template an extension wants shown on the order form, between what
+     * the offer type itself asks for and the choice of payment method -
+     * e.g. a coupon addon's code field. The template is one of this
+     * extension's ("@id/checkout.twig"); a theme may override it like any
+     * other. $data gets the offer and whatever was submitted before (so a
+     * typed code survives a validation error).
+     *
+     * @param Closure(array<string, mixed>, array<string, mixed>, App): array<string, mixed> $data
+     */
+    public function checkoutSection(string $template, Closure $data): void
+    {
+        $this->app->addCheckoutSection($template, $data);
+    }
+
+    /**
+     * A way to adjust an order's line items before they are totalled - e.g.
+     * a coupon addon applying a discount code. Runs in registration order,
+     * each getting the previous one's result; a line's unit price is
+     * unsigned, so a discount must reduce it (prorated across lines) rather
+     * than add a negative one - see Order\Orders::create().
+     *
+     * @param Closure(array<int, array{label: string, quantity: int, unit_price: int}>, array<string, mixed>, array<string, mixed>, App): array<int, array{label: string, quantity: int, unit_price: int}> $modifier items, offer, raw POST input, app => the adjusted items
+     */
+    public function orderDiscount(Closure $modifier): void
+    {
+        $this->app->addOrderDiscount($modifier);
     }
 
     /**

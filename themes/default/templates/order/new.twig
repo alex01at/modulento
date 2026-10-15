@@ -20,6 +20,10 @@
     {# What can be chosen, supplied by the extension of the offer's type. #}
     {% include flow_template %}
 
+    {% for block in checkout_blocks %}
+        {% include block.template with block.data %}
+    {% endfor %}
+
     <label for="note">{{ trans('core.order.new.note') }}</label>
     <textarea id="note" name="note" rows="5" maxlength="5000">{{ note }}</textarea>
 

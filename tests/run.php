@@ -2318,6 +2318,27 @@ check('administrator cancels; both sides are told', $orderRow($waiting)['state']
 $export = json_decode($get('/account/export', 2)['body'], true);
 check('export lists the buyer\'s orders', count($export['orders'] ?? []) === 3 && ($export['orders'][0]['offer_title'] ?? '') === 'Ich gestalte dein Logo');
 
+// --- Registrar::checkoutSection() / Registrar::orderDiscount() -------------
+$pdo->exec("UPDATE extension SET enabled = 1 WHERE id = 'example'");
+$r = $get($orderPath . '?package=1', 2);
+check('checkoutSection(): the extension\'s block is rendered on the order form', str_contains($r['body'], 'Vom Beispiel-Checkout-Block') && str_contains($r['body'], 'name="example_discount_code"'));
+
+$beforeDiscount = $lastOrder();
+$r = $post($orderPath, ['package' => '1', 'example_discount_code' => 'nope'], 2);
+check('orderDiscount(): an invalid code refuses the order, with the extension\'s own message', $lastOrder() === $beforeDiscount && str_contains($r['body'], 'Dieser Rabattcode ist ungültig.'));
+
+$post($orderPath, ['package' => '1'], 2);
+$withoutCode = $lastOrder();
+check('orderDiscount(): no code, the price is untouched', (int) $orderRow($withoutCode)['total'] === 4990);
+
+$post($orderPath, ['package' => '1', 'example_discount_code' => 'EXAMPLE10'], 2);
+$withCode = $lastOrder();
+check('orderDiscount(): a valid code reduces the line\'s unit price, prorated so it stays unsigned', (int) $orderRow($withCode)['total'] === 4491);
+
+$pdo->exec("DELETE FROM orders WHERE id IN ({$withoutCode}, {$withCode})");
+$pdo->exec("UPDATE extension SET enabled = 0 WHERE id = 'example'");
+check('checkoutSection(): disabled again, the block is gone', !str_contains($get($orderPath . '?package=1', 2)['body'], 'Vom Beispiel-Checkout-Block'));
+
 // --- Files attached to orders ---------------------------------------------------
 use Modulento\Core\Order\OrderFiles;
 

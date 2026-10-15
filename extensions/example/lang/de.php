@@ -17,4 +17,7 @@ return [
     'example.account_link' => 'Beispiel-Konto-Link',
     'example.provider.title' => 'Vom Beispiel-Profilblock',
     'example.offer.title' => 'Vom Beispiel-Angebotsblock',
+    'example.checkout.title' => 'Vom Beispiel-Checkout-Block',
+    'example.checkout.code' => 'Rabattcode',
+    'example.checkout.error.invalid_code' => 'Dieser Rabattcode ist ungültig.',
 ];

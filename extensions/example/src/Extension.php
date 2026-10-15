@@ -12,6 +12,7 @@ use Modulento\Core\Extension\Registrar;
 use Modulento\Core\Subscription\SubscriptionProvider;
 use Modulento\Core\Support\Clock;
 use Modulento\Core\Support\Router;
+use RuntimeException;
 
 /**
  * Reference extension: uses every registration point once, so it doubles as
@@ -55,6 +56,25 @@ final class Extension implements ExtensionContract
             'site' => $app->siteName(),
             'offer_id' => $offer['id'],
         ]);
+        $registrar->checkoutSection('@example/checkout.twig', fn (array $offer, array $input, App $app): array => [
+            'offer_id' => $offer['id'],
+        ]);
+        // A real coupon addon (modulento-ext-coupons) would look the code up
+        // against its own table; this exists only so the core's own test
+        // suite can see Registrar::orderDiscount() work end to end - a 10%
+        // discount for one fixed code, prorated across lines since
+        // order_item.unit_price is unsigned (never a negative line).
+        $registrar->orderDiscount(function (array $items, array $offer, array $input, App $app): array {
+            $code = trim((string) ($input['example_discount_code'] ?? ''));
+            if ($code === '') {
+                return $items;
+            }
+            if ($code !== 'EXAMPLE10') {
+                throw new RuntimeException('example.checkout.error.invalid_code');
+            }
+
+            return array_map(fn (array $item) => ['unit_price' => (int) round($item['unit_price'] * 0.9)] + $item, $items);
+        });
         $registrar->subscriptionProvider(self::$subscriptionProvider ?? new class implements SubscriptionProvider {
             public function allows(int $accountId, string $feature): bool { return false; }
             public function grants(int $accountId, string $feature): bool { return false; }

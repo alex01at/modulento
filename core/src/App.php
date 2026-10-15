@@ -161,6 +161,10 @@ final class App
     private array $offerSections = [];
     /** @var array<int, array{template: string, data: \Closure}> */
     private array $dashboardSections = [];
+    /** @var array<int, array{template: string, data: \Closure}> */
+    private array $checkoutSections = [];
+    /** @var array<int, \Closure> */
+    private array $orderDiscounts = [];
     /** @var array<int, array{label_key: string, path: string}> */
     private array $accountLinks = [];
     /** @var array<string, string> permission name => label key */
@@ -435,6 +439,45 @@ final class App
     public function dashboardSections(): array
     {
         return $this->dashboardSections;
+    }
+
+    /**
+     * A template an extension wants shown on the order form, between what
+     * the offer type itself asks for and the choice of payment method -
+     * e.g. a coupon code field. $data gets the offer and whatever was
+     * submitted before (so a typed code survives a validation error).
+     *
+     * @param \Closure(array<string, mixed>, array<string, mixed>, App): array<string, mixed> $data
+     */
+    public function addCheckoutSection(string $template, \Closure $data): void
+    {
+        $this->checkoutSections[] = ['template' => $template, 'data' => $data];
+    }
+
+    /** @return array<int, array{template: string, data: \Closure}> unresolved - the caller supplies the offer and the input */
+    public function checkoutSections(): array
+    {
+        return $this->checkoutSections;
+    }
+
+    /**
+     * A way for an extension to adjust an order's line items before they
+     * are totalled - e.g. a coupon code's discount. Runs in registration
+     * order, each getting the previous one's result. A line's unit_price
+     * is unsigned: a discount must reduce it (prorated across lines), never
+     * add a negative one.
+     *
+     * @param \Closure(array<int, array{label: string, quantity: int, unit_price: int}>, array<string, mixed>, array<string, mixed>, App): array<int, array{label: string, quantity: int, unit_price: int}> $modifier items, offer, raw POST input, app => the adjusted items
+     */
+    public function addOrderDiscount(\Closure $modifier): void
+    {
+        $this->orderDiscounts[] = $modifier;
+    }
+
+    /** @return array<int, \Closure> */
+    public function orderDiscounts(): array
+    {
+        return $this->orderDiscounts;
     }
 
     /** A link an extension adds to the account area, e.g. to a profile page of its own. */
