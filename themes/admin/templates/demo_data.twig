@@ -1,0 +1,31 @@
+{% extends '@admin/layout.twig' %}
+
+{% block title %}{{ trans('core.admin.demo_data.title') }} – {{ site_name }}{% endblock %}
+
+{% block admin %}
+{% include '@admin/_page_header.twig' with {heading: trans('core.admin.demo_data.title')} only %}
+
+<section class="card-box">
+    <p>{{ trans('core.admin.demo_data.intro') }}</p>
+
+    {% if counts.accounts > 0 %}
+        <ul class="plain-list">
+            <li>{{ trans('core.admin.demo_data.count_accounts', {count: counts.accounts}) }}</li>
+            <li>{{ trans('core.admin.demo_data.count_providers', {count: counts.providers}) }}</li>
+            <li>{{ trans('core.admin.demo_data.count_offers', {count: counts.offers}) }}</li>
+            <li>{{ trans('core.admin.demo_data.count_requests', {count: counts.requests}) }}</li>
+        </ul>
+        <form method="post" action="{{ url('/admin/demo-data/clear') }}" class="danger-form">
+            {{ csrf_field() }}
+            <p><small>{{ trans('core.admin.demo_data.clear_hint') }}</small></p>
+            <button type="submit" class="danger">{{ trans('core.admin.demo_data.clear') }}</button>
+        </form>
+    {% else %}
+        <p class="empty">{{ trans('core.admin.demo_data.none') }}</p>
+        <form method="post" action="{{ url('/admin/demo-data/generate') }}">
+            {{ csrf_field() }}
+            <button type="submit">{{ trans('core.admin.demo_data.generate') }}</button>
+        </form>
+    {% endif %}
+</section>
+{% endblock %}

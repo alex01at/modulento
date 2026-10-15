@@ -75,6 +75,19 @@ final class Registrar
         $this->app->orders->registerPaymentMethod($method);
     }
 
+    /**
+     * How this offer type takes part in Administration → Demo data: given a
+     * provider and, where one exists, a category, creates one demo offer
+     * and returns its id (already published), or null if it could not.
+     *
+     * @param Closure(App, int, ?int): ?int $generate
+     */
+    public function demoOffers(string $offerTypeId, Closure $generate): void
+    {
+        $this->prefixed($offerTypeId, 'Offer type');
+        $this->app->addDemoOfferGenerator($offerTypeId, $generate);
+    }
+
     /** A feature the extension sells with a subscription plan; the name is a language key. */
     public function subscriptionFeature(string $key, string $labelKey): void
     {

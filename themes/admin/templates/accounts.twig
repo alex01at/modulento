@@ -31,7 +31,7 @@
             <tbody>
             {% for row in accounts %}
                 <tr>
-                    <th scope="row"><a href="{{ url('/admin/accounts/' ~ row.id) }}">{{ row.email }}</a></th>
+                    <th scope="row"><a href="{{ url('/admin/accounts/' ~ row.id) }}">{{ row.email }}</a> {% if row.is_demo %}<span class="badge">{{ trans('core.admin.demo_data.badge') }}</span>{% endif %}</th>
                     <td>{{ row.display_name }}</td>
                     <td>
                         <span class="badge badge-{{ row.status }}">{{ trans('core.admin.accounts.status.' ~ row.status) }}</span>

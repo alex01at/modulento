@@ -153,6 +153,8 @@ final class App
     private array $navigation = [];
     /** @var array<int, array{label_key: string, path: string}> */
     private array $footerLinks = [];
+    /** @var array<string, \Closure> offer type id => demo-offer generator */
+    private array $demoOfferGenerators = [];
     /** @var array<int, array{template: string, data: ?\Closure}> */
     private array $homeSections = [];
     /** @var array<int, array{template: string, data: \Closure}> */
@@ -332,6 +334,25 @@ final class App
     public function footerLinks(): array
     {
         return $this->footerLinks;
+    }
+
+    /**
+     * A way for an extension's offer type to take part in Administration →
+     * Demo data: given a provider and, where one exists, a category, it
+     * creates one demo offer of its own type and returns the new offer's
+     * id (already published), or null if it could not.
+     *
+     * @param \Closure(App, int, ?int): ?int $generate
+     */
+    public function addDemoOfferGenerator(string $offerTypeId, \Closure $generate): void
+    {
+        $this->demoOfferGenerators[$offerTypeId] = $generate;
+    }
+
+    /** @return array<string, \Closure> offer type id => generator */
+    public function demoOfferGenerators(): array
+    {
+        return $this->demoOfferGenerators;
     }
 
     /**

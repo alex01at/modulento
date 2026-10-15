@@ -107,7 +107,7 @@ final class Accounts
         $count->execute($params);
 
         $stmt = $this->db->prepare(
-            "SELECT id, email, display_name, status, email_verified_at, created_at, last_login_at FROM account {$where}
+            "SELECT id, email, display_name, status, email_verified_at, created_at, last_login_at, is_demo FROM account {$where}
              ORDER BY id DESC LIMIT " . max(1, $perPage) . ' OFFSET ' . max(0, (min($page, 100000) - 1) * $perPage)
         );
         $stmt->execute($params);
