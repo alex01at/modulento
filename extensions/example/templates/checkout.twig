@@ -1,0 +1,4 @@
+{# Included on the order form, see Registrar::checkoutSection(). Gets "offer_id" from the closure given there. #}
+<p>{{ trans('example.checkout.title') }} #{{ offer_id }}</p>
+<label for="example_discount_code">{{ trans('example.checkout.code') }}</label>
+<input id="example_discount_code" name="example_discount_code" type="text" maxlength="20">

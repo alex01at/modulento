@@ -45,6 +45,16 @@ final class OrderController extends Controller
         $built = $flow->build($offer, $_POST, $locale, $app);
         $errors = $built['errors'];
 
+        if ($errors === [] && $built['items'] !== []) {
+            try {
+                foreach ($app->orderDiscounts() as $modifier) {
+                    $built['items'] = $modifier($built['items'], $offer, $_POST, $app);
+                }
+            } catch (RuntimeException $e) {
+                $errors[] = $e->getMessage();
+            }
+        }
+
         $note = trim(str_replace("\r\n", "\n", (string) ($_POST['note'] ?? '')));
         if (mb_strlen($note) > 5000) {
             $errors[] = 'core.order.error.note_too_long';
@@ -154,6 +164,10 @@ final class OrderController extends Controller
             ],
             'flow_template' => $flow->orderFormTemplate(),
             'flow_data' => $flow->orderFormData($offer, $input, $locale, $app),
+            'checkout_blocks' => array_map(
+                fn (array $section) => ['template' => $section['template'], 'data' => ($section['data'])($offer, $input, $app)],
+                $app->checkoutSections()
+            ),
             'note' => (string) ($input['note'] ?? ''),
             'payment_methods' => $methods,
             // The one typed before, or the only one there is.
