@@ -265,6 +265,14 @@ final class App
         return $absolute ? $this->config['app']['url'] . $url : $url;
     }
 
+    /** The version of this installation, or "0.0.0" outside a release package (a working copy from git). */
+    public function coreVersion(): string
+    {
+        $file = $this->config['app']['root'] . '/VERSION';
+
+        return is_file($file) ? (trim((string) file_get_contents($file)) ?: '0.0.0') : '0.0.0';
+    }
+
     /** Set in the administration; APP_NAME from .env until then. */
     public function siteName(): string
     {

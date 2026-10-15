@@ -258,35 +258,25 @@ img { max-width: 100%; height: auto; border-radius: 6px; }
 }
 
 /* --- Dashboard ---------------------------------------------------------- */
-.stats { display: grid; grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr)); gap: 1.5rem; margin: 0 0 1.5rem; padding: 0; list-style: none; }
-.stat-card {
-    position: relative;
-    display: grid;
-    grid-template-columns: 1fr auto;
-    gap: .25rem 1rem;
-    align-items: center;
-    margin: 0;
-    border-left: 4px solid transparent;
-    transition: box-shadow .15s, transform .15s;
-}
-.stat-card:hover, .stat-card:focus-within { box-shadow: var(--shadow-raised); transform: translateY(-2px); }
-.stat-value { color: var(--heading); font-size: 2rem; font-weight: 700; line-height: 1.1; }
-.stat-label { color: var(--muted); font-weight: 600; text-decoration: none; }
-/* The whole card leads to the list; the note's own link stays on top. */
-.stat-label::after { content: ""; position: absolute; inset: 0; border-radius: var(--radius); }
-.stat-label:focus-visible { outline: none; }
-.stat-label:focus-visible::after { outline: 3px solid var(--link); outline-offset: 2px; }
-.stat-icon { display: grid; place-items: center; grid-row: 1 / 3; grid-column: 2; width: 3.25rem; height: 3.25rem; border-radius: 50%; background: var(--primary-soft); color: var(--link); }
-.stat-note { grid-column: 1 / -1; margin-top: .5rem; color: var(--muted); font-size: .875rem; }
-.stat-note a { position: relative; z-index: 1; text-decoration: none; }
-.stat-note a:hover { text-decoration: underline; }
-.stat-card.is-pending { border-left-color: var(--warning-line); }
-.stat-card.is-pending .stat-icon { background: var(--warning-soft); color: var(--warning); }
-
 .area-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr)); gap: .75rem; margin: 0; padding: 0; list-style: none; }
 .area-list a { display: flex; align-items: center; gap: .75rem; padding: .75rem 1rem; border: 1px solid var(--line); border-radius: 8px; color: var(--heading); font-weight: 500; text-decoration: none; }
 .area-list a:hover { border-color: var(--link); background: var(--primary-soft); color: var(--link-strong); }
 .area-list .icon { color: var(--link); }
+
+.dashboard-banner { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .75rem 1.5rem; margin: 0 0 1.5rem; padding: 1rem 1.25rem; border: 1px solid var(--warning-line); border-radius: var(--radius); background: var(--warning-soft); color: var(--warning); }
+.dashboard-banner p { margin: 0; }
+.dashboard-columns { display: grid; grid-template-columns: 2fr 1fr; gap: 1.5rem; align-items: start; }
+.dashboard-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .5rem 1rem; padding: .75rem 0; border-top: 1px solid var(--line); }
+.dashboard-row:first-child { border-top: 0; padding-top: 0; }
+.dashboard-row p { margin: 0; }
+.dashboard-section-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .5rem 1rem; }
+.dashboard-section-head h2 { margin: 0; }
+.btn-block { display: block; margin-top: .75rem; text-align: center; }
+.dashboard-health dt { color: var(--muted); }
+.dashboard-health dd { margin: 0 0 .6rem; color: var(--heading); font-weight: 600; }
+@media (max-width: 64rem) {
+    .dashboard-columns { grid-template-columns: 1fr; }
+}
 
 /* --- Buttons ------------------------------------------------------------ */
 button, .btn {
@@ -468,8 +458,6 @@ code { padding: .1rem .35rem; border: 1px solid var(--line); border-radius: 4px;
     .topbar-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
     .admin-content { padding: 1rem; }
     .card-box, .admin-content > table { margin-bottom: 1rem; padding: 1rem; }
-    .stats { gap: 1rem; }
-    .stats .stat-card { margin: 0; }
     .details th { padding-left: 0; }
     .details th, .details td { display: block; width: auto; max-width: none; }
     .details th { padding-bottom: 0; border-bottom: 0; }

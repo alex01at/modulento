@@ -256,6 +256,7 @@ $pdo->exec("CREATE TABLE account_token (id INTEGER PRIMARY KEY, account_id INTEG
 $pdo->exec("CREATE TABLE account_login_token (id INTEGER PRIMARY KEY, account_id INTEGER REFERENCES account (id) ON DELETE CASCADE,
     selector TEXT UNIQUE, token_hash TEXT, previous_hash TEXT, rotated_at TEXT, auth_stamp TEXT, user_agent TEXT, created_at TEXT, last_used_at TEXT, expires_at TEXT)");
 $pdo->exec("CREATE TABLE rate_limit_attempt (id INTEGER PRIMARY KEY, action TEXT, identifier TEXT, created_at TEXT)");
+$pdo->exec("CREATE TABLE task_run (name TEXT PRIMARY KEY, last_started_at TEXT, last_finished_at TEXT, last_status TEXT, last_error TEXT)");
 $pdo->exec("CREATE TABLE x_example_login (id INTEGER PRIMARY KEY, account_id INTEGER REFERENCES account (id) ON DELETE CASCADE, logged_in_at TEXT)");
 $pdo->exec("CREATE TABLE category (id INTEGER PRIMARY KEY, parent_id INTEGER REFERENCES category (id), position INTEGER, created_at TEXT)");
 $pdo->exec("CREATE TABLE category_translation (category_id INTEGER REFERENCES category (id) ON DELETE CASCADE, locale TEXT, name TEXT, slug TEXT, PRIMARY KEY (category_id, locale), UNIQUE (locale, slug))");
@@ -2386,9 +2387,8 @@ check('hiding an offer question removes it from the thread for both the asker an
 $post('/admin/messages/offer/' . $flaggedOfferMsgId . '/dismiss', [], 3);
 check('dismissing an already-hidden offer question just clears the flag, it stays hidden', $offerMessage($flaggedOfferMsgId)['status'] === 'hidden' && $offerMessage($flaggedOfferMsgId)['decided_at'] !== null);
 
-$total = $app->orders->messageCount() + $app->offerMessages->messageCount();
 $r = $get('/admin', 3);
-check('dashboard: the messages card shows the combined total and links to the flagged filter', str_contains($r['body'], '>' . $total . '<') && str_contains($r['body'], 'href="/admin/messages?status=pending"'));
+check('dashboard: flagged messages show in the action queue, linking to the flagged filter', str_contains($r['body'], 'href="/admin/messages?status=pending"'));
 
 // --- The inbox: every conversation of the account, mixed and sorted by latest activity ---
 check('inbox: the header carries the envelope link and its unread badge', str_contains($get('/account', 1)['body'], 'href="/account/messages"') && str_contains($get('/account', 1)['body'], 'data-unread'));
@@ -2780,7 +2780,7 @@ $request = $requestRow();
 check('request: created pending while approval is required, with its budget converted to minor units and a slug', $request !== false && $request['status'] === 'pending'
     && $request['slug'] === 'website-fuer-fotostudio' && (int) $request['budget_min'] === 30000 && (int) $request['budget_max'] === 60000 && $request['currency'] === 'EUR');
 $requestId = (int) $request['id'];
-check('requests: the admin dashboard has a tile with the pending count', str_contains($get('/admin', 3)['body'], 'href="/admin/requests"') && str_contains($get('/admin', 3)['body'], 'href="/admin/requests?status=pending"'));
+check('requests: the admin dashboard has a tile with the pending count', str_contains($get('/admin', 3)['body'], 'href="/admin/requests?status=pending"'));
 check('request: a pending request is not public', $get('/requests/website-fuer-fotostudio', null)['status'] === 404 && !str_contains($get('/requests', null)['body'], 'Website für Fotostudio'));
 check('request: someone else cannot edit, delete or see the applications of it', $get('/account/requests/' . $requestId . '/edit', 9)['status'] === 404
     && $post('/account/requests/' . $requestId . '/delete', [], 9)['status'] === 404 && $get('/account/requests/' . $requestId . '/applications', 9)['status'] === 404);
@@ -2938,15 +2938,43 @@ check('roles: the admin menu only shows what the account may do', str_contains($
 $r = $get('/admin/pages/new', 3);
 check('admin menu marks the entry of the current page', str_contains($r['body'], 'href="/admin/pages" aria-current="page"')
     && !str_contains($r['body'], 'href="/admin/settings" aria-current'));
+// The dashboard's action queue shows an area only while something of it is
+// actually pending - nothing to review means no entry, not an empty figure.
+$accounts->create('queue-test@example.test', $pw, 'de', verified: true);
+$queueAccountId = (int) $row('queue-test@example.test')['id'];
+$pdo->exec("INSERT INTO provider (id, account_id, type, status, name, slug, created_at, updated_at)
+    VALUES (950, {$queueAccountId}, 'private', 'pending', 'Wartender Anbieter', 'wartender-anbieter', '2026-01-01 00:00:00', '2026-01-01 00:00:00')");
+$queueEntry = fn (string $body, string $path): bool => str_contains($body, 'href="' . $path . '?status=pending"');
 $r = $get('/admin', 3);
-$figure = fn (string $body, string $path): bool => str_contains($body, 'class="stat-label" href="' . $path . '"');
-check('dashboard: an administrator gets a figure for every area', $r['status'] === 200 && $figure($r['body'], '/admin/providers') && $figure($r['body'], '/admin/offers')
-    && $figure($r['body'], '/admin/orders') && $figure($r['body'], '/admin/accounts') && $figure($r['body'], '/admin/reviews'));
+check('dashboard: the action queue shows an area with something pending', $r['status'] === 200 && $queueEntry($r['body'], '/admin/providers'));
+check('dashboard: an area with nothing pending has no entry at all', !$queueEntry($r['body'], '/admin/reviews') && !$queueEntry($r['body'], '/admin/offers'));
 $pdo->exec("INSERT INTO role_permission VALUES ({$roleId}, 'core.admin.access'), ({$roleId}, 'core.orders.manage')");
 $r = $get('/admin', 1);
-check('dashboard: figures only for areas the account may manage', $r['status'] === 200 && $figure($r['body'], '/admin/orders')
-    && !$figure($r['body'], '/admin/accounts') && !$figure($r['body'], '/admin/providers') && !$figure($r['body'], '/admin/reviews'));
+check('dashboard: the queue only shows areas the account may manage, pending or not', $r['status'] === 200 && !$queueEntry($r['body'], '/admin/providers'));
+$pdo->exec("DELETE FROM provider WHERE id = 950");
+$pdo->exec("DELETE FROM account WHERE email = 'queue-test@example.test'");
 $pdo->exec("DELETE FROM role_permission WHERE role_id = {$roleId} AND permission IN ('core.admin.access', 'core.orders.manage')");
+
+// --- Dashboard: quick actions and the system health panel -----------------------
+$r = $get('/admin', 3);
+check('dashboard: an administrator sees every quick action', str_contains($r['body'], 'href="/admin/pages/new"') && str_contains($r['body'], 'href="/admin/accounts/new"')
+    && str_contains($r['body'], 'href="/admin/media"') && str_contains($r['body'], 'href="/admin/settings"'));
+$accountCount = (int) $pdo->query('SELECT COUNT(*) FROM account')->fetchColumn();
+check('dashboard: system health shows the dev version, the real account count, and no app while none is enabled',
+    str_contains($r['body'], '>0.0.0<') && str_contains($r['body'], '>' . $accountCount . '<') && str_contains($r['body'], 'Keine App aktiv'));
+check('dashboard: no cron run yet says so', str_contains($r['body'], 'noch nie'));
+$extensionBefore = $pdo->query("SELECT * FROM extension WHERE id = 'freelancer'")->fetch();
+$pdo->exec("DELETE FROM extension WHERE id = 'freelancer'");
+$pdo->exec("INSERT INTO extension VALUES ('freelancer', '0.1.0', 1)");
+check('dashboard: an enabled app is named', str_contains($get('/admin', 3)['body'], 'freelancer'));
+$pdo->exec("INSERT INTO task_run (name, last_finished_at, last_status) VALUES ('core.notifications.send', '2026-06-01 08:00:00', 'ok')");
+check('dashboard: the last cron run is shown once a task has run', str_contains($get('/admin', 3)['body'], '2026-06-01 08:00:00'));
+$pdo->exec("DELETE FROM task_run");
+$pdo->exec("DELETE FROM extension WHERE id = 'freelancer'");
+if ($extensionBefore !== false) {
+    $pdo->prepare('INSERT INTO extension VALUES (?, ?, ?)')->execute(array_values($extensionBefore));
+}
+check('dashboard: an account without quick-action permissions sees none of them', !str_contains($get('/admin', 1)['body'], 'href="/admin/settings"') && !str_contains($get('/admin', 1)['body'], 'href="/admin/accounts/new"'));
 $pdo->exec("INSERT INTO role_permission VALUES ({$roleId}, 'core.accounts.manage')");
 $post('/admin/accounts/1/roles', ['roles' => [$roleId, $adminRoleId]], 1);
 check('roles: managing accounts does not allow handing out roles', $get('/admin/settings', 1)['status'] === 403);
@@ -4474,10 +4502,10 @@ $updateConfig = ['update' => ['repo' => 'acme/modulento']] + $config;
 $app = new Modulento\Core\App($config, $pdo);
 $app->settings->set('core.update_check', json_encode(['core' => '99.0.0', 'packages' => [], 'checked_at' => gmdate('Y-m-d H:i')]));
 $rr = request($pdo, $updateConfig, 'GET', '/admin', 3);
-check('dashboard: an available update is counted and named, with the installed version next to it', str_contains($rr['body'], 'Modulento 99.0.0') && str_contains($rr['body'], '<span class="stat-value">1</span>'));
+check('dashboard: an available update is named, with the installed version next to it', str_contains($rr['body'], 'Modulento 99.0.0'));
 $justNow = gmdate('Y-m-d H:i');
 $app->settings->set('core.update_check', json_encode(['core' => '0.0.0', 'packages' => [], 'checked_at' => $justNow]));
-check('dashboard: an up-to-date check says so with its date', str_contains(request($pdo, $updateConfig, 'GET', '/admin', 3)['body'], 'Aktuell · geprüft am ' . $justNow . ' UTC'));
+check('dashboard: an up-to-date check says so', str_contains(request($pdo, $updateConfig, 'GET', '/admin', 3)['body'], 'Aktuell'));
 $app->settings->set('core.update_check', '');
 check('dashboard: without a repository it says that updates are off', str_contains(request($pdo, $config, 'GET', '/admin', 3)['body'], 'Updates sind ausgeschaltet'));
 
