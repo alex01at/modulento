@@ -219,7 +219,7 @@ final class View
         // The wording of the text editor (editor.js), as a JSON object for
         // the data-editor attribute of an HTML text field.
         $this->twig->addFunction(new TwigFunction('editor', function () use ($translator): string {
-            $keys = ['toolbar', 'area', 'p', 'h2', 'h3', 'bold', 'italic', 'ul', 'ol', 'quote', 'link', 'unlink', 'html', 'link_prompt', 'format_clear', 'format_color'];
+            $keys = ['toolbar', 'area', 'p', 'h2', 'h3', 'bold', 'italic', 'ul', 'ol', 'quote', 'link', 'unlink', 'html', 'link_prompt', 'format_clear', 'format_color', 'close'];
             $labels = array_combine($keys, array_map(fn (string $key) => $translator->trans('core.editor.' . $key), $keys));
             // The font buttons reuse the Design settings page's own font names, so the two never drift apart.
             foreach (array_keys(Design::FONTS) as $font) {

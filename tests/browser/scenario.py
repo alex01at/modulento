@@ -68,7 +68,8 @@ async def main():
         await asyncio.sleep(1)
         await b.goto(BASE + '/?edit=1')
         await b.click('#inline-cta-links a')
-        check('a button in edit mode is not followed; its form opens instead', await b.location() == '/?edit=1' and await b.eval("!!document.querySelector('#inline-cta-links details.inline-edit[open]')"))
+        check('a button in edit mode is not followed; its form opens as a dialog instead', await b.location() == '/?edit=1' and await b.eval("!!document.querySelector('.inline-edit-dialog[open]')"))
+        await b.eval("document.querySelector('.inline-edit-dialog[open]').close()")
 
         # 2e. duplicate a block
         before = await b.eval("document.querySelectorAll('.inline-block').length")

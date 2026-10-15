@@ -96,6 +96,7 @@ return [
     'core.editor.quote' => 'Zitat',
     'core.editor.link' => 'Link',
     'core.editor.unlink' => 'Link entfernen',
+    'core.editor.close' => 'Schließen',
     'core.editor.html' => 'HTML',
     'core.editor.link_prompt' => 'Adresse des Links:',
     'core.editor.format_clear' => 'Formatierung entfernen',
