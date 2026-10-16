@@ -449,6 +449,8 @@ final class Kernel
         $router->post('/admin/packages/{kind}/{id}/remove', [PackageController::class, 'remove'], 'core.packages.manage');
         $router->post('/admin/packages/{kind}/{id}/enable', [PackageController::class, 'enable'], 'core.packages.manage');
         $router->post('/admin/packages/{kind}/{id}/disable', [PackageController::class, 'disable'], 'core.packages.manage');
+        $router->post('/admin/licenses', [PackageController::class, 'saveLicense'], 'core.packages.manage');
+        $router->post('/admin/licenses/{product}/remove', [PackageController::class, 'removeLicense'], 'core.packages.manage');
 
         $router->get('/admin/demo-data', [DemoDataController::class, 'index'], 'core.demo_data.manage');
         $router->post('/admin/demo-data/generate', [DemoDataController::class, 'generate'], 'core.demo_data.manage');

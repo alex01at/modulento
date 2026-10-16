@@ -133,6 +133,39 @@
 </section>
 
 <section class="card-box">
+    <h2>{{ trans('core.license.title') }}</h2>
+    <p>{{ trans('core.license.hint') }}</p>
+    {% if license_keys %}
+        <table>
+            <thead><tr><th>{{ trans('core.license.product') }}</th><th>{{ trans('core.license.key') }}</th><th>{{ trans('core.license.added_at') }}</th><th></th></tr></thead>
+            <tbody>
+            {% for item in license_keys %}
+                <tr>
+                    <td>{{ item.product_id }}</td>
+                    <td>{{ item.masked }}</td>
+                    <td>{{ item.added_at }}</td>
+                    <td>
+                        <form method="post" action="{{ url('/admin/licenses/' ~ item.product_id ~ '/remove') }}">
+                            {{ csrf_field() }}
+                            <button type="submit" class="btn-sm">{{ trans('core.license.remove') }}</button>
+                        </form>
+                    </td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    {% endif %}
+    <form method="post" action="{{ url('/admin/licenses') }}" class="stack-form">
+        {{ csrf_field() }}
+        <label for="product_id">{{ trans('core.license.product') }}</label>
+        <input id="product_id" name="product_id" placeholder="ext-exklusiv" required>
+        <label for="license_key">{{ trans('core.license.key') }}</label>
+        <input id="license_key" name="license_key" type="text" required>
+        <button type="submit">{{ trans('core.license.save') }}</button>
+    </form>
+</section>
+
+<section class="card-box">
     <h2>{{ trans('core.package.upload_title') }}</h2>
     <p>{{ trans('core.package.upload_hint') }}</p>
     <form method="post" action="{{ url('/admin/packages/upload') }}" enctype="multipart/form-data" class="stack-form">

@@ -7,6 +7,7 @@ namespace Modulento\Core\Package;
 use Modulento\Core\App;
 use Modulento\Core\Support\Clock;
 use Modulento\Core\Support\ReleaseClient;
+use Modulento\Core\Support\ReleaseSource;
 use Modulento\Core\Support\SafeArchive;
 use Modulento\Core\Support\UpdateException;
 use PDO;
@@ -44,7 +45,7 @@ final class Packages
     /** @param string[] $allowedSources patterns like "owner/*" or "owner/name" */
     public function __construct(
         private PDO $db,
-        private ReleaseClient $releases,
+        private ReleaseSource $releases,
         private string $extensionsDir,
         private string $themesDir,
         private string $workDir,
@@ -61,6 +62,15 @@ final class Packages
 
     public function isAllowed(string $repo): bool
     {
+        // A licensed product is gated by its license server, not by this
+        // list - the owner-pattern allowlist below is about which GitHub
+        // repositories are trusted to run as code on this server at all;
+        // for a license: repo, only a key the operator actually entered
+        // (License\LicenseKeys) ever gets a release, which is a stronger
+        // gate than an owner pattern could add.
+        if (self::isLicensedRepo($repo)) {
+            return true;
+        }
         if (!ReleaseClient::isRepository($repo)) {
             return false;
         }
@@ -72,6 +82,12 @@ final class Packages
         }
 
         return false;
+    }
+
+    /** Whether $repo names a product sold under its own license rather than a GitHub repository. */
+    public static function isLicensedRepo(string $repo): bool
+    {
+        return preg_match('/^license:[a-z][a-z0-9_-]{0,63}$/', $repo) === 1;
     }
 
     /** Whether a name belongs to what the core itself brings along. */
