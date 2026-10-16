@@ -45,6 +45,10 @@ return [
         // installed from the administration; empty switches updates off.
         'repo' => $_ENV['UPDATE_REPO'] ?? 'alex01at/modulento',
         'token' => $_ENV['UPDATE_TOKEN'] ?? '',
+        // Base address of a license server a "license:<product>" package
+        // (Package\Packages::isLicensedRepo()) gets its releases from.
+        // Empty: no licensed product can ever be installed or updated here.
+        'license_server' => rtrim($_ENV['LICENSE_SERVER_URL'] ?? '', '/'),
     ],
     'packages' => [
         // Repositories extensions and themes may be installed from, as

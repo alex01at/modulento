@@ -58,7 +58,31 @@ final class PackageController extends Controller
             'unmanaged' => $unmanaged,
             'official' => $official,
             'sources' => $app->packages->allowedSources(),
+            'license_keys' => $app->licenseKeys->all(),
         ]);
+    }
+
+    /** Stores (or replaces) the key for a product sold under its own license. */
+    public function saveLicense(array $params): void
+    {
+        $productId = trim((string) ($_POST['product_id'] ?? ''));
+        $key = trim((string) ($_POST['license_key'] ?? ''));
+
+        if (preg_match('/^[a-z][a-z0-9_-]{0,63}$/', $productId) !== 1 || $key === '') {
+            Session::flash('error', $this->trans('core.license.error.invalid'));
+        } else {
+            $this->app->licenseKeys->save($productId, $key);
+            Session::flash('success', $this->trans('core.license.saved', ['product' => $productId]));
+        }
+
+        $this->redirect('/admin/packages');
+    }
+
+    public function removeLicense(array $params): void
+    {
+        $this->app->licenseKeys->remove($params['product']);
+        Session::flash('success', $this->trans('core.license.removed', ['product' => $params['product']]));
+        $this->redirect('/admin/packages');
     }
 
     public function install(array $params): void
