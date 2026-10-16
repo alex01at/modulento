@@ -535,6 +535,29 @@ $get('/register', null);
 $r = $post('/register', ['email' => 'quick@example.test', 'password' => $pw, 'password_repeat' => $pw]);
 check('register: a form sent back the moment it was shown creates nothing', $row('quick@example.test') === false && str_contains($r['body'], 'Das ging sehr schnell'));
 
+// --- Registrar::registrationGuard() / registrationSection() / cookie consent -----------------
+$pdo->exec("UPDATE extension SET enabled = 1 WHERE id = 'example'");
+$r = $get('/register', null);
+check('registrationSection(): the extension\'s block is rendered on the registration form', str_contains($r['body'], 'Vom Beispiel-Registrierungsblock'));
+check('cookieBanner(): shown on every page, consent not granted without a provider that says so', str_contains($r['body'], 'Beispiel-Cookie-Banner') && str_contains($r['body'], '– nicht zugestimmt'));
+
+Modulento\Example\Extension::$blockRegistration = true;
+$r = $post('/register', ['email' => 'antispam-blocked@example.test', 'password' => $pw, 'password_repeat' => $pw], null);
+check('registrationGuard(): the extension refuses with its own message, no account created', $row('antispam-blocked@example.test') === false && str_contains($r['body'], 'Die Registrierung wurde vom Beispiel blockiert.'));
+Modulento\Example\Extension::$blockRegistration = false;
+$post('/register', ['email' => 'antispam-allowed@example.test', 'password' => $pw, 'password_repeat' => $pw], null);
+check('registrationGuard(): not blocked, the account is created normally', $row('antispam-allowed@example.test') !== false);
+$pdo->exec("DELETE FROM account WHERE email = 'antispam-allowed@example.test'");
+
+Modulento\Example\Extension::$consentProvider = new class implements Modulento\Core\Cookie\ConsentProvider {
+    public function granted(string $category): bool { return $category === 'example.demo_cookie'; }
+};
+check('consentProvider(): a registered provider is asked, the banner reflects its answer', str_contains($get('/register', null)['body'], '– zugestimmt'));
+Modulento\Example\Extension::$consentProvider = null;
+
+$pdo->exec("UPDATE extension SET enabled = 0 WHERE id = 'example'");
+check('registrationSection(): disabled again, the block and the banner are gone', !str_contains($get('/register', null)['body'], 'Vom Beispiel-Registrierungsblock') && !str_contains($get('/register', null)['body'], 'Beispiel-Cookie-Banner'));
+
 $post('/register', ['email' => 'New@Example.test ', 'password' => $pw, 'password_repeat' => $pw], null);
 $new = $row('new@example.test');
 check('register: account is created unconfirmed, address normalised', $new !== false && $new['email_verified_at'] === null && password_verify($pw, $new['password_hash']));

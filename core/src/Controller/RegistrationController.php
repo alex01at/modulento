@@ -11,6 +11,7 @@ use Modulento\Core\Support\PasswordPolicy;
 use Modulento\Core\Support\ClientIp;
 use Modulento\Core\Support\RateLimiter;
 use Modulento\Core\Support\Session;
+use RuntimeException;
 
 final class RegistrationController extends Controller
 {
@@ -58,6 +59,7 @@ final class RegistrationController extends Controller
             'email' => $email,
             'min_length' => PasswordPolicy::MIN_LENGTH,
             'legal' => $this->legalLinks(),
+            'registration_blocks' => $this->app->registrationSections(),
         ]);
     }
 
@@ -93,6 +95,15 @@ final class RegistrationController extends Controller
         }
         if ($errors === [] && (new RateLimiter($this->app->db))->hit('register', ClientIp::key(), 10, 3600)) {
             $errors[] = $this->trans('core.error.too_many_requests');
+        }
+        if ($errors === []) {
+            try {
+                foreach ($this->app->registrationGuards() as $guard) {
+                    $guard($_POST, $this->app);
+                }
+            } catch (RuntimeException $e) {
+                $errors[] = $this->trans($e->getMessage());
+            }
         }
 
         if ($errors !== []) {

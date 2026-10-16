@@ -8,6 +8,7 @@ use Closure;
 use LogicException;
 use Modulento\Core\App;
 use Modulento\Core\Catalogue\OfferType;
+use Modulento\Core\Cookie\ConsentProvider;
 use Modulento\Core\Order\OrderFlow;
 use Modulento\Core\Order\PaymentMethod;
 use Modulento\Core\Subscription\SubscriptionProvider;
@@ -248,6 +249,72 @@ final class Registrar
     public function orderDiscount(Closure $modifier): void
     {
         $this->app->addOrderDiscount($modifier);
+    }
+
+    /**
+     * A category of cookie an extension may set once consent is given - e.g.
+     * an anti-spam addon's external CAPTCHA. The name is a language key;
+     * $descriptionKey explains in one sentence what it is for and who sets
+     * it. Declaring a category costs nothing on its own: check
+     * $app->consent->granted($id) before actually loading whatever needs it.
+     */
+    public function cookieCategory(string $id, string $labelKey, string $descriptionKey): void
+    {
+        $this->app->consent->declareCategory($this->prefixed($id, 'Cookie category'), $labelKey, $descriptionKey);
+    }
+
+    /**
+     * How this extension answers whether a visitor has agreed to a category
+     * of cookie - the other half of a cookie-consent addon
+     * (modulento-ext-cookie). Only one provider is ever registered; a second
+     * call replaces the first.
+     */
+    public function consentProvider(ConsentProvider $provider): void
+    {
+        $this->app->consent->registerProvider($provider);
+    }
+
+    /**
+     * A banner an extension wants shown on every page - e.g. a cookie-consent
+     * addon's own banner. The template is one of this extension's
+     * ("@id/banner.twig"); a theme may override it like any other. $data
+     * runs on every page view; return null (or omit $data) for nothing to
+     * show right now.
+     *
+     * @param Closure(App): array<string, mixed>|null $data
+     */
+    public function cookieBanner(string $template, ?Closure $data = null): void
+    {
+        $this->app->addCookieBanner($template, $data);
+    }
+
+    /**
+     * A way to refuse a registration with this extension's own reason - e.g.
+     * an anti-spam addon rejecting a disposable email address or a failed
+     * CAPTCHA answer. Runs after the core's own checks and before the
+     * account is created; refuse by throwing a RuntimeException whose
+     * message is a language key - see core's RegistrationController::register().
+     *
+     * @param Closure(array<string, mixed>, App): void $check gets $_POST and the app; throws to refuse
+     */
+    public function registrationGuard(Closure $check): void
+    {
+        $this->app->addRegistrationGuard($check);
+    }
+
+    /**
+     * A template an extension wants shown on the registration form, between
+     * the password fields and the terms checkbox - e.g. a CAPTCHA question.
+     * The template is one of this extension's ("@id/register.twig"); a
+     * theme may override it like any other. $data gets the app and runs
+     * every time the form is shown; return null (or omit $data) to show
+     * nothing extra.
+     *
+     * @param Closure(App): array<string, mixed>|null $data
+     */
+    public function registrationSection(string $template, ?Closure $data = null): void
+    {
+        $this->app->addRegistrationSection($template, $data);
     }
 
     /**

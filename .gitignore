@@ -25,4 +25,6 @@
 /extensions/faq
 /extensions/abos
 /extensions/coupons
+/extensions/antispam
+/extensions/cookie
 __pycache__/

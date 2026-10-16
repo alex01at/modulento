@@ -28,6 +28,7 @@ use Modulento\Core\Content\OfferLayout;
 use Modulento\Core\Content\Widgets;
 use Modulento\Core\Catalogue\Offers;
 use Modulento\Core\Content\Pages;
+use Modulento\Core\Cookie\Consent;
 use Modulento\Core\Extension\ExtensionManager;
 use Modulento\Core\Media\Library;
 use Modulento\Core\Notification\Notifications;
@@ -128,6 +129,7 @@ final class App
     public readonly RequestApplications $requestApplications;
     public readonly AccountIdentities $accountIdentities;
     public readonly Secrets $secrets;
+    public readonly Consent $consent;
     private HttpClient $socialLoginHttp;
 
     /** The request path without its language prefix - what routes are matched against. */
@@ -165,6 +167,12 @@ final class App
     private array $checkoutSections = [];
     /** @var array<int, \Closure> */
     private array $orderDiscounts = [];
+    /** @var array<int, array{template: string, data: ?\Closure}> */
+    private array $cookieBanners = [];
+    /** @var array<int, \Closure> */
+    private array $registrationGuards = [];
+    /** @var array<int, array{template: string, data: ?\Closure}> */
+    private array $registrationSections = [];
     /** @var array<int, array{label_key: string, path: string}> */
     private array $accountLinks = [];
     /** @var array<string, string> permission name => label key */
@@ -211,6 +219,7 @@ final class App
         $this->modules = new Modules($this->settings);
         $this->notifications = new Notifications($db, $this->modules);
         $this->subscriptions = new Subscriptions();
+        $this->consent = new Consent();
         $this->badWords = new BadWords($this->settings);
         $this->homeLayout = new HomeLayout($this->settings, fn (): ?string => $this->themes->activeFile('home-layout.json'));
         $this->widgets = new Widgets($this->settings);
@@ -478,6 +487,73 @@ final class App
     public function orderDiscounts(): array
     {
         return $this->orderDiscounts;
+    }
+
+    /**
+     * A banner an extension wants shown on every page - e.g. a cookie-consent
+     * addon's own banner. The template is one of this extension's
+     * ("@id/banner.twig"); a theme may override it like any other. $data
+     * runs on every page view; return null if nothing is to be shown.
+     *
+     * @param \Closure(App): array<string, mixed>|null $data
+     */
+    public function addCookieBanner(string $template, ?\Closure $data = null): void
+    {
+        $this->cookieBanners[] = ['template' => $template, 'data' => $data];
+    }
+
+    /** @return array<int, array{template: string, data: array<string, mixed>}> */
+    public function cookieBanners(): array
+    {
+        return array_map(
+            fn (array $banner) => ['template' => $banner['template'], 'data' => $banner['data'] !== null ? ($banner['data'])($this) : []],
+            $this->cookieBanners
+        );
+    }
+
+    /**
+     * A way for an extension to refuse a registration with its own reason -
+     * e.g. an anti-spam addon rejecting a disposable email address or a
+     * failed CAPTCHA answer. Runs after the core's own checks
+     * (RegistrationController::register()) and before the account is
+     * created; refuse by throwing a RuntimeException whose message is a
+     * language key.
+     *
+     * @param \Closure(array<string, mixed>, App): void $check gets $_POST and the app; throws to refuse
+     */
+    public function addRegistrationGuard(\Closure $check): void
+    {
+        $this->registrationGuards[] = $check;
+    }
+
+    /** @return array<int, \Closure> */
+    public function registrationGuards(): array
+    {
+        return $this->registrationGuards;
+    }
+
+    /**
+     * A template an extension wants shown on the registration form, between
+     * the password fields and the terms checkbox - e.g. a CAPTCHA. The
+     * template is one of this extension's ("@id/register.twig"); a theme
+     * may override it like any other. $data gets the app and runs every
+     * time the form is shown (so a math CAPTCHA's answer can change on
+     * each attempt); return null for nothing extra to show.
+     *
+     * @param \Closure(App): array<string, mixed>|null $data
+     */
+    public function addRegistrationSection(string $template, ?\Closure $data = null): void
+    {
+        $this->registrationSections[] = ['template' => $template, 'data' => $data];
+    }
+
+    /** @return array<int, array{template: string, data: array<string, mixed>}> */
+    public function registrationSections(): array
+    {
+        return array_map(
+            fn (array $section) => ['template' => $section['template'], 'data' => $section['data'] !== null ? ($section['data'])($this) : []],
+            $this->registrationSections
+        );
     }
 
     /** A link an extension adds to the account area, e.g. to a profile page of its own. */
