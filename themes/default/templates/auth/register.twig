@@ -24,6 +24,10 @@
         <input id="website" name="website" type="text" tabindex="-1" autocomplete="off">
     </div>
 
+    {% for block in registration_blocks %}
+        {% include block.template with block.data %}
+    {% endfor %}
+
     {% if legal %}
         <label class="checkbox">
             <input type="checkbox" name="accept_terms" value="1" required>

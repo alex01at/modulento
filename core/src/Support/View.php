@@ -320,6 +320,10 @@ final class View
         )));
         // Templates extensions want included on the home page.
         $this->twig->addFunction(new TwigFunction('home_sections', fn () => $app->homeSections()));
+        // Banners extensions want shown on every page, e.g. a cookie-consent addon's own.
+        $this->twig->addFunction(new TwigFunction('cookie_banners', fn () => $app->cookieBanners()));
+        // Whether the visitor has agreed to a category of cookie an extension declared with Registrar::cookieCategory().
+        $this->twig->addFunction(new TwigFunction('consent', fn (string $category) => $app->consent->granted($category)));
         $this->twig->addFunction(new TwigFunction('registration_open', fn () => $app->settings->get('core.registration', 'open') === 'open'));
         $this->twig->addFunction(new TwigFunction('locale_name', fn (string $locale) => $app->locales->name($locale)));
         $this->twig->addFunction(new TwigFunction('can', fn (string $permission) => $auth->can($permission)));

@@ -20,4 +20,11 @@ return [
     'example.checkout.title' => 'Vom Beispiel-Checkout-Block',
     'example.checkout.code' => 'Rabattcode',
     'example.checkout.error.invalid_code' => 'Dieser Rabattcode ist ungültig.',
+    'example.cookie.label' => 'Beispiel-Cookie',
+    'example.cookie.description' => 'Zeigt nur, ob das Beispiel-Cookie-Banner zustimmt.',
+    'example.banner.title' => 'Beispiel-Cookie-Banner',
+    'example.banner.granted' => 'zugestimmt',
+    'example.banner.not_granted' => 'nicht zugestimmt',
+    'example.register.title' => 'Vom Beispiel-Registrierungsblock',
+    'example.register.error.blocked' => 'Die Registrierung wurde vom Beispiel blockiert.',
 ];
