@@ -9,7 +9,7 @@ namespace Modulento\Core\Support;
  * for the core's own updates and for packages (extensions and themes).
  * A release is a tag "v<version>" with a zip and the matching ".sha256".
  */
-final class ReleaseClient
+final class ReleaseClient implements ReleaseSource
 {
     private const API = 'https://api.github.com';
 

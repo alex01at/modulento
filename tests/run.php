@@ -330,6 +330,7 @@ $pdo->exec("CREATE TABLE account_rating (id INTEGER PRIMARY KEY, rater_id INTEGE
     rated_id INTEGER REFERENCES account (id) ON DELETE CASCADE, rating INTEGER, body TEXT, locale TEXT, status TEXT DEFAULT 'published',
     status_note TEXT, reply TEXT, replied_at TEXT, created_at TEXT, UNIQUE (rater_id, rated_id))");
 $pdo->exec("CREATE TABLE package (kind TEXT, id TEXT, repo TEXT, version TEXT, installed_at TEXT, PRIMARY KEY (kind, id))");
+$pdo->exec("CREATE TABLE license_key (product_id TEXT PRIMARY KEY, key_encrypted TEXT, added_at TEXT)");
 $pdo->exec("PRAGMA foreign_keys = ON");
 $pdo->exec("CREATE TABLE role (id INTEGER PRIMARY KEY, name TEXT)");
 $pdo->exec("CREATE TABLE role_permission (role_id INTEGER REFERENCES role (id) ON DELETE CASCADE, permission TEXT)");
@@ -4679,6 +4680,86 @@ $pdo->exec("UPDATE extension SET enabled = {$enabledBefore} WHERE id = 'example'
 check('package administration: switching needs the permission', $post('/admin/packages/theme/sample/enable', [], 1)['status'] === 403);
 $pdo->exec("DELETE FROM setting WHERE name = 'core.theme'");
 $pdo->exec('DELETE FROM package');
+
+// --- Licensed packages: ReleaseSourceResolver, LicenseServerClient, LicenseKeys ---
+check('package: a "license:<product>" repo is recognised as one, a plain one is not', Packages::isLicensedRepo('license:ext-exklusiv') && Packages::isLicensedRepo('license:a')
+    && !Packages::isLicensedRepo('license:') && !Packages::isLicensedRepo('license:Ext') && !Packages::isLicensedRepo('acme/thing'));
+check('package: a licensed repo is allowed regardless of the owner-pattern allowlist', $packages->isAllowed('license:ext-exklusiv') && !$packages->isAllowed('evil/thing'));
+
+$licenseKeys = new Modulento\Core\License\LicenseKeys($pdo, $app->secrets);
+check('license keys: nothing stored answers null, not an error', $licenseKeys->find('ext-exklusiv') === null && $licenseKeys->all() === []);
+$licenseKeys->save('ext-exklusiv', 'sk_live_abcdef123456');
+check('license keys: stored encrypted, read back in full, listed masked', $pdo->query("SELECT key_encrypted FROM license_key WHERE product_id = 'ext-exklusiv'")->fetchColumn() !== 'sk_live_abcdef123456'
+    && $licenseKeys->find('ext-exklusiv') === 'sk_live_abcdef123456' && $licenseKeys->all() === [['product_id' => 'ext-exklusiv', 'masked' => '••••3456', 'added_at' => $licenseKeys->all()[0]['added_at']]]);
+$licenseKeys->save('ext-exklusiv', 'sk_live_newkey7890');
+check('license keys: saving again for the same product replaces it, not adds a second row', $licenseKeys->find('ext-exklusiv') === 'sk_live_newkey7890' && count($licenseKeys->all()) === 1);
+$licenseKeys->remove('ext-exklusiv');
+check('license keys: removed, nothing left for the product', $licenseKeys->find('ext-exklusiv') === null && $licenseKeys->all() === []);
+$licenseKeys->save('ext-exklusiv', 'sk_live_abcdef123456');
+
+/** A fake HttpClient answering one fixed response, recording what it was asked. */
+final class FakeLicenseHttp implements Modulento\Core\Support\HttpClient
+{
+    public ?array $lastRequest = null;
+
+    public function __construct(private int $status, private string $body)
+    {
+    }
+
+    public function request(string $method, string $url, array $headers = [], ?string $body = null): array
+    {
+        $this->lastRequest = ['method' => $method, 'url' => $url, 'headers' => $headers, 'body' => $body];
+
+        return ['status' => $this->status, 'body' => $this->body];
+    }
+}
+
+$licenseAssets = ['ext-exklusiv-1.3.0.zip' => 'https://license.example.test/v1/download/tok1', 'ext-exklusiv-1.3.0.zip.sha256' => 'https://license.example.test/v1/download/tok2'];
+$fakeHttp = new FakeLicenseHttp(200, json_encode(['version' => '1.3.0', 'published_at' => '2026-01-01T00:00:00Z', 'changelog' => 'x', 'assets' => $licenseAssets]));
+$licenseClient = new Modulento\Core\Support\LicenseServerClient($fakeHttp, 'https://license.example.test', 'kunde.de', $licenseKeys);
+$latest = $licenseClient->latest('license:ext-exklusiv');
+check('license server: a successful answer is read the same shape a GitHub release is', $latest === ['version' => '1.3.0', 'published_at' => '2026-01-01T00:00:00Z', 'changelog' => 'x', 'assets' => $licenseAssets]);
+check('license server: the request carries the product, the stored key and this installation\'s domain, never a GitHub token', json_decode($fakeHttp->lastRequest['body'], true) === ['license_key' => 'sk_live_abcdef123456', 'product' => 'ext-exklusiv', 'domain' => 'kunde.de']
+    && $fakeHttp->lastRequest['url'] === 'https://license.example.test/v1/releases/latest' && !isset($fakeHttp->lastRequest['headers']['Authorization']));
+
+$noKeyClient = new Modulento\Core\Support\LicenseServerClient($fakeHttp, 'https://license.example.test', 'kunde.de', new Modulento\Core\License\LicenseKeys($pdo, $app->secrets));
+check('license server: no key stored for the product refuses locally, no request made', $packageError(fn () => $noKeyClient->latest('license:never-bought')) === 'core.update.error.license_missing');
+
+foreach (['expired' => 'core.update.error.license_expired', 'domain_mismatch' => 'core.update.error.license_domain', 'revoked' => 'core.update.error.license_revoked', 'not_found' => 'core.update.error.license_unknown', 'something_else' => 'core.update.error.unreachable'] as $serverError => $expectedKey) {
+    $errorClient = new Modulento\Core\Support\LicenseServerClient(new FakeLicenseHttp(403, json_encode(['error' => $serverError])), 'https://license.example.test', 'kunde.de', $licenseKeys);
+    check("license server: a '{$serverError}' answer becomes {$expectedKey}", $packageError(fn () => $errorClient->latest('license:ext-exklusiv')) === $expectedKey);
+}
+$unreachableClient = new Modulento\Core\Support\LicenseServerClient(new FakeLicenseHttp(0, ''), 'https://license.example.test', 'kunde.de', $licenseKeys);
+check('license server: no answer at all is also "unreachable"', $packageError(fn () => $unreachableClient->latest('license:ext-exklusiv')) === 'core.update.error.unreachable');
+
+$fakeSha256 = hash('sha256', 'the zip bytes');
+$shaClient = new Modulento\Core\Support\LicenseServerClient(new FakeLicenseHttp(200, "{$fakeSha256}  ext-exklusiv-1.3.0.zip\n"), 'https://license.example.test', 'kunde.de', $licenseKeys);
+check('license server: checksum() reads the same sha256sum format a GitHub asset uses', $shaClient->checksum('https://license.example.test/v1/download/tok2') === $fakeSha256);
+$downloadTarget = $packageRoot . '/license-download-test.zip';
+$downloadClient = new Modulento\Core\Support\LicenseServerClient(new FakeLicenseHttp(200, 'the zip bytes'), 'https://license.example.test', 'kunde.de', $licenseKeys);
+$downloadClient->download('https://license.example.test/v1/download/tok1', $downloadTarget);
+check('license server: download() writes the response body to the target path', file_get_contents($downloadTarget) === 'the zip bytes');
+unlink($downloadTarget);
+
+$resolverGithub = new Modulento\Core\Support\ReleaseClient('');
+$resolverLicense = new Modulento\Core\Support\LicenseServerClient($fakeHttp, 'https://license.example.test', 'kunde.de', $licenseKeys);
+$resolver = new Modulento\Core\Support\ReleaseSourceResolver($resolverGithub, $resolverLicense, 'https://license.example.test');
+check('ReleaseSourceResolver: a "license:" repo goes to the license server, nothing else does', $resolver->latest('license:ext-exklusiv') === $latest);
+$resolverForChecksum = new Modulento\Core\Support\ReleaseSourceResolver($resolverGithub, $shaClient, 'https://license.example.test');
+check('ReleaseSourceResolver: an asset url on the license server\'s own host is checked through it too', $resolverForChecksum->checksum('https://license.example.test/v1/download/tok2') === $fakeSha256);
+$resolverNoLicense = new Modulento\Core\Support\ReleaseSourceResolver($resolverGithub, null, '');
+check('ReleaseSourceResolver: without a configured license server, a "license:" repo falls back to GitHub (and fails there, as it should)', $packageError(fn () => $resolverNoLicense->latest('license:ext-exklusiv')) === 'core.update.error.no_release');
+
+$pdo->exec("DELETE FROM license_key");
+
+// --- Admin: license key management on the packages page ---------------------
+$post('/admin/licenses', ['product_id' => 'ext-exklusiv', 'license_key' => 'sk_live_test'], 3);
+check('license admin: saving a key is reflected on the page, masked', str_contains($get('/admin/packages', 3)['body'], '••••test'));
+check('license admin: needs the packages permission', $post('/admin/licenses', ['product_id' => 'ext-x', 'license_key' => 'k'], 1)['status'] === 403);
+$post('/admin/licenses', ['product_id' => 'Not Valid', 'license_key' => 'k'], 3);
+check('license admin: an invalid product id is refused, the earlier key is untouched', str_contains($_SESSION['_flash']['error'] ?? '', 'ungültig') && $pdo->query("SELECT COUNT(*) FROM license_key")->fetchColumn() == 1);
+$post('/admin/licenses/ext-exklusiv/remove', [], 3);
+check('license admin: removing a key takes it off the page', !str_contains($get('/admin/packages', 3)['body'], '••••test') && $pdo->query("SELECT COUNT(*) FROM license_key")->fetchColumn() == 0);
 
 // --- Router: rest-of-path parameter --------------------------------------
 $r = request($pdo, $config, 'GET', '/assets/theme/theme.css', null);

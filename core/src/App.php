@@ -29,6 +29,7 @@ use Modulento\Core\Content\Widgets;
 use Modulento\Core\Catalogue\Offers;
 use Modulento\Core\Content\Pages;
 use Modulento\Core\Cookie\Consent;
+use Modulento\Core\License\LicenseKeys;
 use Modulento\Core\Extension\ExtensionManager;
 use Modulento\Core\Media\Library;
 use Modulento\Core\Notification\Notifications;
@@ -57,6 +58,8 @@ use Modulento\Core\Support\HttpClient;
 use Modulento\Core\Support\Locales;
 use Modulento\Core\Support\Mailer;
 use Modulento\Core\Support\ReleaseClient;
+use Modulento\Core\Support\ReleaseSourceResolver;
+use Modulento\Core\Support\LicenseServerClient;
 use Modulento\Core\Support\Router;
 use Modulento\Core\Support\Scheduler;
 use Modulento\Core\Support\Secrets;
@@ -130,6 +133,7 @@ final class App
     public readonly AccountIdentities $accountIdentities;
     public readonly Secrets $secrets;
     public readonly Consent $consent;
+    public readonly LicenseKeys $licenseKeys;
     private HttpClient $socialLoginHttp;
 
     /** The request path without its language prefix - what routes are matched against. */
@@ -232,9 +236,21 @@ final class App
         $this->orderFiles = new OrderFiles($db, ($config['app']['uploads'] ?? $config['app']['root'] . '/var/uploads') . '/orders');
         $this->offerImages = new OfferImages($db, ($config['app']['uploads'] ?? $config['app']['root'] . '/var/uploads') . '/offers');
         $this->themes = new ThemeManager($themesDir, $this->settings);
+        $this->secrets = new Secrets($config['app']['secret_key'] ?? $root . '/var/secret.key');
+        $this->licenseKeys = new LicenseKeys($db, $this->secrets);
+        $licenseServerUrl = (string) ($config['update']['license_server'] ?? '');
         $this->packages = new Packages(
             $db,
-            new ReleaseClient($config['update']['token'] ?? ''),
+            new ReleaseSourceResolver(
+                new ReleaseClient($config['update']['token'] ?? ''),
+                $licenseServerUrl !== '' ? new LicenseServerClient(
+                    $config['update']['license_http'] ?? new CurlHttpClient(),
+                    $licenseServerUrl,
+                    (string) ($config['app']['url'] ?? ''),
+                    $this->licenseKeys
+                ) : null,
+                $licenseServerUrl
+            ),
             $extensionsDir,
             $themesDir,
             $config['app']['work'] ?? $root . '/var/updates',
@@ -254,7 +270,6 @@ final class App
         $this->tokens = new Tokens($db);
         $this->accountIdentities = new AccountIdentities($db);
         $this->socialLoginHttp = $config['social_login']['http'] ?? new CurlHttpClient();
-        $this->secrets = new Secrets($config['app']['secret_key'] ?? $root . '/var/secret.key');
         $this->loginTokens = new LoginTokens($db);
         $this->mailer = new Mailer($this);
         $this->router = new Router($this);
