@@ -43,6 +43,10 @@
 </head>
 <body>
 {% include 'layout/_impersonation.twig' %}
+{# A banner an extension wants shown on every page, e.g. a cookie-consent addon's own. #}
+{% for banner in cookie_banners() %}
+    {% include banner.template with banner.data %}
+{% endfor %}
 <header class="site-header">
     <a class="site-name" href="{{ url('/') }}">
         {% set logoLight = site_logo('light') %}

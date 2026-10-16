@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modulento\Example;
 
 use Modulento\Core\App;
+use Modulento\Core\Cookie\ConsentProvider;
 use Modulento\Core\Event\AccountExport;
 use Modulento\Core\Event\AccountLoggedIn;
 use Modulento\Core\Extension\Extension as ExtensionContract;
@@ -33,6 +34,17 @@ final class Extension implements ExtensionContract
      * that grants and limits nothing.
      */
     public static ?SubscriptionProvider $subscriptionProvider = null;
+
+    /**
+     * Same reasoning as $subscriptionProvider above, for the cookie-consent
+     * seam: a real consent addon (modulento-ext-cookie) never swaps its
+     * provider out like this. Unset, this extension still demonstrates the
+     * hook with a harmless one that never grants consent.
+     */
+    public static ?ConsentProvider $consentProvider = null;
+
+    /** Set by a test to make the registration guard below refuse the next attempt. */
+    public static bool $blockRegistration = false;
 
     public function register(Registrar $registrar): void
     {
@@ -75,6 +87,25 @@ final class Extension implements ExtensionContract
 
             return array_map(fn (array $item) => ['unit_price' => (int) round($item['unit_price'] * 0.9)] + $item, $items);
         });
+        $registrar->cookieCategory('example.demo_cookie', 'example.cookie.label', 'example.cookie.description');
+        $registrar->consentProvider(self::$consentProvider ?? new class implements ConsentProvider {
+            public function granted(string $category): bool { return false; }
+        });
+        $registrar->cookieBanner('@example/banner.twig', fn (App $app): array => [
+            'granted' => $app->consent->granted('example.demo_cookie'),
+        ]);
+
+        // A real anti-spam addon (modulento-ext-antispam) would check a
+        // CAPTCHA answer or a disposable-email blocklist; this exists only
+        // so the core's own test suite can see Registrar::registrationGuard()
+        // and Registrar::registrationSection() work end to end.
+        $registrar->registrationSection('@example/register.twig');
+        $registrar->registrationGuard(function (array $input, App $app): void {
+            if (self::$blockRegistration) {
+                throw new RuntimeException('example.register.error.blocked');
+            }
+        });
+
         $registrar->subscriptionProvider(self::$subscriptionProvider ?? new class implements SubscriptionProvider {
             public function allows(int $accountId, string $feature): bool { return false; }
             public function grants(int $accountId, string $feature): bool { return false; }
