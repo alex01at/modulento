@@ -308,6 +308,11 @@ final class View
             fn (array $link) => ['title' => $app->translator->trans($link['label_key']), 'url' => $app->url($link['path']), 'path' => $link['path']],
             $app->navigation()
         )));
+        // Entries the operator added to the main menu (Administration -> Menu).
+        $this->twig->addFunction(new TwigFunction('custom_nav_links', fn () => array_map(
+            fn (array $link) => ['title' => $link['label'], 'url' => $app->url($link['path'])],
+            $app->customMenu->view($app->translator->locale(), $app->locales->default())
+        )));
         // Entries extensions add to the site's footer, e.g. a link to "FAQ".
         $this->twig->addFunction(new TwigFunction('footer_links', fn () => array_map(
             fn (array $link) => ['title' => $app->translator->trans($link['label_key']), 'url' => $app->url($link['path'])],

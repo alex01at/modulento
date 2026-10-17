@@ -23,6 +23,7 @@ use Modulento\Core\Catalogue\Categories;
 use Modulento\Core\CustomField\CustomFields;
 use Modulento\Core\Catalogue\OfferImages;
 use Modulento\Core\Catalogue\OfferMessages;
+use Modulento\Core\Content\CustomMenu;
 use Modulento\Core\Content\HomeLayout;
 use Modulento\Core\Content\OfferLayout;
 use Modulento\Core\Content\Widgets;
@@ -115,6 +116,7 @@ final class App
     public readonly HomeLayout $homeLayout;
     public readonly Design $design;
     public readonly OfferLayout $offerLayout;
+    public readonly CustomMenu $customMenu;
     public readonly AdminLog $adminLog;
     public readonly Widgets $widgets;
     public readonly MessageSeen $messageSeen;
@@ -229,6 +231,7 @@ final class App
         $this->widgets = new Widgets($this->settings);
         $this->design = new Design($this->settings);
         $this->offerLayout = new OfferLayout($this->settings);
+        $this->customMenu = new CustomMenu($this->settings);
         $this->adminLog = new AdminLog($db);
         $this->messageSeen = new MessageSeen($db);
         $this->reviews = new Reviews($db, $this->badWords);

@@ -74,6 +74,9 @@
         {% for link in nav_links() %}
             <a href="{{ link.url }}">{{ link.title }}</a>
         {% endfor %}
+        {% for link in custom_nav_links() %}
+            <a href="{{ link.url }}">{{ link.title }}</a>
+        {% endfor %}
         {% if can('core.admin.access') %}
             <a href="{{ url('/admin') }}">{{ trans('core.nav.admin') }}</a>
         {% endif %}
