@@ -4776,8 +4776,8 @@ $catalogHttp = new FakeLicenseHttp(200, json_encode(['products' => [
     ['id' => 'ext-exklusiv', 'name' => 'Exklusiv', 'description' => 'Die exklusive Erweiterung.', 'price_cents' => 4990, 'currency' => 'EUR', 'screenshot_url' => 'https://license.example.test/screenshots/x.jpg'],
 ]]));
 $r = request($pdo, $shopConfig($catalogHttp), 'GET', '/admin/shop', 3);
-check('shop: a product for sale is shown with name, description, price and picture', $r['status'] === 200 && str_contains($r['body'], 'Exklusiv') && str_contains($r['body'], 'Die exklusive Erweiterung.')
-    && str_contains($r['body'], '49,90') && str_contains($r['body'], 'https://license.example.test/screenshots/x.jpg') && str_contains($r['body'], 'license:ext-exklusiv'));
+check('shop: a product for sale is shown with name, description, price, picture and a buy button', $r['status'] === 200 && str_contains($r['body'], 'Exklusiv') && str_contains($r['body'], 'Die exklusive Erweiterung.')
+    && str_contains($r['body'], '49,90') && str_contains($r['body'], 'https://license.example.test/screenshots/x.jpg') && str_contains($r['body'], '/admin/shop/ext-exklusiv/buy'));
 check('shop: asks the configured server\'s catalog endpoint, nothing else', $catalogHttp->lastRequest['url'] === 'https://license.example.test/v1/catalog' && $catalogHttp->lastRequest['method'] === 'GET');
 
 $malformedHttp = new FakeLicenseHttp(200, json_encode(['products' => [
@@ -4792,6 +4792,40 @@ check('shop: a malformed entry from the server is left out, valid ones around it
 $downHttp = new FakeLicenseHttp(500, 'internal error');
 $r = request($pdo, $shopConfig($downHttp), 'GET', '/admin/shop', 3);
 check('shop: an unreachable or failing server shows an empty catalog, not a broken page', $r['status'] === 200 && str_contains($r['body'], 'Derzeit werden keine Erweiterungen angeboten'));
+
+// --- Shop: buying a product through Stripe Checkout (phase 2) --------------
+$buyOkHttp = new FakeLicenseHttp(200, json_encode(['reference' => 'pur_test123', 'checkout_url' => 'https://checkout.stripe.com/fake/pur_test123']));
+$r = request($pdo, $shopConfig($buyOkHttp), 'POST', '/admin/shop/ext-exklusiv/buy', 3, []);
+check('shop buy: redirects (a 302 - the exact Location target cannot be read back under this CLI test harness, see the card-redirect tests\' own note above)', $r['status'] === 302);
+$sentBody = json_decode($buyOkHttp->lastRequest['body'], true);
+check('shop buy: sends the product, this installation\'s own domain, and a success_url carrying the {reference} placeholder for the server to fill in', $buyOkHttp->lastRequest['url'] === 'https://license.example.test/v1/purchase/start'
+    && $sentBody['product'] === 'ext-exklusiv' && $sentBody['domain'] === 'https://example.test' && str_contains($sentBody['success_url'], '{reference}'));
+
+$buyFailHttp = new FakeLicenseHttp(404, json_encode(['error' => 'not_for_sale']));
+$r = request($pdo, $shopConfig($buyFailHttp), 'POST', '/admin/shop/nope/buy', 3, []);
+check('shop buy: a product that cannot be bought redirects back with its own error, not a broken page', $r['status'] === 302 && str_contains($_SESSION['_flash']['error'] ?? '', 'nicht (mehr) verkauft'));
+
+check('shop buy: needs its permission', request($pdo, $shopConfig($buyOkHttp), 'POST', '/admin/shop/ext-exklusiv/buy', 1, [])['status'] === 403);
+
+// --- Shop: returning from Stripe, polling /v1/purchase/status --------------
+$pendingHttp = new FakeLicenseHttp(200, json_encode(['status' => 'pending']));
+$r = request($pdo, $shopConfig($pendingHttp), 'GET', '/admin/shop?purchase=pur_test123', 3);
+check('shop return: still pending shows a "please check again" message, not an error', $r['status'] === 200 && str_contains($r['body'], 'wird noch verarbeitet'));
+
+$pdo->exec("DELETE FROM license_key WHERE product_id = 'ext-exklusiv'");
+$completedHttp = new FakeLicenseHttp(200, json_encode(['status' => 'completed', 'product' => 'ext-exklusiv', 'license_key' => 'mlk_live_fromshop']));
+$r = request($pdo, $shopConfig($completedHttp), 'GET', '/admin/shop?purchase=pur_test123', 3);
+check('shop return: a completed purchase with a key saves it automatically, no copy-pasting', $r['status'] === 200 && str_contains($r['body'], 'Jetzt installieren'));
+check('shop return: the license key is really stored, not just reported as saved', (new Modulento\Core\License\LicenseKeys($pdo, $app->secrets))->find('ext-exklusiv') === 'mlk_live_fromshop');
+
+$alreadySavedHttp = new FakeLicenseHttp(200, json_encode(['status' => 'completed', 'product' => 'ext-exklusiv', 'license_key' => null]));
+$r = request($pdo, $shopConfig($alreadySavedHttp), 'GET', '/admin/shop?purchase=pur_test123', 3);
+check('shop return: a completed purchase checked a second time (key already consumed) does not error', $r['status'] === 200 && str_contains($r['body'], 'bereits eingetragen'));
+
+$notFoundHttp = new FakeLicenseHttp(404, json_encode(['status' => 'not_found']));
+$r = request($pdo, $shopConfig($notFoundHttp), 'GET', '/admin/shop?purchase=pur_nonexistent', 3);
+check('shop return: an unknown reference shows plainly that it was not found', $r['status'] === 200 && str_contains($r['body'], 'wurde nicht gefunden'));
+$pdo->exec("DELETE FROM license_key WHERE product_id = 'ext-exklusiv'");
 
 // --- Router: rest-of-path parameter --------------------------------------
 $r = request($pdo, $config, 'GET', '/assets/theme/theme.css', null);

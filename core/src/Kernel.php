@@ -454,6 +454,7 @@ final class Kernel
         $router->post('/admin/licenses/{product}/remove', [PackageController::class, 'removeLicense'], 'core.packages.manage');
 
         $router->get('/admin/shop', [ShopController::class, 'index'], 'core.packages.manage');
+        $router->post('/admin/shop/{product}/buy', [ShopController::class, 'buy'], 'core.packages.manage');
 
         $router->get('/admin/demo-data', [DemoDataController::class, 'index'], 'core.demo_data.manage');
         $router->post('/admin/demo-data/generate', [DemoDataController::class, 'generate'], 'core.demo_data.manage');
