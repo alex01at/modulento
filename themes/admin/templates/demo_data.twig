@@ -14,6 +14,7 @@
             <li>{{ trans('core.admin.demo_data.count_providers', {count: counts.providers}) }}</li>
             <li>{{ trans('core.admin.demo_data.count_offers', {count: counts.offers}) }}</li>
             <li>{{ trans('core.admin.demo_data.count_requests', {count: counts.requests}) }}</li>
+            <li>{{ trans('core.admin.demo_data.count_images', {count: counts.images}) }}</li>
         </ul>
         <form method="post" action="{{ url('/admin/demo-data/clear') }}" class="danger-form">
             {{ csrf_field() }}
@@ -22,8 +23,24 @@
         </form>
     {% else %}
         <p class="empty">{{ trans('core.admin.demo_data.none') }}</p>
-        <form method="post" action="{{ url('/admin/demo-data/generate') }}">
+        <form method="post" action="{{ url('/admin/demo-data/generate') }}" class="stack-form">
             {{ csrf_field() }}
+            <label for="providers">{{ trans('core.admin.demo_data.field_providers') }}</label>
+            <input id="providers" name="providers" type="number" min="0" max="{{ max_providers }}" value="4" required>
+
+            <label for="offers_per_provider">{{ trans('core.admin.demo_data.field_offers_per_provider') }}</label>
+            <input id="offers_per_provider" name="offers_per_provider" type="number" min="0" max="{{ max_offers_per_provider }}" value="2" required>
+
+            <label for="customers">{{ trans('core.admin.demo_data.field_customers') }}</label>
+            <input id="customers" name="customers" type="number" min="0" max="{{ max_customers }}" value="2" required>
+
+            {% if images_available %}
+                <label class="checkbox">
+                    <input type="checkbox" name="with_images" value="1" checked>
+                    <span>{{ trans('core.admin.demo_data.field_with_images') }}</span>
+                </label>
+            {% endif %}
+
             <button type="submit">{{ trans('core.admin.demo_data.generate') }}</button>
         </form>
     {% endif %}

@@ -5785,6 +5785,32 @@ check('demo data: clearing removes every bit of it - deleting the demo accounts 
 $post('/admin/demo-data/generate', [], 3);
 check('demo data: generating again after clearing works', $demoCounts()['accounts'] === 6);
 $post('/admin/demo-data/clear', [], 3);
+
+// --- Demo data: chosen quantities and images -------------------------------
+$demoImageCounts = fn () => [
+    'avatars' => (int) $pdo->query("SELECT COUNT(*) FROM account_avatar WHERE account_id IN (SELECT id FROM account WHERE is_demo = 1)")->fetchColumn(),
+    'offer_images' => (int) $pdo->query("SELECT COUNT(*) FROM offer_image WHERE offer_id IN (SELECT id FROM offer WHERE is_demo = 1)")->fetchColumn(),
+];
+$post('/admin/demo-data/generate', ['providers' => '6', 'customers' => '1', 'offers_per_provider' => '3', 'with_images' => '1'], 3);
+$counts = $demoCounts();
+check('demo data: a chosen quantity is used instead of the fixed default', $counts['accounts'] === 7 && $counts['providers'] === 6 && $counts['requests'] === 1 && $counts['offers'] === 18);
+check('demo data: repeating beyond the base list of names still gets a distinct, published provider', str_contains($get('/admin/providers', 3)['body'], 'Mara Nowak') && str_contains($get('/admin/providers', 3)['body'], 'Mara Nowak (2)')
+    && (int) $pdo->query("SELECT COUNT(DISTINCT email) FROM account WHERE is_demo = 1")->fetchColumn() === 7);
+$images = $demoImageCounts();
+check('demo data: with_images generates an avatar per account and two pictures per offer', $images['avatars'] === 7 && $images['offer_images'] === 36);
+$avatarRow = $pdo->query("SELECT name, extension FROM account_avatar LIMIT 1")->fetch();
+check('demo data: a generated avatar is a real picture file, not just a database row', $avatarRow !== false && preg_match('/^[a-f0-9]{32}$/', $avatarRow['name']) === 1 && in_array($avatarRow['extension'], ['webp', 'jpg'], true));
+$post('/admin/demo-data/clear', [], 3);
+check('demo data: clearing also removes the generated picture files, not only their rows', $demoImageCounts() === ['avatars' => 0, 'offer_images' => 0]);
+
+$post('/admin/demo-data/generate', ['providers' => '1', 'customers' => '0', 'offers_per_provider' => '1'], 3);
+check('demo data: with_images unticked generates no pictures at all', $demoImageCounts() === ['avatars' => 0, 'offer_images' => 0] && $demoCounts()['requests'] === 0);
+$post('/admin/demo-data/clear', [], 3);
+
+$post('/admin/demo-data/generate', ['providers' => (string) (Modulento\Core\Support\DemoData::MAX_PROVIDERS + 1000), 'customers' => '0', 'offers_per_provider' => '0'], 3);
+check('demo data: a quantity above the maximum is clamped, not taken at face value', $demoCounts()['providers'] === Modulento\Core\Support\DemoData::MAX_PROVIDERS);
+$post('/admin/demo-data/clear', [], 3);
+
 $pdo->exec("UPDATE extension SET enabled = 0 WHERE id = 'freelancer'");
 
 foreach ($GLOBALS['failed'] ?? [] as $label) {
