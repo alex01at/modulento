@@ -373,6 +373,32 @@ td form { display: flex; justify-content: flex-end; }
 .status-line { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem .75rem; }
 .status-line p { flex-basis: 100%; margin: 0; }
 
+/* --- Extension tiles & their toggle switch ------------------------------- */
+.ext-tile { display: flex; flex-direction: column; gap: .6rem; }
+.ext-tile-head { display: flex; align-items: flex-start; justify-content: space-between; gap: .75rem; }
+.ext-tile h3 { margin: 0; font-size: 1.05rem; color: var(--heading); }
+.ext-tile .ext-id { margin: .15rem 0 0; color: var(--muted); font-size: .8125rem; }
+.ext-tile p.ext-description { margin: 0; color: var(--muted); font-size: .9rem; }
+.ext-badges { display: flex; flex-wrap: wrap; gap: .4rem; }
+.ext-toggle-form { margin: 0; flex: none; }
+
+.toggle {
+    position: relative; display: inline-flex; flex: none; width: 2.75rem; height: 1.5rem; padding: 0;
+    border: 1px solid var(--line); border-radius: 999px; background: var(--neutral-soft); cursor: pointer;
+}
+.toggle::before {
+    content: ''; position: absolute; top: 1px; left: 1px; width: 1.3rem; height: 1.3rem; border-radius: 50%;
+    background: var(--card); box-shadow: 0 1px 2px rgb(0 0 0 / .25); transition: transform .15s ease;
+}
+.toggle.is-on { background: var(--success); border-color: var(--success); }
+.toggle.is-on::before { transform: translateX(1.2rem); }
+.toggle:disabled { opacity: .5; cursor: not-allowed; }
+
+.filter-bar { display: flex; flex-wrap: wrap; gap: .5rem; margin-bottom: 1.25rem; }
+.filter-bar button { padding: .4rem .9rem; border-color: var(--line); background: var(--card); color: var(--text); font-size: .875rem; }
+.filter-bar button:hover { background: var(--row-hover); border-color: var(--line); color: var(--text); }
+.filter-bar button[aria-pressed="true"] { border-color: var(--primary); background: var(--primary); color: #fff; }
+
 .tabs { display: flex; flex-wrap: wrap; gap: .5rem; margin-bottom: 1.25rem; }
 .tabs a { padding: .35rem .9rem; border: 1px solid var(--line); border-radius: 999px; color: var(--text); font-weight: 500; text-decoration: none; }
 .tabs a:hover { border-color: var(--link); color: var(--link); }

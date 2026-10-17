@@ -4,5 +4,6 @@
     "version": "0.1.0",
     "api": 1,
     "type": "addon",
+    "description": "Reference extension: demonstrates every registration point once.",
     "namespace": "Modulento\\Example"
 }

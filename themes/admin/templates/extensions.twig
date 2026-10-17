@@ -11,49 +11,44 @@
 {% if extensions is empty %}
     <p class="empty">{{ trans('core.admin.extensions.none') }}</p>
 {% else %}
-    <div class="table-wrap">
-        <table>
-            <thead>
-            <tr>
-                <th scope="col">{{ trans('core.admin.extensions.name') }}</th>
-                <th scope="col">{{ trans('core.admin.extensions.version') }}</th>
-                <th scope="col">{{ trans('core.admin.extensions.type') }}</th>
-                <th scope="col">{{ trans('core.admin.extensions.status') }}</th>
-                <th scope="col"></th>
-            </tr>
-            </thead>
-            <tbody>
-            {% for extension in extensions %}
-                <tr>
-                    <th scope="row">{{ extension.name }} <small>({{ extension.id }})</small></th>
-                    <td>{{ extension.version }}</td>
-                    <td><span class="badge">{{ trans('core.admin.extensions.type_' ~ extension.type) }}</span></td>
-                    <td>
-                        {% if not extension.compatible %}
-                            <span class="badge badge-incompatible">{{ trans('core.admin.extensions.status_incompatible', {needed: extension.api, provided: api_version}) }}</span>
-                        {% elseif extension.enabled %}
-                            <span class="badge badge-enabled">{{ trans('core.admin.extensions.status_enabled') }}</span>
-                        {% else %}
-                            <span class="badge badge-disabled">{{ trans('core.admin.extensions.status_disabled') }}</span>
-                        {% endif %}
-                    </td>
-                    <td>
-                        {% if extension.enabled %}
-                            <form method="post" action="{{ url('/admin/extensions/' ~ extension.id ~ '/disable') }}">
-                                {{ csrf_field() }}
-                                <button type="submit" class="btn-outline btn-sm">{{ trans('core.admin.extensions.disable') }}</button>
-                            </form>
-                        {% elseif extension.compatible %}
-                            <form method="post" action="{{ url('/admin/extensions/' ~ extension.id ~ '/enable') }}">
-                                {{ csrf_field() }}
-                                <button type="submit" class="btn-sm">{{ trans('core.admin.extensions.enable') }}</button>
-                            </form>
-                        {% endif %}
-                    </td>
-                </tr>
-            {% endfor %}
-            </tbody>
-        </table>
+    <div class="filter-bar" role="group" aria-label="{{ trans('core.admin.extensions.filter') }}" data-extensions-filter>
+        <button type="button" data-filter="all" aria-pressed="true">{{ trans('core.admin.extensions.filter_all') }}</button>
+        <button type="button" data-filter="app" aria-pressed="false">{{ trans('core.admin.extensions.filter_app') }}</button>
+        <button type="button" data-filter="addon" aria-pressed="false">{{ trans('core.admin.extensions.filter_addon') }}</button>
+    </div>
+    <div class="columns" data-extensions-grid
+         data-label-enabled="{{ trans('core.admin.extensions.status_enabled') }}"
+         data-label-disabled="{{ trans('core.admin.extensions.status_disabled') }}"
+         data-label-failed="{{ trans('core.admin.extensions.toggle_failed') }}">
+        {% for extension in extensions %}
+            <div class="card-box ext-tile" data-extension-id="{{ extension.id }}" data-extension-type="{{ extension.type }}">
+                <div class="ext-tile-head">
+                    <div>
+                        <h3>{{ extension.name }}</h3>
+                        <p class="ext-id">{{ extension.id }} · v{{ extension.version }}</p>
+                    </div>
+                    <form method="post" class="ext-toggle-form"
+                          action="{{ url('/admin/extensions/' ~ extension.id ~ (extension.enabled ? '/disable' : '/enable')) }}"
+                          data-enable-url="{{ url('/admin/extensions/' ~ extension.id ~ '/enable') }}"
+                          data-disable-url="{{ url('/admin/extensions/' ~ extension.id ~ '/disable') }}">
+                        {{ csrf_field() }}
+                        <button type="submit" class="toggle{{ extension.enabled ? ' is-on' }}"
+                                aria-pressed="{{ extension.enabled ? 'true' : 'false' }}"
+                                aria-label="{{ extension.name }}"
+                                {{ not extension.compatible ? 'disabled' }}></button>
+                    </form>
+                </div>
+                <div class="ext-badges">
+                    <span class="badge">{{ trans('core.admin.extensions.type_' ~ extension.type) }}</span>
+                    {% if not extension.compatible %}
+                        <span class="badge badge-incompatible" data-status-badge>{{ trans('core.admin.extensions.status_incompatible', {needed: extension.api, provided: api_version}) }}</span>
+                    {% else %}
+                        <span class="badge {{ extension.enabled ? 'badge-enabled' : 'badge-disabled' }}" data-status-badge>{{ extension.enabled ? trans('core.admin.extensions.status_enabled') : trans('core.admin.extensions.status_disabled') }}</span>
+                    {% endif %}
+                </div>
+                {% if extension.description %}<p class="ext-description">{{ extension.description }}</p>{% endif %}
+            </div>
+        {% endfor %}
     </div>
 {% endif %}
 </section>

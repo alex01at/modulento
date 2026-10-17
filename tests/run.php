@@ -204,6 +204,8 @@ check('example extension manifest is valid', Manifest::fromDir($root . '/extensi
 check('manifest without "type" is an app, as every extension was before the field existed', $manifest->type === 'app');
 check('manifest reads an addon type', Manifest::fromDir(manifestDir('shop', str_replace('"api":1', '"api":1,"type":"addon"', $valid)))->type === 'addon');
 check('manifest rejects an unknown type', throws(InvalidArgumentException::class, fn () => Manifest::fromDir(manifestDir('shop', str_replace('"api":1', '"api":1,"type":"plugin"', $valid)))));
+check('manifest without "description" is empty, not an error', $manifest->description === '');
+check('manifest reads a description', Manifest::fromDir(manifestDir('shop', str_replace('"api":1', '"api":1,"description":"Sells things."', $valid)))->description === 'Sells things.');
 
 // --- ExtensionManager: which apps an "enable" switches off, apps vs. addons ---
 $appA = Manifest::fromDir(manifestDir('app_a', str_replace('"shop"', '"app_a"', $valid)));
@@ -4826,6 +4828,38 @@ $notFoundHttp = new FakeLicenseHttp(404, json_encode(['status' => 'not_found']))
 $r = request($pdo, $shopConfig($notFoundHttp), 'GET', '/admin/shop?purchase=pur_nonexistent', 3);
 check('shop return: an unknown reference shows plainly that it was not found', $r['status'] === 200 && str_contains($r['body'], 'wurde nicht gefunden'));
 $pdo->exec("DELETE FROM license_key WHERE product_id = 'ext-exklusiv'");
+
+// --- Administration -> Extensions: tiles, filter, toggle without a reload ---
+check('extensions page: needs its permission', $get('/admin/extensions', 1)['status'] === 403);
+$r = $get('/admin/extensions', 3);
+check('extensions page: a tile per discovered extension, typed for the filter buttons, description shown when the manifest names one', $r['status'] === 200
+    && str_contains($r['body'], 'data-extension-id="example"') && str_contains($r['body'], 'data-extension-type="addon"')
+    && str_contains($r['body'], 'Reference extension: demonstrates every registration point once.')
+    && str_contains($r['body'], 'data-filter="app"') && str_contains($r['body'], 'data-filter="addon"'));
+
+// Only disable goes through the real ExtensionManager in this SQLite suite -
+// enabling a real extension would run its (MariaDB-only) migrations; see the
+// "package administration" tests above, which hit the exact same limit.
+$pdo->exec("UPDATE extension SET enabled = 1 WHERE id = 'example'");
+$_SERVER['HTTP_ACCEPT'] = 'application/json';
+$r = $post('/admin/extensions/example/disable', [], 3);
+unset($_SERVER['HTTP_ACCEPT']);
+check('extensions toggle: Accept: application/json gets JSON back instead of a redirect', $r['status'] === 200 && json_decode($r['body'], true) === ['ok' => true, 'disabled' => 'example']
+    && (int) $pdo->query("SELECT enabled FROM extension WHERE id = 'example'")->fetchColumn() === 0);
+
+// enable() itself writes with MariaDB-only "ON DUPLICATE KEY UPDATE", same
+// limit the "package administration" tests above already work around - so
+// this suite can only ever exercise enable()'s FAILURE path for real
+// (an unknown id, below), never a real success; that half is covered by
+// the "switched off" unit tests of ExtensionManager::appsToSwitchOff()
+// further up, and by hand against the real MariaDB-backed dev install.
+$_SERVER['HTTP_ACCEPT'] = 'application/json';
+$r = $post('/admin/extensions/does-not-exist/enable', [], 3);
+unset($_SERVER['HTTP_ACCEPT']);
+$failBody = json_decode($r['body'], true);
+check('extensions toggle: a failure (unknown id) is reported as JSON too, with its own reason - not a redirect the caller cannot read', $r['status'] === 200 && $failBody['ok'] === false && is_string($failBody['error']) && $failBody['error'] !== '');
+
+check('extensions toggle: without Accept: application/json, the old plain redirect still works (no-JS fallback)', $post('/admin/extensions/example/disable', [], 3)['status'] === 302);
 
 // --- Router: rest-of-path parameter --------------------------------------
 $r = request($pdo, $config, 'GET', '/assets/theme/theme.css', null);

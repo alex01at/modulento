@@ -21,6 +21,8 @@ final class Manifest
         public readonly string $dir,
         /** "app": only one such extension is active at a time; "addon": any number can be. */
         public readonly string $type,
+        /** One sentence for the extensions list; empty when the extension names none. */
+        public readonly string $description,
     ) {
     }
 
@@ -71,6 +73,7 @@ final class Manifest
             $namespace . 'Extension',
             $dir,
             $type,
+            is_string($data['description'] ?? null) ? $data['description'] : '',
         );
     }
 }

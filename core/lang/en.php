@@ -69,6 +69,11 @@ return [
     'core.admin.extensions.disabled' => 'Extension "{id}" has been disabled. Its data is kept.',
     'core.admin.extensions.enable_failed' => 'Extension "{id}" could not be enabled: {reason}',
     'core.admin.extensions.none' => 'There is no extension in the extensions/ folder.',
+    'core.admin.extensions.filter' => 'Filter by type',
+    'core.admin.extensions.filter_all' => 'All',
+    'core.admin.extensions.filter_app' => 'App',
+    'core.admin.extensions.filter_addon' => 'Addon',
+    'core.admin.extensions.toggle_failed' => 'Change failed.',
     'core.admin.extensions.invalid_title' => 'Folders with an invalid extension.json',
     'core.admin.extensions.missing_title' => 'Enabled, but the folder is missing',
 
