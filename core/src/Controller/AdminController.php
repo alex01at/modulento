@@ -4,12 +4,10 @@ declare(strict_types=1);
 
 namespace Modulento\Core\Controller;
 
-use Modulento\Core\App;
 use Modulento\Core\Support\Branding;
 use Modulento\Core\Support\Session;
 use Modulento\Core\Support\UpdateChecks;
 use PDO;
-use Throwable;
 
 final class AdminController extends Controller
 {
@@ -194,79 +192,6 @@ final class AdminController extends Controller
         }
 
         return $stats;
-    }
-
-    public function extensions(array $params): void
-    {
-        $manager = $this->app->extensions;
-        $enabled = $manager->enabledIds();
-        $rows = [];
-
-        foreach ($manager->discover() as $id => $manifest) {
-            $rows[] = [
-                'id' => $id,
-                'name' => $manifest->name,
-                'version' => $manifest->version,
-                'api' => $manifest->api,
-                'type' => $manifest->type,
-                'description' => $manifest->description,
-                'compatible' => $manifest->api === App::API_VERSION,
-                'enabled' => in_array($id, $enabled, true),
-            ];
-        }
-
-        $this->render('@admin/extensions.twig', [
-            'extensions' => $rows,
-            'invalid' => $manager->invalid(),
-            'missing' => array_values(array_diff($enabled, array_keys($manager->discover()))),
-            'api_version' => App::API_VERSION,
-        ]);
-    }
-
-    public function enableExtension(array $params): void
-    {
-        try {
-            $switchedOff = $this->app->extensions->enable($params['id']);
-            Session::flash('success', $this->trans('core.admin.extensions.enabled', ['id' => $params['id']]));
-            foreach ($switchedOff as $id) {
-                Session::flash('success', $this->trans('core.admin.extensions.switched_off', ['id' => $id]));
-            }
-        } catch (Throwable $e) {
-            error_log('Enabling extension ' . $params['id'] . ' failed: ' . $e);
-            Session::flash('error', $this->trans('core.admin.extensions.enable_failed', ['id' => $params['id'], 'reason' => $e->getMessage()]));
-
-            if ($this->wantsJson()) {
-                $this->json(['ok' => false, 'error' => $this->trans('core.admin.extensions.enable_failed', ['id' => $params['id'], 'reason' => $e->getMessage()])]);
-                return;
-            }
-            $this->redirect('/admin/extensions');
-            return;
-        }
-
-        if ($this->wantsJson()) {
-            $this->json(['ok' => true, 'enabled' => $params['id'], 'switched_off' => $switchedOff]);
-            return;
-        }
-        $this->redirect('/admin/extensions');
-    }
-
-    public function disableExtension(array $params): void
-    {
-        $this->app->extensions->disable($params['id']);
-        Session::flash('success', $this->trans('core.admin.extensions.disabled', ['id' => $params['id']]));
-
-        if ($this->wantsJson()) {
-            $this->json(['ok' => true, 'disabled' => $params['id']]);
-            return;
-        }
-        $this->redirect('/admin/extensions');
-    }
-
-    /** Same detection a fetch() call with Accept: application/json (this project's own scripts) or an XMLHttpRequest sets off. */
-    private function wantsJson(): bool
-    {
-        return ($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'XMLHttpRequest'
-            || str_contains((string) ($_SERVER['HTTP_ACCEPT'] ?? ''), 'application/json');
     }
 
     public function tasks(array $params): void

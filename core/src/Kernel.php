@@ -345,9 +345,10 @@ final class Kernel
             $router->get('/admin/reports', [ReportController::class, 'index'], 'core.reports.manage');
             $router->post('/admin/reports/{id}/decide', [ReportController::class, 'decide'], 'core.reports.manage');
         }
-        $router->get('/admin/extensions', [AdminController::class, 'extensions'], 'core.extensions.manage');
-        $router->post('/admin/extensions/{id}/enable', [AdminController::class, 'enableExtension'], 'core.extensions.manage');
-        $router->post('/admin/extensions/{id}/disable', [AdminController::class, 'disableExtension'], 'core.extensions.manage');
+        $router->get('/admin/extensions', [PackageController::class, 'index'], 'core.packages.manage');
+        // The former separate "Pakete" page - kept reachable for old
+        // bookmarks/menus, folded into the one page above.
+        $router->get('/admin/packages', fn () => header('Location: ' . $app->url('/admin/extensions')), 'core.packages.manage');
         $router->get('/admin/tasks', [AdminController::class, 'tasks'], 'core.tasks.view');
 
         $router->get('/admin/settings', [SettingsController::class, 'index'], 'core.settings.manage');
@@ -443,7 +444,6 @@ final class Kernel
         $router->post('/admin/branding/{kind}', [AdminController::class, 'saveBranding'], 'core.themes.manage');
         $router->post('/admin/branding/{kind}/delete', [AdminController::class, 'deleteBranding'], 'core.themes.manage');
 
-        $router->get('/admin/packages', [PackageController::class, 'index'], 'core.packages.manage');
         $router->post('/admin/packages/install', [PackageController::class, 'install'], 'core.packages.manage');
         $router->post('/admin/packages/upload', [PackageController::class, 'upload'], 'core.packages.manage');
         $router->post('/admin/packages/{kind}/{id}/update', [PackageController::class, 'update'], 'core.packages.manage');
@@ -466,7 +466,6 @@ final class Kernel
         $router->post('/admin/updates/apply', [UpdateController::class, 'apply'], 'core.update.manage');
 
         $app->addPermission('core.admin.access', 'core.permission.admin_access');
-        $app->addPermission('core.extensions.manage', 'core.permission.extensions_manage');
         $app->addPermission('core.tasks.view', 'core.permission.tasks_view');
         $app->addPermission('core.themes.manage', 'core.permission.themes_manage');
         $app->addPermission('core.settings.manage', 'core.permission.settings_manage');
@@ -521,11 +520,10 @@ final class Kernel
         $app->addAdminMenu('core.admin.menu.providers', '/admin/providers', 'core.providers.manage', 'marketplace');
         $app->addAdminMenu('core.admin.menu.accounts', '/admin/accounts', 'core.accounts.manage', 'people');
         $app->addAdminMenu('core.admin.menu.roles', '/admin/roles', 'core.roles.manage', 'people');
-        $app->addAdminMenu('core.admin.menu.extensions', '/admin/extensions', 'core.extensions.manage', 'system');
+        $app->addAdminMenu('core.admin.menu.extensions', '/admin/extensions', 'core.packages.manage', 'system');
         $app->addAdminMenu('core.admin.menu.modules', '/admin/modules', 'core.settings.manage', 'system');
         $app->addAdminMenu('core.admin.menu.themes', '/admin/themes', 'core.themes.manage', 'system');
         $app->addAdminMenu('core.admin.menu.handbook', '/handbook', 'core.admin.access', 'system');
-        $app->addAdminMenu('core.admin.menu.packages', '/admin/packages', 'core.packages.manage', 'system');
         $app->addAdminMenu('core.admin.menu.shop', '/admin/shop', 'core.packages.manage', 'system');
         $app->addAdminMenu('core.admin.menu.demo_data', '/admin/demo-data', 'core.demo_data.manage', 'system');
         $app->addAdminMenu('core.admin.menu.tasks', '/admin/tasks', 'core.tasks.view', 'system');

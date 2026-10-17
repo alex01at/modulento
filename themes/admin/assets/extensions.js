@@ -58,6 +58,12 @@
 
             var tile = form.closest('[data-extension-id]');
             var id = tile ? tile.getAttribute('data-extension-id') : '';
+            // "extension:faq" / "theme:indigo" - the part before the colon
+            // is shared by whatever this toggle switches off too (an App
+            // switches off another App, a theme switches off another
+            // theme, never the other kind), so the same prefix finds those
+            // tiles from the plain id the server answers with.
+            var kindPrefix = id.indexOf(':') !== -1 ? id.slice(0, id.indexOf(':') + 1) : '';
             var csrfField = form.querySelector('[name="_csrf"]');
             var goingToEnable = form.action === form.getAttribute('data-enable-url');
             var button = form.querySelector('.toggle');
@@ -80,7 +86,7 @@
                 setTileState(id, goingToEnable);
                 var switchedOff = (result.data && result.data.switched_off) || [];
                 switchedOff.forEach(function (otherId) {
-                    setTileState(otherId, false);
+                    setTileState(kindPrefix + otherId, false);
                 });
             }).catch(function () {
                 button.disabled = false;

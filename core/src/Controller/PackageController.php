@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modulento\Core\Controller;
 
 use Closure;
+use Modulento\Core\App;
 use Modulento\Core\Package\Packages;
 use Modulento\Core\Support\Migrator;
 use Modulento\Core\Support\Session;
@@ -12,36 +13,70 @@ use Modulento\Core\Support\UpdateChecks;
 use Modulento\Core\Support\UpdateException;
 use Throwable;
 
-/** Extensions and themes installed from their own repositories. */
+/**
+ * Administration -> Extensions and themes: one tile per discovered
+ * extension or theme, whether or not it is tracked as a package installed
+ * from a repository - what used to be two separate pages ("Erweiterungen"
+ * and "Pakete") before an operator ever needed both to decide the same
+ * thing: "what do I have, is it on, where did it come from".
+ */
 final class PackageController extends Controller
 {
-    /** How long the newest versions found by a check stay on the page. */
-
     public function index(array $params): void
     {
         $app = $this->app;
-        $installed = $app->packages->installed();
+        $installedByKey = [];
+        foreach ($app->packages->installed() as $package) {
+            $installedByKey[$package['kind'] . ':' . $package['id']] = $package;
+        }
 
-        // Folders that are there without being a package: uploaded by hand,
-        // or left from a time when the core brought them along. Installing
-        // their repository's release takes them over.
-        $known = array_map(fn (array $package) => $package['kind'] . ':' . $package['id'], $installed);
         $projectOwner = strstr((string) ($app->config['update']['repo'] ?? ''), '/', true) ?: '';
         $owner = $projectOwner ?: 'owner';
-        $present = $known;
-        $unmanaged = [];
-        foreach (['theme' => $app->themes->siteThemes(), 'extension' => $app->extensions->discover()] as $kind => $found) {
-            foreach (array_keys($found) as $id) {
-                $present[] = $kind . ':' . $id;
-                if (!Packages::isShipped($kind, $id) && !in_array($kind . ':' . $id, $known, true)) {
-                    $unmanaged[] = ['kind' => $kind, 'id' => $id, 'in_use' => $this->inUse($kind, $id), 'repo' => $owner . '/modulento-' . ($kind === 'theme' ? 'theme-' : 'ext-') . $id];
-                }
-            }
+        $enabledExtensions = $app->extensions->enabledIds();
+        $activeTheme = $app->themes->active();
+
+        $items = [];
+        foreach ($app->extensions->discover() as $id => $manifest) {
+            $tracked = $installedByKey['extension:' . $id] ?? null;
+            $items[] = [
+                'kind' => 'extension',
+                'id' => $id,
+                'name' => $manifest->name,
+                'version' => $tracked['version'] ?? $manifest->version,
+                'description' => $manifest->description,
+                'type' => $manifest->type,
+                'api' => $manifest->api,
+                'compatible' => $manifest->api === App::API_VERSION,
+                'in_use' => in_array($id, $enabledExtensions, true),
+                'tracked' => $tracked !== null,
+                'shipped' => Packages::isShipped('extension', $id),
+                'repo' => $tracked['repo'] ?? ($owner . '/modulento-ext-' . $id),
+                'latest' => $tracked !== null ? (new UpdateChecks($app))->latest('extension', $id) : null,
+            ];
+        }
+        foreach ($app->themes->siteThemes() as $id => $theme) {
+            $tracked = $installedByKey['theme:' . $id] ?? null;
+            $items[] = [
+                'kind' => 'theme',
+                'id' => $id,
+                'name' => $theme['name'],
+                'version' => $tracked['version'] ?? $theme['version'],
+                'description' => $theme['description'],
+                'type' => 'theme',
+                'api' => null,
+                'compatible' => true,
+                'in_use' => $activeTheme === $id,
+                'tracked' => $tracked !== null,
+                'shipped' => Packages::isShipped('theme', $id),
+                'repo' => $tracked['repo'] ?? ($owner . '/modulento-theme-' . $id),
+                'latest' => $tracked !== null ? (new UpdateChecks($app))->latest('theme', $id) : null,
+            ];
         }
 
         // The project's own packages that are not here yet. Built from
         // names alone: opening the page must not ask GitHub anything.
         // Left out where installing would be refused anyway.
+        $present = array_map(fn (array $item) => $item['kind'] . ':' . $item['id'], $items);
         $official = [];
         foreach (Packages::OFFICIAL as $item) {
             $repo = $projectOwner . '/' . $item['name'];
@@ -50,12 +85,11 @@ final class PackageController extends Controller
             }
         }
 
-        $this->render('@admin/packages.twig', [
-            'packages' => array_map(fn (array $package) => $package + [
-                'latest' => (new UpdateChecks($app))->latest($package['kind'], $package['id']),
-                'in_use' => $this->inUse($package['kind'], $package['id']),
-            ], $installed),
-            'unmanaged' => $unmanaged,
+        $this->render('@admin/extensions.twig', [
+            'items' => $items,
+            'invalid' => $app->extensions->invalid(),
+            'missing' => array_values(array_diff($enabledExtensions, array_keys($app->extensions->discover()))),
+            'api_version' => App::API_VERSION,
             'official' => $official,
             'sources' => $app->packages->allowedSources(),
             'license_keys' => $app->licenseKeys->all(),
@@ -75,14 +109,14 @@ final class PackageController extends Controller
             Session::flash('success', $this->trans('core.license.saved', ['product' => $productId]));
         }
 
-        $this->redirect('/admin/packages');
+        $this->redirect('/admin/extensions');
     }
 
     public function removeLicense(array $params): void
     {
         $this->app->licenseKeys->remove($params['product']);
         Session::flash('success', $this->trans('core.license.removed', ['product' => $params['product']]));
-        $this->redirect('/admin/packages');
+        $this->redirect('/admin/extensions');
     }
 
     public function install(array $params): void
@@ -98,12 +132,12 @@ final class PackageController extends Controller
         $file = is_array($_FILES['package'] ?? null) ? $_FILES['package'] : [];
         if (($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK || !is_file($file['tmp_name'] ?? '')) {
             Session::flash('error', $this->trans('core.package.error.upload'));
-            $this->redirect('/admin/packages');
+            $this->redirect('/admin/extensions');
             return;
         }
         if (filesize($file['tmp_name']) > Packages::MAX_UPLOAD_BYTES) {
             Session::flash('error', $this->trans('core.package.error.upload_size'));
-            $this->redirect('/admin/packages');
+            $this->redirect('/admin/extensions');
             return;
         }
 
@@ -114,19 +148,19 @@ final class PackageController extends Controller
     {
         $package = $this->app->packages->find($params['kind'], $params['id']);
         if ($package === null) {
-            $this->redirect('/admin/packages');
+            $this->redirect('/admin/extensions');
             return;
         }
 
         try {
             if ($this->app->packages->latestVersion($package['repo']) === $package['version']) {
                 Session::flash('success', $this->trans('core.package.is_current', ['id' => $package['id'], 'version' => $package['version']]));
-                $this->redirect('/admin/packages');
+                $this->redirect('/admin/extensions');
                 return;
             }
         } catch (UpdateException $e) {
             Session::flash('error', $this->trans($e->messageKey, $e->params));
-            $this->redirect('/admin/packages');
+            $this->redirect('/admin/extensions');
             return;
         }
 
@@ -150,12 +184,13 @@ final class PackageController extends Controller
     private function switch(string $kind, string $id, bool $on): void
     {
         $app = $this->app;
-        // The same right as on the page this action belongs to.
-        $allowed = $kind === 'extension' ? $app->auth->can('core.extensions.manage') : $app->auth->can('core.themes.manage');
 
-        if (!$allowed) {
-            Session::flash('error', $this->trans('core.error.forbidden'));
-        } elseif ($kind === 'extension' && isset($app->extensions->discover()[$id])) {
+        if (!$app->auth->can('core.packages.manage')) {
+            $this->respondToSwitch(false, $id, [], $this->trans('core.error.forbidden'));
+            return;
+        }
+
+        if ($kind === 'extension' && isset($app->extensions->discover()[$id])) {
             try {
                 $switchedOff = $on ? $app->extensions->enable($id) : [];
                 if (!$on) {
@@ -165,18 +200,50 @@ final class PackageController extends Controller
                 foreach ($switchedOff as $other) {
                     Session::flash('success', $this->trans('core.admin.extensions.switched_off', ['id' => $other]));
                 }
+                $this->respondToSwitch(true, $id, $switchedOff);
             } catch (Throwable $e) {
                 error_log('Enabling extension ' . $id . ' failed: ' . $e);
-                Session::flash('error', $this->trans('core.admin.extensions.enable_failed', ['id' => $id, 'reason' => $e->getMessage()]));
+                $this->respondToSwitch(false, $id, [], $this->trans('core.admin.extensions.enable_failed', ['id' => $id, 'reason' => $e->getMessage()]));
             }
-        } elseif ($kind === 'theme' && isset($app->themes->siteThemes()[$id])) {
+
+            return;
+        }
+
+        if ($kind === 'theme' && isset($app->themes->siteThemes()[$id])) {
+            $before = $app->themes->active();
             $target = $on ? $id : 'default';
-            if (($on || $app->themes->active() === $id) && $app->themes->activate($target)) {
+            if (($on || $before === $id) && $app->themes->activate($target)) {
                 Session::flash('success', $this->trans('core.admin.themes.activated', ['id' => $target]));
+                // The one other theme that was active a moment ago, so the
+                // caller's tile for it can be switched off too, without a
+                // reload - the same single-active-thing update an App
+                // switching another App off already needs.
+                $switchedOff = $before !== $target && $before !== '' ? [$before] : [];
+                $this->respondToSwitch(true, $id, $switchedOff);
+
+                return;
             }
         }
 
-        $this->redirect('/admin/packages');
+        $this->respondToSwitch(false, $id, []);
+    }
+
+    /** @param list<string> $switchedOff */
+    private function respondToSwitch(bool $ok, string $id, array $switchedOff, ?string $error = null): void
+    {
+        if ($this->wantsJson()) {
+            $this->json($ok ? ['ok' => true, 'id' => $id, 'switched_off' => $switchedOff] : ['ok' => false, 'error' => $error ?? $this->trans('core.admin.extensions.toggle_failed')]);
+            return;
+        }
+
+        $this->redirect('/admin/extensions');
+    }
+
+    /** Same detection a fetch() call with Accept: application/json (this project's own scripts) or an XMLHttpRequest sets off. */
+    private function wantsJson(): bool
+    {
+        return ($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'XMLHttpRequest'
+            || str_contains((string) ($_SERVER['HTTP_ACCEPT'] ?? ''), 'application/json');
     }
 
     public function remove(array $params): void
@@ -188,7 +255,7 @@ final class PackageController extends Controller
             Session::flash('success', $this->trans('core.package.removed', ['id' => $params['id']]));
         }
 
-        $this->redirect('/admin/packages');
+        $this->redirect('/admin/extensions');
     }
 
     /** @param Closure(): array{kind: string, id: string, version: string, updated: bool} $install */
@@ -212,7 +279,7 @@ final class PackageController extends Controller
             Session::flash('error', $this->trans($e->messageKey, $e->params));
         }
 
-        $this->redirect('/admin/packages');
+        $this->redirect('/admin/extensions');
     }
 
     /** An enabled extension or the active theme cannot be removed. */
