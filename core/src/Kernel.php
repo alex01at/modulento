@@ -11,6 +11,7 @@ use Modulento\Core\Controller\AdminCustomFieldController;
 use Modulento\Core\Controller\AdminController;
 use Modulento\Core\Controller\AdminBadWordsController;
 use Modulento\Core\Controller\AdminHomeController;
+use Modulento\Core\Controller\AdminMenuController;
 use Modulento\Core\Controller\AdminOfferPageController;
 use Modulento\Core\Controller\DesignController;
 use Modulento\Core\Controller\AdminMediaController;
@@ -367,6 +368,8 @@ final class Kernel
         $router->post('/admin/offer-page/field', [AdminOfferPageController::class, 'field'], 'core.settings.manage');
         $router->get('/admin/home', [AdminHomeController::class, 'index'], 'core.settings.manage');
         $router->post('/admin/home', [AdminHomeController::class, 'save'], 'core.settings.manage');
+        $router->get('/admin/menu', [AdminMenuController::class, 'index'], 'core.settings.manage');
+        $router->post('/admin/menu', [AdminMenuController::class, 'save'], 'core.settings.manage');
         $router->get('/admin/badwords', [AdminBadWordsController::class, 'index'], 'core.settings.manage');
         $router->post('/admin/badwords', [AdminBadWordsController::class, 'save'], 'core.settings.manage');
         $router->post('/admin/badwords/reset', [AdminBadWordsController::class, 'reset'], 'core.settings.manage');
@@ -500,6 +503,7 @@ final class Kernel
             $app->addAdminMenu('core.admin.menu.requests', '/admin/requests', 'core.requests.manage', 'moderation');
         }
         $app->addAdminMenu('core.admin.menu.offer_page', '/admin/offer-page', 'core.settings.manage', 'content');
+        $app->addAdminMenu('core.admin.menu.menu', '/admin/menu', 'core.settings.manage', 'content');
         $app->addAdminMenu('core.admin.menu.design', '/admin/design', 'core.settings.manage', 'system');
         $app->addAdminMenu('core.admin.menu.badwords', '/admin/badwords', 'core.settings.manage', 'moderation');
         $app->addAdminMenu('core.admin.menu.orders', '/admin/orders', 'core.orders.manage', 'marketplace');

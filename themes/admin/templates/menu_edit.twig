@@ -1,0 +1,59 @@
+{% extends '@admin/layout.twig' %}
+
+{% block title %}{{ trans('core.admin.menu.menu') }} – {{ site_name }}{% endblock %}
+
+{% block admin %}
+{% include '@admin/_page_header.twig' with {heading: trans('core.admin.menu.menu')} only %}
+
+<section class="card-box">
+    <p>{{ trans('core.menu.intro') }}</p>
+</section>
+
+{# Only the language the administration is in is edited here, like everywhere else: to edit
+   another language, choose it in the header. #}
+{# One form for every entry. Enter sends the first button, which is the one that saves. #}
+<form method="post" action="{{ url('/admin/menu') }}" class="home-editor">
+    {{ csrf_field() }}
+    <button type="submit" name="action" value="save" class="visually-hidden">{{ trans('core.account.save') }}</button>
+
+    {% for item in items %}
+        {% set id = item.id %}
+        <fieldset class="card-box home-block{{ item.enabled ? '' : ' is-off' }}" id="item-{{ id }}">
+            <legend>{{ item.texts[default_locale].label ?? trans('core.menu.entry') }}</legend>
+
+            <label class="checkbox">
+                <input type="checkbox" name="items[{{ id }}][enabled]" value="1" {{ item.enabled ? 'checked' }}>
+                <span>{{ trans('core.home.enabled') }}</span>
+            </label>
+
+            <div class="field">
+                <label for="path-{{ id }}">{{ trans('core.menu.path') }}</label>
+                <input id="path-{{ id }}" name="items[{{ id }}][path]" value="{{ item.path }}" maxlength="500" placeholder="/seite oder https://…">
+            </div>
+
+            <fieldset class="home-language" lang="{{ locale }}">
+                <legend>{{ locale_name(locale) }}</legend>
+                {% set value = item.texts[locale].label ?? '' %}
+                {% set hint = item.texts[default_locale].label ?? '' %}
+                <div class="field">
+                    <label for="label-{{ id }}">{{ trans('core.menu.label') }}</label>
+                    <input id="label-{{ id }}" name="items[{{ id }}][label]" value="{{ value }}" maxlength="60" placeholder="{{ hint }}">
+                </div>
+            </fieldset>
+
+            <div class="button-row">
+                <button type="submit" name="action" value="up:{{ id }}" class="btn-outline btn-sm">{{ trans('core.home.up') }}</button>
+                <button type="submit" name="action" value="down:{{ id }}" class="btn-outline btn-sm">{{ trans('core.home.down') }}</button>
+                <button type="submit" name="action" value="delete:{{ id }}" class="danger btn-sm">{{ trans('core.home.remove') }}</button>
+            </div>
+        </fieldset>
+    {% else %}
+        <p class="empty">{{ trans('core.menu.empty') }}</p>
+    {% endfor %}
+
+    <div class="button-row">
+        <button type="submit" name="action" value="add" class="btn-outline">{{ trans('core.menu.add') }}</button>
+        <button type="submit" name="action" value="save">{{ trans('core.account.save') }}</button>
+    </div>
+</form>
+{% endblock %}
