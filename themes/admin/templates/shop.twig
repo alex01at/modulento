@@ -1,0 +1,31 @@
+{% extends '@admin/layout.twig' %}
+
+{% block title %}{{ trans('core.admin.shop.title') }} – {{ site_name }}{% endblock %}
+
+{% block admin %}
+{% include '@admin/_page_header.twig' with {heading: trans('core.admin.shop.title')} only %}
+
+<section class="card-box">
+    <p>{{ trans('core.admin.shop.intro') }}</p>
+
+    {% if not enabled %}
+        <p class="empty">{{ trans('core.admin.shop.no_server') }}</p>
+    {% elseif products is empty %}
+        <p class="empty">{{ trans('core.admin.shop.none') }}</p>
+    {% else %}
+        <div class="columns">
+            {% for product in products %}
+                <div class="card-box">
+                    {% if product.screenshot_url %}
+                        <img src="{{ product.screenshot_url }}" alt="" loading="lazy">
+                    {% endif %}
+                    <h3>{{ product.name }}</h3>
+                    {% if product.description %}<p>{{ product.description }}</p>{% endif %}
+                    <p><strong>{{ money(product.price_cents, product.currency) }}</strong></p>
+                    <p><small>{{ trans('core.admin.shop.how_to_buy', {product: product.id}) }}</small></p>
+                </div>
+            {% endfor %}
+        </div>
+    {% endif %}
+</section>
+{% endblock %}

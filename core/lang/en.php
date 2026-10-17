@@ -1238,6 +1238,12 @@ return [
 
     'core.permission.packages_manage' => 'Install extensions and themes from repositories',
     'core.admin.menu.packages' => 'Packages',
+    'core.admin.menu.shop' => 'Shop',
+    'core.admin.shop.title' => 'Shop',
+    'core.admin.shop.intro' => 'Extensions offered through the configured license server.',
+    'core.admin.shop.no_server' => 'No license server configured (LICENSE_SERVER_URL in .env).',
+    'core.admin.shop.none' => 'Nothing is being offered right now.',
+    'core.admin.shop.how_to_buy' => 'Enter the license key under "Extensions and themes" and install it as "license:{product}".',
     'core.permission.demo_data_manage' => 'Generate and remove demo data',
     'core.admin.menu.demo_data' => 'Demo data',
     'core.admin.demo_data.title' => 'Demo data',

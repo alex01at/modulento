@@ -30,6 +30,7 @@ use Modulento\Core\Controller\OfferController;
 use Modulento\Core\Controller\OrderController;
 use Modulento\Core\Controller\DemoDataController;
 use Modulento\Core\Controller\PackageController;
+use Modulento\Core\Controller\ShopController;
 use Modulento\Core\Controller\PageController;
 use Modulento\Core\Controller\PaymentController;
 use Modulento\Core\Controller\PaymentSettingsController;
@@ -452,6 +453,8 @@ final class Kernel
         $router->post('/admin/licenses', [PackageController::class, 'saveLicense'], 'core.packages.manage');
         $router->post('/admin/licenses/{product}/remove', [PackageController::class, 'removeLicense'], 'core.packages.manage');
 
+        $router->get('/admin/shop', [ShopController::class, 'index'], 'core.packages.manage');
+
         $router->get('/admin/demo-data', [DemoDataController::class, 'index'], 'core.demo_data.manage');
         $router->post('/admin/demo-data/generate', [DemoDataController::class, 'generate'], 'core.demo_data.manage');
         $router->post('/admin/demo-data/clear', [DemoDataController::class, 'clear'], 'core.demo_data.manage');
@@ -522,6 +525,7 @@ final class Kernel
         $app->addAdminMenu('core.admin.menu.themes', '/admin/themes', 'core.themes.manage', 'system');
         $app->addAdminMenu('core.admin.menu.handbook', '/handbook', 'core.admin.access', 'system');
         $app->addAdminMenu('core.admin.menu.packages', '/admin/packages', 'core.packages.manage', 'system');
+        $app->addAdminMenu('core.admin.menu.shop', '/admin/shop', 'core.packages.manage', 'system');
         $app->addAdminMenu('core.admin.menu.demo_data', '/admin/demo-data', 'core.demo_data.manage', 'system');
         $app->addAdminMenu('core.admin.menu.tasks', '/admin/tasks', 'core.tasks.view', 'system');
         $app->addAdminMenu('core.admin.menu.updates', '/admin/updates', 'core.update.manage', 'system');

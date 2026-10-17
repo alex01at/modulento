@@ -1238,6 +1238,12 @@ return [
 
     'core.permission.packages_manage' => 'Erweiterungen und Themes aus Repositories installieren',
     'core.admin.menu.packages' => 'Pakete',
+    'core.admin.menu.shop' => 'Shop',
+    'core.admin.shop.title' => 'Shop',
+    'core.admin.shop.intro' => 'Erweiterungen, die über den konfigurierten Lizenzserver angeboten werden.',
+    'core.admin.shop.no_server' => 'Kein Lizenzserver konfiguriert (LICENSE_SERVER_URL in der .env).',
+    'core.admin.shop.none' => 'Derzeit werden keine Erweiterungen angeboten.',
+    'core.admin.shop.how_to_buy' => 'Lizenzschlüssel unter „Erweiterungen und Themes“ eintragen und mit „license:{product}“ installieren.',
     'core.permission.demo_data_manage' => 'Demodaten erzeugen und löschen',
     'core.admin.menu.demo_data' => 'Demodaten',
     'core.admin.demo_data.title' => 'Demodaten',
