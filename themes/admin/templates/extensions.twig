@@ -8,49 +8,153 @@
 <section class="card-box">
 <p>{{ trans('core.admin.extensions.single') }}</p>
 <p>{{ trans('core.admin.extensions.type_explain') }}</p>
-{% if extensions is empty %}
+{% if items is empty %}
     <p class="empty">{{ trans('core.admin.extensions.none') }}</p>
 {% else %}
     <div class="filter-bar" role="group" aria-label="{{ trans('core.admin.extensions.filter') }}" data-extensions-filter>
         <button type="button" data-filter="all" aria-pressed="true">{{ trans('core.admin.extensions.filter_all') }}</button>
         <button type="button" data-filter="app" aria-pressed="false">{{ trans('core.admin.extensions.filter_app') }}</button>
         <button type="button" data-filter="addon" aria-pressed="false">{{ trans('core.admin.extensions.filter_addon') }}</button>
+        <button type="button" data-filter="theme" aria-pressed="false">{{ trans('core.admin.extensions.filter_theme') }}</button>
     </div>
     <div class="columns" data-extensions-grid
          data-label-enabled="{{ trans('core.admin.extensions.status_enabled') }}"
          data-label-disabled="{{ trans('core.admin.extensions.status_disabled') }}"
          data-label-failed="{{ trans('core.admin.extensions.toggle_failed') }}">
-        {% for extension in extensions %}
-            <div class="card-box ext-tile" data-extension-id="{{ extension.id }}" data-extension-type="{{ extension.type }}">
+        {% for item in items %}
+            <div class="card-box ext-tile" data-extension-id="{{ item.kind }}:{{ item.id }}" data-extension-type="{{ item.type }}">
                 <div class="ext-tile-head">
                     <div>
-                        <h3>{{ extension.name }}</h3>
-                        <p class="ext-id">{{ extension.id }} · v{{ extension.version }}</p>
+                        <h3>{{ item.name }}</h3>
+                        <p class="ext-id">{{ item.id }} · v{{ item.version }}</p>
                     </div>
                     <form method="post" class="ext-toggle-form"
-                          action="{{ url('/admin/extensions/' ~ extension.id ~ (extension.enabled ? '/disable' : '/enable')) }}"
-                          data-enable-url="{{ url('/admin/extensions/' ~ extension.id ~ '/enable') }}"
-                          data-disable-url="{{ url('/admin/extensions/' ~ extension.id ~ '/disable') }}">
+                          action="{{ url('/admin/packages/' ~ item.kind ~ '/' ~ item.id ~ (item.in_use ? '/disable' : '/enable')) }}"
+                          data-enable-url="{{ url('/admin/packages/' ~ item.kind ~ '/' ~ item.id ~ '/enable') }}"
+                          data-disable-url="{{ url('/admin/packages/' ~ item.kind ~ '/' ~ item.id ~ '/disable') }}">
                         {{ csrf_field() }}
-                        <button type="submit" class="toggle{{ extension.enabled ? ' is-on' }}"
-                                aria-pressed="{{ extension.enabled ? 'true' : 'false' }}"
-                                aria-label="{{ extension.name }}"
-                                {{ not extension.compatible ? 'disabled' }}></button>
+                        <button type="submit" class="toggle{{ item.in_use ? ' is-on' }}"
+                                aria-pressed="{{ item.in_use ? 'true' : 'false' }}"
+                                aria-label="{{ item.name }}"
+                                {{ not item.compatible ? 'disabled' }}></button>
                     </form>
                 </div>
                 <div class="ext-badges">
-                    <span class="badge">{{ trans('core.admin.extensions.type_' ~ extension.type) }}</span>
-                    {% if not extension.compatible %}
-                        <span class="badge badge-incompatible" data-status-badge>{{ trans('core.admin.extensions.status_incompatible', {needed: extension.api, provided: api_version}) }}</span>
+                    <span class="badge">{{ trans('core.admin.extensions.type_' ~ item.type) }}</span>
+                    {% if not item.compatible %}
+                        <span class="badge badge-incompatible" data-status-badge>{{ trans('core.admin.extensions.status_incompatible', {needed: item.api ?? '?', provided: api_version}) }}</span>
                     {% else %}
-                        <span class="badge {{ extension.enabled ? 'badge-enabled' : 'badge-disabled' }}" data-status-badge>{{ extension.enabled ? trans('core.admin.extensions.status_enabled') : trans('core.admin.extensions.status_disabled') }}</span>
+                        <span class="badge {{ item.in_use ? 'badge-enabled' : 'badge-disabled' }}" data-status-badge>{{ item.in_use ? trans('core.admin.extensions.status_enabled') : trans('core.admin.extensions.status_disabled') }}</span>
+                    {% endif %}
+                    {% if item.tracked and item.latest and item.latest != item.version %}
+                        <a class="badge badge-pending" href="{{ url('/admin/updates') }}">{{ trans('core.package.newer', {version: item.latest}) }}</a>
                     {% endif %}
                 </div>
-                {% if extension.description %}<p class="ext-description">{{ extension.description }}</p>{% endif %}
+                {% if item.description %}<p class="ext-description">{{ item.description }}</p>{% endif %}
+                {% if item.tracked %}
+                    <p class="ext-source"><small>{{ trans('core.package.source') }}: {{ item.repo }}</small></p>
+                    {% if not item.in_use %}
+                        <form method="post" action="{{ url('/admin/packages/' ~ item.kind ~ '/' ~ item.id ~ '/remove') }}" class="inline-form">
+                            {{ csrf_field() }}
+                            <button type="submit" class="btn-sm danger">{{ trans('core.package.remove') }}</button>
+                        </form>
+                    {% endif %}
+                {% elseif not item.shipped %}
+                    <form method="post" action="{{ url('/admin/packages/install') }}" class="button-row">
+                        {{ csrf_field() }}
+                        <label class="visually-hidden" for="adopt_{{ item.kind }}_{{ item.id }}">{{ trans('core.package.repo') }}</label>
+                        <input id="adopt_{{ item.kind }}_{{ item.id }}" name="repo" value="{{ item.repo }}" required>
+                        <button type="submit" class="btn-sm">{{ trans('core.package.adopt') }}</button>
+                    </form>
+                {% endif %}
             </div>
         {% endfor %}
     </div>
+    <p><small>{{ trans('core.package.updates_here') }} <a href="{{ url('/admin/updates') }}">{{ trans('core.update.title') }}</a></small></p>
 {% endif %}
+</section>
+
+{% if official %}
+<section class="card-box">
+    <h2>{{ trans('core.package.official_title') }}</h2>
+    <p>{{ trans('core.package.official_hint') }}</p>
+    <div class="table-wrap">
+        <table>
+            <tbody>
+            {% for item in official %}
+                <tr>
+                    <th scope="row">{{ item.id }}</th>
+                    <td>{{ trans('core.package.kind.' ~ item.kind) }}</td>
+                    <td>{{ trans(item.key) }}<br><small>{{ item.repo }}</small></td>
+                    <td>
+                        <form method="post" action="{{ url('/admin/packages/install') }}">
+                            {{ csrf_field() }}
+                            <input type="hidden" name="repo" value="{{ item.repo }}">
+                            <button type="submit" class="btn-sm">{{ trans('core.package.install') }}</button>
+                        </form>
+                    </td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endif %}
+
+<section class="card-box">
+    <h2>{{ trans('core.package.install_title') }}</h2>
+    <p>{{ trans('core.package.install_hint') }}</p>
+    <form method="post" action="{{ url('/admin/packages/install') }}" class="stack-form">
+        {{ csrf_field() }}
+        <label for="repo">{{ trans('core.package.repo') }}</label>
+        <input id="repo" name="repo" placeholder="owner/modulento-theme-name oder https://github.com/owner/name" required>
+        <small>{{ trans('core.package.sources', {sources: sources|join(', ')}) }}</small>
+        <button type="submit">{{ trans('core.package.install') }}</button>
+    </form>
+</section>
+
+<section class="card-box">
+    <h2>{{ trans('core.license.title') }}</h2>
+    <p>{{ trans('core.license.hint') }}</p>
+    {% if license_keys %}
+        <table>
+            <thead><tr><th>{{ trans('core.license.product') }}</th><th>{{ trans('core.license.key') }}</th><th>{{ trans('core.license.added_at') }}</th><th></th></tr></thead>
+            <tbody>
+            {% for item in license_keys %}
+                <tr>
+                    <td>{{ item.product_id }}</td>
+                    <td>{{ item.masked }}</td>
+                    <td>{{ item.added_at }}</td>
+                    <td>
+                        <form method="post" action="{{ url('/admin/licenses/' ~ item.product_id ~ '/remove') }}">
+                            {{ csrf_field() }}
+                            <button type="submit" class="btn-sm">{{ trans('core.license.remove') }}</button>
+                        </form>
+                    </td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    {% endif %}
+    <form method="post" action="{{ url('/admin/licenses') }}" class="stack-form">
+        {{ csrf_field() }}
+        <label for="product_id">{{ trans('core.license.product') }}</label>
+        <input id="product_id" name="product_id" placeholder="ext-exklusiv" required>
+        <label for="license_key">{{ trans('core.license.key') }}</label>
+        <input id="license_key" name="license_key" type="text" required>
+        <button type="submit">{{ trans('core.license.save') }}</button>
+    </form>
+</section>
+
+<section class="card-box">
+    <h2>{{ trans('core.package.upload_title') }}</h2>
+    <p>{{ trans('core.package.upload_hint') }}</p>
+    <form method="post" action="{{ url('/admin/packages/upload') }}" enctype="multipart/form-data" class="stack-form">
+        {{ csrf_field() }}
+        <label for="package">{{ trans('core.package.upload_file') }}</label>
+        <input id="package" name="package" type="file" accept=".zip,application/zip" required>
+        <button type="submit">{{ trans('core.package.upload_submit') }}</button>
+    </form>
 </section>
 
 {% if invalid is not empty %}

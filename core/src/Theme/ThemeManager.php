@@ -22,14 +22,14 @@ final class ThemeManager
     public const ADMIN_THEME = 'admin';
     public const SETTING = 'core.theme';
 
-    /** @var array<string, array{id: string, name: string, version: string, dir: string}>|null */
+    /** @var array<string, array{id: string, name: string, version: string, description: string, dir: string}>|null */
     private ?array $themes = null;
 
     public function __construct(private string $themesDir, private Settings $settings)
     {
     }
 
-    /** @return array<string, array{id: string, name: string, version: string, dir: string}> every valid theme folder */
+    /** @return array<string, array{id: string, name: string, version: string, description: string, dir: string}> every valid theme folder */
     public function discover(): array
     {
         if ($this->themes !== null) {
@@ -49,6 +49,7 @@ final class ThemeManager
                 'id' => $id,
                 'name' => is_string($data['name'] ?? null) ? $data['name'] : $id,
                 'version' => is_string($data['version'] ?? null) ? $data['version'] : '',
+                'description' => is_string($data['description'] ?? null) ? $data['description'] : '',
                 'dir' => $dir,
             ];
         }
@@ -57,7 +58,7 @@ final class ThemeManager
         return $this->themes;
     }
 
-    /** @return array<string, array{id: string, name: string, version: string, dir: string}> themes selectable for the site */
+    /** @return array<string, array{id: string, name: string, version: string, description: string, dir: string}> themes selectable for the site */
     public function siteThemes(): array
     {
         return array_diff_key($this->discover(), [self::ADMIN_THEME => true]);

@@ -4642,7 +4642,8 @@ $packages->remove('theme', 'ocean');
 check('package: removed from disk and from the list', !is_dir($packageRoot . '/themes/ocean') && $packages->find('theme', 'ocean') === null && count($packages->installed()) === 1);
 
 check('package administration needs its permission', $get('/admin/packages', 1)['status'] === 403);
-$r = $get('/admin/packages', 3);
+check('the old /admin/packages address redirects to the merged page', $get('/admin/packages', 3)['status'] === 302);
+$r = $get('/admin/extensions', 3);
 check('package administration lists packages and the allowed sources', $r['status'] === 200 && str_contains($r['body'], 'acme/modulento-shop') && str_contains($r['body'], 'acme/*, other/exact'));
 check('package administration: a theme that is no package can be taken over; updates are not offered on this page', str_contains($r['body'], 'Als Paket übernehmen') && str_contains($r['body'], '/modulento-theme-sample"')
     && !str_contains($r['body'], '/admin/packages/extension/shop/update'));
@@ -4651,12 +4652,12 @@ check('updates: a package with a newer release is offered on the one Updates pag
 $app->settings->set('core.update_check', '');
 check('package administration: extensions that moved out of the core can be taken over', str_contains($r['body'], '/modulento-ext-freelancer"') && str_contains($r['body'], '/modulento-ext-auction"') && !str_contains($r['body'], '/modulento-ext-example"'));
 check('package administration: no official packages without knowing whose they are', !str_contains($r['body'], 'Offizielle Pakete'));
-$r = request($pdo, ['update' => ['repo' => 'acme/modulento']] + $config, 'GET', '/admin/packages', 3);
+$r = request($pdo, ['update' => ['repo' => 'acme/modulento']] + $config, 'GET', '/admin/extensions', 3);
 check('package administration offers the official packages that are not here yet', str_contains($r['body'], 'Offizielle Pakete') && str_contains($r['body'], 'name="repo" value="acme/modulento-theme-indigo"')
     && !str_contains($r['body'], 'type="hidden" name="repo" value="acme/modulento-ext-freelancer"') && !str_contains($r['body'], 'type="hidden" name="repo" value="acme/modulento-ext-auction"')
     // The blog is offered exactly where its folder is not there (it is not needed for these tests).
     && str_contains($r['body'], 'type="hidden" name="repo" value="acme/modulento-ext-blog"') === !is_dir($root . '/extensions/blog'));
-$r = request($pdo, ['update' => ['repo' => 'elsewhere/modulento']] + $config, 'GET', '/admin/packages', 3);
+$r = request($pdo, ['update' => ['repo' => 'elsewhere/modulento']] + $config, 'GET', '/admin/extensions', 3);
 check('package administration: official packages only from an allowed source', $r['status'] === 200 && !str_contains($r['body'], 'Offizielle Pakete'));
 $post('/admin/packages/install', ['repo' => 'evil/thing'], 3);
 check('package administration refuses a source that is not allowed', str_contains($_SESSION['_flash']['error'] ?? '', 'evil/thing'));
@@ -4665,17 +4666,17 @@ $pdo->exec("INSERT INTO setting VALUES ('core.theme', 'sample')");
 $post('/admin/packages/theme/sample/remove', [], 3);
 check('package administration does not remove the active theme', $pdo->query("SELECT COUNT(*) FROM package WHERE id = 'sample'")->fetchColumn() == 1 && is_dir($testThemes . '/sample'));
 $pdo->exec("DELETE FROM setting WHERE name = 'core.theme'");
-$r = $get('/admin/packages', 3);
-check('package administration: each package shows whether it is in use and can be switched', str_contains($r['body'], '/admin/packages/theme/sample/enable') && str_contains($r['body'], 'inaktiv'));
+$r = $get('/admin/extensions', 3);
+check('package administration: each package shows whether it is in use and can be switched', str_contains($r['body'], '/admin/packages/theme/sample/enable') && str_contains($r['body'], 'Inaktiv'));
 $post('/admin/packages/theme/sample/enable', [], 3);
-check('package administration: a theme is chosen from the list', $pdo->query("SELECT value FROM setting WHERE name = 'core.theme'")->fetchColumn() === 'sample' && str_contains($get('/admin/packages', 3)['body'], '/admin/packages/theme/sample/disable'));
+check('package administration: a theme is chosen from the list', $pdo->query("SELECT value FROM setting WHERE name = 'core.theme'")->fetchColumn() === 'sample' && str_contains($get('/admin/extensions', 3)['body'], '/admin/packages/theme/sample/disable'));
 $post('/admin/packages/theme/sample/disable', [], 3);
 check('package administration: switching the active theme off leads back to the default theme', $pdo->query("SELECT value FROM setting WHERE name = 'core.theme'")->fetchColumn() === 'default');
 $pdo->exec("INSERT INTO package VALUES ('extension', 'example', 'acme/modulento-ext-example', '0.1.0', '2026-01-01 00:00:00')");
 // Switching on runs the extension's migrations, which need MariaDB; off is plain.
 $enabledBefore = (int) $pdo->query("SELECT enabled FROM extension WHERE id = 'example'")->fetchColumn();
 $pdo->exec("UPDATE extension SET enabled = 1 WHERE id = 'example'");
-check('package administration: an active extension offers to be switched off', str_contains($get('/admin/packages', 3)['body'], '/admin/packages/extension/example/disable'));
+check('package administration: an active extension offers to be switched off', str_contains($get('/admin/extensions', 3)['body'], '/admin/packages/extension/example/disable'));
 $post('/admin/packages/extension/example/disable', [], 3);
 check('package administration: an extension is switched off from the list', (int) $pdo->query("SELECT enabled FROM extension WHERE id = 'example'")->fetchColumn() === 0);
 $pdo->exec("UPDATE extension SET enabled = {$enabledBefore} WHERE id = 'example'");
@@ -4756,12 +4757,12 @@ $pdo->exec("DELETE FROM license_key");
 
 // --- Admin: license key management on the packages page ---------------------
 $post('/admin/licenses', ['product_id' => 'ext-exklusiv', 'license_key' => 'sk_live_test'], 3);
-check('license admin: saving a key is reflected on the page, masked', str_contains($get('/admin/packages', 3)['body'], '••••test'));
+check('license admin: saving a key is reflected on the page, masked', str_contains($get('/admin/extensions', 3)['body'], '••••test'));
 check('license admin: needs the packages permission', $post('/admin/licenses', ['product_id' => 'ext-x', 'license_key' => 'k'], 1)['status'] === 403);
 $post('/admin/licenses', ['product_id' => 'Not Valid', 'license_key' => 'k'], 3);
 check('license admin: an invalid product id is refused, the earlier key is untouched', str_contains($_SESSION['_flash']['error'] ?? '', 'ungültig') && $pdo->query("SELECT COUNT(*) FROM license_key")->fetchColumn() == 1);
 $post('/admin/licenses/ext-exklusiv/remove', [], 3);
-check('license admin: removing a key takes it off the page', !str_contains($get('/admin/packages', 3)['body'], '••••test') && $pdo->query("SELECT COUNT(*) FROM license_key")->fetchColumn() == 0);
+check('license admin: removing a key takes it off the page', !str_contains($get('/admin/extensions', 3)['body'], '••••test') && $pdo->query("SELECT COUNT(*) FROM license_key")->fetchColumn() == 0);
 
 // --- Administration -> Shop: the public catalog of a license server --------
 check('shop: needs its permission', $get('/admin/shop', 1)['status'] === 403);
@@ -4833,18 +4834,18 @@ $pdo->exec("DELETE FROM license_key WHERE product_id = 'ext-exklusiv'");
 check('extensions page: needs its permission', $get('/admin/extensions', 1)['status'] === 403);
 $r = $get('/admin/extensions', 3);
 check('extensions page: a tile per discovered extension, typed for the filter buttons, description shown when the manifest names one', $r['status'] === 200
-    && str_contains($r['body'], 'data-extension-id="example"') && str_contains($r['body'], 'data-extension-type="addon"')
+    && str_contains($r['body'], 'data-extension-id="extension:example"') && str_contains($r['body'], 'data-extension-type="addon"')
     && str_contains($r['body'], 'Reference extension: demonstrates every registration point once.')
-    && str_contains($r['body'], 'data-filter="app"') && str_contains($r['body'], 'data-filter="addon"'));
+    && str_contains($r['body'], 'data-filter="app"') && str_contains($r['body'], 'data-filter="addon"') && str_contains($r['body'], 'data-filter="theme"'));
 
 // Only disable goes through the real ExtensionManager in this SQLite suite -
 // enabling a real extension would run its (MariaDB-only) migrations; see the
 // "package administration" tests above, which hit the exact same limit.
 $pdo->exec("UPDATE extension SET enabled = 1 WHERE id = 'example'");
 $_SERVER['HTTP_ACCEPT'] = 'application/json';
-$r = $post('/admin/extensions/example/disable', [], 3);
+$r = $post('/admin/packages/extension/example/disable', [], 3);
 unset($_SERVER['HTTP_ACCEPT']);
-check('extensions toggle: Accept: application/json gets JSON back instead of a redirect', $r['status'] === 200 && json_decode($r['body'], true) === ['ok' => true, 'disabled' => 'example']
+check('extensions toggle: Accept: application/json gets JSON back instead of a redirect', $r['status'] === 200 && json_decode($r['body'], true) === ['ok' => true, 'id' => 'example', 'switched_off' => []]
     && (int) $pdo->query("SELECT enabled FROM extension WHERE id = 'example'")->fetchColumn() === 0);
 
 // enable() itself writes with MariaDB-only "ON DUPLICATE KEY UPDATE", same
@@ -4854,12 +4855,12 @@ check('extensions toggle: Accept: application/json gets JSON back instead of a r
 // the "switched off" unit tests of ExtensionManager::appsToSwitchOff()
 // further up, and by hand against the real MariaDB-backed dev install.
 $_SERVER['HTTP_ACCEPT'] = 'application/json';
-$r = $post('/admin/extensions/does-not-exist/enable', [], 3);
+$r = $post('/admin/packages/extension/does-not-exist/enable', [], 3);
 unset($_SERVER['HTTP_ACCEPT']);
 $failBody = json_decode($r['body'], true);
 check('extensions toggle: a failure (unknown id) is reported as JSON too, with its own reason - not a redirect the caller cannot read', $r['status'] === 200 && $failBody['ok'] === false && is_string($failBody['error']) && $failBody['error'] !== '');
 
-check('extensions toggle: without Accept: application/json, the old plain redirect still works (no-JS fallback)', $post('/admin/extensions/example/disable', [], 3)['status'] === 302);
+check('extensions toggle: without Accept: application/json, the old plain redirect still works (no-JS fallback)', $post('/admin/packages/extension/example/disable', [], 3)['status'] === 302);
 
 // --- Router: rest-of-path parameter --------------------------------------
 $r = request($pdo, $config, 'GET', '/assets/theme/theme.css', null);
