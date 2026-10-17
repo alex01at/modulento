@@ -209,6 +209,7 @@ final class AdminController extends Controller
                 'version' => $manifest->version,
                 'api' => $manifest->api,
                 'type' => $manifest->type,
+                'description' => $manifest->description,
                 'compatible' => $manifest->api === App::API_VERSION,
                 'enabled' => in_array($id, $enabled, true),
             ];
@@ -233,8 +234,19 @@ final class AdminController extends Controller
         } catch (Throwable $e) {
             error_log('Enabling extension ' . $params['id'] . ' failed: ' . $e);
             Session::flash('error', $this->trans('core.admin.extensions.enable_failed', ['id' => $params['id'], 'reason' => $e->getMessage()]));
+
+            if ($this->wantsJson()) {
+                $this->json(['ok' => false, 'error' => $this->trans('core.admin.extensions.enable_failed', ['id' => $params['id'], 'reason' => $e->getMessage()])]);
+                return;
+            }
+            $this->redirect('/admin/extensions');
+            return;
         }
 
+        if ($this->wantsJson()) {
+            $this->json(['ok' => true, 'enabled' => $params['id'], 'switched_off' => $switchedOff]);
+            return;
+        }
         $this->redirect('/admin/extensions');
     }
 
@@ -242,7 +254,19 @@ final class AdminController extends Controller
     {
         $this->app->extensions->disable($params['id']);
         Session::flash('success', $this->trans('core.admin.extensions.disabled', ['id' => $params['id']]));
+
+        if ($this->wantsJson()) {
+            $this->json(['ok' => true, 'disabled' => $params['id']]);
+            return;
+        }
         $this->redirect('/admin/extensions');
+    }
+
+    /** Same detection a fetch() call with Accept: application/json (this project's own scripts) or an XMLHttpRequest sets off. */
+    private function wantsJson(): bool
+    {
+        return ($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'XMLHttpRequest'
+            || str_contains((string) ($_SERVER['HTTP_ACCEPT'] ?? ''), 'application/json');
     }
 
     public function tasks(array $params): void

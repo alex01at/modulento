@@ -69,6 +69,11 @@ return [
     'core.admin.extensions.disabled' => 'Erweiterung „{id}“ wurde deaktiviert. Ihre Daten bleiben erhalten.',
     'core.admin.extensions.enable_failed' => 'Erweiterung „{id}“ konnte nicht aktiviert werden: {reason}',
     'core.admin.extensions.none' => 'Im Ordner extensions/ liegt keine Erweiterung.',
+    'core.admin.extensions.filter' => 'Nach Art filtern',
+    'core.admin.extensions.filter_all' => 'Alle',
+    'core.admin.extensions.filter_app' => 'App',
+    'core.admin.extensions.filter_addon' => 'Addon',
+    'core.admin.extensions.toggle_failed' => 'Änderung fehlgeschlagen.',
     'core.admin.extensions.invalid_title' => 'Ordner mit ungültiger extension.json',
     'core.admin.extensions.missing_title' => 'Aktiviert, aber Ordner fehlt',
 
