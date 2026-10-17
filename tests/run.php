@@ -4761,6 +4761,38 @@ check('license admin: an invalid product id is refused, the earlier key is untou
 $post('/admin/licenses/ext-exklusiv/remove', [], 3);
 check('license admin: removing a key takes it off the page', !str_contains($get('/admin/packages', 3)['body'], '••••test') && $pdo->query("SELECT COUNT(*) FROM license_key")->fetchColumn() == 0);
 
+// --- Administration -> Shop: the public catalog of a license server --------
+check('shop: needs its permission', $get('/admin/shop', 1)['status'] === 403);
+$r = $get('/admin/shop', 3);
+check('shop: no license server configured says so plainly', $r['status'] === 200 && str_contains($r['body'], 'Kein Lizenzserver konfiguriert'));
+
+$shopConfig = fn (Modulento\Core\Support\HttpClient $http) => ['update' => ['license_server' => 'https://license.example.test', 'license_http' => $http]] + $config;
+
+$emptyCatalogHttp = new FakeLicenseHttp(200, json_encode(['products' => []]));
+$r = request($pdo, $shopConfig($emptyCatalogHttp), 'GET', '/admin/shop', 3);
+check('shop: a configured server with nothing for sale says so, not an error', $r['status'] === 200 && str_contains($r['body'], 'Derzeit werden keine Erweiterungen angeboten'));
+
+$catalogHttp = new FakeLicenseHttp(200, json_encode(['products' => [
+    ['id' => 'ext-exklusiv', 'name' => 'Exklusiv', 'description' => 'Die exklusive Erweiterung.', 'price_cents' => 4990, 'currency' => 'EUR', 'screenshot_url' => 'https://license.example.test/screenshots/x.jpg'],
+]]));
+$r = request($pdo, $shopConfig($catalogHttp), 'GET', '/admin/shop', 3);
+check('shop: a product for sale is shown with name, description, price and picture', $r['status'] === 200 && str_contains($r['body'], 'Exklusiv') && str_contains($r['body'], 'Die exklusive Erweiterung.')
+    && str_contains($r['body'], '49,90') && str_contains($r['body'], 'https://license.example.test/screenshots/x.jpg') && str_contains($r['body'], 'license:ext-exklusiv'));
+check('shop: asks the configured server\'s catalog endpoint, nothing else', $catalogHttp->lastRequest['url'] === 'https://license.example.test/v1/catalog' && $catalogHttp->lastRequest['method'] === 'GET');
+
+$malformedHttp = new FakeLicenseHttp(200, json_encode(['products' => [
+    ['id' => 'ok-one', 'name' => 'Ok', 'description' => '', 'price_cents' => 1000, 'currency' => 'EUR', 'screenshot_url' => null],
+    ['id' => 'Not Valid', 'name' => 'Bad id', 'description' => '', 'price_cents' => 1000, 'currency' => 'EUR'],
+    ['id' => 'no-price', 'name' => 'Missing price', 'description' => '', 'price_cents' => null, 'currency' => 'EUR'],
+    'not even an array',
+]]));
+$r = request($pdo, $shopConfig($malformedHttp), 'GET', '/admin/shop', 3);
+check('shop: a malformed entry from the server is left out, valid ones around it still show', $r['status'] === 200 && str_contains($r['body'], '>Ok<') && !str_contains($r['body'], 'Bad id') && !str_contains($r['body'], 'Missing price'));
+
+$downHttp = new FakeLicenseHttp(500, 'internal error');
+$r = request($pdo, $shopConfig($downHttp), 'GET', '/admin/shop', 3);
+check('shop: an unreachable or failing server shows an empty catalog, not a broken page', $r['status'] === 200 && str_contains($r['body'], 'Derzeit werden keine Erweiterungen angeboten'));
+
 // --- Router: rest-of-path parameter --------------------------------------
 $r = request($pdo, $config, 'GET', '/assets/theme/theme.css', null);
 check('theme asset is served through the router', $r['status'] === 200 && str_contains($r['body'], '.site-header'));
