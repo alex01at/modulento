@@ -5,6 +5,22 @@
 {% block admin %}
 {% include '@admin/_page_header.twig' with {heading: trans('core.admin.shop.title')} only %}
 
+{% if purchase %}
+    <section class="card-box">
+        {% if purchase.status == 'pending' %}
+            <p class="flash">{{ trans('core.admin.shop.purchase_pending') }}</p>
+            <p><a href="{{ url('/admin/shop') }}?purchase={{ purchase.reference }}">{{ trans('core.admin.shop.purchase_refresh') }}</a></p>
+        {% elseif purchase.status == 'completed' and purchase.license_key %}
+            <p class="flash flash-success">{{ trans('core.admin.shop.purchase_done', {product: purchase.product}) }}</p>
+            <p><a href="{{ url('/admin/packages') }}">{{ trans('core.admin.shop.go_install') }}</a></p>
+        {% elseif purchase.status == 'completed' %}
+            <p class="flash flash-success">{{ trans('core.admin.shop.purchase_already_saved') }}</p>
+        {% else %}
+            <p class="flash flash-error">{{ trans('core.admin.shop.purchase_not_found') }}</p>
+        {% endif %}
+    </section>
+{% endif %}
+
 <section class="card-box">
     <p>{{ trans('core.admin.shop.intro') }}</p>
 
@@ -22,7 +38,10 @@
                     <h3>{{ product.name }}</h3>
                     {% if product.description %}<p>{{ product.description }}</p>{% endif %}
                     <p><strong>{{ money(product.price_cents, product.currency) }}</strong></p>
-                    <p><small>{{ trans('core.admin.shop.how_to_buy', {product: product.id}) }}</small></p>
+                    <form method="post" action="{{ url('/admin/shop/' ~ product.id ~ '/buy') }}">
+                        {{ csrf_field() }}
+                        <button type="submit">{{ trans('core.admin.shop.buy') }}</button>
+                    </form>
                 </div>
             {% endfor %}
         </div>
