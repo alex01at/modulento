@@ -1630,6 +1630,7 @@ return [
     'core.admin.menu.menu' => 'Menü',
     'core.menu.intro' => 'Die Einträge im Hauptmenü der Website: fest verdrahtete (Katalog, Anfragen, von Erweiterungen hinzugefügte) können umbenannt, sortiert und ausgeblendet, aber nicht entfernt werden; eigene Einträge lassen sich frei hinzufügen, bearbeiten und löschen.',
     'core.menu.locked' => 'fest',
+    'core.menu.reorder_failed' => 'Die neue Reihenfolge konnte nicht gespeichert werden.',
     'core.menu.entry' => 'Eintrag',
     'core.menu.path' => 'Ziel (Seite oder Adresse)',
     'core.menu.label' => 'Beschriftung',

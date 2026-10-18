@@ -370,6 +370,7 @@ final class Kernel
         $router->post('/admin/home', [AdminHomeController::class, 'save'], 'core.settings.manage');
         $router->get('/admin/menu', [AdminMenuController::class, 'index'], 'core.settings.manage');
         $router->post('/admin/menu', [AdminMenuController::class, 'save'], 'core.settings.manage');
+        $router->post('/admin/menu/reorder', [AdminMenuController::class, 'reorder'], 'core.settings.manage');
         $router->get('/admin/badwords', [AdminBadWordsController::class, 'index'], 'core.settings.manage');
         $router->post('/admin/badwords', [AdminBadWordsController::class, 'save'], 'core.settings.manage');
         $router->post('/admin/badwords/reset', [AdminBadWordsController::class, 'reset'], 'core.settings.manage');

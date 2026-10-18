@@ -15,7 +15,9 @@ use Modulento\Core\Support\Session;
  * custom one, but their target page is fixed and they cannot be removed.
  * One form holds every entry; the buttons next to one (move, remove) and
  * "add" save the form first, then do their step - the same pattern
- * AdminHomeController uses for the home page's own blocks.
+ * AdminHomeController uses for the home page's own blocks. Dragging an
+ * entry to a new place (menu.js) is the one action that does not go
+ * through that form - see reorder().
  */
 final class AdminMenuController extends Controller
 {
@@ -92,6 +94,37 @@ final class AdminMenuController extends Controller
         }
 
         return $items;
+    }
+
+    /**
+     * The whole list in the order dragged on the page - the only thing
+     * drag and drop ever changes; a label, path or enabled box someone
+     * was mid-way editing is untouched, since this never looks at the
+     * rest of the form. An id the request does not name (a stale page,
+     * or a fixed entry that appeared since) keeps its place at the end.
+     */
+    public function reorder(array $params): void
+    {
+        $menu = $this->app->customMenu;
+        $byId = [];
+        foreach ($menu->items($this->app) as $item) {
+            $byId[$item['id']] = $item;
+        }
+
+        $order = is_array($_POST['order'] ?? null) ? $_POST['order'] : [];
+        $items = [];
+        foreach ($order as $id) {
+            if (is_string($id) && isset($byId[$id])) {
+                $items[] = $byId[$id];
+                unset($byId[$id]);
+            }
+        }
+        foreach ($byId as $leftover) {
+            $items[] = $leftover;
+        }
+
+        $menu->save($items);
+        $this->json(['ok' => true]);
     }
 
     /**

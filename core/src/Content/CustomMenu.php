@@ -72,8 +72,12 @@ final class CustomMenu
         $fixedIds = array_column($fixed, 'id');
 
         $items = [];
-        // Fixed entries first, in their last known order, then any that are new.
+        // Fixed entries first, in their last known order, then any that are new. The key
+        // is cast back to string - a purely numeric id (unlikely, but not impossible for
+        // the random hex ids newItem() hands out) would otherwise come back as an int,
+        // since PHP normalises a numeric array key to one.
         foreach ($stored as $id => $item) {
+            $id = (string) $id;
             if (in_array($id, $fixedIds, true)) {
                 $items[] = $this->withFixedDefinition($item, $fixed);
             }
@@ -87,6 +91,7 @@ final class CustomMenu
         // (core./ext. prefix) but no longer matches one above belongs to a catalogue,
         // module or extension that went away, so it is dropped rather than kept as custom.
         foreach ($stored as $id => $item) {
+            $id = (string) $id;
             if (!in_array($id, $fixedIds, true) && !self::looksFixed($id)) {
                 $items[] = [
                     'id' => $id,
