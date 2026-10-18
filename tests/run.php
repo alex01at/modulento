@@ -4569,6 +4569,17 @@ foreach ([...glob($root . '/themes/*/templates/{,*/,*/*/}*.twig', GLOB_BRACE), .
 }
 check('templates carry no inline script or style, which the content security policy would block: ' . implode(', ', $inline), $inline === []);
 
+// --- core.home_redirect: another page can be made the start page, without the core
+// knowing it or its extension at all - set by whatever offers "use this as the start page".
+check('home: without a redirect set, the home page renders as usual', $get('/', null)['status'] === 200);
+$app->settings->set('core.home_redirect', '/impressum');
+check('home: a redirect set makes "/" forward instead of rendering the home page', $get('/', null)['status'] === 302);
+$app->settings->set('core.home_redirect', 'https://evil.example');
+check('home: an external address is not accepted - only an internal path redirects', $get('/', null)['status'] === 200);
+$app->settings->set('core.home_redirect', 'javascript:alert(1)');
+check('home: an unsafe address is not accepted either', $get('/', null)['status'] === 200);
+$app->settings->set('core.home_redirect', '');
+
 // --- A second site theme --------------------------------------------------------
 $r = $get('/', null);
 check('default theme: no texts of another theme', $r['status'] === 200 && !str_contains($r['body'], 'sample-home'));
