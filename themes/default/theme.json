@@ -1,5 +1,6 @@
 {
     "id": "default",
     "name": "Default",
-    "version": "0.1.0"
+    "version": "0.1.0",
+    "description": "The marketplace look Modulento ships with: search, category tiles, a provider showcase and the newest offers on the home page."
 }

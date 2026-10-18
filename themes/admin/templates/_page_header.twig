@@ -1,8 +1,11 @@
 {# Title of a page with its breadcrumb trail. Receives "heading" and
-   optionally "crumbs", a list of label/path pairs between the dashboard and
-   this page. #}
+   optionally "crumbs" (a list of label/path pairs between the dashboard and
+   this page) and "subtitle" (one line under the heading). #}
 <header class="page-header card-box">
-    <h1>{{ heading }}</h1>
+    <div>
+        <h1>{{ heading }}</h1>
+        {% if subtitle is defined and subtitle %}<p class="page-header-subtitle">{{ subtitle }}</p>{% endif %}
+    </div>
     <nav aria-label="{{ trans('core.admin.layout.breadcrumb') }}">
         <ol class="breadcrumb">
             <li><a href="{{ url('/admin') }}">{{ trans('core.admin.title') }}</a></li>
