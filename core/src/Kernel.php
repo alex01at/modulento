@@ -467,6 +467,7 @@ final class Kernel
         $router->post('/admin/updates/migrate', [UpdateController::class, 'migrate'], 'core.update.manage');
         $router->post('/admin/updates/check', [UpdateController::class, 'check'], 'core.update.manage');
         $router->post('/admin/updates/apply', [UpdateController::class, 'apply'], 'core.update.manage');
+        $router->post('/admin/updates/apply-all', [UpdateController::class, 'applyAll'], 'core.update.manage');
 
         $app->addPermission('core.admin.access', 'core.permission.admin_access');
         $app->addPermission('core.tasks.view', 'core.permission.tasks_view');

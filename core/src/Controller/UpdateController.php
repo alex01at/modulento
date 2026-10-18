@@ -17,6 +17,8 @@ final class UpdateController extends Controller
     {
         $updater = $this->updater();
         $checks = new UpdateChecks($this->app);
+        $canPackages = $this->app->auth->can('core.packages.manage');
+        $available = $checks->available();
 
         $this->render('@admin/updates.twig', [
             'enabled' => $updater->isEnabled(),
@@ -25,7 +27,9 @@ final class UpdateController extends Controller
             'stale_lock' => $updater->staleLockInfo(),
             'components' => $checks->components(),
             'checked_at' => $checks->checkedAt(),
-            'can_packages' => $this->app->auth->can('core.packages.manage'),
+            'can_packages' => $canPackages,
+            'available_count' => count($available),
+            'actionable_count' => count($this->actionable($available, $updater, $canPackages)),
         ]);
     }
 
@@ -53,6 +57,66 @@ final class UpdateController extends Controller
     }
 
     /**
+     * Every component with a newer release, one after another: the core
+     * through its own backup-and-migrate path, each package through
+     * Packages::install() - a package that fails (refused source, a
+     * checksum that no longer matches, …) does not stop the rest; its
+     * message is reported alongside whatever did succeed.
+     */
+    public function applyAll(array $params): void
+    {
+        @set_time_limit(0);
+
+        $checks = new UpdateChecks($this->app);
+        $updater = $this->updater();
+        $canPackages = $this->app->auth->can('core.packages.manage');
+        $updated = 0;
+        $errors = [];
+
+        foreach ($checks->available() as $component) {
+            if ($component['kind'] === 'core') {
+                if (!$updater->isEnabled() || $updater->isDevelopmentCheckout()) {
+                    continue;
+                }
+                $result = $updater->applyUpdate();
+                if ($result['success']) {
+                    $updated++;
+                } elseif ($result['stage'] !== 'up_to_date') {
+                    $errors[] = $this->trans('core.update.core') . ': ' . $this->trans($result['message_key'], $result['params']);
+                }
+                continue;
+            }
+
+            if (!$canPackages) {
+                continue;
+            }
+
+            try {
+                $this->app->packages->install($component['repo']);
+                $updated++;
+            } catch (UpdateException $e) {
+                $errors[] = $component['id'] . ': ' . $this->trans($e->messageKey, $e->params);
+            }
+        }
+
+        // A package's migrations, if any - the core already ran its own above.
+        if ($updated > 0) {
+            Migrator::runAll($this->app->db, $this->app->config['app']['root']);
+        }
+
+        foreach ($errors as $error) {
+            Session::flash('error', $error);
+        }
+        if ($updated > 0) {
+            Session::flash('success', $this->trans('core.update.applied_all', ['count' => $updated]));
+        } elseif ($errors === []) {
+            Session::flash('success', $this->trans('core.update.nothing_to_apply'));
+        }
+
+        $this->redirect('/admin/updates');
+    }
+
+    /**
      * For changes that did not come through an update: an extension that
      * was replaced by a newer copy over FTP brings new migration files
      * that nothing else would run without shell access.
@@ -64,6 +128,21 @@ final class UpdateController extends Controller
 
         Session::flash('success', $this->trans($count > 0 ? 'core.update.migrations_applied' : 'core.update.migrations_none', ['count' => $count]));
         $this->redirect('/admin/updates');
+    }
+
+    /**
+     * Of the components with a newer release, the ones "Update all" would
+     * actually touch - the core only with updates enabled and not a git
+     * checkout, a package only with the separate permission for it.
+     *
+     * @param list<array{kind: string, id: string, installed: string, latest: ?string, newer: bool, action: string, repo: string}> $available
+     * @return list<array{kind: string, id: string, installed: string, latest: ?string, newer: bool, action: string, repo: string}>
+     */
+    private function actionable(array $available, Updater $updater, bool $canPackages): array
+    {
+        return array_values(array_filter($available, static fn (array $component) => $component['kind'] === 'core'
+            ? ($updater->isEnabled() && !$updater->isDevelopmentCheckout())
+            : $canPackages));
     }
 
     private function updater(): Updater
