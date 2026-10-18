@@ -8,6 +8,16 @@
 <section class="card-box">
     <h2>{{ trans('core.update.components_title') }}</h2>
     <p>{{ trans('core.update.components_hint') }}</p>
+
+    <p>
+        {% if available_count > 0 %}
+            <span class="badge badge-pending">{{ trans('core.update.available_count', {count: available_count}) }}</span>
+        {% else %}
+            <span class="badge badge-enabled">{{ trans('core.update.all_current') }}</span>
+        {% endif %}
+        <small>{{ checked_at ? trans('core.update.checked_at', {date: checked_at}) : trans('core.update.never_checked') }}</small>
+    </p>
+
     {% if not enabled %}
         <p>{{ trans('core.update.error.disabled') }}</p>
     {% elseif dev_checkout %}
@@ -18,6 +28,21 @@
             {{ trans('core.update.stale_lock', {stage: stale_lock.stage, version: stale_lock.release_version, started_at: stale_lock.started_at}) }}
         </p>
     {% endif %}
+
+    <div class="button-row">
+        {% if enabled and not dev_checkout %}
+            <form method="post" action="{{ url('/admin/updates/check') }}" class="inline-form">
+                {{ csrf_field() }}
+                <button type="submit" class="btn-outline">{{ trans('core.update.check') }}</button>
+            </form>
+        {% endif %}
+        {% if actionable_count > 0 %}
+            <form method="post" action="{{ url('/admin/updates/apply-all') }}" class="inline-form">
+                {{ csrf_field() }}
+                <button type="submit">{{ trans('core.update.apply_all', {count: actionable_count}) }}</button>
+            </form>
+        {% endif %}
+    </div>
 
     <div class="table-wrap">
         <table>
@@ -61,14 +86,6 @@
             </tbody>
         </table>
     </div>
-
-    <p><small>{{ checked_at ? trans('core.update.checked_at', {date: checked_at}) : trans('core.update.never_checked') }}</small></p>
-    {% if enabled and not dev_checkout %}
-        <form method="post" action="{{ url('/admin/updates/check') }}">
-            {{ csrf_field() }}
-            <button type="submit">{{ trans('core.update.check') }}</button>
-        </form>
-    {% endif %}
 </section>
 
 <section class="card-box">

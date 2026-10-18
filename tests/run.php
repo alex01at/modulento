@@ -4725,6 +4725,23 @@ check('package administration: switching needs the permission', $post('/admin/pa
 $pdo->exec("DELETE FROM setting WHERE name = 'core.theme'");
 $pdo->exec('DELETE FROM package');
 
+// "Update all": one request for every component with a newer release. The core here is
+// switched off (no repository configured in $config), so it is skipped without asking
+// anything; a package whose source is not allowed fails inside Packages::install() before
+// it ever reaches a release server, so this stays as free of real network access as the
+// rest of this file.
+$pdo->exec("INSERT INTO package VALUES ('extension', 'zzz_update_all_test', 'evil/thing-not-allowed', '1.0.0', '2026-01-01 00:00:00')");
+$app->settings->set('core.update_check', json_encode(['core' => '0.0.0', 'packages' => ['extension:zzz_update_all_test' => '2.0.0'], 'checked_at' => gmdate('Y-m-d H:i')]));
+check('update all: needs its permission', $post('/admin/updates/apply-all', [], 1)['status'] === 403);
+$post('/admin/updates/apply-all', [], 3);
+check('update all: a package whose source is not allowed fails without reaching the network, and is reported',
+    str_contains($_SESSION['_flash']['error'] ?? '', 'evil/thing-not-allowed') && $pdo->query("SELECT version FROM package WHERE id = 'zzz_update_all_test'")->fetchColumn() === '1.0.0');
+$app->settings->set('core.update_check', json_encode(['core' => '0.0.0', 'packages' => [], 'checked_at' => gmdate('Y-m-d H:i')]));
+$post('/admin/updates/apply-all', [], 3);
+check('update all: nothing to update says so', ($_SESSION['_flash']['success'] ?? '') === 'Es gibt nichts zu aktualisieren.');
+$pdo->exec("DELETE FROM package WHERE id = 'zzz_update_all_test'");
+$app->settings->set('core.update_check', '');
+
 // --- Licensed packages: ReleaseSourceResolver, LicenseServerClient, LicenseKeys ---
 check('package: a "license:<product>" repo is recognised as one, a plain one is not', Packages::isLicensedRepo('license:ext-exklusiv') && Packages::isLicensedRepo('license:a')
     && !Packages::isLicensedRepo('license:') && !Packages::isLicensedRepo('license:Ext') && !Packages::isLicensedRepo('acme/thing'));
