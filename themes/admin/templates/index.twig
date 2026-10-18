@@ -4,11 +4,14 @@
 {% block title %}{{ trans('core.admin.title') }} – {{ site_name }}{% endblock %}
 
 {% block admin %}
-{% include '@admin/_page_header.twig' with {heading: trans('core.admin.dashboard.title')} only %}
+{% include '@admin/_page_header.twig' with {heading: trans('core.admin.dashboard.title'), subtitle: trans('core.admin.dashboard.intro')} only %}
 
 {% if action_queue is not empty %}
     <div class="dashboard-banner">
-        <p><strong>{{ trans('core.admin.dashboard.banner', {count: action_queue|length}) }}</strong></p>
+        <div class="dashboard-banner-text">
+            <span class="dashboard-icon dashboard-icon-warning" aria-hidden="true">{{ icons.icon('warning') }}</span>
+            <p><strong>{{ trans('core.admin.dashboard.banner', {count: action_queue|length}) }}</strong></p>
+        </div>
         <a href="#action-queue" class="btn-sm">{{ trans('core.admin.dashboard.banner_link') }}</a>
     </div>
 {% endif %}
@@ -17,10 +20,13 @@
     <div>
         {% if action_queue is not empty %}
             <section class="card-box" id="action-queue">
-                <h2>{{ trans('core.admin.dashboard.queue') }}</h2>
+                <h2><span class="dashboard-dot" aria-hidden="true"></span>{{ trans('core.admin.dashboard.queue') }}</h2>
                 {% for stat in action_queue %}
                     <div class="dashboard-row">
-                        <p>{{ icons.menu(stat.path) }} {{ trans(stat.label_key) }}</p>
+                        <div class="dashboard-row-text">
+                            <span class="dashboard-icon" aria-hidden="true">{{ icons.menu(stat.path) }}</span>
+                            <p class="dashboard-row-title">{{ trans(stat.label_key) }}</p>
+                        </div>
                         <a href="{{ url(stat.path) }}?status=pending" class="badge badge-pending">{{ trans('core.admin.dashboard.pending', {count: stat.pending}) }}</a>
                     </div>
                 {% endfor %}
@@ -35,10 +41,10 @@
                 </div>
                 {% for order in recent_orders %}
                     <div class="dashboard-row">
-                        <p>
-                            <a href="{{ url(order.path) }}">#{{ order.id }}</a> – {{ money(order.total, order.currency) }}
-                            <br><small>{{ order.buyer_name }} · {{ order.offer_title }}</small>
-                        </p>
+                        <div>
+                            <a href="{{ url(order.path) }}" class="dashboard-row-title">#{{ order.id }} – {{ money(order.total, order.currency) }}</a>
+                            <p class="dashboard-row-meta">{{ order.buyer_name }} · {{ order.offer_title }}</p>
+                        </div>
                         <span class="badge badge-{{ order.payment_state }}">{{ trans('core.order.payment_state.' ~ order.payment_state) }}</span>
                     </div>
                 {% endfor %}
@@ -62,7 +68,7 @@
                 <h2>{{ trans('core.admin.dashboard.quick_actions') }}</h2>
                 <ul class="area-list">
                     {% for action in quick_actions %}
-                        <li><a href="{{ url(action.path) }}">{{ icons.menu(action.path) }}<span>{{ trans(action.label_key) }}</span></a></li>
+                        <li><a href="{{ url(action.path) }}"><span class="dashboard-icon" aria-hidden="true">{{ icons.menu(action.path) }}</span><span>{{ trans(action.label_key) }}</span></a></li>
                     {% endfor %}
                 </ul>
             </section>
