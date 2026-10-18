@@ -8,11 +8,14 @@ use Modulento\Core\Content\CustomMenu;
 use Modulento\Core\Support\Session;
 
 /**
- * The editor of the operator's own entries in the site's main (header) menu
- * - next to whatever an installed extension already adds there. One form
- * holds every entry; the buttons next to one (move, remove) and "add" save
- * the form first, then do their step - the same pattern AdminHomeController
- * uses for the home page's own blocks.
+ * The editor of the site's main (header) menu: the operator's own entries,
+ * together with the built-in catalogue/requests links and whatever an
+ * installed extension adds with Registrar::navigation() - those "locked"
+ * entries can be relabelled, reordered and switched off here just like a
+ * custom one, but their target page is fixed and they cannot be removed.
+ * One form holds every entry; the buttons next to one (move, remove) and
+ * "add" save the form first, then do their step - the same pattern
+ * AdminHomeController uses for the home page's own blocks.
  */
 final class AdminMenuController extends Controller
 {
@@ -23,19 +26,20 @@ final class AdminMenuController extends Controller
         $this->render('@admin/menu_edit.twig', [
             'locale' => $app->translator->locale(),
             'default_locale' => $app->locales->default(),
-            'items' => $app->customMenu->items(),
+            'items' => $app->customMenu->items($app),
         ]);
     }
 
     public function save(array $params): void
     {
-        $menu = $this->app->customMenu;
-        $items = $this->fromForm($menu->items());
+        $app = $this->app;
+        $menu = $app->customMenu;
+        $items = $this->fromForm($menu->items($app));
         $action = (string) ($_POST['action'] ?? 'save');
 
         if ($action === 'add') {
             $items[] = CustomMenu::newItem();
-        } elseif (preg_match('/^(up|down|delete):([a-f0-9]{1,16})$/', $action, $match) === 1) {
+        } elseif (preg_match('/^(up|down|delete):([a-zA-Z0-9_.-]{1,80})$/', $action, $match) === 1) {
             $items = $this->step($items, $match[1], $match[2]);
         }
 
@@ -46,7 +50,8 @@ final class AdminMenuController extends Controller
 
     /**
      * The stored entries with the values of the form on them. An entry the
-     * form does not know (added elsewhere meanwhile) is kept as it is.
+     * form does not know (added elsewhere meanwhile) is kept as it is. A
+     * locked entry's path cannot be changed from the form, whatever it sends.
      *
      * @param list<array<string, mixed>> $stored
      * @return list<array<string, mixed>>
@@ -70,11 +75,18 @@ final class AdminMenuController extends Controller
             $label = is_string($input['label'] ?? null) ? $input['label'] : '';
             $texts[$locale]['label'] = CustomMenu::cleanLabel($label);
 
-            $path = is_string($input['path'] ?? null) ? trim($input['path']) : '';
+            if ($item['locked']) {
+                $path = $item['path'];
+            } else {
+                $path = is_string($input['path'] ?? null) ? trim($input['path']) : '';
+                $path = CustomMenu::validPath($path) ? $path : '';
+            }
+
             $items[] = [
                 'id' => $id,
+                'locked' => $item['locked'],
                 'enabled' => isset($input['enabled']),
-                'path' => CustomMenu::validPath($path) ? $path : '',
+                'path' => $path,
                 'texts' => $texts,
             ];
         }
@@ -83,7 +95,9 @@ final class AdminMenuController extends Controller
     }
 
     /**
-     * Moves an entry one place up or down, or removes it.
+     * Moves an entry one place up or down, or removes it - "delete" is
+     * refused for a locked entry, since it has no form of its own to
+     * switch it off other than the "enabled" box.
      *
      * @param list<array<string, mixed>> $items
      * @return list<array<string, mixed>>
@@ -101,6 +115,9 @@ final class AdminMenuController extends Controller
         }
 
         if ($direction === 'delete') {
+            if ($items[$index]['locked'] ?? false) {
+                return $items;
+            }
             array_splice($items, $index, 1);
         } else {
             $target = $direction === 'up' ? $index - 1 : $index + 1;

@@ -18,23 +18,31 @@
 
     {% for item in items %}
         {% set id = item.id %}
+        {% set defaultLabel = item.label_key ? trans(item.label_key) : trans('core.menu.entry') %}
         <fieldset class="card-box home-block{{ item.enabled ? '' : ' is-off' }}" id="item-{{ id }}">
-            <legend>{{ item.texts[default_locale].label ?? trans('core.menu.entry') }}</legend>
+            <legend>{{ item.texts[default_locale].label ?? defaultLabel }}{% if item.locked %} <span class="badge">{{ trans('core.menu.locked') }}</span>{% endif %}</legend>
 
             <label class="checkbox">
                 <input type="checkbox" name="items[{{ id }}][enabled]" value="1" {{ item.enabled ? 'checked' }}>
                 <span>{{ trans('core.home.enabled') }}</span>
             </label>
 
-            <div class="field">
-                <label for="path-{{ id }}">{{ trans('core.menu.path') }}</label>
-                <input id="path-{{ id }}" name="items[{{ id }}][path]" value="{{ item.path }}" maxlength="500" placeholder="/seite oder https://…">
-            </div>
+            {% if item.locked %}
+                <div class="field">
+                    <label>{{ trans('core.menu.path') }}</label>
+                    <input value="{{ item.path }}" readonly disabled>
+                </div>
+            {% else %}
+                <div class="field">
+                    <label for="path-{{ id }}">{{ trans('core.menu.path') }}</label>
+                    <input id="path-{{ id }}" name="items[{{ id }}][path]" value="{{ item.path }}" maxlength="500" placeholder="/seite oder https://…">
+                </div>
+            {% endif %}
 
             <fieldset class="home-language" lang="{{ locale }}">
                 <legend>{{ locale_name(locale) }}</legend>
                 {% set value = item.texts[locale].label ?? '' %}
-                {% set hint = item.texts[default_locale].label ?? '' %}
+                {% set hint = item.texts[default_locale].label ?? defaultLabel %}
                 <div class="field">
                     <label for="label-{{ id }}">{{ trans('core.menu.label') }}</label>
                     <input id="label-{{ id }}" name="items[{{ id }}][label]" value="{{ value }}" maxlength="60" placeholder="{{ hint }}">
@@ -44,7 +52,9 @@
             <div class="button-row">
                 <button type="submit" name="action" value="up:{{ id }}" class="btn-outline btn-sm">{{ trans('core.home.up') }}</button>
                 <button type="submit" name="action" value="down:{{ id }}" class="btn-outline btn-sm">{{ trans('core.home.down') }}</button>
-                <button type="submit" name="action" value="delete:{{ id }}" class="danger btn-sm">{{ trans('core.home.remove') }}</button>
+                {% if not item.locked %}
+                    <button type="submit" name="action" value="delete:{{ id }}" class="danger btn-sm">{{ trans('core.home.remove') }}</button>
+                {% endif %}
             </div>
         </fieldset>
     {% else %}

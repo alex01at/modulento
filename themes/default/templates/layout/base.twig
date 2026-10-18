@@ -63,18 +63,9 @@
         {% for link in page_links('header') %}
             <a href="{{ link.url }}">{{ link.title }}</a>
         {% endfor %}
-        {# Only where an extension adds a kind of offer is there a catalogue. #}
-        {% if has_catalogue() %}
-            <a href="{{ url('/offers') }}">{{ trans('core.nav.offers') }}</a>
-            <a href="{{ url('/providers') }}">{{ trans('core.nav.providers') }}</a>
-        {% endif %}
-        {% if module('requests') %}
-            <a href="{{ url('/requests') }}">{{ trans('core.nav.requests') }}</a>
-        {% endif %}
-        {% for link in nav_links() %}
-            <a href="{{ link.url }}">{{ link.title }}</a>
-        {% endfor %}
-        {% for link in custom_nav_links() %}
+        {# Catalogue/requests links, whatever an extension added, and the operator's own
+           entries - one list, in the order and under the names set at Administration -> Menu. #}
+        {% for link in main_menu_links() %}
             <a href="{{ link.url }}">{{ link.title }}</a>
         {% endfor %}
         {% if can('core.admin.access') %}

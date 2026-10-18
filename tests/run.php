@@ -4281,33 +4281,46 @@ check('home editor: a reset brings back the default page', !$pdo->query("SELECT 
 $post('/admin/home', ['action' => 'save', 'blocks' => []], 1);
 check('home editor: a visitor without the permission cannot change it', !$pdo->query("SELECT COUNT(*) FROM setting WHERE name = 'core.home_layout'")->fetchColumn());
 
-// The main menu: entries the operator adds, next to whatever an extension already contributes with nav_links().
+// The main menu: entries the operator adds, next to the fixed catalogue/requests links and
+// whatever an extension already contributes with Registrar::navigation() - the fixed ones can
+// be relabelled, reordered and hidden the same way, but not removed, as they have no path of their own.
 $menuItems = fn () => json_decode((string) $pdo->query("SELECT value FROM setting WHERE name = 'core.custom_menu'")->fetchColumn(), true);
+$customItems = fn () => array_values(array_filter($menuItems() ?? [], fn (array $i) => !str_starts_with($i['id'], 'core.') && !str_starts_with($i['id'], 'ext.')));
 check('menu editor: empty at first, the editor needs its permission', ($menuItems() ?? []) === []
     && $get('/admin/menu', 3)['status'] === 200 && $get('/admin/menu', 1)['status'] === 403);
+check('menu editor: the fixed "requests" entry (on by default) is listed, locked, with no delete button of its own',
+    str_contains($get('/admin/menu', 3)['body'], 'item-core.requests') && !str_contains($get('/admin/menu', 3)['body'], 'delete:core.requests'));
+$post('/admin/menu', ['action' => 'save', 'items' => ['core.requests' => ['enabled' => '1', 'label' => 'Support-Anfragen']]], 3);
+check('menu editor: a fixed entry can be relabelled, and the visitor sees the new label', str_contains($get('/', null)['body'], '>Support-Anfragen<'));
+$post('/admin/menu', ['action' => 'save', 'items' => ['core.requests' => ['label' => 'Support-Anfragen']]], 3);
+check('menu editor: unchecking "enabled" hides a fixed entry for the visitor, but it stays in the editor',
+    !str_contains($get('/', null)['body'], '>Support-Anfragen<') && str_contains($get('/admin/menu', 3)['body'], 'item-core.requests'));
+$post('/admin/menu', ['action' => 'delete:core.requests'], 3);
+check('menu editor: a fixed entry cannot be removed', str_contains($get('/admin/menu', 3)['body'], 'item-core.requests'));
+$post('/admin/menu', ['action' => 'save', 'items' => ['core.requests' => ['enabled' => '1', 'label' => 'Support-Anfragen']]], 3);
 $post('/admin/menu', ['action' => 'add'], 3);
-$menuId = $menuItems()[0]['id'];
+$menuId = $customItems()[0]['id'];
 check('menu editor: an entry can be added', $menuId !== null);
-$post('/admin/menu', ['action' => 'save', 'items' => [$menuId => ['enabled' => '1', 'path' => '/impressum', 'label' => 'Impressum']]], 3);
-check('menu editor: an entry is saved with its path and label', $menuItems()[0]['path'] === '/impressum' && $menuItems()[0]['texts']['de']['label'] === 'Impressum');
-check('menu: the visitor sees the entry in the header, after what an extension already adds', str_contains($get('/', null)['body'], 'href="/impressum">Impressum<'));
-$post('/admin/menu', ['action' => 'save', 'items' => [$menuId => ['enabled' => '1', 'path' => 'javascript:alert(1)', 'label' => 'Böse']]], 3);
-check('menu editor: an unsafe address is dropped, so the entry has no target and is not shown', $menuItems()[0]['path'] === '' && !str_contains($get('/', null)['body'], 'Böse'));
-$post('/admin/menu', ['action' => 'save', 'items' => [$menuId => ['enabled' => '1', 'path' => '/impressum', 'label' => 'Impressum']]], 3);
-$post('/en/admin/menu', ['action' => 'save', 'items' => [$menuId => ['enabled' => '1', 'path' => '/impressum', 'label' => 'Imprint']]], 3);
+$post('/admin/menu', ['action' => 'save', 'items' => [$menuId => ['enabled' => '1', 'path' => '/impressum', 'label' => 'Impressum'], 'core.requests' => ['enabled' => '1', 'label' => 'Support-Anfragen']]], 3);
+check('menu editor: an entry is saved with its path and label', $customItems()[0]['path'] === '/impressum' && $customItems()[0]['texts']['de']['label'] === 'Impressum');
+check('menu: the visitor sees the entry in the header, after what is already there', str_contains($get('/', null)['body'], 'href="/impressum">Impressum<'));
+$post('/admin/menu', ['action' => 'save', 'items' => [$menuId => ['enabled' => '1', 'path' => 'javascript:alert(1)', 'label' => 'Böse'], 'core.requests' => ['enabled' => '1', 'label' => 'Support-Anfragen']]], 3);
+check('menu editor: an unsafe address is dropped, so the entry has no target and is not shown', $customItems()[0]['path'] === '' && !str_contains($get('/', null)['body'], 'Böse'));
+$post('/admin/menu', ['action' => 'save', 'items' => [$menuId => ['enabled' => '1', 'path' => '/impressum', 'label' => 'Impressum'], 'core.requests' => ['enabled' => '1', 'label' => 'Support-Anfragen']]], 3);
+$post('/en/admin/menu', ['action' => 'save', 'items' => [$menuId => ['enabled' => '1', 'path' => '/impressum', 'label' => 'Imprint'], 'core.requests' => ['enabled' => '1', 'label' => 'Support requests']]], 3);
 check('menu editor: a language edits only its own label; the others are kept, and the visitor sees its own language\'s label',
-    $menuItems()[0]['texts']['de']['label'] === 'Impressum' && $menuItems()[0]['texts']['en']['label'] === 'Imprint'
+    $customItems()[0]['texts']['de']['label'] === 'Impressum' && $customItems()[0]['texts']['en']['label'] === 'Imprint'
     && str_contains($get('/en', null)['body'], '>Imprint<') && str_contains($get('/', null)['body'], '>Impressum<'));
 $post('/admin/menu', ['action' => 'add'], 3);
-$secondId = array_values(array_filter($menuItems(), fn (array $i) => $i['id'] !== $menuId))[0]['id'];
+$secondId = array_values(array_filter($customItems(), fn (array $i) => $i['id'] !== $menuId))[0]['id'];
 $post('/admin/menu', ['action' => 'up:' . $secondId], 3);
-check('menu editor: an entry moves up, and a step saves the form first', $menuItems()[0]['id'] === $secondId && $menuItems()[1]['texts']['de']['label'] === 'Impressum');
-check('menu editor: an entry without a label is left out for the visitor, but stays in the editor', count($menuItems()) === 2 && str_contains($get('/', null)['body'], '>Impressum<'));
+check('menu editor: an entry moves up, and a step saves the form first', $customItems()[0]['id'] === $secondId && $customItems()[1]['texts']['de']['label'] === 'Impressum');
+check('menu editor: an entry without a label is left out for the visitor, but stays in the editor', count($customItems()) === 2 && str_contains($get('/', null)['body'], '>Impressum<'));
 $post('/admin/menu', ['action' => 'delete:' . $secondId], 3);
 $post('/admin/menu', ['action' => 'delete:' . $menuId], 3);
-check('menu editor: an entry can be removed', $menuItems() === []);
+check('menu editor: a custom entry can be removed, the fixed one stays', $customItems() === [] && str_contains($get('/admin/menu', 3)['body'], 'item-core.requests'));
 $post('/admin/menu', ['action' => 'add'], 1);
-check('menu editor: a visitor without the permission cannot change it', $menuItems() === []);
+check('menu editor: a visitor without the permission cannot change it', $customItems() === []);
 
 // Design: colours, font and radius, written as a stylesheet the pages load; only administrators change them.
 check('design: the pages load the stylesheet of the values, and the default values are the theme\'s', str_contains($get('/', null)['body'], '<link rel="stylesheet" href="/design/')

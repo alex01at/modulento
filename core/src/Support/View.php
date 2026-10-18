@@ -311,7 +311,14 @@ final class View
         // Entries the operator added to the main menu (Administration -> Menu).
         $this->twig->addFunction(new TwigFunction('custom_nav_links', fn () => array_map(
             fn (array $link) => ['title' => $link['label'], 'url' => $app->url($link['path'])],
-            $app->customMenu->view($app->translator->locale(), $app->locales->default())
+            $app->customMenu->view($app, $app->translator->locale(), $app->locales->default())
+        )));
+        // The whole main menu (Administration -> Menu): catalogue/requests, extension and
+        // operator entries together, in the order set there - what a theme should loop over
+        // instead of has_catalogue()/module('requests')/nav_links()/custom_nav_links() on their own.
+        $this->twig->addFunction(new TwigFunction('main_menu_links', fn () => array_map(
+            fn (array $link) => ['title' => $link['label'], 'url' => $app->url($link['path'])],
+            $app->customMenu->view($app, $app->translator->locale(), $app->locales->default())
         )));
         // Entries extensions add to the site's footer, e.g. a link to "FAQ".
         $this->twig->addFunction(new TwigFunction('footer_links', fn () => array_map(
