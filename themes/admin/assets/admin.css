@@ -399,6 +399,23 @@ td form { display: flex; justify-content: flex-end; }
 .filter-bar button:hover { background: var(--row-hover); border-color: var(--line); color: var(--text); }
 .filter-bar button[aria-pressed="true"] { border-color: var(--primary); background: var(--primary); color: #fff; }
 
+/* --- Menu editor: a draggable, collapsible list of entries -------------- */
+.menu-list { display: grid; gap: .6rem; margin: 0 0 1.5rem; padding: 0; list-style: none; }
+.menu-item { border: 1px solid var(--line); border-radius: 8px; background: var(--card); }
+.menu-item.is-off { opacity: .6; }
+.menu-item.is-dragging { opacity: .4; }
+.menu-item.drag-over { border-color: var(--primary); }
+.menu-item-row { display: flex; align-items: center; gap: .6rem; padding: .35rem .75rem; }
+.menu-item-handle { flex: none; color: var(--muted); font-size: 1.1rem; line-height: 1; cursor: grab; user-select: none; }
+.menu-item-enabled { margin: 0; flex: none; }
+.menu-item-details { flex: 1; min-width: 0; }
+.menu-item-details > summary { display: flex; align-items: center; gap: .5rem; padding: .4rem 0; list-style: none; cursor: pointer; }
+.menu-item-details > summary::-webkit-details-marker { display: none; }
+.menu-item-details > summary::before { content: '\25B8'; color: var(--muted); transition: transform .15s ease; }
+.menu-item-details[open] > summary::before { transform: rotate(90deg); }
+.menu-item-label { font-weight: 600; color: var(--heading); overflow-wrap: anywhere; }
+.menu-item-body { display: grid; gap: 1rem; padding: 0 0 1rem; }
+
 .tabs { display: flex; flex-wrap: wrap; gap: .5rem; margin-bottom: 1.25rem; }
 .tabs a { padding: .35rem .9rem; border: 1px solid var(--line); border-radius: 999px; color: var(--text); font-weight: 500; text-decoration: none; }
 .tabs a:hover { border-color: var(--link); color: var(--link); }

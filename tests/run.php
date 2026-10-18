@@ -4316,6 +4316,16 @@ $secondId = array_values(array_filter($customItems(), fn (array $i) => $i['id'] 
 $post('/admin/menu', ['action' => 'up:' . $secondId], 3);
 check('menu editor: an entry moves up, and a step saves the form first', $customItems()[0]['id'] === $secondId && $customItems()[1]['texts']['de']['label'] === 'Impressum');
 check('menu editor: an entry without a label is left out for the visitor, but stays in the editor', count($customItems()) === 2 && str_contains($get('/', null)['body'], '>Impressum<'));
+check('menu editor: dragging an entry needs the permission too', $post('/admin/menu/reorder', ['order' => [$menuId, 'core.requests', $secondId]], 1)['status'] === 403);
+$r = $post('/admin/menu/reorder', ['order' => [$menuId, 'core.requests', $secondId]], 3);
+$byId = fn () => array_column($menuItems(), null, 'id');
+check('menu editor: dragging saves the new order right away, as JSON, leaving every entry\'s own fields untouched',
+    $r['status'] === 200 && str_contains($r['body'], '"ok":true')
+    && array_column($menuItems(), 'id') === [$menuId, 'core.requests', $secondId]
+    && $byId()[$menuId]['texts']['de']['label'] === 'Impressum');
+$post('/admin/menu/reorder', ['order' => ['core.requests', $secondId]], 3);
+check('menu editor: an id the request does not name (here: menuId left out) keeps its place at the end, nothing is lost',
+    array_column($menuItems(), 'id') === ['core.requests', $secondId, $menuId]);
 $post('/admin/menu', ['action' => 'delete:' . $secondId], 3);
 $post('/admin/menu', ['action' => 'delete:' . $menuId], 3);
 check('menu editor: a custom entry can be removed, the fixed one stays', $customItems() === [] && str_contains($get('/admin/menu', 3)['body'], 'item-core.requests'));

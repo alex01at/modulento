@@ -1630,6 +1630,7 @@ return [
     'core.admin.menu.menu' => 'Menu',
     'core.menu.intro' => 'The entries of the site’s main menu: the fixed ones (the catalogue, requests, anything an extension adds) can be renamed, reordered and hidden, but not removed; your own entries can be freely added, edited and deleted.',
     'core.menu.locked' => 'fixed',
+    'core.menu.reorder_failed' => 'The new order could not be saved.',
     'core.menu.entry' => 'Entry',
     'core.menu.path' => 'Target (page or address)',
     'core.menu.label' => 'Label',
