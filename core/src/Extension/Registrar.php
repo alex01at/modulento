@@ -140,6 +140,23 @@ final class Registrar
     }
 
     /**
+     * A part of this extension's own configuration an administrator built
+     * by hand (a page, a set of blocks, whatever this extension keeps) that
+     * can be exported to a file and imported again - its own, or into
+     * another installation. $export returns whatever is JSON-serialisable;
+     * $import gets exactly that back and applies it, the same way saving
+     * it by hand already does (reuse that method - it already cleans up
+     * anything handed to it).
+     *
+     * @param Closure(App): mixed $export
+     * @param Closure(mixed, App): void $import
+     */
+    public function exportable(string $key, string $labelKey, Closure $export, Closure $import): void
+    {
+        $this->app->addExportable($this->prefixed($key, 'Exportable'), $labelKey, $export, $import);
+    }
+
+    /**
      * An optional feature of this extension, switched off and on under
      * Administration → Modules exactly like a core module - call
      * $app->modules->enabled($id) in register() itself (to decide whether

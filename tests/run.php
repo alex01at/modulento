@@ -4351,6 +4351,58 @@ check('design: the administration has the form', str_contains($get('/admin/desig
 $post('/admin/design/reset', [], 3);
 check('design: a reset brings back the theme\'s values', !$design()->isCustomized() && $design()->values()['accent'] === '#1f5fbf');
 
+// Export/Import: a chosen part of the configuration (Design, the home page, the main menu, and
+// whatever an extension adds through Registrar::exportable()) written to one file, or read back
+// from one - only what the file actually names is touched.
+check('export: needs its permission', $get('/admin/export', 1)['status'] === 403);
+$post('/admin/export', [], 3);
+check('export: choosing nothing is refused', str_contains($_SESSION['_flash']['error'] ?? '', 'Wähle mindestens'));
+
+// A fresh CustomMenu/Settings for every read below: $app's own Settings caches its first read for
+// good (like $design() above has to, for the same reason) - writes made by $post()'s own,
+// separate App instance would otherwise never show up again on $app's.
+$menu = fn () => new Modulento\Core\Content\CustomMenu(new Modulento\Core\Support\Settings($pdo));
+
+$app->customMenu->save([['id' => 'abc12345', 'enabled' => true, 'path' => '/impressum', 'texts' => ['de' => ['label' => 'Impressum']]]]);
+$r = $post('/admin/export', ['sections' => ['core.menu']], 3);
+$exported = json_decode($r['body'], true);
+check('export: the file names the core version, a timestamp, and only the chosen section',
+    $exported['modulento_export'] === true && isset($exported['core_version'], $exported['exported_at'])
+    && array_keys($exported['sections']) === ['core.menu'] && $exported['sections']['core.menu'][0]['texts']['de']['label'] === 'Impressum');
+
+$app->customMenu->save([]);
+check('export: sanity check before importing it back - the menu is empty again', $menu()->storedItems() === []);
+
+$exportFile = tempnam(sys_get_temp_dir(), 'modulento-export');
+file_put_contents($exportFile, $r['body']);
+$_FILES = ['file' => ['tmp_name' => $exportFile, 'error' => UPLOAD_ERR_OK, 'size' => filesize($exportFile), 'name' => 'export.json', 'type' => 'application/json']];
+check('import: needs its permission too', $post('/admin/import', [], 1)['status'] === 403 && $menu()->storedItems() === []);
+$post('/admin/import', [], 3);
+$_FILES = [];
+check('import: restores exactly the one section the file names, says which', $menu()->storedItems() !== [] && $menu()->storedItems()[0]['texts']['de']['label'] === 'Impressum'
+    && str_contains($_SESSION['_flash']['success'] ?? '', 'Hauptmenü'));
+unlink($exportFile);
+$app->customMenu->save([]);
+
+$badFile = tempnam(sys_get_temp_dir(), 'modulento-export');
+file_put_contents($badFile, 'not json at all');
+$_FILES = ['file' => ['tmp_name' => $badFile, 'error' => UPLOAD_ERR_OK, 'size' => filesize($badFile), 'name' => 'x.json', 'type' => 'application/json']];
+$post('/admin/import', [], 3);
+$_FILES = [];
+check('import: a file that is not a Modulento export is refused', str_contains($_SESSION['_flash']['error'] ?? '', 'keine Modulento-Exportdatei'));
+unlink($badFile);
+
+$unknownFile = tempnam(sys_get_temp_dir(), 'modulento-export');
+file_put_contents($unknownFile, json_encode(['modulento_export' => true, 'sections' => ['some.unknown.key' => ['x' => 1]]]));
+$_FILES = ['file' => ['tmp_name' => $unknownFile, 'error' => UPLOAD_ERR_OK, 'size' => filesize($unknownFile), 'name' => 'x.json', 'type' => 'application/json']];
+$post('/admin/import', [], 3);
+$_FILES = [];
+check('import: a file naming only sections this installation does not know says so', str_contains($_SESSION['_flash']['error'] ?? '', 'nichts, das diese Installation kennt'));
+unlink($unknownFile);
+
+check('export: the administration page lists Design, Startseite and Hauptmenü to choose from', str_contains($get('/admin/export', 3)['body'], 'value="core.design"')
+    && str_contains($get('/admin/export', 3)['body'], 'value="core.home"') && str_contains($get('/admin/export', 3)['body'], 'value="core.menu"'));
+
 // Accounts: an administrator creates one, and signs in as any account that is not an administrator, blocked or their own.
 check('accounts: the form to create one needs the permission', $get('/admin/accounts/new', 3)['status'] === 200 && str_contains($get('/admin/accounts/new', 3)['body'], 'name="email"')
     && $get('/admin/accounts/new', 1)['status'] === 403);
