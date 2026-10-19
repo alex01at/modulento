@@ -42,7 +42,74 @@
         }
     }
 
-    // The toolbar of a rich text: paragraph and headings, bold, italic, lists, quote, link.
+    // Mirrors Modulento\Core\Support\Design::FONTS's keys and
+    // Modulento\Core\Support\HtmlSanitizer::SPAN_CLASSES, the same as editor.js (the plain
+    // form's own editor) - a span with one of these classes, or just a colour, is the only
+    // font/size/colour formatting the server keeps.
+    var FONTS = ['system', 'serif', 'humanist', 'mono'];
+    var SIZES = ['sm', 'md', 'lg', 'xl'];
+
+    // Wraps the current selection (inside el) in a new span - font/size/colour formatting,
+    // which execCommand cannot produce with an arbitrary class. Does nothing to a collapsed
+    // selection (nothing picked to format) - see editor.js, which this mirrors exactly.
+    function wrapSelection(el, attrs) {
+        var selection = window.getSelection();
+        if (!selection.rangeCount || selection.isCollapsed) {
+            return;
+        }
+        var range = selection.getRangeAt(0);
+        if (!el.contains(range.commonAncestorContainer)) {
+            return;
+        }
+        var span = document.createElement('span');
+        if (attrs.className) {
+            span.className = attrs.className;
+        }
+        if (attrs.style) {
+            span.setAttribute('style', attrs.style);
+        }
+        span.appendChild(range.extractContents());
+        range.insertNode(span);
+        selection.removeAllRanges();
+        var after = document.createRange();
+        after.selectNodeContents(span);
+        selection.addRange(after);
+    }
+
+    // Removes every text-formatting span (font/size/colour) from the selection, keeping its
+    // text - the same "unwrap" rule the server's sanitizer applies to a span that ends up with
+    // neither a known class nor a colour.
+    function unwrapFormatting(node) {
+        Array.prototype.slice.call(node.childNodes).forEach(function (child) {
+            if (child.nodeType !== Node.ELEMENT_NODE) {
+                return;
+            }
+            unwrapFormatting(child);
+            if (child.nodeName.toLowerCase() === 'span' && (child.className || child.getAttribute('style'))) {
+                while (child.firstChild) {
+                    node.insertBefore(child.firstChild, child);
+                }
+                node.removeChild(child);
+            }
+        });
+    }
+
+    function stripSelectionFormatting(el) {
+        var selection = window.getSelection();
+        if (!selection.rangeCount || selection.isCollapsed) {
+            return;
+        }
+        var range = selection.getRangeAt(0);
+        if (!el.contains(range.commonAncestorContainer)) {
+            return;
+        }
+        var fragment = range.extractContents();
+        unwrapFormatting(fragment);
+        range.insertNode(fragment);
+    }
+
+    // The toolbar of a rich text: paragraph and headings, bold, italic, lists, quote, link,
+    // font, size, colour.
     function toolbar(el) {
         var bar = document.createElement('div');
         bar.className = 'inline-wysiwyg';
@@ -80,6 +147,89 @@
             });
             bar.appendChild(button);
         });
+
+        // Font and size: one button per value, previewed on the button's own text - the same
+        // class the server keeps (HtmlSanitizer::SPAN_CLASSES) and the design stylesheet
+        // styles (Design::textFormatting()), so the preview matches the result.
+        FONTS.forEach(function (font) {
+            var button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'inline-wysiwyg-font text-font-' + font;
+            button.textContent = 'Aa';
+            button.setAttribute('aria-label', labels['font_' + font] || font);
+            button.title = labels['font_' + font] || font;
+            button.addEventListener('mousedown', function (event) {
+                event.preventDefault();
+            });
+            button.addEventListener('click', function () {
+                el.focus();
+                wrapSelection(el, {className: 'text-font-' + font});
+            });
+            bar.appendChild(button);
+        });
+        SIZES.forEach(function (size) {
+            var button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'inline-wysiwyg-size text-size-' + size;
+            button.textContent = 'A';
+            button.setAttribute('aria-label', labels['size_' + size] || size);
+            button.title = labels['size_' + size] || size;
+            button.addEventListener('mousedown', function (event) {
+                event.preventDefault();
+            });
+            button.addEventListener('click', function () {
+                el.focus();
+                wrapSelection(el, {className: 'text-size-' + size});
+            });
+            bar.appendChild(button);
+        });
+
+        // Colour needs its own native picker, so it cannot keep the selection the mousedown
+        // trick's way above - the selection is saved on its own and restored right before
+        // wrapping it, exactly like editor.js (the plain form's own editor) already does.
+        var savedRange = null;
+        el.addEventListener('mouseup', saveRange);
+        el.addEventListener('keyup', saveRange);
+        function saveRange() {
+            var selection = window.getSelection();
+            if (selection.rangeCount && !selection.isCollapsed && el.contains(selection.getRangeAt(0).commonAncestorContainer)) {
+                savedRange = selection.getRangeAt(0).cloneRange();
+            }
+        }
+        var colour = document.createElement('input');
+        colour.type = 'color';
+        colour.className = 'inline-wysiwyg-color';
+        colour.setAttribute('aria-label', labels.format_color || 'Colour');
+        colour.title = labels.format_color || 'Colour';
+        colour.addEventListener('mousedown', function (event) {
+            event.preventDefault();
+        });
+        colour.addEventListener('input', function () {
+            if (!savedRange) {
+                return;
+            }
+            var selection = window.getSelection();
+            selection.removeAllRanges();
+            selection.addRange(savedRange);
+            wrapSelection(el, {style: 'color: ' + colour.value});
+        });
+        bar.appendChild(colour);
+
+        var clearButton = document.createElement('button');
+        clearButton.type = 'button';
+        clearButton.className = 'inline-wysiwyg-clear';
+        clearButton.textContent = '✕';
+        clearButton.setAttribute('aria-label', labels.format_clear || 'Clear formatting');
+        clearButton.title = labels.format_clear || 'Clear formatting';
+        clearButton.addEventListener('mousedown', function (event) {
+            event.preventDefault();
+        });
+        clearButton.addEventListener('click', function () {
+            el.focus();
+            stripSelectionFormatting(el);
+        });
+        bar.appendChild(clearButton);
+
         el.parentNode.insertBefore(bar, el);
 
         return bar;

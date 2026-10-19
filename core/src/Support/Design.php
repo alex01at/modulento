@@ -104,6 +104,7 @@ CSS;
 .inline-wysiwyg button:hover { border-color: var(--accent); color: var(--accent); }
 .inline-wysiwyg .inline-wysiwyg-bold { font-weight: 700; }
 .inline-wysiwyg .inline-wysiwyg-italic { font-style: italic; }
+.inline-wysiwyg-color { width: 2rem; height: 1.9rem; padding: 2px; border: 1px solid var(--line); border-radius: .3rem; background: var(--surface); cursor: pointer; }
 .inline-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .4rem .75rem; }
 .inline-head p { margin: 0; }
 .inline-grip { cursor: grab; color: var(--muted, #888); font-size: 1.1em; user-select: none; touch-action: none; }
