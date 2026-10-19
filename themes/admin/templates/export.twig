@@ -1,0 +1,42 @@
+{% extends '@admin/layout.twig' %}
+
+{% block title %}{{ trans('core.export.title') }} – {{ site_name }}{% endblock %}
+
+{% block admin %}
+{% include '@admin/_page_header.twig' with {heading: trans('core.export.title')} only %}
+
+<section class="card-box">
+    <h2>{{ trans('core.export.export_title') }}</h2>
+    <p>{{ trans('core.export.export_hint') }}</p>
+    {% if sections is empty %}
+        <p class="empty">{{ trans('core.export.none_available') }}</p>
+    {% else %}
+        <form method="post" action="{{ url('/admin/export') }}">
+            {{ csrf_field() }}
+            <fieldset>
+                <legend class="visually-hidden">{{ trans('core.export.export_title') }}</legend>
+                {% for section in sections %}
+                    <label class="checkbox">
+                        <input type="checkbox" name="sections[]" value="{{ section.key }}">
+                        <span>{{ trans(section.label_key) }}</span>
+                    </label>
+                {% endfor %}
+            </fieldset>
+            <button type="submit">{{ trans('core.export.export_button') }}</button>
+        </form>
+    {% endif %}
+</section>
+
+<section class="card-box">
+    <h2>{{ trans('core.export.import_title') }}</h2>
+    <p>{{ trans('core.export.import_hint') }}</p>
+    <form method="post" action="{{ url('/admin/import') }}" enctype="multipart/form-data">
+        {{ csrf_field() }}
+        <div class="field">
+            <label for="import-file">{{ trans('core.export.import_file') }}</label>
+            <input id="import-file" type="file" name="file" accept="application/json,.json" required>
+        </div>
+        <button type="submit">{{ trans('core.export.import_button') }}</button>
+    </form>
+</section>
+{% endblock %}

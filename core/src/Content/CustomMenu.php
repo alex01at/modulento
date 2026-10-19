@@ -134,6 +134,20 @@ final class CustomMenu
         ];
     }
 
+    /**
+     * The menu exactly as stored - the operator's own entries and whatever
+     * was customized about a fixed one (its order, label or enabled flag),
+     * nothing recomputed from the catalogue or installed extensions. For
+     * export/import (App::addExportable()); items($app) is what every
+     * other caller wants.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function storedItems(): array
+    {
+        return $this->decode();
+    }
+
     private static function looksFixed(string $id): bool
     {
         return str_starts_with($id, 'core.') || str_starts_with($id, 'ext.');

@@ -45,6 +45,7 @@ use Modulento\Core\Controller\SettingsController;
 use Modulento\Core\Controller\UpdateController;
 use Modulento\Core\Controller\ReportController;
 use Modulento\Core\Controller\WithdrawalController;
+use Modulento\Core\Controller\ExportController;
 use Modulento\Core\Event\AccountLoggedIn;
 use Modulento\Core\Support\ClientIp;
 use Modulento\Core\Support\Database;
@@ -470,6 +471,10 @@ final class Kernel
         $router->post('/admin/updates/apply', [UpdateController::class, 'apply'], 'core.update.manage');
         $router->post('/admin/updates/apply-all', [UpdateController::class, 'applyAll'], 'core.update.manage');
 
+        $router->get('/admin/export', [ExportController::class, 'index'], 'core.settings.manage');
+        $router->post('/admin/export', [ExportController::class, 'export'], 'core.settings.manage');
+        $router->post('/admin/import', [ExportController::class, 'import'], 'core.settings.manage');
+
         $app->addPermission('core.admin.access', 'core.permission.admin_access');
         $app->addPermission('core.tasks.view', 'core.permission.tasks_view');
         $app->addPermission('core.themes.manage', 'core.permission.themes_manage');
@@ -534,7 +539,24 @@ final class Kernel
         $app->addAdminMenu('core.admin.menu.demo_data', '/admin/demo-data', 'core.demo_data.manage', 'system');
         $app->addAdminMenu('core.admin.menu.tasks', '/admin/tasks', 'core.tasks.view', 'system');
         $app->addAdminMenu('core.admin.menu.updates', '/admin/updates', 'core.update.manage', 'system');
+        $app->addAdminMenu('core.admin.menu.export', '/admin/export', 'core.settings.manage', 'system');
         $app->addAdminMenu('core.admin.docs.title', '/admin/docs', 'core.admin.access', 'system');
+
+        // What Administration -> Export/Import can write to a file and read back - every one of
+        // these already cleans up anything handed to it, so an imported file goes through no
+        // less validation than typing the same values into the usual form by hand.
+        $app->addExportable('core.design', 'core.export.design', static fn (App $app): array => $app->design->values(),
+            static function ($data, App $app): void {
+                $app->design->save(is_array($data) ? $data : []);
+            });
+        $app->addExportable('core.home', 'core.export.home', static fn (App $app): array => $app->homeLayout->blocks(),
+            static function ($data, App $app): void {
+                $app->homeLayout->save(is_array($data) ? $data : []);
+            });
+        $app->addExportable('core.menu', 'core.export.menu', static fn (App $app): array => $app->customMenu->storedItems(),
+            static function ($data, App $app): void {
+                $app->customMenu->save(is_array($data) ? $data : []);
+            });
 
         // Core's own sellable features, the same mechanism an extension uses
         // (Registrar::declareFeature()) - a plan can include any of these.

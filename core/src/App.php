@@ -159,6 +159,8 @@ final class App
     private array $footerLinks = [];
     /** @var array<string, \Closure> offer type id => demo-offer generator */
     private array $demoOfferGenerators = [];
+    /** @var array<string, array{label_key: string, export: \Closure, import: \Closure}> */
+    private array $exportables = [];
     /** @var array<int, array{template: string, data: \Closure}> */
     private array $adminAccountSections = [];
     /** @var array<int, array{template: string, data: ?\Closure}> */
@@ -343,6 +345,34 @@ final class App
     public function navigation(): array
     {
         return $this->navigation;
+    }
+
+    /**
+     * A part of the configuration an administrator built by hand that can
+     * be written to a file and read back - to back it up, or to carry it
+     * over to another installation: a key unique across the core and
+     * every extension (an extension's own is prefixed with its id by
+     * Registrar::exportable()), a language key naming it in the
+     * export/import screen, and the pair of closures that produce and
+     * apply it. $export returns whatever is JSON-serialisable (the exact
+     * shape is this key's own business); $import gets exactly that back
+     * and is expected to apply it the same way saving it by hand would -
+     * every one of the core's own (Design::save(), HomeLayout::save(),
+     * CustomMenu::save()) already cleans up anything it is handed, so an
+     * imported file is no less safe than typing the same values in by hand.
+     *
+     * @param \Closure(App): mixed $export
+     * @param \Closure(mixed, App): void $import
+     */
+    public function addExportable(string $key, string $labelKey, \Closure $export, \Closure $import): void
+    {
+        $this->exportables[$key] = ['label_key' => $labelKey, 'export' => $export, 'import' => $import];
+    }
+
+    /** @return array<string, array{label_key: string, export: \Closure, import: \Closure}> */
+    public function exportables(): array
+    {
+        return $this->exportables;
     }
 
     /** An entry of the site's footer that an extension brings along, e.g. a link to "FAQ". */
