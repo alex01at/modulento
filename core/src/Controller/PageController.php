@@ -96,14 +96,31 @@ final class PageController extends Controller
             'position' => (int) ($_POST['position'] ?? 0),
         ];
 
+        // Only the language the form is in is actually edited (see page_edit.twig);
+        // every other enabled language keeps its existing text untouched, instead
+        // of being wiped because the form never carried its fields at all.
+        $existing = $id !== null ? $this->app->pages->find($id) : null;
+        $currentLocale = $this->app->translator->locale();
+
         $translations = [];
         foreach ($this->app->locales->enabled() as $locale) {
-            $input = is_array($_POST['text'][$locale] ?? null) ? $_POST['text'][$locale] : [];
-            $translations[$locale] = [
-                'title' => (string) ($input['title'] ?? ''),
-                'slug' => (string) ($input['slug'] ?? ''),
-                'meta_description' => (string) ($input['meta_description'] ?? ''),
-            ];
+            if ($locale === $currentLocale) {
+                $input = is_array($_POST['text'][$locale] ?? null) ? $_POST['text'][$locale] : [];
+                $translations[$locale] = [
+                    'title' => (string) ($input['title'] ?? ''),
+                    'slug' => (string) ($input['slug'] ?? ''),
+                    'meta_description' => (string) ($input['meta_description'] ?? ''),
+                ];
+                continue;
+            }
+            $existingText = $existing['translations'][$locale] ?? null;
+            if ($existingText !== null) {
+                $translations[$locale] = [
+                    'title' => $existingText['title'],
+                    'slug' => $existingText['slug'],
+                    'meta_description' => (string) ($existingText['meta_description'] ?? ''),
+                ];
+            }
         }
 
         $result = $this->app->pages->save($id, $fields, $translations);

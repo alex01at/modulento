@@ -31,8 +31,29 @@ final class AdminController extends Controller
                 ['label_key' => 'core.admin.dashboard.quick.media', 'path' => '/admin/media', 'permission' => 'core.media.manage'],
                 ['label_key' => 'core.admin.dashboard.quick.settings', 'path' => '/admin/settings', 'permission' => 'core.settings.manage'],
             ], fn (array $action) => $app->auth->can($action['permission']))),
+            'setup_steps' => $this->setupSteps(),
             'system_health' => $this->systemHealth(),
         ]);
+    }
+
+    /**
+     * A short, ordered first-run checklist (design, home page, pages, menu) -
+     * shown only until every step the account may do is actually done, so
+     * it guides a fresh install without lingering once the site is set up.
+     *
+     * @return list<array{label_key: string, path: string, done: bool}>
+     */
+    private function setupSteps(): array
+    {
+        $app = $this->app;
+        $steps = array_values(array_filter([
+            ['label_key' => 'core.admin.dashboard.setup.design', 'path' => '/admin/design', 'permission' => 'core.settings.manage', 'done' => $app->design->isCustomized()],
+            ['label_key' => 'core.admin.dashboard.setup.home', 'path' => '/admin/home', 'permission' => 'core.settings.manage', 'done' => $app->homeLayout->isCustomized()],
+            ['label_key' => 'core.admin.dashboard.setup.pages', 'path' => '/admin/pages', 'permission' => 'core.pages.manage', 'done' => $app->pages->all() !== []],
+            ['label_key' => 'core.admin.dashboard.setup.menu', 'path' => '/admin/menu', 'permission' => 'core.settings.manage', 'done' => $app->customMenu->isCustomized()],
+        ], fn (array $step) => $app->auth->can($step['permission'])));
+
+        return array_filter($steps, fn (array $step) => !$step['done']) !== [] ? $steps : [];
     }
 
     /** @return array{version: string, account_count: int, apps: list<string>, addons: list<string>, cron_last: ?string} */

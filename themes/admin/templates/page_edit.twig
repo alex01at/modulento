@@ -15,31 +15,44 @@
 <form method="post" action="{{ url(page and page.id ? '/admin/pages/' ~ page.id : '/admin/pages/new') }}">
     {{ csrf_field() }}
 
-    {% for code in locales %}
-        {% set text = page ? (page.translations[code] ?? {}) : {} %}
-        <fieldset class="card-box">
-            <legend>{{ locale_name(code) }}</legend>
-            {% if not loop.first %}
-                <p><small>{{ trans('core.admin.pages.optional_language') }}</small></p>
-            {% endif %}
-
-            <div class="field-grid">
-                <div class="field">
-                    <label for="title_{{ code }}">{{ trans('core.admin.pages.field.title') }}</label>
-                    <input id="title_{{ code }}" name="text[{{ code }}][title]" value="{{ text.title ?? '' }}" maxlength="200" lang="{{ code }}">
-                </div>
-                <div class="field">
-                    <label for="slug_{{ code }}">{{ trans('core.admin.pages.field.slug') }}</label>
-                    <input id="slug_{{ code }}" name="text[{{ code }}][slug]" value="{{ text.slug ?? '' }}" maxlength="200">
-                    <small>{{ trans('core.admin.pages.field.slug_hint') }}</small>
-                </div>
-                <div class="field field-wide">
-                    <label for="meta_{{ code }}">{{ trans('core.admin.pages.field.meta') }}</label>
-                    <input id="meta_{{ code }}" name="text[{{ code }}][meta_description]" value="{{ text.meta_description ?? '' }}" maxlength="300" lang="{{ code }}">
-                </div>
+    {# Only the language the administration is in is edited here, like everywhere
+       else a block/section is edited (home page, a widget) - to work on another
+       language, choose it at the top right. Keeps the form to one language's
+       worth of fields instead of every enabled language's fields at once. #}
+    {% set code = locale() %}
+    {% set text = page ? (page.translations[code] ?? {}) : {} %}
+    <fieldset class="card-box">
+        <legend>{{ locale_name(code) }}</legend>
+        <div class="field-grid">
+            <div class="field">
+                <label for="title_{{ code }}">{{ trans('core.admin.pages.field.title') }}</label>
+                <input id="title_{{ code }}" name="text[{{ code }}][title]" value="{{ text.title ?? '' }}" maxlength="200" lang="{{ code }}">
             </div>
-        </fieldset>
-    {% endfor %}
+            <div class="field">
+                <label for="slug_{{ code }}">{{ trans('core.admin.pages.field.slug') }}</label>
+                <input id="slug_{{ code }}" name="text[{{ code }}][slug]" value="{{ text.slug ?? '' }}" maxlength="200">
+                <small>{{ trans('core.admin.pages.field.slug_hint') }}</small>
+            </div>
+            <div class="field field-wide">
+                <label for="meta_{{ code }}">{{ trans('core.admin.pages.field.meta') }}</label>
+                <input id="meta_{{ code }}" name="text[{{ code }}][meta_description]" value="{{ text.meta_description ?? '' }}" maxlength="300" lang="{{ code }}">
+            </div>
+        </div>
+
+        {% set otherLocales = locales|filter(l => l != code) %}
+        {% if otherLocales is not empty %}
+            <p class="admin-pages-translations">
+                {% for other in otherLocales %}
+                    {% if page and page.translations[other] is defined %}
+                        <span class="badge badge-published">{{ locale_name(other) }} ✓</span>
+                    {% else %}
+                        <span class="badge badge-draft">{{ locale_name(other) }} {{ trans('core.admin.pages.field.not_translated') }}</span>
+                    {% endif %}
+                {% endfor %}
+                <small>{{ trans('core.admin.pages.field.translate_hint') }}</small>
+            </p>
+        {% endif %}
+    </fieldset>
 
     {% if page and page.id %}
         <p><small>{{ trans('core.admin.pages.field.content_hint') }}</small>

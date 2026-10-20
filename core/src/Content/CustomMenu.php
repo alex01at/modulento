@@ -27,6 +27,11 @@ final class CustomMenu
     {
     }
 
+    public function isCustomized(): bool
+    {
+        return $this->settings->has(self::SETTING);
+    }
+
     /**
      * The fixed entries that currently exist - not stored, derived fresh
      * from what is actually active, so one that stops applying (catalogue
