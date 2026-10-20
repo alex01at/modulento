@@ -12,37 +12,48 @@
         <a class="btn" href="{{ url('/admin/pages/new') }}">{{ icons.icon('plus') }}<span>{{ trans('core.admin.pages.new') }}</span></a>
     </div>
 
+    {% macro rows(pages, default_locale, indent) %}
+        {% import _self as self %}
+        {% for page in pages %}
+            {% set text = page.translations[default_locale] ?? page.translations|first %}
+            <tr>
+                <th scope="row"><a href="{{ url('/admin/pages/' ~ page.id) }}">{{ indent }}{{ text.title }}</a></th>
+                <td>{{ page.translations|keys|join(', ') }}</td>
+                <td>{{ page.role ? trans('core.admin.pages.role.' ~ page.role) }}</td>
+                <td><span class="badge badge-{{ page.status }}">{{ trans('core.admin.pages.status.' ~ page.status) }}</span></td>
+            </tr>
+            {{ self.rows(page.children, default_locale, indent ~ '— ') }}
+        {% endfor %}
+    {% endmacro %}
+    <div class="table-wrap">
+        <table>
+            <thead>
+            <tr>
+                <th scope="col">{{ trans('core.admin.pages.field.title') }}</th>
+                <th scope="col">{{ trans('core.admin.pages.languages') }}</th>
+                <th scope="col">{{ trans('core.admin.pages.field.role') }}</th>
+                <th scope="col">{{ trans('core.admin.extensions.status') }}</th>
+            </tr>
+            </thead>
+            <tbody>
+            {# The home page is not a row of its own (no slug, no hierarchy, always
+               published) - pinned here instead of a separate top-level admin menu
+               entry, so there is one place for every page's content. Only linked
+               for whoever may actually open it. #}
+            {% if can('core.settings.manage') %}
+                <tr>
+                    <th scope="row"><a href="{{ url('/admin/home') }}">{{ trans('core.admin.menu.home') }}</a></th>
+                    <td>—</td>
+                    <td>—</td>
+                    <td><span class="badge badge-published">{{ trans('core.admin.pages.status.published') }}</span></td>
+                </tr>
+            {% endif %}
+            {{ _self.rows(pages, default_locale, '') }}
+            </tbody>
+        </table>
+    </div>
     {% if pages is empty %}
         <p class="empty">{{ trans('core.admin.pages.none') }}</p>
-    {% else %}
-        {% macro rows(pages, default_locale, indent) %}
-            {% import _self as self %}
-            {% for page in pages %}
-                {% set text = page.translations[default_locale] ?? page.translations|first %}
-                <tr>
-                    <th scope="row"><a href="{{ url('/admin/pages/' ~ page.id) }}">{{ indent }}{{ text.title }}</a></th>
-                    <td>{{ page.translations|keys|join(', ') }}</td>
-                    <td>{{ page.role ? trans('core.admin.pages.role.' ~ page.role) }}</td>
-                    <td><span class="badge badge-{{ page.status }}">{{ trans('core.admin.pages.status.' ~ page.status) }}</span></td>
-                </tr>
-                {{ self.rows(page.children, default_locale, indent ~ '— ') }}
-            {% endfor %}
-        {% endmacro %}
-        <div class="table-wrap">
-            <table>
-                <thead>
-                <tr>
-                    <th scope="col">{{ trans('core.admin.pages.field.title') }}</th>
-                    <th scope="col">{{ trans('core.admin.pages.languages') }}</th>
-                    <th scope="col">{{ trans('core.admin.pages.field.role') }}</th>
-                    <th scope="col">{{ trans('core.admin.extensions.status') }}</th>
-                </tr>
-                </thead>
-                <tbody>
-                {{ _self.rows(pages, default_locale, '') }}
-                </tbody>
-            </table>
-        </div>
     {% endif %}
 </section>
 {% endblock %}

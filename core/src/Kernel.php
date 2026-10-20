@@ -508,7 +508,8 @@ final class Kernel
         $app->addAdminMenu('core.admin.menu.payments', '/admin/payments', 'core.settings.manage', 'marketplace');
         $app->addAdminMenu('core.admin.menu.pages', '/admin/pages', 'core.pages.manage', 'content');
         $app->addAdminMenu('core.admin.menu.media', '/admin/media', 'core.media.manage', 'content');
-        $app->addAdminMenu('core.admin.menu.home', '/admin/home', 'core.settings.manage', 'content');
+        // The home page is pinned at the top of Administration → Seiten instead
+        // of its own top-level entry - it is a page like any other now.
         if ($app->modules->enabled('requests')) {
             $app->addAdminMenu('core.admin.menu.requests', '/admin/requests', 'core.requests.manage', 'moderation');
         }
