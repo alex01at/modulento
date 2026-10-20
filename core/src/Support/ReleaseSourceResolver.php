@@ -7,9 +7,14 @@ namespace Modulento\Core\Support;
 /**
  * Routes a package to the right ReleaseSource: a "license:<product>" repo
  * (Package\Packages::isLicensedRepo()) goes to the configured license
- * server, everything else goes to GitHub, exactly as before this class
- * existed. Implements ReleaseSource itself, so Package\Packages needs no
- * change beyond its constructor's type hint to support both at once.
+ * server, everything else goes to GitHub - except that, when a license
+ * server is configured, an ordinary repository is first offered to it as
+ * well (LicenseServerClient::latestPublic()), for the operator's own free
+ * products it caches without any key (fewer installations hitting
+ * GitHub's own rate limit directly). That is a pure speedup: anything
+ * other than a well-formed release from it - not configured, unreachable,
+ * repository not cached there - falls straight back to GitHub, exactly as
+ * before this class offered that path at all.
  */
 final class ReleaseSourceResolver implements ReleaseSource
 {
@@ -19,6 +24,10 @@ final class ReleaseSourceResolver implements ReleaseSource
 
     public function latest(string $repo): array
     {
+        if ($this->license !== null && !str_starts_with($repo, 'license:')) {
+            return $this->license->latestPublic($repo) ?? $this->github->latest($repo);
+        }
+
         return $this->forRepo($repo)->latest($repo);
     }
 
