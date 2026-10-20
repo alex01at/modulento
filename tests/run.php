@@ -1912,8 +1912,30 @@ $ownId = $own[0]['id'];
 $post('/admin/home', ['action' => 'insert:start', 'add_type' => 'widget:own:' . $ownId], 3);
 check('widgets: an own widget is inserted like a shipped one, as a copy with its own id', $widgetCount() === $shipped + 2 && $widgetBlocks()[0]['texts']['de']['heading'] === 'Bereit loslegen?'
     && $widgetBlocks()[0]['id'] !== $ctaBlock['id']);
-check('widgets: the own widget is listed on the editor, and the offer page offers it too', str_contains($get('/admin/home', 3)['body'], 'Mein Aufruf')
-    && str_contains($get('/offers/ich-gestalte-dein-logo?edit=1', 3)['body'], 'value="widget:own:' . $ownId . '"'));
+check('widgets: the offer page offers it in the insert menu', str_contains($get('/offers/ich-gestalte-dein-logo?edit=1', 3)['body'], 'value="widget:own:' . $ownId . '"'));
+
+// The widgets overview: every shipped widget plus the own ones, and a way to create a new own one directly.
+$r = $get('/admin/widgets', 3);
+check('widgets overview: lists shipped widgets and the own one, which can be removed', $r['status'] === 200
+    && str_contains($r['body'], 'Aufruf mit Schaltfläche') && str_contains($r['body'], 'Mein Aufruf') && str_contains($r['body'], '/admin/widgets/' . $ownId . '/delete'));
+check('widgets overview: no longer duplicated on the home or offer page editor', !str_contains($get('/admin/home', 3)['body'], 'Mein Aufruf')
+    && !str_contains($get('/admin/offer-page', 3)['body'], 'Mein Aufruf'));
+check('widgets: new-widget page needs a type first, picked from a plain list of links', str_contains($get('/admin/widgets/new', 3)['body'], 'type=text')
+    && !str_contains($get('/admin/widgets/new', 3)['body'], 'name="name"'));
+$r = $get('/admin/widgets/new?type=text', 3);
+check('widgets: once a type is picked, its own fields show, in every language', str_contains($r['body'], 'name="name"')
+    && str_contains($r['body'], 'name="texts[de][heading]"') && str_contains($r['body'], 'name="texts[en][heading]"'));
+$post('/admin/widgets/new', ['type' => 'text', 'name' => 'Teaser', 'texts' => ['de' => ['heading' => 'Hallo', 'body' => '<p>Willkommen</p><script>x</script>'], 'en' => ['heading' => 'Hello', 'body' => '<p>Welcome</p>']]], 3);
+$teaser = array_values(array_filter((new Modulento\Core\Content\Widgets(new Modulento\Core\Support\Settings($pdo)))->own(), fn (array $w) => $w['name'] === 'Teaser'))[0] ?? null;
+check('widgets: created directly from the overview, cleaned, every language kept', $teaser !== null && $teaser['type'] === 'text'
+    && $teaser['texts']['de']['body'] === '<p>Willkommen</p>' && $teaser['texts']['en']['heading'] === 'Hello');
+check('widgets: the new own widget shows on the overview', str_contains($get('/admin/widgets', 3)['body'], 'Teaser'));
+$post('/admin/widgets/new', ['type' => 'text', 'name' => '', 'texts' => ['de' => ['heading' => 'x']]], 3);
+check('widgets: an empty name is refused, nothing new created', count((new Modulento\Core\Content\Widgets(new Modulento\Core\Support\Settings($pdo)))->own()) === 2);
+$post('/admin/widgets/' . $teaser['id'] . '/delete', [], 3);
+check('widgets: removed again from the overview, shipped ones untouched', !str_contains($get('/admin/widgets', 3)['body'], 'Teaser')
+    && str_contains($get('/admin/widgets', 3)['body'], 'Aufruf mit Schaltfläche'));
+
 $post('/admin/home', ['action' => 'removewidget:' . $ownId], 3);
 check('widgets: an own widget can be removed; the blocks made from it stay', (new Modulento\Core\Content\Widgets(new Modulento\Core\Support\Settings($pdo)))->own() === [] && $widgetCount() === $shipped + 2);
 $post('/admin/home', ['action' => 'reset'], 3);

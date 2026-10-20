@@ -18,7 +18,6 @@ final class AdminOfferPageController extends Controller
             'locale' => $this->app->translator->locale(),
             'default_locale' => $this->app->locales->default(),
             'customized' => $this->app->offerLayout->isCustomized(),
-            'own_widgets' => array_values(array_filter($this->app->widgets->own(), fn (array $w) => $w['type'] === 'text')),
         ]);
     }
 
