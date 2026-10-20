@@ -37,30 +37,14 @@
                     <label for="meta_{{ code }}">{{ trans('core.admin.pages.field.meta') }}</label>
                     <input id="meta_{{ code }}" name="text[{{ code }}][meta_description]" value="{{ text.meta_description ?? '' }}" maxlength="300" lang="{{ code }}">
                 </div>
-                <div class="field field-wide">
-                    <label for="body_{{ code }}">{{ trans('core.admin.pages.field.body') }}</label>
-                    <textarea id="body_{{ code }}" name="text[{{ code }}][body]" rows="14" lang="{{ code }}" data-editor="{{ editor() }}">{{ text.body ?? '' }}</textarea>
-                    <small>{{ trans('core.admin.pages.field.body_hint') }}</small>
-                    {% if media %}
-                        <details class="media-picker">
-                            <summary>{{ trans('core.admin.pages.media.insert') }}</summary>
-                            <ul class="media-pick">
-                                {% for item in media %}
-                                    <li>
-                                        <button type="button" data-media-insert="body_{{ code }}" data-media-url="{{ item.url }}" data-media-alt="{{ item.title }}" title="{{ item.title ?: item.url }}">
-                                            <img src="{{ item.url }}" alt="" width="{{ item.width }}" height="{{ item.height }}" loading="lazy">
-                                            <span>{{ item.title ?: trans('core.media.list.untitled') }}</span>
-                                        </button>
-                                    </li>
-                                {% endfor %}
-                            </ul>
-                            <small>{{ trans('core.admin.pages.media.hint') }}</small>
-                        </details>
-                    {% endif %}
-                </div>
             </div>
         </fieldset>
     {% endfor %}
+
+    {% if page and page.id %}
+        <p><small>{{ trans('core.admin.pages.field.content_hint') }}</small>
+            <a href="{{ url('/' ~ (page.translations[locale()].slug ?? page.translations[default_locale].slug ?? '')) }}?edit=1">{{ trans('core.admin.pages.edit_content') }}</a></p>
+    {% endif %}
 
     <fieldset class="card-box">
         <legend>{{ trans('core.admin.pages.publishing') }}</legend>
@@ -87,6 +71,17 @@
             <div class="field">
                 <label for="position">{{ trans('core.admin.pages.field.position') }}</label>
                 <input id="position" name="position" type="number" value="{{ page ? page.position : 0 }}">
+            </div>
+            <div class="field">
+                <label for="parent_id">{{ trans('core.admin.pages.field.parent') }}</label>
+                <select id="parent_id" name="parent_id">
+                    <option value="0">{{ trans('core.admin.pages.field.parent_none') }}</option>
+                    {% for option in parent_options %}
+                        {% set optionText = option.translations[locale()] ?? option.translations[default_locale] ?? option.translations|first %}
+                        <option value="{{ option.id }}" {{ page and page.parent_id == option.id ? 'selected' }}>{{ option.indent }}{{ optionText.title }}</option>
+                    {% endfor %}
+                </select>
+                <small>{{ trans('core.admin.pages.field.parent_hint') }}</small>
             </div>
         </div>
 

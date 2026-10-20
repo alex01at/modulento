@@ -261,8 +261,9 @@ final class View
 
             return null;
         }));
-        // Whether the page is being edited in place: an administrator with the settings permission, "?edit=1".
-        $this->twig->addFunction(new TwigFunction('edit_mode', fn (): bool => $auth->can('core.settings.manage')
+        // Whether the page is being edited in place: an administrator with the given
+        // permission (the settings one by default, for the home and offer pages), "?edit=1".
+        $this->twig->addFunction(new TwigFunction('edit_mode', fn (string $permission = 'core.settings.manage'): bool => $auth->can($permission)
             && $auth->impersonator() === null && ($_GET['edit'] ?? '') === '1'));
         // Every widget that can be inserted, shipped and own, with its label.
         $this->twig->addFunction(new TwigFunction('widget_options', fn (): array => $app->widgets->all(
@@ -270,7 +271,7 @@ final class View
         )));
         // The fields a block of a page has, for the in-place editor.
         $this->twig->addFunction(new TwigFunction('block_fields', fn (string $page): array => match ($page) {
-            'home' => \Modulento\Core\Content\HomeLayout::TEXT_FIELDS,
+            'home', 'page' => \Modulento\Core\Content\HomeLayout::TEXT_FIELDS,
             default => ['text' => ['heading', 'body', 'button_label', 'button_url']],
         }));
         // The pictures of the media library, for the picture of a block.
@@ -298,6 +299,13 @@ final class View
             $app->locales->default(),
             fn (string $key, array $params = []) => $translator->trans($key, $params),
             $app->siteName(),
+            $all
+        )));
+        // The blocks of a content page, in the current language, enabled ones only.
+        $this->twig->addFunction(new TwigFunction('page_blocks', fn (int $pageId, bool $all = false): array => $app->pages->view(
+            $pageId,
+            $app->translator->locale(),
+            $app->locales->default(),
             $all
         )));
         // Seconds between two asks for new messages; 0 switches the asking off (Administration → Settings).

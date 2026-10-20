@@ -1,6 +1,8 @@
 {# The "+" between two blocks: adds a block of one of the given kinds after "after" ("start" for the
-   first place). A details element, so it works without scripts. Receives after, page_path, add_types. #}
-{% if edit_mode() and can('core.settings.manage') %}
+   first place). A details element, so it works without scripts. Receives after, page_path, add_types,
+   and optionally permission (default core.settings.manage, see _bar.twig). #}
+{% set permission = permission|default('core.settings.manage') %}
+{% if edit_mode(permission) and can(permission) %}
 <details class="inline-plus">
     <summary aria-label="{{ trans('core.inline.add_here') }}"><span aria-hidden="true">+</span></summary>
     <form method="post" action="{{ url(page_path) }}" class="inline-plus-form">
