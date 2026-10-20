@@ -1,0 +1,119 @@
+{% extends '@admin/layout.twig' %}
+
+{% block title %}{{ trans('core.admin.widgets.new') }} – {{ site_name }}{% endblock %}
+
+{% block admin %}
+{% include '@admin/_page_header.twig' with {
+    heading: trans('core.admin.widgets.new'),
+    crumbs: [{label: trans('core.admin.widgets.title'), path: '/admin/widgets'}]
+} only %}
+
+{% for error in errors %}
+    <p class="flash flash-error" role="alert">{{ error }}</p>
+{% endfor %}
+
+{% if input.type is not defined %}
+    <section class="card-box">
+        <p>{{ trans('core.admin.widgets.type_hint') }}</p>
+        <ul class="plain-list">
+            {% for type in types %}
+                <li><a href="{{ url('/admin/widgets/new') }}?type={{ type }}">{{ trans('core.home.type.' ~ type) }}</a></li>
+            {% endfor %}
+        </ul>
+    </section>
+{% else %}
+    {% set type = input.type %}
+    <form method="post" action="{{ url('/admin/widgets/new') }}">
+        {{ csrf_field() }}
+        <input type="hidden" name="type" value="{{ type }}">
+
+        <section class="card-box">
+            <p><small>{{ trans('core.home.type.' ~ type) }}</small> · <a href="{{ url('/admin/widgets/new') }}">{{ trans('core.admin.widgets.type_change') }}</a></p>
+            <div class="field">
+                <label for="name">{{ trans('core.widget.name') }}</label>
+                <input id="name" name="name" value="{{ input.name ?? '' }}" maxlength="60" required>
+            </div>
+        </section>
+
+        {% if type == 'offers' or type == 'providers' %}
+            <section class="card-box">
+                <div class="field">
+                    <label for="count">{{ trans('core.home.count') }}</label>
+                    <input id="count" name="settings[count]" type="number" min="1" max="12" value="{{ input.settings.count ?? 6 }}">
+                </div>
+            </section>
+        {% elseif type == 'image' %}
+            <section class="card-box">
+                <div class="field">
+                    <label for="media">{{ trans('core.home.picture') }}</label>
+                    <select id="media" name="settings[media]">
+                        <option value="">{{ trans('core.home.picture_none') }}</option>
+                        {% for picture in library_pictures() %}
+                            <option value="{{ picture.url }}" {{ picture.url == (input.settings.media ?? '') ? 'selected' }}>{{ picture.title ?: picture.url }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </section>
+        {% endif %}
+
+        <section class="card-box">
+            <fieldset>
+                <legend>{{ trans('core.home.background') }}</legend>
+                <div class="field">
+                    <label for="bg-type">{{ trans('core.home.background_type') }}</label>
+                    <select id="bg-type" name="settings[background_type]" data-background-toggle>
+                        <option value="" {{ (input.settings.background_type ?? '') == '' ? 'selected' }}>{{ trans('core.home.background_option_none') }}</option>
+                        <option value="color" {{ (input.settings.background_type ?? '') == 'color' ? 'selected' }}>{{ trans('core.home.background_option_color') }}</option>
+                        <option value="gradient" {{ (input.settings.background_type ?? '') == 'gradient' ? 'selected' }}>{{ trans('core.home.background_option_gradient') }}</option>
+                        <option value="image" {{ (input.settings.background_type ?? '') == 'image' ? 'selected' }}>{{ trans('core.home.background_option_image') }}</option>
+                    </select>
+                </div>
+                <div class="field" data-background-field="color gradient">
+                    <label for="bg-color">{{ trans('core.home.background_color') }}</label>
+                    <input id="bg-color" type="color" name="settings[background_color]" value="{{ input.settings.background_color ?? '#ffffff' }}">
+                </div>
+                <div class="field" data-background-field="gradient">
+                    <label for="bg-color2">{{ trans('core.home.background_color2') }}</label>
+                    <input id="bg-color2" type="color" name="settings[background_color2]" value="{{ input.settings.background_color2 ?? '#ffffff' }}">
+                </div>
+                <div class="field" data-background-field="image">
+                    <label for="bg-media">{{ trans('core.home.picture') }}</label>
+                    <select id="bg-media" name="settings[background_media]">
+                        <option value="">{{ trans('core.home.picture_none') }}</option>
+                        {% for picture in library_pictures() %}
+                            <option value="{{ picture.url }}" {{ picture.url == (input.settings.background_media ?? '') ? 'selected' }}>{{ picture.title ?: picture.url }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </fieldset>
+        </section>
+
+        {% for code in locales %}
+            <fieldset class="card-box" lang="{{ code }}">
+                <legend>{{ locale_name(code) }}</legend>
+                {% for field in fields[type] %}
+                    {% set value = input.texts[code][field] ?? '' %}
+                    {% set name = 'texts[' ~ code ~ '][' ~ field ~ ']' %}
+                    <div class="field">
+                        <label for="{{ field }}-{{ code }}">{{ trans('core.home.field.' ~ field) }}</label>
+                        {% if field == 'body' %}
+                            <textarea id="{{ field }}-{{ code }}" name="{{ name }}" rows="8" lang="{{ code }}" data-editor="{{ editor() }}">{{ value }}</textarea>
+                        {% elseif field == 'items' %}
+                            <textarea id="{{ field }}-{{ code }}" name="{{ name }}" rows="4">{{ value }}</textarea>
+                            <small>{{ trans('core.home.items_hint') }}</small>
+                        {% elseif field == 'text' %}
+                            <textarea id="{{ field }}-{{ code }}" name="{{ name }}" rows="3" maxlength="2000">{{ value }}</textarea>
+                        {% else %}
+                            <input id="{{ field }}-{{ code }}" name="{{ name }}" value="{{ value }}" maxlength="300">
+                        {% endif %}
+                    </div>
+                {% endfor %}
+            </fieldset>
+        {% endfor %}
+
+        <div class="button-row">
+            <button type="submit">{{ trans('core.widget.save') }}</button>
+        </div>
+    </form>
+{% endif %}
+{% endblock %}

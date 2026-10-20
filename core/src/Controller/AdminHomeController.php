@@ -28,7 +28,6 @@ final class AdminHomeController extends Controller
             'pictures' => array_map(fn (array $row) => ['url' => Library::url($row['file']), 'title' => $row['title']],
                 $app->media->list(1, 200)['rows']),
             'customized' => $layout->isCustomized(),
-            'own_widgets' => $this->app->widgets->own(),
         ]);
     }
 

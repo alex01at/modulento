@@ -11,6 +11,7 @@ use Modulento\Core\Controller\AdminCustomFieldController;
 use Modulento\Core\Controller\AdminController;
 use Modulento\Core\Controller\AdminBadWordsController;
 use Modulento\Core\Controller\AdminHomeController;
+use Modulento\Core\Controller\AdminWidgetController;
 use Modulento\Core\Controller\AdminMenuController;
 use Modulento\Core\Controller\AdminOfferPageController;
 use Modulento\Core\Controller\DesignController;
@@ -369,6 +370,10 @@ final class Kernel
         $router->post('/admin/offer-page/field', [AdminOfferPageController::class, 'field'], 'core.settings.manage');
         $router->get('/admin/home', [AdminHomeController::class, 'index'], 'core.settings.manage');
         $router->post('/admin/home', [AdminHomeController::class, 'save'], 'core.settings.manage');
+        $router->get('/admin/widgets', [AdminWidgetController::class, 'index'], 'core.settings.manage');
+        $router->get('/admin/widgets/new', [AdminWidgetController::class, 'create'], 'core.settings.manage');
+        $router->post('/admin/widgets/new', [AdminWidgetController::class, 'save'], 'core.settings.manage');
+        $router->post('/admin/widgets/{id}/delete', [AdminWidgetController::class, 'delete'], 'core.settings.manage');
         $router->get('/admin/menu', [AdminMenuController::class, 'index'], 'core.settings.manage');
         $router->post('/admin/menu', [AdminMenuController::class, 'save'], 'core.settings.manage');
         $router->post('/admin/menu/reorder', [AdminMenuController::class, 'reorder'], 'core.settings.manage');
@@ -507,6 +512,7 @@ final class Kernel
         $app->addAdminMenu('core.admin.menu.settings', '/admin/settings', 'core.settings.manage', 'system');
         $app->addAdminMenu('core.admin.menu.payments', '/admin/payments', 'core.settings.manage', 'marketplace');
         $app->addAdminMenu('core.admin.menu.pages', '/admin/pages', 'core.pages.manage', 'content');
+        $app->addAdminMenu('core.admin.menu.widgets', '/admin/widgets', 'core.settings.manage', 'content');
         $app->addAdminMenu('core.admin.menu.media', '/admin/media', 'core.media.manage', 'content');
         // The home page is pinned at the top of Administration → Seiten instead
         // of its own top-level entry - it is a page like any other now.

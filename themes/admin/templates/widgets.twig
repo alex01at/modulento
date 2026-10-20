@@ -1,0 +1,43 @@
+{% extends '@admin/layout.twig' %}
+{% import '@admin/_icons.twig' as icons %}
+
+{% block title %}{{ trans('core.admin.widgets.title') }} – {{ site_name }}{% endblock %}
+
+{% block admin %}
+{% include '@admin/_page_header.twig' with {heading: trans('core.admin.widgets.title')} only %}
+
+<section class="card-box">
+    <div class="card-head">
+        <p>{{ trans('core.admin.widgets.intro') }}</p>
+        <a class="btn" href="{{ url('/admin/widgets/new') }}">{{ icons.icon('plus') }}<span>{{ trans('core.admin.widgets.new') }}</span></a>
+    </div>
+
+    {% set shipped = widgets|filter(w => not w.own) %}
+    {% set own = widgets|filter(w => w.own) %}
+
+    <h2>{{ trans('core.admin.widgets.shipped') }}</h2>
+    <ul class="plain-list">
+        {% for widget in shipped %}
+            <li>{{ widget.label }}</li>
+        {% endfor %}
+    </ul>
+
+    <h2>{{ trans('core.widget.own_title') }}</h2>
+    <p>{{ trans('core.widget.own_hint') }}</p>
+    {% if own is empty %}
+        <p class="empty">{{ trans('core.widget.own_empty') }}</p>
+    {% else %}
+        <ul class="plain-list">
+            {% for widget in own %}
+                <li>
+                    <form method="post" action="{{ url('/admin/widgets/' ~ widget.key|split(':')[1] ~ '/delete') }}" class="inline-form">
+                        {{ csrf_field() }}
+                        <strong>{{ widget.label }}</strong>
+                        <button type="submit" class="danger btn-sm">{{ trans('core.widget.remove') }}</button>
+                    </form>
+                </li>
+            {% endfor %}
+        </ul>
+    {% endif %}
+</section>
+{% endblock %}
