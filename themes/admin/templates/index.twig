@@ -16,6 +16,24 @@
     </div>
 {% endif %}
 
+{% if setup_steps is not empty %}
+    <section class="card-box">
+        <h2>{{ trans('core.admin.dashboard.setup.title') }}</h2>
+        <p>{{ trans('core.admin.dashboard.setup.intro') }}</p>
+        <ul class="area-list">
+            {% for step in setup_steps %}
+                <li>
+                    <a href="{{ url(step.path) }}">
+                        <span class="dashboard-icon" aria-hidden="true">{{ icons.menu(step.path) }}</span>
+                        <span>{{ trans(step.label_key) }}</span>
+                    </a>
+                    <span class="badge {{ step.done ? 'badge-published' : 'badge-draft' }}">{{ trans(step.done ? 'core.admin.dashboard.setup.done' : 'core.admin.dashboard.setup.open') }}</span>
+                </li>
+            {% endfor %}
+        </ul>
+    </section>
+{% endif %}
+
 <div class="dashboard-columns">
     <div>
         {% if action_queue is not empty %}

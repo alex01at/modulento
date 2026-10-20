@@ -985,9 +985,9 @@ use Modulento\Core\Content\Pages;
 check('slug: umlauts and punctuation', Pages::slugify(' Über uns & Größe! ') === 'ueber-uns-groesse' && Pages::slugify('Conditions générales') === 'conditions-generales');
 
 $text = fn (string $title, string $slug = '') => ['title' => $title, 'slug' => $slug, 'meta_description' => ''];
-$r = $post('/admin/pages/new', ['status' => 'published', 'role' => 'imprint', 'text' => ['de' => $text('Impressum'), 'en' => $text('')]], 1);
+$r = $post('/admin/pages/new', ['status' => 'published', 'role' => 'imprint', 'text' => ['de' => $text('Impressum')]], 1);
 check('pages: need their permission', $r['status'] === 403 && $pdo->query('SELECT COUNT(*) FROM page')->fetchColumn() == 0);
-$post('/admin/pages/new', ['status' => 'published', 'role' => 'imprint', 'text' => ['de' => $text('Impressum'), 'en' => $text('')]], 3);
+$post('/admin/pages/new', ['status' => 'published', 'role' => 'imprint', 'text' => ['de' => $text('Impressum')]], 3);
 $imprint = $pdo->query("SELECT * FROM page_translation WHERE slug = 'impressum'")->fetch();
 check('pages: saved with slug from the title, only the filled language', $imprint !== false
     && $pdo->query('SELECT COUNT(*) FROM page_translation')->fetchColumn() == 1);
@@ -1020,7 +1020,7 @@ $pdo->prepare('UPDATE page_translation SET body = :body WHERE page_id = :id AND 
 check('page blocks: a legacy body becomes one text block, shown on the public page',
     str_contains($get('/impressum', null)['body'], '<p>Alter Inhalt</p>'));
 check('page blocks: the legacy body is not written back just by being read', $pdo->query("SELECT blocks FROM page WHERE id = {$imprint['page_id']}")->fetchColumn() === null);
-$post('/admin/pages/' . $imprint['page_id'], ['status' => 'published', 'role' => 'imprint', 'text' => ['de' => $text('Impressum'), 'en' => $text('')]], 3);
+$post('/admin/pages/' . $imprint['page_id'], ['status' => 'published', 'role' => 'imprint', 'text' => ['de' => $text('Impressum')]], 3);
 check('page blocks: saving the page\'s own settings does not wipe a not-yet-opened legacy body',
     $pdo->query("SELECT body FROM page_translation WHERE page_id = {$imprint['page_id']} AND locale = 'de'")->fetchColumn() === '<p>Alter Inhalt</p>');
 $pdo->exec("UPDATE page_translation SET body = '' WHERE page_id = {$imprint['page_id']}");
@@ -1042,7 +1042,10 @@ check('pages: published, the flash says so and the page shows in the footer', ($
     && str_contains($get('/', null)['body'], '<a href="/datenschutz">Datenschutz</a>'));
 $pdo->exec("DELETE FROM page WHERE role = 'privacy'");
 
-$post('/admin/pages/' . $imprint['page_id'], ['status' => 'published', 'role' => 'imprint', 'text' => ['de' => $text('Impressum', 'impressum'), 'en' => $text('Imprint')]], 3);
+$post('/admin/pages/' . $imprint['page_id'], ['status' => 'published', 'role' => 'imprint', 'text' => ['de' => $text('Impressum', 'impressum')]], 3);
+// Only the administration's own language is edited per request (see page_edit.twig);
+// another language is reached by switching the language first, like everywhere else.
+$post('/en/admin/pages/' . $imprint['page_id'], ['status' => 'published', 'role' => 'imprint', 'text' => ['en' => $text('Imprint')]], 3);
 $r = $get('/en/imprint', null);
 check('pages: translated text and slug', $r['status'] === 200 && str_contains($r['body'], '<h1>Imprint</h1>') && str_contains($r['body'], '<article lang="en">'));
 check('pages: language menu and hreflang point to the translated slug', str_contains($r['body'], '<a href="/impressum" hreflang="de" lang="de">Deutsch</a>')
