@@ -54,9 +54,47 @@ final class LicenseServerClient implements ReleaseSource
             throw new UpdateException($errorKey, $errorKey === 'core.update.error.unreachable' ? ['status' => $response['status']] : ['product' => $product]);
         }
 
+        $result = self::parseRelease($body);
+        if ($result === null) {
+            throw new UpdateException('core.update.error.invalid_response');
+        }
+
+        return $result;
+    }
+
+    /**
+     * The same lookup as latest(), but for a repository the license server
+     * caches without any license key at all (the operator's own free, open
+     * extensions and themes - see the server's "public_cache" product
+     * flag) - a speedup/fallback only, never required: anything other than
+     * a well-formed release answers null, so the caller (ReleaseSourceResolver)
+     * just asks GitHub directly instead, exactly as if this method did not
+     * exist.
+     *
+     * @return array{version: string, published_at: string, changelog: string, assets: array<string, string>}|null
+     */
+    public function latestPublic(string $repo): ?array
+    {
+        $response = $this->http->request(
+            'POST',
+            rtrim($this->serverUrl, '/') . '/v1/releases/public',
+            ['Content-Type' => 'application/json', 'Accept' => 'application/json'],
+            json_encode(['repo' => $repo, 'domain' => $this->domain], JSON_UNESCAPED_SLASHES)
+        );
+
+        if ($response['status'] !== 200) {
+            return null;
+        }
+
+        return self::parseRelease(json_decode($response['body'], true));
+    }
+
+    /** @return array{version: string, published_at: string, changelog: string, assets: array<string, string>}|null */
+    private static function parseRelease(mixed $body): ?array
+    {
         $version = is_array($body) && is_string($body['version'] ?? null) ? $body['version'] : '';
         if (preg_match('/^\d+\.\d+\.\d+$/', $version) !== 1) {
-            throw new UpdateException('core.update.error.invalid_response');
+            return null;
         }
 
         $assets = [];

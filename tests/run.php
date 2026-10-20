@@ -4964,6 +4964,26 @@ check('ReleaseSourceResolver: an asset url on the license server\'s own host is 
 $resolverNoLicense = new Modulento\Core\Support\ReleaseSourceResolver($resolverGithub, null, '');
 check('ReleaseSourceResolver: without a configured license server, a "license:" repo falls back to GitHub (and fails there, as it should)', $packageError(fn () => $resolverNoLicense->latest('license:ext-exklusiv')) === 'core.update.error.no_release');
 
+// --- The license server also caches a plain (non-"license:") repo it knows as public, a pure speedup ---
+$publicAssets = ['widget-2.0.0.zip' => 'https://license.example.test/v1/download/pub1', 'widget-2.0.0.zip.sha256' => 'https://license.example.test/v1/download/pub2'];
+$publicHttp = new FakeLicenseHttp(200, json_encode(['version' => '2.0.0', 'published_at' => '2026-02-01T00:00:00Z', 'changelog' => 'y', 'assets' => $publicAssets]));
+$publicClient = new Modulento\Core\Support\LicenseServerClient($publicHttp, 'https://license.example.test', 'kunde.de', $licenseKeys);
+check('license server: latestPublic() reads a plain repository the same shape as a GitHub release', $publicClient->latestPublic('acme/widget') === ['version' => '2.0.0', 'published_at' => '2026-02-01T00:00:00Z', 'changelog' => 'y', 'assets' => $publicAssets]);
+check('license server: latestPublic() sends the repo and this domain, never a license key', json_decode($publicHttp->lastRequest['body'], true) === ['repo' => 'acme/widget', 'domain' => 'kunde.de']
+    && $publicHttp->lastRequest['url'] === 'https://license.example.test/v1/releases/public');
+
+$resolverPublic = new Modulento\Core\Support\ReleaseSourceResolver($resolverGithub, $publicClient, 'https://license.example.test');
+check('ReleaseSourceResolver: a plain repo the license server caches as public is answered from there, GitHub is never asked', $resolverPublic->latest('acme/widget') === $publicClient->latestPublic('acme/widget'));
+
+$notCachedClient = new Modulento\Core\Support\LicenseServerClient(new FakeLicenseHttp(404, json_encode(['error' => 'not_found'])), 'https://license.example.test', 'kunde.de', $licenseKeys);
+check('license server: latestPublic() for a repo it does not cache answers null, not an error', $notCachedClient->latestPublic('acme/not-cached') === null);
+$resolverFallback = new Modulento\Core\Support\ReleaseSourceResolver($resolverGithub, $notCachedClient, 'https://license.example.test');
+check('ReleaseSourceResolver: a repo the license server does not know falls back to GitHub, exactly as without a license server at all',
+    $packageError(fn () => $resolverFallback->latest('acme/this-repo-does-not-exist-xyz')) === 'core.update.error.no_release');
+
+$unreachablePublicClient = new Modulento\Core\Support\LicenseServerClient(new FakeLicenseHttp(0, ''), 'https://license.example.test', 'kunde.de', $licenseKeys);
+check('license server: latestPublic() with no answer at all is also null, not an error', $unreachablePublicClient->latestPublic('acme/widget') === null);
+
 $pdo->exec("DELETE FROM license_key");
 
 // --- Admin: license key management on the packages page ---------------------
