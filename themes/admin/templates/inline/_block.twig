@@ -1,8 +1,10 @@
 {# One block while the page is edited in place: its tools, the block itself, and the "+" after it.
    The block's own partial is drawn inside, so the page's loop stays the same for every theme.
    Texts marked with data-field are edited on the spot (JavaScript); the form below them works
-   without scripts too. Receives block, page_path, partial, fields, label_key, deletable, add_types. #}
+   without scripts too. Receives block, page_path, partial, fields, label_key, deletable, add_types,
+   and optionally permission (default core.settings.manage, see _bar.twig). #}
 {% set id = block.id %}
+{% set permission = permission|default('core.settings.manage') %}
 <div class="inline-block{{ block.enabled ? '' : ' is-hidden-block' }}" id="inline-{{ id }}" data-block-id="{{ id }}"
      data-field-url="{{ url(page_path) }}/field" data-order-url="{{ url(page_path) }}/order" data-csrf="{{ csrf_token() }}">
     <div class="inline-tools">
@@ -117,5 +119,5 @@
         <p class="inline-off">{{ trans(label_key) }} · {{ trans('core.inline.hidden') }}</p>
     {% endif %}
 
-    {% include '@admin/inline/_plus.twig' with {after: id, page_path: page_path, add_types: add_types} %}
+    {% include '@admin/inline/_plus.twig' with {after: id, page_path: page_path, add_types: add_types, permission: permission} %}
 </div>

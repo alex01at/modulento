@@ -248,7 +248,7 @@ $pdo->exec("CREATE TABLE provider (id INTEGER PRIMARY KEY, account_id INTEGER UN
     vat_id TEXT, tax_id TEXT, company_register TEXT, self_certified_at TEXT, details_changed_at TEXT, decided_at TEXT, decided_by INTEGER, created_at TEXT, updated_at TEXT,
     avg_response_minutes INTEGER, response_sample_count INTEGER NOT NULL DEFAULT 0)");
 $pdo->exec("CREATE TABLE provider_translation (provider_id INTEGER REFERENCES provider (id) ON DELETE CASCADE, locale TEXT, headline TEXT, description TEXT, PRIMARY KEY (provider_id, locale))");
-$pdo->exec("CREATE TABLE page (id INTEGER PRIMARY KEY, status TEXT, role TEXT UNIQUE, in_header INTEGER, in_footer INTEGER, position INTEGER, created_at TEXT, updated_at TEXT)");
+$pdo->exec("CREATE TABLE page (id INTEGER PRIMARY KEY, status TEXT, role TEXT UNIQUE, parent_id INTEGER REFERENCES page (id), in_header INTEGER, in_footer INTEGER, position INTEGER, blocks TEXT, created_at TEXT, updated_at TEXT)");
 $pdo->exec("CREATE TABLE page_translation (page_id INTEGER REFERENCES page (id) ON DELETE CASCADE, locale TEXT, title TEXT, slug TEXT,
     meta_description TEXT, body TEXT, PRIMARY KEY (page_id, locale), UNIQUE (locale, slug))");
 $pdo->exec("CREATE TABLE account_identity (id INTEGER PRIMARY KEY, account_id INTEGER REFERENCES account (id) ON DELETE CASCADE,
@@ -984,15 +984,47 @@ use Modulento\Core\Content\Pages;
 
 check('slug: umlauts and punctuation', Pages::slugify(' Über uns & Größe! ') === 'ueber-uns-groesse' && Pages::slugify('Conditions générales') === 'conditions-generales');
 
-$text = fn (string $title, string $body = '<p>Text</p>', string $slug = '') => ['title' => $title, 'slug' => $slug, 'meta_description' => '', 'body' => $body];
-$r = $post('/admin/pages/new', ['status' => 'published', 'role' => 'imprint', 'text' => ['de' => $text('Impressum', '<p>Angaben</p><script>x</script>'), 'en' => $text('')]], 1);
+$text = fn (string $title, string $slug = '') => ['title' => $title, 'slug' => $slug, 'meta_description' => ''];
+$r = $post('/admin/pages/new', ['status' => 'published', 'role' => 'imprint', 'text' => ['de' => $text('Impressum'), 'en' => $text('')]], 1);
 check('pages: need their permission', $r['status'] === 403 && $pdo->query('SELECT COUNT(*) FROM page')->fetchColumn() == 0);
-$post('/admin/pages/new', ['status' => 'published', 'role' => 'imprint', 'text' => ['de' => $text('Impressum', '<p>Angaben</p><script>x</script>'), 'en' => $text('')]], 3);
+$post('/admin/pages/new', ['status' => 'published', 'role' => 'imprint', 'text' => ['de' => $text('Impressum'), 'en' => $text('')]], 3);
 $imprint = $pdo->query("SELECT * FROM page_translation WHERE slug = 'impressum'")->fetch();
-check('pages: saved with slug from the title, body cleaned, only the filled language', $imprint !== false && $imprint['body'] === '<p>Angaben</p>'
+check('pages: saved with slug from the title, only the filled language', $imprint !== false
     && $pdo->query('SELECT COUNT(*) FROM page_translation')->fetchColumn() == 1);
 $r = $get('/impressum', null);
-check('pages: shown at their address', $r['status'] === 200 && str_contains($r['body'], '<h1>Impressum</h1>') && str_contains($r['body'], '<p>Angaben</p>'));
+check('pages: shown at their address', $r['status'] === 200 && str_contains($r['body'], '<h1>Impressum</h1>'));
+
+// Content is the same block layout as the home page, kept per page (not in the
+// form above) - added and edited through the live page's own editor.
+$post('/admin/pages/' . $imprint['page_id'] . '/blocks', ['action' => 'add', 'add_type' => 'text'], 3);
+$imprintBlocks = (new Pages($pdo, $locales()))->blocksFor((int) $imprint['page_id']);
+check('page blocks: a text block can be added', count($imprintBlocks) === 1 && $imprintBlocks[0]['type'] === 'text');
+$post('/admin/pages/' . $imprint['page_id'] . '/blocks', ['action' => 'save', 'blocks' => [
+    $imprintBlocks[0]['id'] => ['enabled' => '1', 'texts' => ['de' => ['heading' => 'Angaben', 'body' => '<p>Firma</p><script>x</script>']]],
+]], 3);
+check('page blocks: a block\'s text is saved and cleaned, and shows on the public page',
+    str_contains($get('/impressum', null)['body'], '<p>Firma</p>') && !str_contains($get('/impressum', null)['body'], '<script>x'));
+$post('/admin/pages/' . $imprint['page_id'] . '/blocks', ['action' => 'toggle:' . $imprintBlocks[0]['id']], 3);
+check('page blocks: a hidden block disappears from the public page', !str_contains($get('/impressum', null)['body'], 'Firma'));
+$post('/admin/pages/' . $imprint['page_id'] . '/blocks', ['action' => 'toggle:' . $imprintBlocks[0]['id']], 3);
+$post('/admin/pages/' . $imprint['page_id'] . '/blocks', ['action' => 'duplicate:' . $imprintBlocks[0]['id']], 3);
+check('page blocks: a block can be duplicated', count((new Pages($pdo, $locales()))->blocksFor((int) $imprint['page_id'])) === 2);
+$post('/admin/pages/' . $imprint['page_id'] . '/blocks', ['action' => 'delete:' . $imprintBlocks[0]['id']], 3);
+check('page blocks: a block can be removed again', count((new Pages($pdo, $locales()))->blocksFor((int) $imprint['page_id'])) === 1);
+
+// A page saved before blocks existed keeps its old "body" text until opened in the
+// new editor - synthesized as a single text block, nothing lost, nothing rewritten.
+$pdo->exec("UPDATE page SET blocks = NULL WHERE id = {$imprint['page_id']}");
+$pdo->prepare('UPDATE page_translation SET body = :body WHERE page_id = :id AND locale = :locale')
+    ->execute(['body' => '<p>Alter Inhalt</p>', 'id' => $imprint['page_id'], 'locale' => 'de']);
+check('page blocks: a legacy body becomes one text block, shown on the public page',
+    str_contains($get('/impressum', null)['body'], '<p>Alter Inhalt</p>'));
+check('page blocks: the legacy body is not written back just by being read', $pdo->query("SELECT blocks FROM page WHERE id = {$imprint['page_id']}")->fetchColumn() === null);
+$post('/admin/pages/' . $imprint['page_id'], ['status' => 'published', 'role' => 'imprint', 'text' => ['de' => $text('Impressum'), 'en' => $text('')]], 3);
+check('page blocks: saving the page\'s own settings does not wipe a not-yet-opened legacy body',
+    $pdo->query("SELECT body FROM page_translation WHERE page_id = {$imprint['page_id']} AND locale = 'de'")->fetchColumn() === '<p>Alter Inhalt</p>');
+$pdo->exec("UPDATE page_translation SET body = '' WHERE page_id = {$imprint['page_id']}");
+
 $r = $get('/en/impressum', null);
 check('pages: a language without its own text shows the default one, marked as German', $r['status'] === 200 && str_contains($r['body'], '<article lang="de">') && str_contains($r['body'], '<html lang="en">'));
 check('pages: legal page is in the footer of every language', str_contains($r['body'], '<a href="/en/impressum">Impressum</a>'));
@@ -1010,7 +1042,7 @@ check('pages: published, the flash says so and the page shows in the footer', ($
     && str_contains($get('/', null)['body'], '<a href="/datenschutz">Datenschutz</a>'));
 $pdo->exec("DELETE FROM page WHERE role = 'privacy'");
 
-$post('/admin/pages/' . $imprint['page_id'], ['status' => 'published', 'role' => 'imprint', 'text' => ['de' => $text('Impressum', '<p>Angaben</p>', 'impressum'), 'en' => $text('Imprint', '<p>Details</p>')]], 3);
+$post('/admin/pages/' . $imprint['page_id'], ['status' => 'published', 'role' => 'imprint', 'text' => ['de' => $text('Impressum', 'impressum'), 'en' => $text('Imprint')]], 3);
 $r = $get('/en/imprint', null);
 check('pages: translated text and slug', $r['status'] === 200 && str_contains($r['body'], '<h1>Imprint</h1>') && str_contains($r['body'], '<article lang="en">'));
 check('pages: language menu and hreflang point to the translated slug', str_contains($r['body'], '<a href="/impressum" hreflang="de" lang="de">Deutsch</a>')
@@ -1019,7 +1051,7 @@ check('pages: the other language\'s slug is not an address here', $get('/en/impr
 
 $post('/admin/pages/new', ['status' => 'published', 'role' => 'imprint', 'text' => ['de' => $text('Zweites Impressum')]], 3);
 check('pages: a legal function belongs to one page', $pdo->query('SELECT COUNT(*) FROM page')->fetchColumn() == 1);
-$post('/admin/pages/new', ['status' => 'published', 'text' => ['de' => $text('Doppelt', '', 'impressum')]], 3);
+$post('/admin/pages/new', ['status' => 'published', 'text' => ['de' => $text('Doppelt', 'impressum')]], 3);
 check('pages: an address is unique per language', $pdo->query('SELECT COUNT(*) FROM page')->fetchColumn() == 1);
 $r = $post('/admin/pages/new', ['status' => 'published', 'text' => ['de' => $text('Login')]], 3);
 check('pages: system addresses are refused, the form keeps the input', $pdo->query('SELECT COUNT(*) FROM page')->fetchColumn() == 1 && str_contains($r['body'], 'value="Login"'));
@@ -1029,6 +1061,27 @@ $aboutId = $pdo->query("SELECT page_id FROM page_translation WHERE slug = 'ueber
 $post('/admin/pages/' . $aboutId, ['status' => 'published', 'in_header' => '1', 'text' => ['de' => $text('Über uns')]], 3);
 check('pages: published page appears in the main menu', str_contains($get('/', null)['body'], '<a href="/ueber-uns">Über uns</a>'));
 check('pages: core routes win over a page address', str_contains($get('/login', null)['body'], 'name="password"'));
+
+// --- Pages: parent/child hierarchy, for the administration's tree and a later mega menu ---
+$pages = new Pages($pdo, $locales());
+$post('/admin/pages/new', ['status' => 'draft', 'text' => ['de' => $text('Team')], 'parent_id' => (string) $aboutId], 3);
+$teamId = $pdo->query("SELECT page_id FROM page_translation WHERE slug = 'team'")->fetchColumn();
+check('pages: a page can be saved with a parent', (int) $pdo->query("SELECT parent_id FROM page WHERE id = {$teamId}")->fetchColumn() === (int) $aboutId);
+check('pages: descendantIds lists children, grandchildren included', $pages->descendantIds((int) $aboutId) === [(int) $teamId]);
+check('pages: depth counts the ancestors', $pages->depth((int) $aboutId) === 0 && $pages->depth((int) $teamId) === 1);
+
+$r = $post('/admin/pages/' . $aboutId, ['status' => 'published', 'in_header' => '1', 'text' => ['de' => $text('Über uns')], 'parent_id' => (string) $teamId], 3);
+check('pages: a page cannot become its own descendant\'s child', (int) $pdo->query("SELECT parent_id FROM page WHERE id = {$aboutId}")->fetchColumn() === 0
+    && str_contains($r['body'], 'nicht ihrer eigenen Unterseite'));
+$r = $post('/admin/pages/' . $aboutId, ['status' => 'published', 'in_header' => '1', 'text' => ['de' => $text('Über uns')], 'parent_id' => (string) $aboutId], 3);
+check('pages: a page cannot be its own parent', (int) $pdo->query("SELECT parent_id FROM page WHERE id = {$aboutId}")->fetchColumn() === 0);
+$r = $post('/admin/pages/' . $aboutId, ['status' => 'published', 'in_header' => '1', 'text' => ['de' => $text('Über uns')], 'parent_id' => '999999'], 3);
+check('pages: an unknown parent is refused', str_contains($r['body'], 'gibt es nicht'));
+
+$tree = $pages->tree();
+$aboutNode = array_values(array_filter($tree, fn (array $p) => (int) $p['id'] === (int) $aboutId))[0] ?? null;
+check('pages: tree() nests the child under its parent', $aboutNode !== null && count($aboutNode['children']) === 1 && (int) $aboutNode['children'][0]['id'] === (int) $teamId);
+$pdo->exec("DELETE FROM page WHERE id = {$teamId}");
 
 // --- Terms at registration -------------------------------------------------
 check('register: no checkbox while no terms are published', !str_contains($get('/register', null)['body'], 'accept_terms'));
@@ -2148,10 +2201,9 @@ $library = '/media/library/' . str_repeat('a', 32) . '.webp';
 $clean = Modulento\Core\Support\HtmlSanitizer::clean('<p><img src="' . $library . '" alt="Logo"><img src="https://evil.example/x.png"><img src="/media/library/../x.png"><img src="/assets/x.png"></p>');
 check('pictures: the sanitizer keeps library pictures with their text and removes every other picture', str_contains($clean, '<img src="' . $library . '" alt="Logo">')
     && substr_count($clean, '<img') === 1);
-$pdo->exec("INSERT INTO media (file, title, width, height, bytes, created_at) VALUES ('" . str_repeat('b', 32) . ".png', 'Logo', 40, 30, 100, '2026-10-04 10:00:00')");
-check('pictures: the page editor offers the library pictures for the text', str_contains($get('/admin/pages/new', 3)['body'], 'data-media-insert="body_de"')
-    && str_contains($get('/admin/pages/new', 3)['body'], 'data-media-url="/media/library/' . str_repeat('b', 32) . '.png"') && !str_contains($get('/admin/pages/new', 2)['body'], 'data-media-insert'));
-$pdo->exec("DELETE FROM media");
+// A page's own content no longer has a picture-insert-at-cursor button in a
+// settings-form textarea - its text now goes through the same block editor
+// as the home page, which has never had that either (just an "image" block).
 
 $post('/account/offers/' . $offerId . '/pause', [], 1);
 check('offer: paused by the provider is not public', $offerRow()['status'] === 'paused' && $get('/offers/ich-gestalte-dein-logo', null)['status'] === 404);
@@ -4114,9 +4166,12 @@ check('administration: an entry without a known section goes to "more"', $extens
 $r = $get('/admin', 2);
 preg_match_all('#<p class="admin-menu-group" id="menu-group-([a-z]+)">#', $r['body'], $sections);
 check('administration: a section the account sees nothing of is left out', !in_array('people', $sections[1], true) && !in_array('system', $sections[1], true));
-$r = $get('/admin/pages/new', 3);
+$post('/admin/pages/new', ['status' => 'published', 'text' => ['de' => $text('Editor-Test')]], 3);
+$editorPageId = $pdo->query("SELECT page_id FROM page_translation WHERE slug = 'editor-test'")->fetchColumn();
+$post('/admin/pages/' . $editorPageId . '/blocks', ['action' => 'add', 'add_type' => 'text'], 3);
+$r = $get('/editor-test?edit=1', 3);
 preg_match('#data-editor="([^"]*)"#', $r['body'], $editor);
-check('editor: the page text gets the editor, its wording in the administrator\'s language', ($editor[1] ?? '') !== '' && (json_decode(html_entity_decode($editor[1]), true)['bold'] ?? null) === 'Fett'
+check('editor: a page\'s block text gets the editor, its wording in the administrator\'s language', ($editor[1] ?? '') !== '' && (json_decode(html_entity_decode($editor[1]), true)['bold'] ?? null) === 'Fett'
     && str_contains($r['body'], 'editor.js') && file_exists($root . '/themes/admin/assets/editor.js'));
 check('editor: the "close" wording for the in-place edit dialog is in the same labels, and inline-edit.js builds it', (json_decode(html_entity_decode($editor[1]), true)['close'] ?? null) === 'Schließen'
     && str_contains((string) file_get_contents($root . '/themes/admin/assets/inline-edit.js'), 'inline-edit-dialog'));

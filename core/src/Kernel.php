@@ -381,6 +381,9 @@ final class Kernel
         $router->get('/admin/pages', [PageController::class, 'index'], 'core.pages.manage');
         $router->get('/admin/pages/new', [PageController::class, 'edit'], 'core.pages.manage');
         $router->post('/admin/pages/{id}/field', [PageController::class, 'field'], 'core.pages.manage');
+        $router->post('/admin/pages/{id}/blocks', [PageController::class, 'blocks'], 'core.pages.manage');
+        $router->post('/admin/pages/{id}/blocks/field', [PageController::class, 'blockField'], 'core.pages.manage');
+        $router->post('/admin/pages/{id}/blocks/order', [PageController::class, 'blockOrder'], 'core.pages.manage');
         $router->post('/admin/pages/new', [PageController::class, 'save'], 'core.pages.manage');
         $router->get('/admin/pages/{id}', [PageController::class, 'edit'], 'core.pages.manage');
         $router->post('/admin/pages/{id}', [PageController::class, 'save'], 'core.pages.manage');

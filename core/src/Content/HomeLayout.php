@@ -30,7 +30,7 @@ final class HomeLayout
         'image' => ['caption'],
         'links' => ['heading', 'items'],
     ];
-    private const MAX_BLOCKS = 30;
+    public const MAX_BLOCKS = 30;
     private const MAX_LINE = 300;
     private const MAX_BODY = 60000;
     private const MEDIA_PATTERN = '#^/media/library/[a-f0-9]{32}\.(webp|png)$#';
@@ -339,8 +339,12 @@ final class HomeLayout
         return $css;
     }
 
-    /** The background a block's own settings ask for, as a ready "property: value;" string - empty for none. */
-    private static function backgroundStyle(array $settings): string
+    /**
+     * The background a block's own settings ask for, as a ready
+     * "property: value;" string - empty for none. Public: Pages::view()
+     * reuses it for the same block catalogue on a normal page.
+     */
+    public static function backgroundStyle(array $settings): string
     {
         $type = $settings['background_type'] ?? null;
         $colour = fn (string $key) => is_string($settings[$key] ?? null) && self::validColour($settings[$key]) ? $settings[$key] : null;
@@ -355,8 +359,12 @@ final class HomeLayout
         };
     }
 
-    /** @return list<array{title: string, url: string}> */
-    private static function links(string $items): array
+    /**
+     * @return list<array{title: string, url: string}>
+     *
+     * Public: Pages::view() reuses it for the "links" block type.
+     */
+    public static function links(string $items): array
     {
         $links = [];
         foreach (preg_split('/\R/', $items) ?: [] as $line) {
