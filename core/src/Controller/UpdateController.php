@@ -33,7 +33,13 @@ final class UpdateController extends Controller
         ]);
     }
 
-    /** Asks every component's release server once; the answers are kept for the dashboard and this page. */
+    /**
+     * Asks every component's release server once; the answers are kept for
+     * the dashboard and this page. Also reachable from the dashboard's own
+     * "System & Status" card, which the 24-hour cache (UpdateChecks::isStale())
+     * would otherwise leave showing a stale answer right after a fresh
+     * release - that form sends "return=/admin" to come straight back to it.
+     */
     public function check(array $params): void
     {
         $checks = new UpdateChecks($this->app);
@@ -45,7 +51,7 @@ final class UpdateController extends Controller
             ? $this->trans('core.update.checked_some', ['count' => $count])
             : $this->trans('core.update.checked_none'));
 
-        $this->redirect('/admin/updates');
+        $this->redirect($this->safeReturn('/admin/updates'));
     }
 
     public function apply(array $params): void
