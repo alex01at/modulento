@@ -65,7 +65,7 @@
             // tiles from the plain id the server answers with.
             var kindPrefix = id.indexOf(':') !== -1 ? id.slice(0, id.indexOf(':') + 1) : '';
             var csrfField = form.querySelector('[name="_csrf"]');
-            var goingToEnable = form.action === form.getAttribute('data-enable-url');
+            var goingToEnable = form.getAttribute('action') === form.getAttribute('data-enable-url');
             var button = form.querySelector('.toggle');
             button.disabled = true;
 
