@@ -119,6 +119,16 @@
                         <span class="badge badge-ok">{{ trans('core.admin.dashboard.update_current_short') }}</span>
                     {% endif %}
                 </div>
+                <p><small>{{ update.checked_at ? trans('core.update.checked_at', {date: update.checked_at}) : trans('core.update.never_checked') }}</small></p>
+                {# This card's own numbers come from the last check (cached up to 24h,
+                   see UpdateChecks::isStale()) - re-checking here and coming straight
+                   back, rather than only linking out to /admin/updates, is what lets
+                   the card itself show a release published minutes ago. #}
+                <form method="post" action="{{ url('/admin/updates/check') }}" class="inline-form">
+                    {{ csrf_field() }}
+                    <input type="hidden" name="return" value="/admin">
+                    <button type="submit" class="btn-outline btn-sm btn-block">{{ trans('core.update.check') }}</button>
+                </form>
             {% endif %}
             <a href="{{ url('/admin/updates') }}" class="btn-outline btn-sm btn-block">{{ trans('core.admin.dashboard.updates_check') }}</a>
         </section>
