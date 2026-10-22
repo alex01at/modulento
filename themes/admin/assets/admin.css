@@ -623,8 +623,31 @@ code { padding: .1rem .35rem; border: 1px solid var(--line); border-radius: 4px;
 .docs h3 { margin: 1.5rem 0 .5rem; font-size: 1.05rem; }
 .docs li { margin-bottom: .4rem; }
 
-/* --- Sections of the menu --- */
-.admin-menu-group { margin: 1.1rem 1.25rem .35rem; color: var(--sidebar-text); font-size: .7rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; opacity: .6; }
+/* --- Sections of the menu: a <details>, closed except for the section the
+   current page is in, so a section's items only show once its heading is
+   clicked. --- */
+.admin-menu-group { margin: .2rem 0; }
+.admin-menu-group summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .5rem;
+    margin: .9rem 1.25rem .15rem;
+    padding: 0 0 .35rem;
+    border-bottom: 1px solid rgba(255, 255, 255, .08);
+    color: var(--sidebar-text);
+    font-size: .7rem;
+    font-weight: 700;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    opacity: .6;
+    cursor: pointer;
+    list-style: none;
+}
+.admin-menu-group summary::-webkit-details-marker { display: none; }
+.admin-menu-group summary:hover { opacity: 1; }
+.admin-menu-group summary svg { width: 14px; height: 14px; flex-shrink: 0; transition: transform .15s ease; }
+.admin-menu-group[open] summary svg { transform: rotate(180deg); }
 
 /* --- Text editor (editor.js) --- */
 .editor { border: 1px solid var(--line); border-radius: 6px; background: var(--card); }

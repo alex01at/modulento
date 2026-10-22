@@ -19,10 +19,14 @@
                     <a class="mega-link" href="{{ url('/admin') }}" {{ here == '/admin' ? 'aria-current="page"' }}>{{ trans('core.admin.dashboard.title') }}</a>
                 </li>
                 {% for group in admin_menu_groups %}
-                    {% set open = here == '/admin/section/' ~ group.id or group.items|filter(item => here == item.path or here starts with (item.path ~ '/'))|length > 0 %}
+                    {# A generic name like "open" would collide with a page's
+                       own template variables (e.g. the reports list's open
+                       count) - set/for in Twig share the whole inheritance
+                       chain's context, not a block-local scope. #}
+                    {% set sectionOpen = here == '/admin/section/' ~ group.id or group.items|filter(item => here == item.path or here starts with (item.path ~ '/'))|length > 0 %}
                     <li class="mega" data-mega>
                         <div class="mega-top">
-                            <a class="mega-link" href="{{ url('/admin/section/' ~ group.id) }}" {{ open ? 'aria-current="page"' }}>{{ trans(group.label_key) }}</a>
+                            <a class="mega-link" href="{{ url('/admin/section/' ~ group.id) }}" {{ sectionOpen ? 'aria-current="page"' }}>{{ trans(group.label_key) }}</a>
                             <button type="button" class="mega-toggle" data-mega-toggle aria-expanded="false" aria-controls="mega-{{ group.id }}">
                                 {{ icons.icon('chevron') }}
                                 <span class="visually-hidden">{{ trans('core.admin.layout.submenu', {label: trans(group.label_key)}) }}</span>

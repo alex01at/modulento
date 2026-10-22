@@ -16,13 +16,26 @@
     <nav class="admin-menu" aria-label="{{ trans('core.nav.admin') }}">
         {% set here = current_path() %}
         <a href="{{ url('/admin') }}" {{ here == '/admin' ? 'aria-current="page"' }}>{{ icons.menu('/admin') }}<span>{{ trans('core.admin.dashboard.title') }}</span></a>
+        {# A section's own items only show once its heading is clicked - a plain
+           <details>, so this needs no script and still works without one; the
+           section the current page belongs to starts open. #}
         {% for group in admin_menu_groups %}
-            <p class="admin-menu-group" id="menu-group-{{ group.id }}">{{ trans(group.label_key) }}</p>
-            <div role="group" aria-labelledby="menu-group-{{ group.id }}">
-                {% for item in group.items %}
-                    <a href="{{ url(item.path) }}" {{ here == item.path or here starts with (item.path ~ '/') ? 'aria-current="page"' }}>{{ icons.menu(item.path) }}<span>{{ trans(item.label_key) }}</span></a>
-                {% endfor %}
-            </div>
+            {# A generic name like "open" would collide with a page's own
+               template variables (e.g. the reports list's open count) -
+               set/for in Twig share the whole inheritance chain's context,
+               not a block-local scope. #}
+            {% set menuGroupOpen = group.items|filter(item => here == item.path or here starts with (item.path ~ '/'))|length > 0 %}
+            <details class="admin-menu-group" {{ menuGroupOpen ? 'open' }}>
+                <summary id="menu-group-{{ group.id }}">
+                    <span>{{ trans(group.label_key) }}</span>
+                    {{ icons.icon('chevron') }}
+                </summary>
+                <div role="group" aria-labelledby="menu-group-{{ group.id }}">
+                    {% for item in group.items %}
+                        <a href="{{ url(item.path) }}" {{ here == item.path or here starts with (item.path ~ '/') ? 'aria-current="page"' }}>{{ icons.menu(item.path) }}<span>{{ trans(item.label_key) }}</span></a>
+                    {% endfor %}
+                </div>
+            </details>
         {% endfor %}
     </nav>
 </aside>

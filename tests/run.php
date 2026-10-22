@@ -4181,7 +4181,7 @@ $r = $get('/admin/docs', 3);
 check('documentation: in the administration, in the administrator\'s language, with the examples as text', $r['status'] === 200 && str_contains($r['body'], 'Ein Theme bauen') && str_contains($r['body'], '&lt;?php')
     && str_contains($r['body'], '{{ theme_asset(') && str_contains($r['body'], 'href="/admin/docs"') && str_contains($get('/en/admin/docs', 3)['body'], 'Building a theme') && $get('/admin/docs', 1)['status'] === 403);
 $r = $get('/admin', 3);
-preg_match_all('#<p class="admin-menu-group" id="menu-group-([a-z]+)">#', $r['body'], $sections);
+preg_match_all('#<summary id="menu-group-([a-z]+)">#', $r['body'], $sections);
 check('administration: the menu comes in sections, in a fixed order', array_values(array_intersect(Modulento\Core\App::ADMIN_GROUPS, $sections[1])) === $sections[1]
     && array_intersect(['content', 'marketplace', 'moderation', 'people', 'system'], $sections[1]) === ['content', 'marketplace', 'moderation', 'people', 'system']
     && preg_match('#id="menu-group-people">.*?href="/admin/accounts".*?href="/admin/roles".*?id="menu-group-system"#s', $r['body']) === 1);
@@ -4189,7 +4189,7 @@ $extensionApp = new Modulento\Core\App($config, $pdo);
 $extensionApp->addAdminMenu('x.menu', '/admin/x', 'x.manage', 'nonsense');
 check('administration: an entry without a known section goes to "more"', $extensionApp->adminMenu()[0]['group'] === 'more');
 $r = $get('/admin', 2);
-preg_match_all('#<p class="admin-menu-group" id="menu-group-([a-z]+)">#', $r['body'], $sections);
+preg_match_all('#<summary id="menu-group-([a-z]+)">#', $r['body'], $sections);
 check('administration: a section the account sees nothing of is left out', !in_array('people', $sections[1], true) && !in_array('system', $sections[1], true));
 $post('/admin/pages/new', ['status' => 'published', 'text' => ['de' => $text('Editor-Test')]], 3);
 $editorPageId = $pdo->query("SELECT page_id FROM page_translation WHERE slug = 'editor-test'")->fetchColumn();
