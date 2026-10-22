@@ -1603,7 +1603,7 @@ return [
     'core.update.apply_all' => 'Alle {count} aktualisieren',
     'core.update.applied_all' => '{count} Komponente(n) aktualisiert.',
     'core.update.nothing_to_apply' => 'Es gibt nichts zu aktualisieren.',
-    'core.package.updates_here' => 'Neue Versionen werden unter Updates gemeinsam angeboten.',
+    'core.package.updates_here' => 'Eine neue Version lässt sich direkt oben aktualisieren, oder gesammelt unter Updates.',
     'core.admin.dashboard.update_off' => 'Updates sind ausgeschaltet',
     'core.admin.menu.home' => 'Startseite',
     'core.home.type.hero' => 'Titelbereich',
