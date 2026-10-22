@@ -12,6 +12,7 @@ use Modulento\Core\Account\BillingProfile;
 use Modulento\Core\Account\IdentityVerification;
 use Modulento\Core\Support\AdminLog;
 use Modulento\Core\Support\BadWords;
+use Modulento\Core\Support\Backups;
 use Modulento\Core\Support\Design;
 use Modulento\Core\Support\Branding;
 use Modulento\Core\Support\MessageSeen;
@@ -136,6 +137,7 @@ final class App
     public readonly Secrets $secrets;
     public readonly Consent $consent;
     public readonly LicenseKeys $licenseKeys;
+    public readonly Backups $backups;
     private HttpClient $socialLoginHttp;
 
     /** The request path without its language prefix - what routes are matched against. */
@@ -243,6 +245,7 @@ final class App
         $this->themes = new ThemeManager($themesDir, $this->settings);
         $this->secrets = new Secrets($config['app']['secret_key'] ?? $root . '/var/secret.key');
         $this->licenseKeys = new LicenseKeys($db, $this->secrets);
+        $this->backups = new Backups($root, $db);
         $licenseServerUrl = (string) ($config['update']['license_server'] ?? '');
         $this->packages = new Packages(
             $db,
