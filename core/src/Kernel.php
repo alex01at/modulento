@@ -9,6 +9,7 @@ use Modulento\Core\Controller\AdminAccountController;
 use Modulento\Core\Controller\AdminCatalogueController;
 use Modulento\Core\Controller\AdminCustomFieldController;
 use Modulento\Core\Controller\AdminController;
+use Modulento\Core\Controller\BackupController;
 use Modulento\Core\Controller\AdminBadWordsController;
 use Modulento\Core\Controller\AdminHomeController;
 use Modulento\Core\Controller\AdminWidgetController;
@@ -479,6 +480,11 @@ final class Kernel
         $router->post('/admin/updates/apply', [UpdateController::class, 'apply'], 'core.update.manage');
         $router->post('/admin/updates/apply-all', [UpdateController::class, 'applyAll'], 'core.update.manage');
 
+        $router->get('/admin/backup', [BackupController::class, 'index'], 'core.backup.manage');
+        $router->post('/admin/backup/create', [BackupController::class, 'create'], 'core.backup.manage');
+        $router->get('/admin/backup/{name}/download', [BackupController::class, 'download'], 'core.backup.manage');
+        $router->post('/admin/backup/{name}/delete', [BackupController::class, 'delete'], 'core.backup.manage');
+
         $router->get('/admin/export', [ExportController::class, 'index'], 'core.settings.manage');
         $router->post('/admin/export', [ExportController::class, 'export'], 'core.settings.manage');
         $router->post('/admin/import', [ExportController::class, 'import'], 'core.settings.manage');
@@ -506,6 +512,7 @@ final class Kernel
         $app->addPermission('core.accounts.impersonate', 'core.permission.accounts_impersonate');
         $app->addPermission('core.roles.manage', 'core.permission.roles_manage');
         $app->addPermission('core.update.manage', 'core.permission.update_manage');
+        $app->addPermission('core.backup.manage', 'core.permission.backup_manage');
         $app->addPermission('core.packages.manage', 'core.permission.packages_manage');
         $app->addPermission('core.demo_data.manage', 'core.permission.demo_data_manage');
 
@@ -549,6 +556,7 @@ final class Kernel
         $app->addAdminMenu('core.admin.menu.demo_data', '/admin/demo-data', 'core.demo_data.manage', 'system');
         $app->addAdminMenu('core.admin.menu.tasks', '/admin/tasks', 'core.tasks.view', 'system');
         $app->addAdminMenu('core.admin.menu.updates', '/admin/updates', 'core.update.manage', 'system');
+        $app->addAdminMenu('core.admin.menu.backup', '/admin/backup', 'core.backup.manage', 'system');
         $app->addAdminMenu('core.admin.menu.export', '/admin/export', 'core.settings.manage', 'system');
         $app->addAdminMenu('core.admin.docs.title', '/admin/docs', 'core.admin.access', 'system');
 

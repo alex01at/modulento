@@ -1,0 +1,51 @@
+{% extends '@admin/layout.twig' %}
+
+{% block title %}{{ trans('core.backup.title') }} – {{ site_name }}{% endblock %}
+
+{% block admin %}
+{% include '@admin/_page_header.twig' with {heading: trans('core.backup.title')} only %}
+
+<section class="card-box">
+    <p>{{ trans('core.backup.intro') }}</p>
+    <p><small>{{ trans('core.backup.contents') }}</small></p>
+
+    <form method="post" action="{{ url('/admin/backup/create') }}" class="inline-form">
+        {{ csrf_field() }}
+        <button type="submit">{{ trans('core.backup.create') }}</button>
+    </form>
+</section>
+
+<section class="card-box">
+    <h2>{{ trans('core.backup.list_title') }}</h2>
+    {% if backups is empty %}
+        <p class="empty">{{ trans('core.backup.none') }}</p>
+    {% else %}
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th scope="col">{{ trans('core.backup.field.created_at') }}</th>
+                        <th scope="col">{{ trans('core.backup.field.size') }}</th>
+                        <th scope="col"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for backup in backups %}
+                        <tr>
+                            <td>{{ backup.created_at }}</td>
+                            <td>{{ (backup.size / 1048576)|round(1) }} MB</td>
+                            <td>
+                                <a class="btn-sm" href="{{ url('/admin/backup/' ~ backup.name ~ '/download') }}">{{ trans('core.backup.download') }}</a>
+                                <form method="post" action="{{ url('/admin/backup/' ~ backup.name ~ '/delete') }}" class="inline-form">
+                                    {{ csrf_field() }}
+                                    <button type="submit" class="btn-sm danger">{{ trans('core.backup.delete') }}</button>
+                                </form>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% endif %}
+</section>
+{% endblock %}
