@@ -47,10 +47,16 @@
                         <span class="badge {{ item.in_use ? 'badge-enabled' : 'badge-disabled' }}" data-status-badge>{{ item.in_use ? trans('core.admin.extensions.status_enabled') : trans('core.admin.extensions.status_disabled') }}</span>
                     {% endif %}
                     {% if item.tracked and item.latest and item.latest != item.version %}
-                        <a class="badge badge-pending" href="{{ url('/admin/updates') }}">{{ trans('core.package.newer', {version: item.latest}) }}</a>
+                        <span class="badge badge-pending">{{ trans('core.package.newer', {version: item.latest}) }}</span>
                     {% endif %}
                 </div>
                 {% if item.description %}<p class="ext-description">{{ item.description }}</p>{% endif %}
+                {% if item.tracked and item.latest and item.latest != item.version %}
+                    <form method="post" action="{{ url('/admin/packages/' ~ item.kind ~ '/' ~ item.id ~ '/update') }}" class="inline-form">
+                        {{ csrf_field() }}
+                        <button type="submit" class="btn-sm">{{ trans('core.package.update', {version: item.latest}) }}</button>
+                    </form>
+                {% endif %}
                 {% if item.tracked %}
                     <p class="ext-source"><small>{{ trans('core.package.source') }}: {{ item.repo }}</small></p>
                     {% if not item.in_use %}

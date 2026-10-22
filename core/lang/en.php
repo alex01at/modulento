@@ -1603,7 +1603,7 @@ return [
     'core.update.apply_all' => 'Update all {count}',
     'core.update.applied_all' => '{count} component(s) updated.',
     'core.update.nothing_to_apply' => 'There is nothing to update.',
-    'core.package.updates_here' => 'New versions are offered together under Updates.',
+    'core.package.updates_here' => 'A new version can be updated right above, or all together under Updates.',
     'core.admin.dashboard.update_off' => 'Updates are switched off',
     'core.admin.menu.home' => 'Home page',
     'core.home.type.hero' => 'Title area',
