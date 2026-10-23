@@ -219,8 +219,16 @@ CSS;
      */
     private function controls(): string
     {
-        return ".edit-page { display: inline-flex; align-items: center; justify-content: center; width: 2.4rem; height: 2.4rem; border-radius: 50%; background: var(--accent, #1f5fbf); color: #fff; box-shadow: 0 .25rem .9rem rgb(0 0 0 / .25); text-decoration: none; }\n"
-            . ".edit-page:hover, .edit-page:focus-visible { filter: brightness(1.15); color: #fff; }\n"
+        // !important on background/color: a theme's own, more specific
+        // selector for its header/nav links (e.g. ".header-actions
+        // a:not(.button)") would otherwise win on specificity alone,
+        // regardless of this stylesheet loading last - seen for real with
+        // a theme that styles every header link this way, turning the
+        // white pencil an unreadable grey. This element is meant to look
+        // the same on every theme by design (see this method's own doc
+        // comment), so it must not be themeable at all.
+        return ".edit-page { display: inline-flex; align-items: center; justify-content: center; width: 2.4rem; height: 2.4rem; border-radius: 50%; background: var(--accent, #1f5fbf) !important; color: #fff !important; box-shadow: 0 .25rem .9rem rgb(0 0 0 / .25); text-decoration: none; }\n"
+            . ".edit-page:hover, .edit-page:focus-visible { filter: brightness(1.15); color: #fff !important; }\n"
             . ".edit-page svg { width: 1.15rem; height: 1.15rem; }\n"
             . self::EDITING_CSS
             . self::SIGN_IN_AS_CSS;
