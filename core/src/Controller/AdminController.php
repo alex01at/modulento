@@ -257,7 +257,18 @@ final class AdminController extends Controller
 
     public function activateTheme(array $params): void
     {
+        $before = $this->app->themes->active();
         if ($this->app->themes->activate($params['id'])) {
+            // Back to whichever home page the new theme brings (its own
+            // home-layout.json, or the core's own default) - an operator
+            // switching themes almost always wants the new theme's own
+            // home page, not a leftover customization built for the
+            // previous one. A page never actually hand-edited was already
+            // showing the new theme's content on its own either way (see
+            // HomeLayout::isCustomized()); this only matters once it was.
+            if ($before !== $params['id']) {
+                $this->app->homeLayout->reset();
+            }
             Session::flash('success', $this->trans('core.admin.themes.activated', ['id' => $params['id']]));
         }
 
