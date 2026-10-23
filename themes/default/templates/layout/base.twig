@@ -9,17 +9,33 @@
     {# No version number on purpose: that would help an attacker target a
        known vulnerability of a specific release. #}
     <meta name="generator" content="Modulento">
+    <meta name="theme-color" content="{{ design_accent() }}">
+    {# Nothing here needs hiding from a search engine by default; a page
+       that does (an internal search result, a checkout step, ...) overrides
+       this the same way it would meta_description, e.g.
+       {% block robots %}noindex, follow{% endblock %}. #}
+    <meta name="robots" content="{% block robots %}index, follow{% endblock %}">
     {# Captured once, so the page's own title (or lack of one) is reused for og:title without computing it twice. #}
     {% set page_title %}{% block title %}{{ site_name }}{% endblock %}{% endset %}
     <title>{{ page_title }}</title>
     {# Likewise for the description: a page sets it by overriding this block, e.g. {% block meta_description %}{{ offer.summary }}{% endblock %}. #}
     {% set page_description %}{% block meta_description %}{{ meta_description() }}{% endblock %}{% endset %}
     {% if page_description %}<meta name="description" content="{{ page_description }}">{% endif %}
+    {# Captured once: the canonical link and og:url are the same address, and the
+       language alternates (og:locale:alternate below, hreflang further down) share
+       this one lookup instead of asking locale_urls() twice. #}
+    {% set canonical_url = url(current_path(), null, true) %}
+    {% set languages = locale_urls() %}
+    <link rel="canonical" href="{{ canonical_url }}">
     <meta property="og:site_name" content="{{ site_name }}">
     <meta property="og:type" content="website">
     <meta property="og:title" content="{{ page_title }}">
     {% if page_description %}<meta property="og:description" content="{{ page_description }}">{% endif %}
-    <meta property="og:url" content="{{ url(current_path(), null, true) }}">
+    <meta property="og:url" content="{{ canonical_url }}">
+    <meta property="og:locale" content="{{ og_locale(locale()) }}">
+    {% for language in languages %}
+        {% if not language.current %}<meta property="og:locale:alternate" content="{{ og_locale(language.locale) }}">{% endif %}
+    {% endfor %}
     {# A page overrides this with its own picture, e.g. an offer's first image; the path it gives is made absolute the same way. #}
     {% set page_image %}{% block meta_image %}{{ site_logo('light') }}{% endblock %}{% endset %}
     {% if page_image %}
@@ -28,7 +44,7 @@
         <meta name="twitter:image" content="{{ site_url }}{{ page_image }}">
     {% endif %}
     {% if site_favicon() %}<link rel="icon" href="{{ site_favicon() }}">{% endif %}
-    {% for language in locale_urls() %}
+    {% for language in languages %}
         <link rel="alternate" hreflang="{{ language.locale }}" href="{{ language.absolute_url }}">
     {% endfor %}
     <link rel="stylesheet" href="{{ theme_asset('theme.css') }}">
