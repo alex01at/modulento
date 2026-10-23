@@ -6,6 +6,9 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    {# No version number on purpose: that would help an attacker target a
+       known vulnerability of a specific release. #}
+    <meta name="generator" content="Modulento">
     {# Captured once, so the page's own title (or lack of one) is reused for og:title without computing it twice. #}
     {% set page_title %}{% block title %}{{ site_name }}{% endblock %}{% endset %}
     <title>{{ page_title }}</title>
