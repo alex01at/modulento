@@ -213,6 +213,11 @@ final class PackageController extends Controller
             $before = $app->themes->active();
             $target = $on ? $id : 'default';
             if (($on || $before === $id) && $app->themes->activate($target)) {
+                // See AdminController::activateTheme()'s own comment: back
+                // to whichever home page the newly active theme brings.
+                if ($before !== $target) {
+                    $app->homeLayout->reset();
+                }
                 Session::flash('success', $this->trans('core.admin.themes.activated', ['id' => $target]));
                 // The one other theme that was active a moment ago, so the
                 // caller's tile for it can be switched off too, without a
