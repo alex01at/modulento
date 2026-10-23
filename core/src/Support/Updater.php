@@ -32,20 +32,22 @@ final class Updater
     private const BACKUP_RETENTION = 5;
     private const REQUIRED_PACKAGE_ENTRIES = ['public/index.php', 'core/src', 'themes/default/theme.json', 'themes/admin/theme.json', 'vendor/autoload.php', 'composer.json', 'VERSION'];
 
-    private ReleaseClient $releases;
-
     /**
+     * @param ReleaseSource $releases where a release comes from - the
+     *        app's shared App::$releaseSource (license server first where
+     *        one is configured, GitHub otherwise, see
+     *        ReleaseSourceResolver's own doc comment), not a GitHub client
+     *        of this class's own
      * @param Closure(): void $migrate runs the core and extension migrations
      *        after the new files are in place
      */
     public function __construct(
         private string $root,
         private string $repo,
-        private string $token,
+        private ReleaseSource $releases,
         private Closure $migrate
     ) {
         $this->root = rtrim($this->root, '/');
-        $this->releases = new ReleaseClient($this->token);
     }
 
     public function isEnabled(): bool

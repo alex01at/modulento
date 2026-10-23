@@ -60,6 +60,7 @@ use Modulento\Core\Support\HttpClient;
 use Modulento\Core\Support\Locales;
 use Modulento\Core\Support\Mailer;
 use Modulento\Core\Support\ReleaseClient;
+use Modulento\Core\Support\ReleaseSource;
 use Modulento\Core\Support\ReleaseSourceResolver;
 use Modulento\Core\Support\LicenseServerClient;
 use Modulento\Core\Support\Router;
@@ -138,6 +139,16 @@ final class App
     public readonly Consent $consent;
     public readonly LicenseKeys $licenseKeys;
     public readonly Backups $backups;
+    /**
+     * Where a release of the core or of a package comes from: the
+     * configured license server first where one is set (a pure speedup/
+     * fallback, see ReleaseSourceResolver's own doc comment), GitHub
+     * otherwise or whenever the license server has nothing for that
+     * repository. Shared by Packages and by every Updater this app
+     * builds (UpdateChecks, UpdateController), so there is exactly one
+     * place that decides this, not one per caller.
+     */
+    public readonly ReleaseSource $releaseSource;
     private HttpClient $socialLoginHttp;
 
     /** The request path without its language prefix - what routes are matched against. */
@@ -247,18 +258,19 @@ final class App
         $this->licenseKeys = new LicenseKeys($db, $this->secrets);
         $this->backups = new Backups($root, $db);
         $licenseServerUrl = (string) ($config['update']['license_server'] ?? '');
+        $this->releaseSource = new ReleaseSourceResolver(
+            new ReleaseClient($config['update']['token'] ?? ''),
+            $licenseServerUrl !== '' ? new LicenseServerClient(
+                $config['update']['license_http'] ?? new CurlHttpClient(),
+                $licenseServerUrl,
+                (string) ($config['app']['url'] ?? ''),
+                $this->licenseKeys
+            ) : null,
+            $licenseServerUrl
+        );
         $this->packages = new Packages(
             $db,
-            new ReleaseSourceResolver(
-                new ReleaseClient($config['update']['token'] ?? ''),
-                $licenseServerUrl !== '' ? new LicenseServerClient(
-                    $config['update']['license_http'] ?? new CurlHttpClient(),
-                    $licenseServerUrl,
-                    (string) ($config['app']['url'] ?? ''),
-                    $this->licenseKeys
-                ) : null,
-                $licenseServerUrl
-            ),
+            $this->releaseSource,
             $extensionsDir,
             $themesDir,
             $config['app']['work'] ?? $root . '/var/updates',

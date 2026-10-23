@@ -5193,7 +5193,7 @@ $package = [
 
 $dir = installation();
 $migrated = 0;
-$updater = new Modulento\Core\Support\Updater($dir, 'owner/repo', '', function () use (&$migrated): void {
+$updater = new Modulento\Core\Support\Updater($dir, 'owner/repo', new Modulento\Core\Support\ReleaseClient(''), function () use (&$migrated): void {
     $migrated++;
 });
 $zipPath = $dir . '/package.zip';
@@ -5219,7 +5219,7 @@ function refuses(string $expectedKey, array $files, array $symlinks = [], string
 {
     $dir = installation();
     $migrated = 0;
-    $updater = new Modulento\Core\Support\Updater($dir, 'owner/repo', '', function () use (&$migrated): void {
+    $updater = new Modulento\Core\Support\Updater($dir, 'owner/repo', new Modulento\Core\Support\ReleaseClient(''), function () use (&$migrated): void {
         $migrated++;
     });
     $zipPath = $dir . '/package.zip';
@@ -5246,10 +5246,10 @@ check('update refuses a package whose VERSION differs', refuses('core.update.err
 
 $dir = installation();
 mkdir($dir . '/.git');
-$updater = new Modulento\Core\Support\Updater($dir, 'owner/repo', '', fn () => null);
+$updater = new Modulento\Core\Support\Updater($dir, 'owner/repo', new Modulento\Core\Support\ReleaseClient(''), fn () => null);
 $result = $updater->applyUpdate();
 check('update refuses to touch a git working copy', !$result['success'] && $result['message_key'] === 'core.update.error.dev_checkout');
-check('updater is off without a repository', !(new Modulento\Core\Support\Updater($dir, '', '', fn () => null))->isEnabled());
+check('updater is off without a repository', !(new Modulento\Core\Support\Updater($dir, '', new Modulento\Core\Support\ReleaseClient(''), fn () => null))->isEnabled());
 
 // --- Shop: a single-provider shop with variants, a cart spanning several products, one checkout ---
 // A mock "shop" extension/package row was created above (package installer
