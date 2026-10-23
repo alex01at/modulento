@@ -160,7 +160,7 @@ final class UpdateController extends Controller
         return new Updater(
             $root,
             $config['update']['repo'] ?? '',
-            $config['update']['token'] ?? '',
+            $this->app->releaseSource,
             static function () use ($db, $root): void {
                 Migrator::runAll($db, $root);
             }
