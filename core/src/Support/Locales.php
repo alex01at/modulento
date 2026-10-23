@@ -28,6 +28,24 @@ final class Locales
         'tr' => 'Türkçe', 'uk' => 'Українська',
     ];
 
+    // The territory og:locale expects a language paired with ("de" ->
+    // "de_DE"), one sensible default market per language - not meant to
+    // guess which country a given visitor is actually in.
+    private const OG_TERRITORIES = [
+        'bg' => 'BG', 'cs' => 'CZ', 'da' => 'DK', 'de' => 'DE', 'el' => 'GR',
+        'en' => 'US', 'es' => 'ES', 'et' => 'EE', 'fi' => 'FI', 'fr' => 'FR',
+        'hr' => 'HR', 'hu' => 'HU', 'it' => 'IT', 'lt' => 'LT', 'lv' => 'LV',
+        'nl' => 'NL', 'no' => 'NO', 'pl' => 'PL', 'pt' => 'PT', 'ro' => 'RO',
+        'ru' => 'RU', 'sk' => 'SK', 'sl' => 'SI', 'sr' => 'RS', 'sv' => 'SE',
+        'tr' => 'TR', 'uk' => 'UA',
+    ];
+
+    /** A language the way <meta property="og:locale"> expects it ("de_DE"). */
+    public static function ogLocale(string $locale): string
+    {
+        return $locale . '_' . (self::OG_TERRITORIES[$locale] ?? strtoupper($locale));
+    }
+
     /** @var string[]|null */
     private ?array $enabled = null;
 

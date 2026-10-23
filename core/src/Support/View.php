@@ -293,6 +293,10 @@ final class View
         // see DesignController::stylesheet()), so either changing busts the cache.
         $this->twig->addFunction(new TwigFunction('design_url', fn (): string => '/design/'
             . substr(sha1($app->design->css() . $app->homeLayout->backgroundCss()), 0, 16) . '.css'));
+        // A language the way <meta property="og:locale"> expects it ("de_DE").
+        $this->twig->addFunction(new TwigFunction('og_locale', fn (string $locale): string => Locales::ogLocale($locale)));
+        // The current accent colour (Administration → Design), for <meta name="theme-color">.
+        $this->twig->addFunction(new TwigFunction('design_accent', fn (): string => (string) $app->design->values()['accent']));
         // The blocks of the home page, in the current language, enabled ones only.
         $this->twig->addFunction(new TwigFunction('home_blocks', fn (bool $all = false): array => $app->homeLayout->view(
             $app->translator->locale(),
