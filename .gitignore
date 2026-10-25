@@ -31,5 +31,12 @@
 /extensions/landing
 /extensions/buttons
 /extensions/dating
+/extensions/invoices
+/extensions/social
 /themes/date
+/themes/indigo
+/themes/indigopro
+/themes/audigo
+/themes/merchigo
+/themes/card
 __pycache__/
