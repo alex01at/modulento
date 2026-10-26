@@ -3879,6 +3879,88 @@ $result = $updater->applyUpdate();
 check('update refuses to touch a git working copy', !$result['success'] && $result['message_key'] === 'core.update.error.dev_checkout');
 check('updater is off without a repository', !(new Modulento\Core\Support\Updater($dir, '', '', fn () => null))->isEnabled());
 
+// --- Offer types with filters of their own --------------------------------
+// A tiny type with a "stars" field, to check what listPublic does with a
+// FilterableOfferType: the type is chosen, its condition and sorts apply, and
+// a parameter outside the f_ prefix is refused.
+$fdb = new PDO('sqlite::memory:', null, null, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC]);
+$fdb->exec("CREATE TABLE account (id INTEGER PRIMARY KEY, email TEXT, locale TEXT, status TEXT)");
+$fdb->exec("CREATE TABLE provider (id INTEGER PRIMARY KEY, account_id INTEGER, name TEXT, slug TEXT, status TEXT)");
+$fdb->exec("CREATE TABLE offer (id INTEGER PRIMARY KEY, provider_id INTEGER, type TEXT, category_id INTEGER, status TEXT, status_note TEXT, price_from INTEGER, currency TEXT,
+    decided_at TEXT, decided_by INTEGER, published_at TEXT, created_at TEXT, updated_at TEXT, rating_count INTEGER DEFAULT 0, rating_sum INTEGER DEFAULT 0)");
+$fdb->exec("CREATE TABLE offer_translation (offer_id INTEGER, locale TEXT, title TEXT, slug TEXT, summary TEXT, description TEXT)");
+$fdb->exec("CREATE TABLE offer_image (id INTEGER PRIMARY KEY, offer_id INTEGER, name TEXT, extension TEXT, width INTEGER, height INTEGER, position INTEGER, created_at TEXT)");
+$fdb->exec("CREATE TABLE x_hotel (offer_id INTEGER PRIMARY KEY, stars INTEGER)");
+$fdb->exec("CREATE TABLE setting (name TEXT PRIMARY KEY, value TEXT)");
+$fdb->exec("INSERT INTO account VALUES (1, 'a@example.test', 'de', 'active')");
+$fdb->exec("INSERT INTO provider VALUES (1, 1, 'Host', 'host', 'approved')");
+foreach ([[1, 'hotel.stay', 5, 100], [2, 'hotel.stay', 3, 300], [3, 'hotel.stay', 4, 200], [4, 'plain.thing', null, 50]] as [$id, $kind, $stars, $price]) {
+    $fdb->exec("INSERT INTO offer VALUES ({$id}, 1, '{$kind}', NULL, 'published', NULL, {$price}, 'EUR', NULL, NULL, '2026-01-0{$id} 00:00:00', '2026-01-01', '2026-01-01', 0, 0)");
+    $fdb->exec("INSERT INTO offer_translation VALUES ({$id}, 'de', 'Angebot {$id}', 'angebot-{$id}', '', '')");
+    if ($stars !== null) {
+        $fdb->exec("INSERT INTO x_hotel VALUES ({$id}, {$stars})");
+    }
+}
+
+abstract class TestOfferType implements Modulento\Core\Catalogue\OfferType
+{
+    public function labelKey(): string { return 'x'; }
+    public function formTemplate(): string { return 'x'; }
+    public function detailTemplate(): string { return 'x'; }
+    public function formData(?int $offerId, ?array $typed, Modulento\Core\App $app): array { return []; }
+    public function validate(array $input, ?int $offerId, Modulento\Core\App $app): array { return ['values' => [], 'errors' => []]; }
+    public function save(int $offerId, array $values, Modulento\Core\App $app): ?int { return null; }
+    public function detailData(int $offerId, string $locale, Modulento\Core\App $app): array { return []; }
+}
+
+class HotelTestType extends TestOfferType implements Modulento\Core\Catalogue\FilterableOfferType
+{
+    public function __construct(private string $paramName = 'f_stars') {}
+    public function id(): string { return 'hotel.stay'; }
+    public function filterTemplate(): string { return 'x'; }
+    public function filterData(array $input, string $locale, Modulento\Core\App $app): array { return []; }
+    public function applyFilter(array $input, string $locale): ?array
+    {
+        $stars = (int) ($input['stars'] ?? 0);
+
+        return $stars > 0 ? ['where' => "o.id IN (SELECT offer_id FROM x_hotel WHERE stars >= :{$this->paramName})", 'params' => [$this->paramName => $stars]] : null;
+    }
+    public function sorts(): array { return ['stars' => 'x.sort.stars']; }
+    public function orderBy(string $sort): ?string
+    {
+        return $sort === 'stars' ? '(SELECT stars FROM x_hotel WHERE offer_id = o.id) DESC' : null;
+    }
+}
+
+class PlainTestType extends TestOfferType
+{
+    public function id(): string { return 'plain.thing'; }
+}
+
+$fsettings = new Modulento\Core\Support\Settings($fdb);
+$flocales = new Modulento\Core\Support\Locales($fsettings, $root . '/core/lang');
+$foffers = new Modulento\Core\Catalogue\Offers($fdb, $fsettings, $flocales);
+$foffers->registerType(new HotelTestType());
+$foffers->registerType(new PlainTestType());
+
+$ids = fn (array $list): array => array_column($list['rows'], 'id');
+check('listPublic: without a type, all types are listed', $foffers->listPublic([], 'de', 1, 10)['total'] === 4);
+check('listPublic: a type narrows the list', $ids($foffers->listPublic(['type' => 'hotel.stay'], 'de', 1, 10)) === [3, 2, 1]);
+check('listPublic: an unknown type lists nothing', $foffers->listPublic(['type' => 'nope.nope'], 'de', 1, 10) === ['rows' => [], 'total' => 0]);
+check('listPublic: the type\'s filter applies', $ids($foffers->listPublic(['type' => 'hotel.stay', 'fields' => ['stars' => '4']], 'de', 1, 10)) === [3, 1]);
+check('listPublic: the total follows the type\'s filter', $foffers->listPublic(['type' => 'hotel.stay', 'fields' => ['stars' => '4']], 'de', 1, 10)['total'] === 2);
+check('listPublic: a filter value of no use is ignored', $foffers->listPublic(['type' => 'hotel.stay', 'fields' => ['stars' => 'many']], 'de', 1, 10)['total'] === 3);
+check('listPublic: fields without a type are ignored', $foffers->listPublic(['fields' => ['stars' => '5']], 'de', 1, 10)['total'] === 4);
+check('listPublic: a type without a filter ignores fields', $foffers->listPublic(['type' => 'plain.thing', 'fields' => ['stars' => '5']], 'de', 1, 10)['total'] === 1);
+check('listPublic: the type\'s own sort applies', $ids($foffers->listPublic(['type' => 'hotel.stay', 'sort' => 'stars'], 'de', 1, 10)) === [1, 3, 2]);
+check('listPublic: a sort of the type needs the type', $ids($foffers->listPublic(['sort' => 'stars'], 'de', 1, 10)) === [4, 3, 2, 1]);
+check('listPublic: the core\'s sorts still work with a type', $ids($foffers->listPublic(['type' => 'hotel.stay', 'sort' => 'price_low'], 'de', 1, 10)) === [1, 3, 2]);
+check('listPublic: filter and search combine', $ids($foffers->listPublic(['type' => 'hotel.stay', 'fields' => ['stars' => '4'], 'search' => 'Angebot 3'], 'de', 1, 10)) === [3]);
+
+$badFilter = new Modulento\Core\Catalogue\Offers($fdb, $fsettings, $flocales);
+$badFilter->registerType(new HotelTestType('stars'));
+check('listPublic: a filter parameter outside f_ is refused', throws(LogicException::class, fn () => $badFilter->listPublic(['type' => 'hotel.stay', 'fields' => ['stars' => '4']], 'de', 1, 10)));
+
 foreach ($GLOBALS['failed'] ?? [] as $label) {
     echo "FAIL  {$label}\n";
 }

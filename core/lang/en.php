@@ -736,6 +736,8 @@ return [
     'core.offers.latest' => 'New offers',
     'core.offers.all' => 'All offers',
     'core.offers.categories' => 'Categories',
+    'core.offers.types' => 'Kinds of offer',
+    'core.offers.all_types' => 'All kinds',
     'core.offers.search' => 'Search offers',
     'core.offers.search_submit' => 'Search',
     'core.offers.sort' => 'Sort by',

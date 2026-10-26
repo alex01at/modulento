@@ -14,6 +14,7 @@ final class OfferView
      * For lists: one card per offer.
      *
      * @return array{id: int, title: string, summary: string, path: string, price_from: ?int, currency: string, thumb: ?string, provider_name: string, provider_path: string, type: string, rating: array{count: int, average: ?float}}
+     *         (cards() adds "type_card" for types with a CardOfferType)
      */
     public static function card(array $offer, App $app): array
     {
@@ -41,6 +42,25 @@ final class OfferView
      */
     public static function cards(array $offers, App $app): array
     {
-        return array_map(fn (array $offer) => self::card($offer, $app), $offers);
+        $cards = array_map(fn (array $offer) => self::card($offer, $app), $offers);
+
+        // A type that shows more on its cards is asked once for all of its
+        // offers on the page.
+        $byType = [];
+        foreach ($cards as $i => $card) {
+            $byType[$card['type']][$card['id']] = $i;
+        }
+        foreach ($byType as $typeId => $indexes) {
+            $type = $app->offers->type($typeId);
+            if (!$type instanceof CardOfferType) {
+                continue;
+            }
+            $data = $type->cardData(array_keys($indexes), $app->translator->locale(), $app);
+            foreach ($indexes as $id => $i) {
+                $cards[$i]['type_card'] = ['template' => $type->cardTemplate(), 'data' => $data[$id] ?? []];
+            }
+        }
+
+        return $cards;
     }
 }

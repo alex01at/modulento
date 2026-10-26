@@ -672,8 +672,8 @@ Templates of the site theme, with the variables they receive:
 | `account/dashboard.twig` | `name`, `avatar`, `recent` (offer cards viewed last, from the session), `purchases` (`open`, `closed`, `recent`), `provider` (null or `name`, `status`, `path`, `rating`, `offers`, `offers_public`, `sales` like `purchases`, `types`); the page behind "Dashboard" |
 | `account/index.twig` | the settings: `avatar` (path of the profile picture or null), `locales`, `min_length`, `is_last_admin`, `provider_status`, `devices` (where the account stays logged in: `created_at`, `last_used_at`, `browser`, `current`), `remember_days` |
 | `account/provider.twig` | `provider` (stored or typed values, `texts` by language), `status`, `status_note`, `public_path`, `certified`, `errors`, `locales`, `countries`, `approval_required` |
-| `offer/index.twig` | `offers` (cards), `total`, `categories` (tree), `category`, `search`, `sort`, `sorts`, `page`, `pages` |
-| `offer/_cards.twig` | `offers`: `title`, `summary`, `path`, `price_from`, `currency`, `thumb`, `provider_name`, `provider_path` |
+| `offer/index.twig` | `offers` (cards), `total`, `categories` (tree), `category`, `search`, `sort`, `sorts` (sort name => language key), `page`, `pages`, `query` (what the pager's links carry besides `page`, as a query string), `types` (the kinds of offer to choose from, empty if there is only one), `type` (the chosen one or null), `filter` (`template`, `data` of a chosen `FilterableOfferType`, or null) |
+| `offer/_cards.twig` | `offers`: `title`, `summary`, `path`, `price_from`, `currency`, `thumb`, `provider_name`, `provider_path`, `type_card` (`template`, `data` of a `CardOfferType`; may be missing) |
 | `offer/show.twig` | `offer` (`title`, `summary`, `description` as plain text, `images`, `price_from`, `category`, `provider_*`, `is_own`), `type_template`, `type_data` |
 | `account/payments.twig` | `transfer` (`ready`, `holder`, `iban`, `bic`, `bank`), `paypal` (`status`: null, `unverified` or `ready`; `client_id`, `sandbox`, `has_secret`), `stripe` (`platform_ready`, `status`: null, `pending` or `ready`; `account`) - each null if the operator does not allow the method -, `offline`, `errors`; forms post to `/account/payments/transfer`, `/paypal`, `/paypal/check`, `/stripe/connect`, `/stripe/status` and `/<method>/delete`; keep the note on refunds; a secret is never passed to the template |
 | `account/offers.twig` | `offers`, `types`, `provider_status` |
@@ -962,6 +962,25 @@ that implements `Modulento\Core\Catalogue\OfferType`:
   receives the offer's id (null for a new one), so a type can keep what must
   not change any more; `save()` returns the lowest price for listings
 - `detailTemplate()` / `detailData()` - its part of the public offer page
+
+Two optional interfaces extend a type to the lists:
+
+- `FilterableOfferType` - the type's own fields in the list. On `/offers` the
+  visitor picks a kind of offer (`?type=<id>`, shown when there is more than
+  one); the list then shows `filterTemplate()` inside its search form, with
+  inputs named `f[<key>]`. `applyFilter()` turns what was sent into a
+  condition, `sorts()` / `orderBy()` add sorts of the type's own. The SQL runs
+  inside the list's query, where the offer is the table `o`; parameters must
+  be named `:f_<name>` (anything else is refused), values go through
+  parameters, never into the SQL text. The core drops anything but short texts
+  and lists of texts from `f[...]` before the type sees it.
+- `CardOfferType` - more on the cards of a list. `cardData()` gets the ids of
+  all of a page's offers of the type at once (one query, not one per card) and
+  `cardTemplate()` is included in each card with that data as `type_data`.
+
+In the wizard for a new offer, the type's `validate()` already runs on the
+step with its fields, so a mistake shows there and not only when the offer is
+saved.
 
 [`modulento-ext-freelancer`](https://github.com/alex01at/modulento-ext-freelancer)
 is the reference: packages with price, delivery time and revisions, extras,
@@ -1257,7 +1276,8 @@ Version 1 consists of:
   `extension.json` with `id`, `name`, `version`, `api`, `namespace`
 - the `Registrar` methods `routes`, `permission`, `adminMenu`, `navigation`, `homeSection`, `listen`,
   `task`, `offerType`, `orderFlow`, `paymentMethod`, and its `manifest`
-- the interfaces `Modulento\Core\Catalogue\OfferType`,
+- the interfaces `Modulento\Core\Catalogue\OfferType` (with the optional
+  `FilterableOfferType` and `CardOfferType`),
   `Modulento\Core\Order\OrderFlow` and `Modulento\Core\Order\PaymentMethod`,
   including the keys of the arrays they return (states, transitions,
   deadlines); `Modulento\Core\Order\ProviderPaymentMethod` is an optional

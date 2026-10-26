@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modulento\Core\Controller;
 
+use Modulento\Core\Catalogue\FilterableOfferType;
 use Modulento\Core\Catalogue\OfferImages;
 use Modulento\Core\Catalogue\OfferType;
 use Modulento\Core\Catalogue\Offers;
@@ -31,7 +32,12 @@ final class OfferController extends Controller
         $view = $category !== null ? $this->app->categories->view($category, $this->app->translator->locale()) : null;
 
         if ($view !== null) {
-            $query = http_build_query(array_filter(['q' => trim((string) ($_GET['q'] ?? ''))]));
+            $query = http_build_query(array_filter([
+                'q' => trim((string) ($_GET['q'] ?? '')),
+                'type' => is_string($_GET['type'] ?? null) ? $_GET['type'] : '',
+                'sort' => is_string($_GET['sort'] ?? null) ? $_GET['sort'] : '',
+                'f' => is_array($_GET['f'] ?? null) ? $_GET['f'] : [],
+            ], fn ($value) => $value !== '' && $value !== []));
             header('Location: ' . $this->app->url($view['path']) . ($query !== '' ? '?' . $query : ''));
             return;
         }
@@ -64,13 +70,35 @@ final class OfferController extends Controller
         $locale = $this->app->translator->locale();
         $page = max(1, (int) ($_GET['page'] ?? 1));
         $search = trim((string) ($_GET['q'] ?? ''));
-        $sort = in_array($_GET['sort'] ?? '', Offers::SORTS, true) ? $_GET['sort'] : 'newest';
+
+        // One type at a time can be filtered by its own fields.
+        $type = is_string($_GET['type'] ?? null) ? $this->app->offers->type($_GET['type']) : null;
+        $filterable = $type instanceof FilterableOfferType ? $type : null;
+        $typeSorts = $filterable?->sorts() ?? [];
+        $fields = $filterable !== null ? self::filterInput($_GET['f'] ?? null) : [];
+        $sort = is_string($_GET['sort'] ?? null) && (in_array($_GET['sort'], Offers::SORTS, true) || isset($typeSorts[$_GET['sort']]))
+            ? $_GET['sort'] : 'newest';
 
         $list = $this->app->offers->listPublic([
             'search' => $search,
             'sort' => $sort,
             'category_ids' => $category !== null ? $this->app->categories->withChildren($category['id']) : [],
+            'type' => $type?->id(),
+            'fields' => $fields,
         ], $locale, $page, self::PER_PAGE);
+
+        $sorts = [];
+        foreach (Offers::SORTS as $name) {
+            $sorts[$name] = 'core.offers.sort.' . $name;
+        }
+
+        // What the pager and the type links carry from page to page.
+        $carried = array_filter([
+            'q' => $search,
+            'sort' => $sort !== 'newest' ? $sort : '',
+            'type' => $type?->id() ?? '',
+            'f' => $fields,
+        ], fn ($value) => $value !== '' && $value !== []);
 
         $this->render('offer/index.twig', [
             'offers' => OfferView::cards($list['rows'], $this->app),
@@ -79,10 +107,44 @@ final class OfferController extends Controller
             'category' => $category !== null ? $this->app->categories->view($category, $locale) : null,
             'search' => $search,
             'sort' => $sort,
-            'sorts' => Offers::SORTS,
+            'sorts' => $sorts + $typeSorts,
             'page' => $page,
             'pages' => max(1, (int) ceil($list['total'] / self::PER_PAGE)),
+            'query' => http_build_query($carried),
+            // The kinds of offer to choose between, when there is a choice.
+            'types' => count($this->app->offers->types()) > 1
+                ? array_map(fn (OfferType $each) => ['id' => $each->id(), 'label_key' => $each->labelKey()], array_values($this->app->offers->types()))
+                : [],
+            'type' => $type !== null ? ['id' => $type->id(), 'label_key' => $type->labelKey()] : null,
+            'filter' => $filterable !== null
+                ? ['template' => $filterable->filterTemplate(), 'data' => $filterable->filterData($fields, $locale, $this->app)]
+                : null,
         ]);
+    }
+
+    /**
+     * The visitor's f[...] values: names of letters, digits and underscores,
+     * and text, or a list of texts, as values - anything else is dropped
+     * before a type sees it.
+     *
+     * @return array<string, string|list<string>>
+     */
+    private static function filterInput(mixed $input): array
+    {
+        $clean = [];
+        foreach (is_array($input) ? array_slice($input, 0, 30, true) : [] as $key => $value) {
+            if (!is_string($key) || preg_match('/^[a-z0-9_]{1,40}$/', $key) !== 1) {
+                continue;
+            }
+            if (is_string($value)) {
+                $clean[$key] = mb_substr($value, 0, 200);
+            } elseif (is_array($value)) {
+                $texts = array_values(array_filter($value, 'is_string'));
+                $clean[$key] = array_map(fn (string $text) => mb_substr($text, 0, 200), array_slice($texts, 0, 30));
+            }
+        }
+
+        return $clean;
     }
 
     public function show(array $params): void
@@ -388,6 +450,8 @@ final class OfferController extends Controller
             case 5:
                 // Whatever the offer's type asks for, under the names its form uses.
                 $values['type_fields'] = array_diff_key($_POST, array_flip(['type', 'wizard_step', '_csrf', 'category_id', 'text']));
+                // Checked here, not only when the last step saves: the mistake shows next to the field.
+                $errors = array_merge($errors, $type->validate($values['type_fields'], null, $app)['errors']);
                 break;
         }
 

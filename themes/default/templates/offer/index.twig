@@ -10,12 +10,23 @@
     <input id="q" name="q" type="search" value="{{ search }}" placeholder="{{ trans('core.offers.search') }}">
     <label class="visually-hidden" for="sort">{{ trans('core.offers.sort') }}</label>
     <select id="sort" name="sort">
-        {% for name in sorts %}
-            <option value="{{ name }}" {{ name == sort ? 'selected' }}>{{ trans('core.offers.sort.' ~ name) }}</option>
+        {% for name, label_key in sorts %}
+            <option value="{{ name }}" {{ name == sort ? 'selected' }}>{{ trans(label_key) }}</option>
         {% endfor %}
     </select>
+    {% if type %}<input type="hidden" name="type" value="{{ type.id }}">{% endif %}
+    {% if filter %}{% include filter.template with {filter: filter.data} %}{% endif %}
     <button type="submit">{{ trans('core.offers.search_submit') }}</button>
 </form>
+
+{% if types %}
+    <nav class="category-nav" aria-label="{{ trans('core.offers.types') }}">
+        <a href="{{ url(category ? category.path : '/offers') }}" {{ type is null ? 'aria-current="page"' }}>{{ trans('core.offers.all_types') }}</a>
+        {% for each in types %}
+            <a href="{{ url(category ? category.path : '/offers') }}?type={{ each.id|url_encode }}" {{ type and type.id == each.id ? 'aria-current="page"' }}>{{ trans(each.label_key) }}</a>
+        {% endfor %}
+    </nav>
+{% endif %}
 
 {% if categories %}
     <nav class="category-nav" aria-label="{{ trans('core.offers.categories') }}">
@@ -36,7 +47,7 @@
     {% include 'offer/_cards.twig' %}
 
     {% if pages > 1 %}
-        {% set query = (search ? '&q=' ~ search|url_encode : '') ~ (sort != 'newest' ? '&sort=' ~ sort : '') %}
+        {% set query = query ? '&' ~ query : '' %}
         <nav class="pager" aria-label="{{ trans('core.pager.label') }}">
             {% if page > 1 %}<a href="{{ url(category ? category.path : '/offers') }}?page={{ page - 1 }}{{ query }}" rel="prev">{{ trans('core.pager.previous') }}</a>{% endif %}
             <span>{{ trans('core.pager.position', {page: page, pages: pages}) }}</span>

@@ -128,7 +128,11 @@ final class Offers
     /**
      * Offers for visitors.
      *
-     * @param array{search?: string, category_ids?: int[], provider_id?: int, sort?: string} $filter
+     * "type" narrows the list to one offer type; "fields" (the visitor's f[...]
+     * values) are then handed to that type's filter, if it has one, and the
+     * type may add sorts of its own.
+     *
+     * @param array{search?: string, category_ids?: int[], provider_id?: int, sort?: string, type?: string, fields?: array<string, mixed>} $filter
      * @return array{rows: array<int, array>, total: int}
      */
     public function listPublic(array $filter, string $locale, int $page, int $perPage): array
@@ -142,6 +146,29 @@ final class Offers
             return ['rows' => [], 'total' => 0];
         }
         $where[] = 'o.type IN (' . $this->placeholders('type', $types, $params) . ')';
+
+        $only = null;
+        if (isset($filter['type'])) {
+            $only = $this->types[$filter['type']] ?? null;
+            if ($only === null) {
+                return ['rows' => [], 'total' => 0];
+            }
+            $where[] = 'o.type = :only_type';
+            $params['only_type'] = $filter['type'];
+
+            if ($only instanceof FilterableOfferType && ($filter['fields'] ?? []) !== []) {
+                $extra = $only->applyFilter($filter['fields'], $locale);
+                if ($extra !== null) {
+                    foreach ($extra['params'] as $name => $value) {
+                        if (!str_starts_with((string) $name, 'f_')) {
+                            throw new LogicException('Filter parameters of offer type "' . $only->id() . '" must be named f_<name>, got "' . $name . '"');
+                        }
+                        $params[$name] = $value;
+                    }
+                    $where[] = '(' . $extra['where'] . ')';
+                }
+            }
+        }
 
         if (($filter['category_ids'] ?? []) !== []) {
             $where[] = 'o.category_id IN (' . $this->placeholders('cat', $filter['category_ids'], $params) . ')';
@@ -161,7 +188,11 @@ final class Offers
             $params += ['s_locale' => $locale, 's_default' => $this->locales->default(), 's1' => $pattern, 's2' => $pattern, 's3' => $pattern];
         }
 
-        $order = match ($filter['sort'] ?? 'newest') {
+        $sort = $filter['sort'] ?? 'newest';
+        $typeOrder = $only instanceof FilterableOfferType && !in_array($sort, self::SORTS, true)
+            ? $only->orderBy($sort) : null;
+
+        $order = $typeOrder !== null ? $typeOrder . ', o.id DESC' : match ($sort) {
             'price_low' => '(o.price_from IS NULL), o.price_from ASC, o.id DESC',
             'price_high' => 'o.price_from DESC, o.id DESC',
             // Rated offers first, by their average; the number of
