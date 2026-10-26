@@ -983,7 +983,7 @@ step with its fields, so a mistake shows there and not only when the offer is
 saved.
 
 An extension whose kinds are only known at run time (made in the
-administration, like `extensions/fields`) registers them with
+administration, like [`modulento-ext-custom-fields`](https://github.com/alex01at/modulento-ext-custom-fields)) registers them with
 `Registrar::offerTypes(fn (App $app) => [...])`: the closure runs once, when a
 type is first looked up, and may give the translator the types' names with
 `Translator::define()`. `Offers::countOfType()` tells whether offers still use

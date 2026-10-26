@@ -18,4 +18,6 @@
 /extensions/freelancer
 /extensions/auction
 /extensions/blog
+# The builder of kinds of offer (modulento-ext-custom-fields); its id is "fields".
+/extensions/fields
 __pycache__/
