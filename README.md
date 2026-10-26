@@ -982,6 +982,13 @@ In the wizard for a new offer, the type's `validate()` already runs on the
 step with its fields, so a mistake shows there and not only when the offer is
 saved.
 
+An extension whose kinds are only known at run time (made in the
+administration, like `extensions/fields`) registers them with
+`Registrar::offerTypes(fn (App $app) => [...])`: the closure runs once, when a
+type is first looked up, and may give the translator the types' names with
+`Translator::define()`. `Offers::countOfType()` tells whether offers still use
+a type.
+
 [`modulento-ext-freelancer`](https://github.com/alex01at/modulento-ext-freelancer)
 is the reference: packages with price, delivery time and revisions, extras,
 and requirements, each with a text per language.
@@ -1275,7 +1282,7 @@ Version 1 consists of:
 - `Modulento\Core\Extension\Extension` with `register(Registrar)`, and
   `extension.json` with `id`, `name`, `version`, `api`, `namespace`
 - the `Registrar` methods `routes`, `permission`, `adminMenu`, `navigation`, `homeSection`, `listen`,
-  `task`, `offerType`, `orderFlow`, `paymentMethod`, and its `manifest`
+  `task`, `offerType`, `offerTypes`, `orderFlow`, `paymentMethod`, and its `manifest`
 - the interfaces `Modulento\Core\Catalogue\OfferType` (with the optional
   `FilterableOfferType` and `CardOfferType`),
   `Modulento\Core\Order\OrderFlow` and `Modulento\Core\Order\PaymentMethod`,

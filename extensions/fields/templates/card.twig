@@ -1,0 +1,4 @@
+{# What a custom type adds to a card in a list. Receives "type_data". #}
+{% if type_data.items %}
+    <p class="fields-card"><small>{% for item in type_data.items %}{{ item.label }}: {{ item.value }}{{ not loop.last ? ' · ' }}{% endfor %}</small></p>
+{% endif %}

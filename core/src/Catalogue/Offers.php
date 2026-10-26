@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modulento\Core\Catalogue;
 
+use Closure;
 use LogicException;
 use Modulento\Core\Content\Pages;
 use Modulento\Core\Support\Clock;
@@ -29,9 +30,23 @@ final class Offers
 
     /** @var array<string, OfferType> */
     private array $types = [];
+    /** @var list<Closure(): iterable<OfferType>> asked for their types on first use */
+    private array $providers = [];
 
     public function __construct(private PDO $db, private Settings $settings, private Locales $locales)
     {
+    }
+
+    /**
+     * Types that are only known at run time (made in the administration):
+     * the provider is called once, the first time any type is looked up, so
+     * a request that never needs a type does not pay for them.
+     *
+     * @param Closure(): iterable<OfferType> $provider
+     */
+    public function registerProvider(Closure $provider): void
+    {
+        $this->providers[] = $provider;
     }
 
     public function registerType(OfferType $type): void
@@ -46,13 +61,26 @@ final class Offers
     /** @return array<string, OfferType> */
     public function types(): array
     {
+        $this->resolveProviders();
+
         return $this->types;
+    }
+
+    private function resolveProviders(): void
+    {
+        $providers = $this->providers;
+        $this->providers = [];
+        foreach ($providers as $provider) {
+            foreach ($provider() as $type) {
+                $this->registerType($type);
+            }
+        }
     }
 
     /** Null when the extension that brought the type is switched off; such offers are kept but not shown. */
     public function type(string $id): ?OfferType
     {
-        return $this->types[$id] ?? null;
+        return $this->types()[$id] ?? null;
     }
 
     public function approvalRequired(): bool
@@ -122,7 +150,7 @@ final class Offers
     public function isPublic(array $offer): bool
     {
         return $offer['status'] === 'published' && $offer['provider_status'] === 'approved'
-            && $offer['account_status'] === 'active' && isset($this->types[$offer['type']]);
+            && $offer['account_status'] === 'active' && isset($this->types()[$offer['type']]);
     }
 
     /**
@@ -141,7 +169,7 @@ final class Offers
         $params = [];
 
         // Offers whose extension is switched off are not shown.
-        $types = array_keys($this->types);
+        $types = array_keys($this->types());
         if ($types === []) {
             return ['rows' => [], 'total' => 0];
         }
@@ -149,7 +177,7 @@ final class Offers
 
         $only = null;
         if (isset($filter['type'])) {
-            $only = $this->types[$filter['type']] ?? null;
+            $only = $this->types()[$filter['type']] ?? null;
             if ($only === null) {
                 return ['rows' => [], 'total' => 0];
             }
@@ -250,7 +278,7 @@ final class Offers
     /** @return array<int, int> category id => number of public offers directly in it */
     public function publicCountsByCategory(): array
     {
-        $types = array_keys($this->types);
+        $types = array_keys($this->types());
         if ($types === []) {
             return [];
         }
@@ -367,6 +395,15 @@ final class Offers
         $this->db->commit();
 
         return $id;
+    }
+
+    /** How many offers (of any status) have this type; for refusing to remove a type that is in use. */
+    public function countOfType(string $typeId): int
+    {
+        $stmt = $this->db->prepare('SELECT COUNT(*) FROM offer WHERE type = :type');
+        $stmt->execute(['type' => $typeId]);
+
+        return (int) $stmt->fetchColumn();
     }
 
     public function setPriceFrom(int $id, ?int $minorUnits): void

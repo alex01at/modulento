@@ -1,0 +1,7 @@
+{
+    "id": "fields",
+    "name": "Custom fields",
+    "version": "0.1.0",
+    "api": 1,
+    "namespace": "Modulento\\Fields"
+}

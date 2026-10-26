@@ -23,6 +23,8 @@ final class Translator
     private array $sources = [];
     /** @var array<string, array<string, string>> locale => texts, built on first use */
     private array $catalogs = [];
+    /** @var array<string, array<string, string>> locale => texts defined at run time */
+    private array $defined = [];
     private string $fallback = self::LAST_RESORT;
 
     public function __construct(private string $locale, private string $siteName)
@@ -60,6 +62,29 @@ final class Translator
     {
         $this->sources[] = ['dir' => $langDir, 'prefix' => $prefix];
         $this->catalogs = [];
+    }
+
+    /**
+     * Texts that exist only at run time, e.g. the names of kinds of offer an
+     * operator made in the administration. Same rule as load(): every key
+     * must start with "<prefix>.". Texts from language files and the site's
+     * own folder win over these.
+     *
+     * @param array<string, string> $texts key => text
+     */
+    public function define(string $prefix, string $locale, array $texts): void
+    {
+        foreach (array_keys($texts) as $key) {
+            if (!str_starts_with((string) $key, $prefix . '.')) {
+                throw new LogicException("Language key \"{$key}\" must start with \"{$prefix}.\"");
+            }
+        }
+        if (!self::isLocaleCode($locale)) {
+            throw new LogicException("\"{$locale}\" is not a language code");
+        }
+
+        $this->defined[$locale] = array_replace($this->defined[$locale] ?? [], $texts);
+        unset($this->catalogs[$locale]);
     }
 
     /**
@@ -171,7 +196,7 @@ final class Translator
             return $this->catalogs[$locale];
         }
 
-        $catalog = [];
+        $catalog = $this->defined[$locale] ?? [];
         foreach ($this->sources as $source) {
             $file = $source['dir'] . '/' . $locale . '.php';
             if (!self::isLocaleCode($locale) || !is_file($file)) {

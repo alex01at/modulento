@@ -48,3 +48,6 @@ jobs:
 
       - name: Tests
         run: php tests/run.php
+
+      - name: Tests of the extension fields
+        run: php extensions/fields/tests/run.php

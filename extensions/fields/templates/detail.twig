@@ -1,0 +1,9 @@
+{# The fields of a custom type on the offer's page. Receives "type_data". #}
+{% if type_data.items %}
+    <dl class="fields-detail">
+        {% for item in type_data.items %}
+            <dt>{{ item.label }}</dt>
+            <dd{{ item.long ? ' style="white-space: pre-line"' }}>{{ item.value }}</dd>
+        {% endfor %}
+    </dl>
+{% endif %}

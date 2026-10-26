@@ -1,0 +1,33 @@
+{% extends '@admin/layout.twig' %}
+
+{% block title %}{{ trans('fields.title') }} – {{ site_name }}{% endblock %}
+
+{% block admin %}
+{% include '@admin/_page_header.twig' with {heading: trans('fields.title')} only %}
+
+<p>{{ trans('fields.intro') }}</p>
+<p><a class="button" href="{{ url('/admin/fields/new') }}">{{ trans('fields.type.new') }}</a></p>
+
+{% if types is empty %}
+    <p>{{ trans('fields.types.none') }}</p>
+{% else %}
+    <table>
+        <thead>
+        <tr>
+            <th scope="col">{{ trans('fields.type.name') }}</th>
+            <th scope="col">{{ trans('fields.type.fields') }}</th>
+            <th scope="col">{{ trans('fields.type.offers') }}</th>
+        </tr>
+        </thead>
+        <tbody>
+        {% for type in types %}
+            <tr>
+                <td><a href="{{ url('/admin/fields/' ~ type.id) }}">{{ type.label }}</a></td>
+                <td>{{ type.fields }}</td>
+                <td>{{ type.offers }}</td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+{% endif %}
+{% endblock %}

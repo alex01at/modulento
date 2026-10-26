@@ -61,6 +61,28 @@ final class Registrar
         $this->app->offers->registerType($type);
     }
 
+    /**
+     * Kinds of offer that are not known until run time, e.g. made by an
+     * operator in the administration. The closure is called once, when a
+     * type is first looked up, not on every request; every id it returns
+     * must start with the extension id.
+     *
+     * @param Closure(App): iterable<OfferType> $provider
+     */
+    public function offerTypes(Closure $provider): void
+    {
+        $app = $this->app;
+        $this->app->offers->registerProvider(function () use ($provider, $app): array {
+            $types = [];
+            foreach ($provider($app) as $type) {
+                $this->prefixed($type->id(), 'Offer type');
+                $types[] = $type;
+            }
+
+            return $types;
+        });
+    }
+
     /** How offers of one of this extension's types are ordered and carried out. */
     public function orderFlow(OrderFlow $flow): void
     {
