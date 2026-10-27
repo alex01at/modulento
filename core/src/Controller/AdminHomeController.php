@@ -19,12 +19,13 @@ final class AdminHomeController extends Controller
         $app = $this->app;
         $layout = $app->homeLayout;
 
+        $extra = $app->pageBlockTypes();
         $this->render('@admin/home_edit.twig', [
             'locale' => $app->translator->locale(),
             'default_locale' => $app->locales->default(),
-            'blocks' => $this->blocksForForm($layout->blocks()),
-            'types' => HomeLayout::TYPES,
-            'fields' => HomeLayout::TEXT_FIELDS,
+            'blocks' => $this->blocksForForm($layout->blocks($extra), $extra),
+            'types' => HomeLayout::typeLabels($extra),
+            'fields' => HomeLayout::textFields($extra),
             'pictures' => array_map(fn (array $row) => ['url' => Library::url($row['file']), 'title' => $row['title']],
                 $app->media->list(1, 200)['rows']),
             'customized' => $layout->isCustomized(),
@@ -34,7 +35,8 @@ final class AdminHomeController extends Controller
     public function save(array $params): void
     {
         $layout = $this->app->homeLayout;
-        $blocks = $this->fromForm($layout->blocks());
+        $extra = $this->app->pageBlockTypes();
+        $blocks = $this->fromForm($layout->blocks($extra), $extra);
         $action = (string) ($_POST['action'] ?? 'save');
 
         if ($action === 'reset') {
@@ -46,7 +48,7 @@ final class AdminHomeController extends Controller
 
         if ($action === 'add') {
             $type = (string) ($_POST['add_type'] ?? '');
-            if (in_array($type, HomeLayout::TYPES, true)) {
+            if (in_array($type, HomeLayout::types($extra), true)) {
                 $blocks[] = HomeLayout::newBlock($type) + ($type === 'offers' ? ['settings' => ['count' => 6]] : []);
             }
         } elseif (preg_match('/^insert:([a-z0-9-]{1,32})$/', $action, $match) === 1) {
@@ -56,7 +58,7 @@ final class AdminHomeController extends Controller
                 if ($widget !== null) {
                     $blocks = HomeLayout::placeAfter($blocks, $match[1], $widget);
                 }
-            } elseif (in_array($choice, HomeLayout::TYPES, true)) {
+            } elseif (in_array($choice, HomeLayout::types($extra), true)) {
                 $blocks = HomeLayout::insertAfter($blocks, $match[1], $choice);
             }
         } elseif (preg_match('/^savewidget:([a-z0-9-]{1,32})$/', $action, $match) === 1) {
@@ -68,7 +70,7 @@ final class AdminHomeController extends Controller
             $blocks = $this->step($blocks, $match[1], $match[2]);
         }
 
-        $layout->save($blocks);
+        $layout->save($blocks, $extra);
         // A widget step has its own message, set above.
         if (!str_contains($action, 'widget')) {
             Session::flash('success', $this->trans($action === 'save' ? 'core.home.saved' : 'core.home.changed'));
@@ -90,9 +92,11 @@ final class AdminHomeController extends Controller
     }
 
     /** @param list<array<string, mixed>> $blocks */
-    private function blocksForForm(array $blocks): array
+    private function blocksForForm(array $blocks, array $extra): array
     {
-        return array_map(fn (array $block) => $block + ['label_key' => 'core.home.type.' . $block['type']], $blocks);
+        $labels = HomeLayout::typeLabels($extra);
+
+        return array_map(fn (array $block) => $block + ['label_key' => $labels[$block['type']] ?? ('core.home.type.' . $block['type'])], $blocks);
     }
 
     /**
@@ -102,7 +106,7 @@ final class AdminHomeController extends Controller
      * @param list<array<string, mixed>> $stored
      * @return list<array<string, mixed>>
      */
-    private function fromForm(array $stored): array
+    private function fromForm(array $stored, array $extra): array
     {
         $posted = is_array($_POST['blocks'] ?? null) ? $_POST['blocks'] : [];
         $blocks = [];
@@ -119,7 +123,7 @@ final class AdminHomeController extends Controller
             // Only the language the administration is in is edited here; the texts of the others stay.
             $locale = $this->app->translator->locale();
             $texts = $block['texts'];
-            foreach (HomeLayout::TEXT_FIELDS[$type] as $field) {
+            foreach (HomeLayout::textFields($extra)[$type] as $field) {
                 $value = is_string($input['texts'][$locale][$field] ?? null) ? $input['texts'][$locale][$field] : '';
                 $texts[$locale][$field] = HomeLayout::clean($type, $field, $value);
             }
@@ -216,7 +220,8 @@ final class AdminHomeController extends Controller
             return;
         }
 
-        $app->homeLayout->save(HomeLayout::ordered($app->homeLayout->blocks(), $ids));
+        $extra = $app->pageBlockTypes();
+        $app->homeLayout->save(HomeLayout::ordered($app->homeLayout->blocks($extra), $ids), $extra);
         $this->json(['ok' => true]);
     }
 

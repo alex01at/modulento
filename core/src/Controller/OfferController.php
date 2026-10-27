@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace Modulento\Core\Controller;
 
+use Modulento\Core\Catalogue\FilterableOfferType;
 use Modulento\Core\Catalogue\OfferImages;
 use Modulento\Core\Catalogue\OfferType;
 use Modulento\Core\Catalogue\Offers;
 use Modulento\Core\Catalogue\OfferView;
+use Modulento\Core\Catalogue\SortableOfferType;
 use Modulento\Core\Event\OfferStatusChanged;
 use Modulento\Core\Review\Reviews;
 use Modulento\Core\Review\ReviewView;
@@ -64,12 +66,27 @@ final class OfferController extends Controller
         $locale = $this->app->translator->locale();
         $page = max(1, (int) ($_GET['page'] ?? 1));
         $search = trim((string) ($_GET['q'] ?? ''));
-        $sort = in_array($_GET['sort'] ?? '', Offers::SORTS, true) ? $_GET['sort'] : 'newest';
+
+        $types = $this->app->offers->types();
+        $typeId = is_string($_GET['type'] ?? null) ? $_GET['type'] : null;
+        $type = $typeId !== null ? ($types[$typeId] ?? null) : null;
+        $fieldFilter = is_array($_GET['f'] ?? null) ? $_GET['f'] : [];
+
+        $sorts = [];
+        foreach (Offers::SORTS as $id) {
+            $sorts[$id] = $this->trans('core.offers.sort.' . $id);
+        }
+        if ($type instanceof SortableOfferType) {
+            $sorts += $type->sorts();
+        }
+        $sort = isset($sorts[$_GET['sort'] ?? '']) ? $_GET['sort'] : 'newest';
 
         $list = $this->app->offers->listPublic([
             'search' => $search,
             'sort' => $sort,
             'category_ids' => $category !== null ? $this->app->categories->withChildren($category['id']) : [],
+            'type' => $type?->id(),
+            'field_filter' => $fieldFilter,
         ], $locale, $page, self::PER_PAGE, $this->app->subscriptions->accountIdsWithFeature('core.catalogue.priority_placement'));
 
         $this->render('offer/index.twig', [
@@ -79,9 +96,18 @@ final class OfferController extends Controller
             'category' => $category !== null ? $this->app->categories->view($category, $locale) : null,
             'search' => $search,
             'sort' => $sort,
-            'sorts' => Offers::SORTS,
+            'sorts' => $sorts,
             'page' => $page,
             'pages' => max(1, (int) ceil($list['total'] / self::PER_PAGE)),
+            'types' => count($types) > 1
+                ? array_map(fn (OfferType $t) => ['id' => $t->id(), 'label' => $this->trans($t->labelKey())], array_values($types))
+                : [],
+            'type' => $type?->id(),
+            'field_filter' => $fieldFilter,
+            'filter' => $type instanceof FilterableOfferType ? [
+                'template' => $type->filterTemplate(),
+                'data' => $type->filterData($fieldFilter, $locale, $this->app),
+            ] : null,
         ]);
     }
 

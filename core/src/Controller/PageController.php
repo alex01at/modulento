@@ -10,8 +10,11 @@ use Modulento\Core\Support\Session;
 
 final class PageController extends Controller
 {
-    /** The block types a page may use - the same catalogue as the home page. */
-    private const BLOCK_TYPES = HomeLayout::TYPES;
+    /** The block types a page may use - the same catalogue as the home page, plus whatever extensions registered. */
+    private function blockTypes(): array
+    {
+        return HomeLayout::types($this->app->pageBlockTypes());
+    }
 
     /** A title or body of a page saved from the page itself (edit mode): the cleaned value comes back. */
     public function field(array $params): void
@@ -156,12 +159,13 @@ final class PageController extends Controller
     {
         $id = (int) $params['id'];
         $pages = $this->app->pages;
-        $blocks = $this->fromForm($pages->blocksFor($id));
+        $extra = $this->app->pageBlockTypes();
+        $blocks = $this->fromForm($pages->blocksFor($id, $extra));
         $action = (string) ($_POST['action'] ?? 'save');
 
         if ($action === 'add') {
             $type = (string) ($_POST['add_type'] ?? '');
-            if (in_array($type, self::BLOCK_TYPES, true)) {
+            if (in_array($type, $this->blockTypes(), true)) {
                 $blocks[] = HomeLayout::newBlock($type) + ($type === 'offers' ? ['settings' => ['count' => 6]] : []);
             }
         } elseif (preg_match('/^insert:([a-z0-9-]{1,32})$/', $action, $match) === 1) {
@@ -171,7 +175,7 @@ final class PageController extends Controller
                 if ($widget !== null) {
                     $blocks = HomeLayout::placeAfter($blocks, $match[1], $widget);
                 }
-            } elseif (in_array($choice, self::BLOCK_TYPES, true)) {
+            } elseif (in_array($choice, $this->blockTypes(), true)) {
                 $blocks = HomeLayout::insertAfter($blocks, $match[1], $choice);
             }
         } elseif (preg_match('/^savewidget:([a-z0-9-]{1,32})$/', $action, $match) === 1) {
@@ -189,7 +193,7 @@ final class PageController extends Controller
             $blocks = $this->step($blocks, $match[1], $match[2]);
         }
 
-        $pages->saveBlocks($id, $blocks);
+        $pages->saveBlocks($id, $blocks, $extra);
         if (!str_contains($action, 'widget')) {
             Session::flash('success', $this->trans($action === 'save' ? 'core.admin.pages.content_saved' : 'core.home.changed'));
         }
@@ -207,7 +211,8 @@ final class PageController extends Controller
             return;
         }
 
-        $this->app->pages->saveBlocks($id, HomeLayout::ordered($this->app->pages->blocksFor($id), $ids));
+        $extra = $this->app->pageBlockTypes();
+        $this->app->pages->saveBlocks($id, HomeLayout::ordered($this->app->pages->blocksFor($id, $extra), $ids), $extra);
         $this->json(['ok' => true]);
     }
 
@@ -222,7 +227,7 @@ final class PageController extends Controller
             return;
         }
 
-        $clean = $this->app->pages->setBlockField((int) $params['id'], $data['block'], $locale, $data['field'], $data['value']);
+        $clean = $this->app->pages->setBlockField((int) $params['id'], $data['block'], $locale, $data['field'], $data['value'], $this->app->pageBlockTypes());
         if ($clean === null) {
             $this->json(['ok' => false], 422);
             return;
@@ -253,7 +258,7 @@ final class PageController extends Controller
 
             $locale = $this->app->translator->locale();
             $texts = $block['texts'];
-            foreach (HomeLayout::TEXT_FIELDS[$type] as $field) {
+            foreach (HomeLayout::textFields($this->app->pageBlockTypes())[$type] as $field) {
                 $value = is_string($input['texts'][$locale][$field] ?? null) ? $input['texts'][$locale][$field] : '';
                 $texts[$locale][$field] = HomeLayout::clean($type, $field, $value);
             }

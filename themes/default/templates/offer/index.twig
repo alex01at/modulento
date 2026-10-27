@@ -8,10 +8,22 @@
 <form method="get" action="{{ url(category ? category.path : '/offers') }}" class="filter-row" role="search">
     <label class="visually-hidden" for="q">{{ trans('core.offers.search') }}</label>
     <input id="q" name="q" type="search" value="{{ search }}" placeholder="{{ trans('core.offers.search') }}">
+    {% if types %}
+        <label class="visually-hidden" for="type">{{ trans('core.offers.types') }}</label>
+        <select id="type" name="type">
+            <option value="">{{ trans('core.offers.type_all') }}</option>
+            {% for t in types %}
+                <option value="{{ t.id }}" {{ t.id == type ? 'selected' }}>{{ t.label }}</option>
+            {% endfor %}
+        </select>
+    {% endif %}
+    {% if filter %}
+        {% include filter.template with {filter: filter.data} %}
+    {% endif %}
     <label class="visually-hidden" for="sort">{{ trans('core.offers.sort') }}</label>
     <select id="sort" name="sort">
-        {% for name in sorts %}
-            <option value="{{ name }}" {{ name == sort ? 'selected' }}>{{ trans('core.offers.sort.' ~ name) }}</option>
+        {% for id, label in sorts %}
+            <option value="{{ id }}" {{ id == sort ? 'selected' }}>{{ label }}</option>
         {% endfor %}
     </select>
     <button type="submit">{{ trans('core.offers.search_submit') }}</button>
@@ -36,7 +48,10 @@
     {% include 'offer/_cards.twig' %}
 
     {% if pages > 1 %}
-        {% set query = (search ? '&q=' ~ search|url_encode : '') ~ (sort != 'newest' ? '&sort=' ~ sort : '') %}
+        {% set query = (search ? '&q=' ~ search|url_encode : '') ~ (sort != 'newest' ? '&sort=' ~ sort : '') ~ (type ? '&type=' ~ type|url_encode : '') %}
+        {% for key, value in field_filter %}
+            {% set query = query ~ '&f[' ~ key ~ ']=' ~ value|url_encode %}
+        {% endfor %}
         <nav class="pager" aria-label="{{ trans('core.pager.label') }}">
             {% if page > 1 %}<a href="{{ url(category ? category.path : '/offers') }}?page={{ page - 1 }}{{ query }}" rel="prev">{{ trans('core.pager.previous') }}</a>{% endif %}
             <span>{{ trans('core.pager.position', {page: page, pages: pages}) }}</span>

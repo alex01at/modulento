@@ -127,9 +127,10 @@ final class Pages
      * Nothing is written back here; that only happens once the page is
      * actually saved through the editor.
      *
+     * @param array<string, array{label_key: string, text_fields: string[], template: string}> $extra App::pageBlockTypes()
      * @return list<array{id: string, type: string, enabled: bool, texts: array<string, array<string, string>>, settings: array<string, mixed>}>
      */
-    public function blocksFor(int $id): array
+    public function blocksFor(int $id, array $extra = []): array
     {
         $page = $this->find($id);
         if ($page === null) {
@@ -140,7 +141,7 @@ final class Pages
         if (is_array($data)) {
             $blocks = [];
             foreach ($data as $block) {
-                if (!is_array($block) || !in_array($block['type'] ?? '', HomeLayout::TYPES, true)) {
+                if (!is_array($block) || !in_array($block['type'] ?? '', HomeLayout::types($extra), true)) {
                     continue;
                 }
                 $blocks[] = [
@@ -175,17 +176,18 @@ final class Pages
      * minus the "a fresh site shows this" wording fallback - a page with
      * no text in a field simply shows none.
      *
+     * @param array<string, array{label_key: string, text_fields: string[], template: string}> $extra App::pageBlockTypes()
      * @return list<array<string, mixed>>
      */
-    public function view(int $id, string $locale, string $default, bool $includeHidden = false): array
+    public function view(int $id, string $locale, string $default, bool $includeHidden = false, array $extra = []): array
     {
         $view = [];
-        foreach ($this->blocksFor($id) as $block) {
+        foreach ($this->blocksFor($id, $extra) as $block) {
             if (!$block['enabled'] && !$includeHidden) {
                 continue;
             }
             $texts = [];
-            foreach (HomeLayout::TEXT_FIELDS[$block['type']] as $field) {
+            foreach (HomeLayout::textFields($extra)[$block['type']] as $field) {
                 $text = (string) ($block['texts'][$locale][$field] ?? '');
                 if ($text === '') {
                     $text = (string) ($block['texts'][$default][$field] ?? '');
@@ -197,6 +199,8 @@ final class Pages
                 'id' => $block['id'],
                 'type' => $block['type'],
                 'enabled' => $block['enabled'],
+                'template' => HomeLayout::template($block['type'], $extra),
+                'label_key' => HomeLayout::typeLabels($extra)[$block['type']] ?? ('core.home.type.' . $block['type']),
                 'texts' => $texts,
                 'count' => max(1, min(12, (int) ($block['settings']['count'] ?? 6))),
                 'media' => (string) ($block['settings']['media'] ?? ''),
@@ -211,12 +215,15 @@ final class Pages
         return $view;
     }
 
-    /** @param list<array<string, mixed>> $blocks */
-    public function saveBlocks(int $id, array $blocks): void
+    /**
+     * @param list<array<string, mixed>> $blocks
+     * @param array<string, array{label_key: string, text_fields: string[], template: string}> $extra App::pageBlockTypes()
+     */
+    public function saveBlocks(int $id, array $blocks, array $extra = []): void
     {
         $clean = [];
         foreach (array_slice($blocks, 0, HomeLayout::MAX_BLOCKS) as $block) {
-            if (in_array($block['type'] ?? '', HomeLayout::TYPES, true)) {
+            if (in_array($block['type'] ?? '', HomeLayout::types($extra), true)) {
                 $clean[] = $block;
             }
         }
@@ -224,20 +231,24 @@ final class Pages
         $stmt->execute(['blocks' => json_encode($clean, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR), 'id' => $id]);
     }
 
-    /** Saves one text field of one block in one language; returns the cleaned value, or null when there is no such field. */
-    public function setBlockField(int $id, string $blockId, string $locale, string $field, string $value): ?string
+    /**
+     * Saves one text field of one block in one language; returns the cleaned value, or null when there is no such field.
+     *
+     * @param array<string, array{label_key: string, text_fields: string[], template: string}> $extra App::pageBlockTypes()
+     */
+    public function setBlockField(int $id, string $blockId, string $locale, string $field, string $value, array $extra = []): ?string
     {
-        $blocks = $this->blocksFor($id);
+        $blocks = $this->blocksFor($id, $extra);
         foreach ($blocks as $i => $block) {
             if ($block['id'] !== $blockId) {
                 continue;
             }
-            if (!in_array($field, HomeLayout::TEXT_FIELDS[$block['type']] ?? [], true)) {
+            if (!in_array($field, HomeLayout::textFields($extra)[$block['type']] ?? [], true)) {
                 return null;
             }
             $clean = HomeLayout::clean($block['type'], $field, $value);
             $blocks[$i]['texts'][$locale][$field] = $clean;
-            $this->saveBlocks($id, $blocks);
+            $this->saveBlocks($id, $blocks, $extra);
 
             return $clean;
         }

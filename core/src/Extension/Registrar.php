@@ -191,6 +191,24 @@ final class Registrar
     }
 
     /**
+     * A new kind of block an admin can add anywhere a page is built from
+     * blocks (the home page, or any other page), next to the built-in ones
+     * (hero, text, categories, ...). Shows up in the "+" menu between
+     * blocks, with its own fields and its own template - the block editor
+     * itself needs no change for it.
+     *
+     * @param string $id unique, must start with this extension's id ("fields.list")
+     * @param string $labelKey shown in the "+" menu and as the block's own heading
+     * @param string[] $textFields plain-text fields of the block (shown as simple inputs, like "heading" on the built-in types - no picture, count or background settings)
+     * @param string $template renders the block, both on the real page and live in the admin editor; receives "block" (id, type, enabled, texts: array<locale, array<field, text>>) plus whatever $data returns
+     * @param Closure(App, array): array<string, mixed>|null $data anything beyond the block's own texts (e.g. a live list fetched from the database); run fresh every time the block is shown, gets the block itself (same shape as "block" above)
+     */
+    public function pageBlockType(string $id, string $labelKey, array $textFields, string $template, ?Closure $data = null): void
+    {
+        $this->app->addPageBlockType($this->prefixed($id, 'Page block type'), $labelKey, $textFields, $template, $data);
+    }
+
+    /**
      * A section on a provider's public profile, e.g. a freelancer's skills
      * and portfolio. The template is one of this extension's
      * ("@id/provider.twig"); a theme may override it like any other. $data

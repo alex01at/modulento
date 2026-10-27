@@ -271,8 +271,22 @@ final class View
         )));
         // The fields a block of a page has, for the in-place editor.
         $this->twig->addFunction(new TwigFunction('block_fields', fn (string $page): array => match ($page) {
-            'home', 'page' => \Modulento\Core\Content\HomeLayout::TEXT_FIELDS,
+            'home', 'page' => \Modulento\Core\Content\HomeLayout::textFields($app->pageBlockTypes()),
             default => ['text' => ['heading', 'body', 'button_label', 'button_url']],
+        }));
+        // Every block type offered in the "+" menu, with its language key - home/page only, since the
+        // offer page's own block types are fixed (just "text", see block_fields() above).
+        $this->twig->addFunction(new TwigFunction('block_types', fn (string $page): array => match ($page) {
+            'home', 'page' => \Modulento\Core\Content\HomeLayout::typeLabels($app->pageBlockTypes()),
+            default => ['text' => 'core.offer_page.type.text'],
+        }));
+        // What a block's own template is included with: "block" itself, plus whatever an
+        // extension's own pageBlockType() $data closure adds (e.g. a live list of offers) -
+        // run fresh every time, so it is never stale behind a cached page.
+        $this->twig->addFunction(new TwigFunction('block_context', function (array $block) use ($app): array {
+            $registered = $app->pageBlockTypes()[$block['type']] ?? null;
+
+            return ['block' => $block] + ($registered !== null && $registered['data'] !== null ? ($registered['data'])($app, $block) : []);
         }));
         // The pictures of the media library, for the picture of a block.
         $this->twig->addFunction(new TwigFunction('library_pictures', fn (): array => array_map(
@@ -303,14 +317,16 @@ final class View
             $app->locales->default(),
             fn (string $key, array $params = []) => $translator->trans($key, $params),
             $app->siteName(),
-            $all
+            $all,
+            $app->pageBlockTypes()
         )));
         // The blocks of a content page, in the current language, enabled ones only.
         $this->twig->addFunction(new TwigFunction('page_blocks', fn (int $pageId, bool $all = false): array => $app->pages->view(
             $pageId,
             $app->translator->locale(),
             $app->locales->default(),
-            $all
+            $all,
+            $app->pageBlockTypes()
         )));
         // Seconds between two asks for new messages; 0 switches the asking off (Administration → Settings).
         $this->twig->addFunction(new TwigFunction('poll_seconds', fn (): int => (int) $app->settings->get('core.poll_seconds', '60')));
