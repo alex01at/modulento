@@ -9,8 +9,8 @@
         {{ csrf_field() }}
         <input type="hidden" name="return" value="{{ current_path() }}?edit=1">
         <input type="hidden" name="action" value="insert:{{ after }}">
-        {% for type in add_types %}
-            <button type="submit" name="add_type" value="{{ type }}">{{ trans('core.home.type.' ~ type) }}</button>
+        {% for type, label_key in add_types %}
+            <button type="submit" name="add_type" value="{{ type }}">{{ trans(label_key) }}</button>
         {% endfor %}
         {% for widget in widget_options() %}
             <button type="submit" name="add_type" value="widget:{{ widget.key }}" class="inline-widget-choice">{{ widget.label }}</button>

@@ -13,8 +13,8 @@
             <input type="hidden" name="return" value="{{ current_path() }}?edit=1">
             <label for="inline-add-type">{{ trans('core.home.add') }}</label>
             <select id="inline-add-type" name="add_type">
-                {% for type in add_types %}
-                    <option value="{{ type }}">{{ trans('core.home.type.' ~ type) }}</option>
+                {% for type, label_key in add_types %}
+                    <option value="{{ type }}">{{ trans(label_key) }}</option>
                 {% endfor %}
             </select>
             <button type="submit" name="action" value="add">{{ trans('core.home.add') }}</button>

@@ -851,6 +851,8 @@ return [
     'core.offers.categories' => 'Kategorien',
     'core.offers.search' => 'Angebote durchsuchen',
     'core.offers.search_submit' => 'Suchen',
+    'core.offers.types' => 'Arten von Angeboten',
+    'core.offers.type_all' => 'Alle Arten',
     'core.offers.sort' => 'Sortierung',
     'core.offers.sort.newest' => 'Neueste zuerst',
     'core.offers.sort.price_low' => 'Preis aufsteigend',

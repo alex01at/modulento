@@ -128,7 +128,9 @@ final class Offers
     /**
      * Offers for visitors.
      *
-     * @param array{search?: string, category_ids?: int[], provider_id?: int, sort?: string} $filter
+     * @param array{search?: string, category_ids?: int[], provider_id?: int, sort?: string, type?: string, field_filter?: array<string, mixed>} $filter
+     *        "type" narrows to one registered type (ignored if it is not one); "field_filter" is handed to that
+     *        type's FilterableOfferType::applyFilter() and has no effect without "type".
      * @return array{rows: array<int, array>, total: int}
      */
     /** @param int[] $priorityAccountIds providers whose offers come first, within whatever sort was chosen */
@@ -142,7 +144,24 @@ final class Offers
         if ($types === []) {
             return ['rows' => [], 'total' => 0];
         }
-        $where[] = 'o.type IN (' . $this->placeholders('type', $types, $params) . ')';
+
+        // Narrowed to one type only when it is actually registered - an
+        // unknown or disabled one behaves as if "type" had not been given.
+        $only = isset($filter['type']) ? ($this->types[$filter['type']] ?? null) : null;
+        $where[] = $only !== null
+            ? 'o.type = :only_type'
+            : 'o.type IN (' . $this->placeholders('type', $types, $params) . ')';
+        if ($only !== null) {
+            $params['only_type'] = $only->id();
+        }
+
+        if ($only instanceof FilterableOfferType) {
+            $condition = $only->applyFilter((array) ($filter['field_filter'] ?? []), $locale);
+            if ($condition !== null) {
+                $where[] = $condition['where'];
+                $params += $condition['params'];
+            }
+        }
 
         if (($filter['category_ids'] ?? []) !== []) {
             $where[] = 'o.category_id IN (' . $this->placeholders('cat', $filter['category_ids'], $params) . ')';
@@ -162,7 +181,11 @@ final class Offers
             $params += ['s_locale' => $locale, 's_default' => $this->locales->default(), 's1' => $pattern, 's2' => $pattern, 's3' => $pattern];
         }
 
-        $order = match ($filter['sort'] ?? 'newest') {
+        // The selected type's own sort ids take priority; any other value
+        // (including none of its ids, or no type selected) falls back to
+        // the built-in sorts.
+        $order = $only instanceof SortableOfferType ? $only->orderBy((string) ($filter['sort'] ?? '')) : null;
+        $order ??= match ($filter['sort'] ?? 'newest') {
             'price_low' => '(o.price_from IS NULL), o.price_from ASC, o.id DESC',
             'price_high' => 'o.price_from DESC, o.id DESC',
             // Rated offers first, by their average; the number of
@@ -248,6 +271,15 @@ final class Offers
         }
 
         return $counts;
+    }
+
+    /** How many offers (any status) are of one type - an extension's "in use, can't delete" check. */
+    public function countOfType(string $type): int
+    {
+        $stmt = $this->db->prepare('SELECT COUNT(*) FROM offer WHERE type = :type');
+        $stmt->execute(['type' => $type]);
+
+        return (int) $stmt->fetchColumn();
     }
 
     /** @return array<string, int> status => number of offers */

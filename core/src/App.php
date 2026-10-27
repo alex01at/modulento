@@ -198,6 +198,8 @@ final class App
     private array $accountLinks = [];
     /** @var array<string, string> permission name => label key */
     private array $permissions = [];
+    /** @var array<string, array{label_key: string, text_fields: string[], template: string, data: ?\Closure}> block type id => its schema */
+    private array $pageBlockTypes = [];
 
     public function __construct(public readonly array $config, public readonly PDO $db, string $locale = 'en')
     {
@@ -457,6 +459,21 @@ final class App
             fn (array $section) => ['template' => $section['template'], 'data' => $section['data'] !== null ? ($section['data'])($this) : []],
             $this->homeSections
         );
+    }
+
+    /**
+     * A new kind of block an admin can add to the home page or any other
+     * page, alongside the built-in ones (hero, text, ...).
+     */
+    public function addPageBlockType(string $id, string $labelKey, array $textFields, string $template, ?\Closure $data = null): void
+    {
+        $this->pageBlockTypes[$id] = ['label_key' => $labelKey, 'text_fields' => $textFields, 'template' => $template, 'data' => $data];
+    }
+
+    /** @return array<string, array{label_key: string, text_fields: string[], template: string, data: ?\Closure}> */
+    public function pageBlockTypes(): array
+    {
+        return $this->pageBlockTypes;
     }
 
     /**

@@ -19,7 +19,7 @@
     {% for block in blocks %}
         {% set id = block.id %}
         <fieldset class="card-box home-block{{ block.enabled ? '' : ' is-off' }}" id="block-{{ id }}">
-            <legend>{{ trans('core.home.type.' ~ block.type) }}</legend>
+            <legend>{{ trans(block.label_key) }}</legend>
 
             <label class="checkbox">
                 <input type="checkbox" name="blocks[{{ id }}][enabled]" value="1" {{ block.enabled ? 'checked' }}>
@@ -109,8 +109,8 @@
     <div class="button-row">
         <label for="add_type" class="visually-hidden">{{ trans('core.home.add') }}</label>
         <select id="add_type" name="add_type">
-            {% for type in types %}
-                <option value="{{ type }}">{{ trans('core.home.type.' ~ type) }}</option>
+            {% for type, label_key in types %}
+                <option value="{{ type }}">{{ trans(label_key) }}</option>
             {% endfor %}
         </select>
         <button type="submit" name="action" value="add" class="btn-outline">{{ trans('core.home.add') }}</button>

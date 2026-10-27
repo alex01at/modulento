@@ -40,6 +40,57 @@ final class HomeLayout
     {
     }
 
+    /**
+     * The built-in types plus whatever extensions registered
+     * (Registrar::pageBlockType()).
+     *
+     * @param array<string, array{label_key: string, text_fields: string[], template: string}> $extra App::pageBlockTypes()
+     * @return string[]
+     */
+    public static function types(array $extra = []): array
+    {
+        return [...self::TYPES, ...array_keys($extra)];
+    }
+
+    /**
+     * @param array<string, array{label_key: string, text_fields: string[], template: string}> $extra App::pageBlockTypes()
+     * @return array<string, string[]>
+     */
+    public static function textFields(array $extra = []): array
+    {
+        $fields = self::TEXT_FIELDS;
+        foreach ($extra as $id => $type) {
+            $fields[$id] = $type['text_fields'];
+        }
+
+        return $fields;
+    }
+
+    /**
+     * Every type with the language key for its name in the "+" menu.
+     *
+     * @param array<string, array{label_key: string, text_fields: string[], template: string}> $extra App::pageBlockTypes()
+     * @return array<string, string>
+     */
+    public static function typeLabels(array $extra = []): array
+    {
+        $labels = [];
+        foreach (self::TYPES as $type) {
+            $labels[$type] = 'core.home.type.' . $type;
+        }
+        foreach ($extra as $id => $type) {
+            $labels[$id] = $type['label_key'];
+        }
+
+        return $labels;
+    }
+
+    /** The template that renders one block: the theme's built-in convention, or an extension's own for a type it registered. */
+    public static function template(string $type, array $extra = []): string
+    {
+        return $extra[$type]['template'] ?? ('home/_' . $type . '.twig');
+    }
+
     public function isCustomized(): bool
     {
         return $this->settings->has(self::SETTING);
@@ -48,9 +99,10 @@ final class HomeLayout
     /**
      * The blocks as they are stored, in their order.
      *
+     * @param array<string, array{label_key: string, text_fields: string[], template: string}> $extra App::pageBlockTypes()
      * @return list<array{id: string, type: string, enabled: bool, texts: array<string, array<string, string>>, settings: array<string, mixed>}>
      */
-    public function blocks(): array
+    public function blocks(array $extra = []): array
     {
         $data = json_decode($this->settings->get(self::SETTING), true);
         if (!is_array($data)) {
@@ -69,7 +121,7 @@ final class HomeLayout
 
         $blocks = [];
         foreach ($data as $block) {
-            if (!is_array($block) || !in_array($block['type'] ?? '', self::TYPES, true)) {
+            if (!is_array($block) || !in_array($block['type'] ?? '', self::types($extra), true)) {
                 continue;
             }
             $blocks[] = [
@@ -89,17 +141,18 @@ final class HomeLayout
      * that language, else in the default language, else the wording of the core.
      *
      * @param Closure(string, array<string, string>): string $trans
+     * @param array<string, array{label_key: string, text_fields: string[], template: string}> $extra App::pageBlockTypes()
      * @return list<array<string, mixed>>
      */
-    public function view(string $locale, string $default, Closure $trans, string $siteName, bool $includeHidden = false): array
+    public function view(string $locale, string $default, Closure $trans, string $siteName, bool $includeHidden = false, array $extra = []): array
     {
         $view = [];
-        foreach ($this->blocks() as $block) {
+        foreach ($this->blocks($extra) as $block) {
             if (!$block['enabled'] && !$includeHidden) {
                 continue;
             }
             $texts = [];
-            foreach (self::TEXT_FIELDS[$block['type']] as $field) {
+            foreach (self::textFields($extra)[$block['type']] as $field) {
                 // An empty text in this language is no text: the default language stands in.
                 $text = (string) ($block['texts'][$locale][$field] ?? '');
                 if ($text === '') {
@@ -115,6 +168,8 @@ final class HomeLayout
                 'id' => $block['id'],
                 'type' => $block['type'],
                 'enabled' => $block['enabled'],
+                'template' => self::template($block['type'], $extra),
+                'label_key' => self::typeLabels($extra)[$block['type']] ?? ('core.home.type.' . $block['type']),
                 'texts' => $texts,
                 'count' => max(1, min(12, (int) ($block['settings']['count'] ?? 6))),
                 'media' => (string) ($block['settings']['media'] ?? ''),
@@ -136,12 +191,13 @@ final class HomeLayout
      * Saves the blocks in this order. Each block is cleaned on the way in.
      *
      * @param list<array<string, mixed>> $blocks
+     * @param array<string, array{label_key: string, text_fields: string[], template: string}> $extra App::pageBlockTypes()
      */
-    public function save(array $blocks): void
+    public function save(array $blocks, array $extra = []): void
     {
         $clean = [];
         foreach (array_slice($blocks, 0, self::MAX_BLOCKS) as $block) {
-            if (in_array($block['type'] ?? '', self::TYPES, true)) {
+            if (in_array($block['type'] ?? '', self::types($extra), true)) {
                 $clean[] = $block;
             }
         }
@@ -154,20 +210,24 @@ final class HomeLayout
         $this->settings->forget(self::SETTING);
     }
 
-    /** Saves one text field of one block in one language; returns the cleaned value, or null when there is no such field. */
-    public function setField(string $id, string $locale, string $field, string $value): ?string
+    /**
+     * Saves one text field of one block in one language; returns the cleaned value, or null when there is no such field.
+     *
+     * @param array<string, array{label_key: string, text_fields: string[], template: string}> $extra App::pageBlockTypes()
+     */
+    public function setField(string $id, string $locale, string $field, string $value, array $extra = []): ?string
     {
-        $blocks = $this->blocks();
+        $blocks = $this->blocks($extra);
         foreach ($blocks as $i => $block) {
             if ($block['id'] !== $id) {
                 continue;
             }
-            if (!in_array($field, self::TEXT_FIELDS[$block['type']] ?? [], true)) {
+            if (!in_array($field, self::textFields($extra)[$block['type']] ?? [], true)) {
                 return null;
             }
             $clean = self::clean($block['type'], $field, $value);
             $blocks[$i]['texts'][$locale][$field] = $clean;
-            $this->save($blocks);
+            $this->save($blocks, $extra);
 
             return $clean;
         }

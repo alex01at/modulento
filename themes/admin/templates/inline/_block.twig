@@ -94,8 +94,13 @@
                     {% for field in fields %}
                         {% set value = block.texts[locale()][field] ?? '' %}
                         {% set name = 'blocks[' ~ id ~ '][texts][' ~ locale() ~ '][' ~ field ~ ']' %}
+                        {# The built-in types share one catalogue of field labels; a type an extension
+                           registered (pageBlockType()) has none there, so it gets its own, next to its
+                           own label (e.g. "fields.block.list" + ".field.type_key"). #}
+                        {% set field_key = field in ['title', 'text', 'button_label', 'button_url', 'heading', 'body', 'caption', 'items']
+                            ? 'core.home.field.' ~ field : block.label_key ~ '.field.' ~ field %}
                         <div class="field">
-                            <label for="{{ field }}-{{ id }}">{{ trans('core.home.field.' ~ field) }}</label>
+                            <label for="{{ field }}-{{ id }}">{{ trans(field_key) }}</label>
                             {% if field == 'body' %}
                                 <textarea id="{{ field }}-{{ id }}" name="{{ name }}" rows="8" data-editor="{{ editor() }}">{{ value }}</textarea>
                             {% elseif field == 'button_url' %}
@@ -114,7 +119,7 @@
     </div>
 
     {% if block.enabled %}
-        {% include partial with {block: block} %}
+        {% include partial with block_context(block) %}
     {% else %}
         <p class="inline-off">{{ trans(label_key) }} · {{ trans('core.inline.hidden') }}</p>
     {% endif %}
