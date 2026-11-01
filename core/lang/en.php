@@ -445,6 +445,7 @@ return [
     'core.update.migrations_applied' => '{count} database update(s) applied.',
     'core.update.migrations_none' => 'The database is up to date.',
     'core.install.title' => 'Set up Modulento',
+    'core.install.language' => 'Language',
     'core.install.intro' => 'This page appears as long as no database has been entered. Submitting it sets up the database, creates the first administration account and writes the configuration file.',
     'core.install.requirements' => 'Requirements',
     'core.install.requirement_ok' => 'OK',

@@ -445,6 +445,7 @@ return [
     'core.update.migrations_applied' => '{count} Datenbank-Aktualisierung(en) ausgeführt.',
     'core.update.migrations_none' => 'Die Datenbank ist auf dem aktuellen Stand.',
     'core.install.title' => 'Modulento einrichten',
+    'core.install.language' => 'Sprache',
     'core.install.intro' => 'Diese Seite erscheint, solange noch keine Datenbank eingetragen ist. Nach dem Absenden wird die Datenbank eingerichtet, das erste Verwaltungskonto angelegt und die Konfigurationsdatei geschrieben.',
     'core.install.requirements' => 'Voraussetzungen',
     'core.install.requirement_ok' => 'in Ordnung',

@@ -926,9 +926,9 @@ check('locales: the redirect to the plain address never leads to another site', 
 check('locales: a word starting like a code is not a prefix', $locales()->split('/english')['path'] === '/english');
 
 $r = $get('/login', null);
-check('page in the default language', str_contains($r['body'], '<html lang="de">') && str_contains($r['body'], 'action="/login"') && str_contains($r['body'], 'Passwort vergessen'));
+check('page in the default language', str_contains($r['body'], '<html lang="de" dir="ltr">') && str_contains($r['body'], 'action="/login"') && str_contains($r['body'], 'Passwort vergessen'));
 $r = $get('/en/login', null);
-check('page in another language: texts, links and form targets carry the prefix', str_contains($r['body'], '<html lang="en">')
+check('page in another language: texts, links and form targets carry the prefix', str_contains($r['body'], '<html lang="en" dir="ltr">')
     && str_contains($r['body'], 'action="/en/login"') && str_contains($r['body'], 'href="/en/register"') && str_contains($r['body'], 'Forgot your password'));
 check('hreflang alternates for every language', str_contains($r['body'], 'hreflang="de" href="https://example.test/login"') && str_contains($r['body'], 'hreflang="en" href="https://example.test/en/login"'));
 check('language menu links to the same page', str_contains($r['body'], '<a href="/login" hreflang="de" lang="de">Deutsch</a>'));
@@ -1026,7 +1026,7 @@ check('page blocks: saving the page\'s own settings does not wipe a not-yet-open
 $pdo->exec("UPDATE page_translation SET body = '' WHERE page_id = {$imprint['page_id']}");
 
 $r = $get('/en/impressum', null);
-check('pages: a language without its own text shows the default one, marked as German', $r['status'] === 200 && str_contains($r['body'], '<article lang="de">') && str_contains($r['body'], '<html lang="en">'));
+check('pages: a language without its own text shows the default one, marked as German', $r['status'] === 200 && str_contains($r['body'], '<article lang="de">') && str_contains($r['body'], '<html lang="en" dir="ltr">'));
 check('pages: legal page is in the footer of every language', str_contains($r['body'], '<a href="/en/impressum">Impressum</a>'));
 
 // A form for a new page marks no status option as chosen, so a browser that
@@ -1101,7 +1101,7 @@ $r = $post('/admin/settings', ['site_name' => 'Neuer Name', 'mail_from' => 'post
 check('settings: need their permission', $r['status'] === 403);
 $post('/admin/settings', ['site_name' => 'Neuer Name', 'mail_from' => 'post@example.test', 'registration' => 'closed', 'default_locale' => 'en', 'locales' => ['en', 'de']], 3);
 $r = $get('/login', null);
-check('settings: site name and default language take effect', str_contains($r['body'], 'Neuer Name') && str_contains($r['body'], '<html lang="en">') && str_contains($get('/de/login', null)['body'], '<html lang="de">'));
+check('settings: site name and default language take effect', str_contains($r['body'], 'Neuer Name') && str_contains($r['body'], '<html lang="en" dir="ltr">') && str_contains($get('/de/login', null)['body'], '<html lang="de" dir="ltr">'));
 check('settings: closed registration hides the link and creates nothing', !str_contains($r['body'], '/register')
     && $post('/register', ['email' => 'closed@example.test', 'password' => $pw, 'password_repeat' => $pw, 'accept_terms' => '1'], null) && $row('closed@example.test') === false);
 $post('/admin/settings', ['site_name' => '', 'mail_from' => 'nope', 'default_locale' => 'xx'], 3);
@@ -4139,7 +4139,7 @@ check('every language key used exists: ' . implode(', ', array_unique($missingKe
 $r = $get('/', null);
 check('header: a visitor gets the login link, no dashboard link and no account menu', $r['status'] === 200 && str_contains($r['body'], 'href="/login"')
     && !str_contains($r['body'], 'href="/account"') && !str_contains($r['body'], 'account-menu') && !str_contains($r['body'], 'action="/logout"'));
-check('colour scheme: a visitor\'s page leaves the choice to the device', str_contains($r['body'], '<html lang="de">'));
+check('colour scheme: a visitor\'s page leaves the choice to the device', str_contains($r['body'], '<html lang="de" dir="ltr">'));
 $r = $get('/', 1);
 preg_match('#<details class="account-menu">.*?</details>#s', $r['body'], $menu);
 check('header: an account gets "Dashboard" and its menu', str_contains($r['body'], '<a href="/account">Dashboard</a>') && ($menu[0] ?? '') !== '' && !str_contains($r['body'], 'Mein Konto'));
@@ -4160,7 +4160,7 @@ $post('/account/avatar/delete', [], 1);
 $r = $get('/account', 1);
 check('account pages: the overview is called "Dashboard"', str_contains($r['body'], '<title>Dashboard – ') && str_contains($r['body'], '<a href="/account">Dashboard</a>'));
 $r = $get('/admin', 3);
-check('administration: called "Administration" in title and menu', str_contains($r['body'], '<title>Administration – ') && str_contains($r['body'], 'aria-label="Administration"') && str_contains($r['body'], '<html lang="de">'));
+check('administration: called "Administration" in title and menu', str_contains($r['body'], '<title>Administration – ') && str_contains($r['body'], 'aria-label="Administration"') && str_contains($r['body'], '<html lang="de" dir="ltr">'));
 
 $schemeOf = fn (int $id) => $pdo->query("SELECT value FROM account_preference WHERE name = 'color_scheme' AND account_id = {$id}")->fetchColumn();
 $r = $get('/account/settings', 1);
@@ -4169,7 +4169,7 @@ check('colour scheme: the account menu offers three choices, "automatic" chosen'
 $post('/account/appearance', ['color_scheme' => 'dark'], 1);
 check('colour scheme: a fixed choice is stored for the account', $schemeOf(1) === 'dark' && isset($_SESSION['_flash']['success']));
 $r = $get('/account/settings', 1);
-check('colour scheme: a fixed choice appears as data-theme and in the form', str_contains($r['body'], '<html lang="de" data-theme="dark">') && str_contains($r['body'], 'value="dark" aria-pressed="true"'));
+check('colour scheme: a fixed choice appears as data-theme and in the form', str_contains($r['body'], '<html lang="de" dir="ltr" data-theme="dark">') && str_contains($r['body'], 'value="dark" aria-pressed="true"'));
 $r = $post('/account/appearance', ['color_scheme' => 'dark', 'return' => '/offers'], 1);
 check('colour scheme: chosen from the menu, the page one was on comes back without a detour over the settings', !isset($_SESSION['_flash']['success']));
 foreach (['//evil.example', 'https://evil.example/', '/\\evil', "/a\nb"] as $elsewhere) {
@@ -4208,7 +4208,7 @@ check('roles: a template fills in name and permissions', str_contains($r['body']
     && preg_match('#value="core.accounts.manage" checked#', $r['body']) === 1 && preg_match('#value="core.pages.manage" checked#', $r['body']) === 0);
 check('roles: an unknown template is an empty form', !str_contains($get('/admin/roles/new?preset=x', 3)['body'], ' checked') && $get('/admin/roles/new?preset[]=x', 3)['status'] === 200);
 check('administration: the top bar has the same account menu', str_contains($r['body'], '<details class="account-menu">') && str_contains($r['body'], 'action="/account/appearance"') && str_contains($r['body'], 'account-menu.js'));
-check('colour scheme: it is the account\'s own', str_contains($get('/', 2)['body'], '<html lang="de">') && str_contains($get('/', null)['body'], '<html lang="de">'));
+check('colour scheme: it is the account\'s own', str_contains($get('/', 2)['body'], '<html lang="de" dir="ltr">') && str_contains($get('/', null)['body'], '<html lang="de" dir="ltr">'));
 foreach (['pink', '', ['dark'], 'DARK'] as $invalid) {
     $post('/account/appearance', ['color_scheme' => $invalid], 1);
     check('colour scheme: ' . json_encode($invalid) . ' is refused and the choice stays', $schemeOf(1) === 'dark' && str_contains($_SESSION['_flash']['error'] ?? '', 'Farbschemata'));
@@ -4217,16 +4217,16 @@ $r = $post('/account/appearance', ['color_scheme' => 'light', '_csrf' => 'wrong'
 check('colour scheme: not changed without the token', $schemeOf(1) === 'dark');
 $post('/account/appearance', ['color_scheme' => 'light'], 1);
 check('colour scheme: changing replaces the one row', $schemeOf(1) === 'light' && $pdo->query('SELECT COUNT(*) FROM account_preference')->fetchColumn() == 1
-    && str_contains($get('/offers', 1)['body'], '<html lang="de" data-theme="light">'));
+    && str_contains($get('/offers', 1)['body'], '<html lang="de" dir="ltr" data-theme="light">'));
 check('colour scheme: a visitor cannot set one', $post('/account/appearance', ['color_scheme' => 'dark'], null)['status'] === 403 && $pdo->query('SELECT COUNT(*) FROM account_preference')->fetchColumn() == 1);
 $post('/account/appearance', ['color_scheme' => 'dark'], 3);
 $r = $get('/admin', 3);
-check('colour scheme: the administration takes the account\'s choice', str_contains($r['body'], '<html lang="de" data-theme="dark">') && str_contains($get('/admin/settings', 3)['body'], 'data-theme="dark"'));
+check('colour scheme: the administration takes the account\'s choice', str_contains($r['body'], '<html lang="de" dir="ltr" data-theme="dark">') && str_contains($get('/admin/settings', 3)['body'], 'data-theme="dark"'));
 check('colour scheme: part of the data export', (json_decode($get('/account/export', 3)['body'], true)['preferences'] ?? null) === ['color_scheme' => 'dark']);
 $post('/account/appearance', ['color_scheme' => 'auto'], 3);
 $post('/account/appearance', ['color_scheme' => 'auto'], 1);
 check('colour scheme: "automatic" needs no row and writes no attribute', $pdo->query('SELECT COUNT(*) FROM account_preference')->fetchColumn() == 0
-    && str_contains($get('/account/settings', 1)['body'], '<html lang="de">') && str_contains($get('/admin', 3)['body'], '<html lang="de">'));
+    && str_contains($get('/account/settings', 1)['body'], '<html lang="de" dir="ltr">') && str_contains($get('/admin', 3)['body'], '<html lang="de" dir="ltr">'));
 // Word filter in the administration: kept in the settings, the shipped lists apply until someone saves one.
 check('badwords admin: only administrators with the settings permission see the word filter', $get('/admin/badwords', 3)['status'] === 200
     && $get('/admin/badwords', 1)['status'] === 403 && str_contains($get('/admin/badwords', 3)['body'], 'name="words"'));

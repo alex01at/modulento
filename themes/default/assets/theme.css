@@ -117,7 +117,7 @@ button { background: var(--accent); border-color: var(--accent); color: var(--on
 ::placeholder { color: var(--muted); opacity: 1; }
 :disabled { opacity: .6; cursor: not-allowed; }
 
-.flash { padding: .6rem .8rem; border-left: .25rem solid var(--muted); background: var(--surface); }
+.flash { padding: .6rem .8rem; border-inline-start: .25rem solid var(--muted); background: var(--surface); }
 .flash-error { border-color: var(--error); color: var(--error); }
 .flash-success { border-color: var(--success); color: var(--success); }
 
@@ -153,12 +153,12 @@ address { font-style: normal; }
 .category-nav [aria-current] { font-weight: 700; text-decoration: none; }
 .price { font-weight: 700; }
 table { width: 100%; border-collapse: collapse; }
-th, td { padding: .5rem .6rem; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+th, td { padding: .5rem .6rem; border-bottom: 1px solid var(--line); text-align: start; vertical-align: top; }
 
 a.button { display: inline-block; margin-top: .5rem; padding: .45rem .8rem; border-radius: var(--radius); background: var(--accent); color: var(--on-accent); text-decoration: none; }
-.history { padding-left: 1.2rem; display: grid; gap: .6rem; }
-.history p, .message { margin: .25rem 0; padding: .5rem .7rem; background: var(--surface); border-left: .2rem solid var(--line); }
-.message.own { border-left-color: var(--accent); }
+.history { padding-inline-start: 1.2rem; display: grid; gap: .6rem; }
+.history p, .message { margin: .25rem 0; padding: .5rem .7rem; background: var(--surface); border-inline-start: .2rem solid var(--line); }
+.message.own { border-inline-start-color: var(--accent); }
 
 .files { list-style: none; padding: 0; margin: .25rem 0; }
 .files li::before { content: "📎 "; }
@@ -179,7 +179,7 @@ a.button { display: inline-block; margin-top: .5rem; padding: .45rem .8rem; bord
 .rating small { color: var(--muted); }
 .review { padding: .75rem 0; border-top: 1px solid var(--line); }
 .review p { margin: .25rem 0; }
-.reply { margin-left: 1.5rem; padding: .5rem .7rem; background: var(--surface); border-left: .2rem solid var(--accent); }
+.reply { margin-inline-start: 1.5rem; padding: .5rem .7rem; background: var(--surface); border-inline-start: .2rem solid var(--accent); }
 
 /* --- The account's overview --- */
 .dashboard { display: grid; gap: 2rem; grid-template-columns: minmax(0, 18rem) minmax(0, 1fr); align-items: start; }
@@ -206,7 +206,7 @@ img.avatar { display: block; object-fit: cover; }
 .account-menu summary:hover .account-menu-picture, .account-menu[open] .account-menu-picture { box-shadow: 0 0 0 2px var(--ground), 0 0 0 4px var(--accent); }
 /* Placed against the header, not against the picture: wherever the picture
    ends up when the header wraps on a narrow screen, the menu stays inside. */
-.account-menu-items { position: absolute; z-index: 10; top: calc(100% - .35rem); right: 1rem; display: grid; gap: .6rem; min-width: 12rem; max-width: calc(100% - 2rem); padding: .9rem 1rem; border: 1px solid var(--line); border-radius: .4rem; background: var(--ground); box-shadow: var(--shadow); }
+.account-menu-items { position: absolute; z-index: 10; top: calc(100% - .35rem); inset-inline-end: 1rem; display: grid; gap: .6rem; min-width: 12rem; max-width: calc(100% - 2rem); padding: .9rem 1rem; border: 1px solid var(--line); border-radius: .4rem; background: var(--ground); box-shadow: var(--shadow); }
 .account-menu-name { padding-bottom: .6rem; border-bottom: 1px solid var(--line); color: var(--muted); font-size: .9rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .account-menu-items form { margin: 0; }
 
@@ -237,7 +237,7 @@ img.avatar { display: block; object-fit: cover; }
 
 /* The number of unread messages, on the inbox envelope in the header. */
 .inbox-link { position: relative; display: inline-flex; align-items: center; font-size: 1.3rem; line-height: 1; text-decoration: none; }
-.unread-badge { position: absolute; top: -.35rem; right: -.45rem; min-width: 1.25rem; height: 1.25rem; padding: 0 .3rem; border-radius: 999px; background: #b3211d; color: #fff; font-size: .7rem; font-weight: 700; line-height: 1.25rem; text-align: center; }
+.unread-badge { position: absolute; top: -.35rem; inset-inline-end: -.45rem; min-width: 1.25rem; height: 1.25rem; padding: 0 .3rem; border-radius: 999px; background: #b3211d; color: #fff; font-size: .7rem; font-weight: 700; line-height: 1.25rem; text-align: center; }
 
 /* The inbox: one row per conversation, newest activity first. Clicking a
    row opens it in place (a <details> element - works without scripts);
@@ -266,15 +266,15 @@ img.avatar { display: block; object-fit: cover; }
 .account-tab .stack-form label { font-weight: 600; }
 .account-tab fieldset { margin: 0; padding: .75rem 1rem; }
 .account-tab table { width: 100%; border-collapse: collapse; font-size: .9rem; }
-.account-tab th, .account-tab td { padding: .45rem .4rem; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+.account-tab th, .account-tab td { padding: .45rem .4rem; border-bottom: 1px solid var(--line); text-align: start; vertical-align: top; }
 .account-tab .avatar, .account-tab img.avatar { border-radius: 50%; }
 
 
 /* The handbook: a numbered table of contents and a pager between chapters. */
-.handbook-toc { padding-left: 1.4rem; display: grid; gap: .5rem; }
+.handbook-toc { padding-inline-start: 1.4rem; display: grid; gap: .5rem; }
 .handbook-chapter h2 { margin-top: 2rem; }
 .handbook-chapter table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
-.handbook-chapter th, .handbook-chapter td { padding: .45rem .6rem; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+.handbook-chapter th, .handbook-chapter td { padding: .45rem .6rem; border-bottom: 1px solid var(--line); text-align: start; vertical-align: top; }
 .handbook-chapter pre { padding: .75rem 1rem; border-radius: .5rem; background: var(--ground); border: 1px solid var(--line); overflow-x: auto; }
 .handbook-pager { display: flex; justify-content: space-between; gap: 1rem; margin-top: 2.5rem; padding-top: 1.25rem; border-top: 1px solid var(--line); }
 .handbook-chapter dl { display: grid; gap: .3rem 0; }

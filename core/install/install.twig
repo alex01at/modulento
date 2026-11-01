@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="{{ locale }}">
+<html lang="{{ locale }}" dir="{{ dir }}">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -7,9 +7,20 @@
     <title>{{ t['core.install.title'] }}</title>
     <link rel="stylesheet" href="/install.css">
     <script src="/password-toggle.js" defer data-show="{{ password_show }}" data-hide="{{ password_hide }}"></script>
+    <script src="/language-select.js" defer></script>
 </head>
 <body>
 <main>
+    <form method="get" action="/" class="language-form">
+        <label for="locale">{{ t['core.install.language'] }}</label>
+        <select id="locale" name="locale" data-auto-submit>
+            {% for option in locales %}
+                <option value="{{ option.code }}" {{ option.code == locale ? 'selected' }}>{{ option.name }}</option>
+            {% endfor %}
+        </select>
+        <noscript><button type="submit">{{ t['core.install.language'] }}</button></noscript>
+    </form>
+
     <h1>{{ t['core.install.title'] }}</h1>
     <p>{{ t['core.install.intro'] }}</p>
 
@@ -29,6 +40,7 @@
 
     <form method="post" action="/">
         <input type="hidden" name="_csrf" value="{{ csrf }}">
+        <input type="hidden" name="locale" value="{{ locale }}">
 
         <h2>{{ t['core.install.site'] }}</h2>
         <label for="site_name">{{ t['core.install.site_name'] }}</label>

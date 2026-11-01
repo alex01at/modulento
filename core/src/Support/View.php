@@ -89,6 +89,8 @@ final class View
         // The language can change while rendering (an e-mail in the
         // recipient's language), so these are functions, not fixed values.
         $this->twig->addFunction(new TwigFunction('locale', fn () => $translator->locale()));
+        // "rtl" or "ltr", for `<html dir="...">` - Arabic, Hebrew, Persian, Urdu.
+        $this->twig->addFunction(new TwigFunction('locale_dir', fn () => $app->locales->direction($translator->locale())));
         // The request path without its language prefix, e.g. to mark the
         // menu entry of the current page.
         $this->twig->addFunction(new TwigFunction('current_path', fn () => $app->path));

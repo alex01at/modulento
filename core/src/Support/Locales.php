@@ -20,24 +20,28 @@ final class Locales
     // Native names for the language menu. A language missing here still
     // works and shows its code.
     private const NAMES = [
-        'bg' => 'Български', 'cs' => 'Čeština', 'da' => 'Dansk', 'de' => 'Deutsch', 'el' => 'Ελληνικά',
-        'en' => 'English', 'es' => 'Español', 'et' => 'Eesti', 'fi' => 'Suomi', 'fr' => 'Français',
-        'hr' => 'Hrvatski', 'hu' => 'Magyar', 'it' => 'Italiano', 'lt' => 'Lietuvių', 'lv' => 'Latviešu',
+        'ar' => 'العربية', 'bg' => 'Български', 'cs' => 'Čeština', 'da' => 'Dansk', 'de' => 'Deutsch', 'el' => 'Ελληνικά',
+        'en' => 'English', 'es' => 'Español', 'et' => 'Eesti', 'fa' => 'فارسی', 'fi' => 'Suomi', 'fr' => 'Français',
+        'he' => 'עברית', 'hr' => 'Hrvatski', 'hu' => 'Magyar', 'it' => 'Italiano', 'lt' => 'Lietuvių', 'lv' => 'Latviešu',
         'nl' => 'Nederlands', 'no' => 'Norsk', 'pl' => 'Polski', 'pt' => 'Português', 'ro' => 'Română',
         'ru' => 'Русский', 'sk' => 'Slovenčina', 'sl' => 'Slovenščina', 'sr' => 'Srpski', 'sv' => 'Svenska',
-        'tr' => 'Türkçe', 'uk' => 'Українська',
+        'tr' => 'Türkçe', 'uk' => 'Українська', 'ur' => 'اردو',
     ];
+
+    // ISO 639-1 codes of languages written right-to-left. A language
+    // missing here is left-to-right, including one with no entry at all.
+    private const RTL = ['ar', 'fa', 'he', 'ur'];
 
     // The territory og:locale expects a language paired with ("de" ->
     // "de_DE"), one sensible default market per language - not meant to
     // guess which country a given visitor is actually in.
     private const OG_TERRITORIES = [
-        'bg' => 'BG', 'cs' => 'CZ', 'da' => 'DK', 'de' => 'DE', 'el' => 'GR',
-        'en' => 'US', 'es' => 'ES', 'et' => 'EE', 'fi' => 'FI', 'fr' => 'FR',
-        'hr' => 'HR', 'hu' => 'HU', 'it' => 'IT', 'lt' => 'LT', 'lv' => 'LV',
+        'ar' => 'SA', 'bg' => 'BG', 'cs' => 'CZ', 'da' => 'DK', 'de' => 'DE', 'el' => 'GR',
+        'en' => 'US', 'es' => 'ES', 'et' => 'EE', 'fa' => 'IR', 'fi' => 'FI', 'fr' => 'FR',
+        'he' => 'IL', 'hr' => 'HR', 'hu' => 'HU', 'it' => 'IT', 'lt' => 'LT', 'lv' => 'LV',
         'nl' => 'NL', 'no' => 'NO', 'pl' => 'PL', 'pt' => 'PT', 'ro' => 'RO',
         'ru' => 'RU', 'sk' => 'SK', 'sl' => 'SI', 'sr' => 'RS', 'sv' => 'SE',
-        'tr' => 'TR', 'uk' => 'UA',
+        'tr' => 'TR', 'uk' => 'UA', 'ur' => 'PK',
     ];
 
     /** A language the way <meta property="og:locale"> expects it ("de_DE"). */
@@ -88,9 +92,17 @@ final class Locales
         return in_array($locale, $this->enabled(), true);
     }
 
-    public function name(string $locale): string
+    // Static (not just an instance method): the installer shows a language
+    // picker before any database, so before a Settings instance exists.
+    public static function name(string $locale): string
     {
         return self::NAMES[$locale] ?? strtoupper($locale);
+    }
+
+    /** "rtl" or "ltr", for the page's own `<html dir="...">`. */
+    public static function direction(string $locale): string
+    {
+        return in_array($locale, self::RTL, true) ? 'rtl' : 'ltr';
     }
 
     /** @param string[] $enabled */

@@ -58,10 +58,18 @@ final class Installer
             readfile($this->root . '/core/install/password-toggle.js');
             return;
         }
+        if ($path === '/language-select.js') {
+            header('Content-Type: text/javascript; charset=utf-8');
+            readfile($this->root . '/core/install/language-select.js');
+            return;
+        }
 
         Session::start();
         $available = Translator::localesIn($this->root . '/core/lang');
-        $locale = Translator::detectLocale($_SERVER['HTTP_ACCEPT_LANGUAGE'] ?? null, $available, 'en');
+        $chosen = $_POST['locale'] ?? $_GET['locale'] ?? null;
+        $locale = is_string($chosen) && in_array($chosen, $available, true)
+            ? $chosen
+            : Translator::detectLocale($_SERVER['HTTP_ACCEPT_LANGUAGE'] ?? null, $available, 'en');
         $this->translator = new Translator($locale, 'Modulento');
         $this->translator->load($this->root . '/core/lang', 'core');
 
@@ -92,6 +100,8 @@ final class Installer
         $twig = new Environment(new FilesystemLoader($this->root . '/core/install'), ['cache' => false]);
         echo $twig->render('install.twig', [
             'locale' => $locale,
+            'dir' => Locales::direction($locale),
+            'locales' => array_map(fn (string $code) => ['code' => $code, 'name' => Locales::name($code)], $available),
             't' => array_filter(
                 require $this->root . '/core/lang/' . $locale . '.php',
                 fn (string $key) => str_starts_with($key, 'core.install.'),
