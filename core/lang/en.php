@@ -1342,6 +1342,7 @@ return [
     'core.package.kind.extension' => 'Extension',
     'core.package.kind.theme' => 'Theme',
     'core.package.source' => 'Source',
+    'core.package.source_official' => 'Official source',
     'core.package.newer' => '{version} available',
     'core.package.current' => 'up to date',
     'core.package.update' => 'Update to {version}',

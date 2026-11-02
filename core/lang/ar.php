@@ -1342,6 +1342,7 @@ return [
     'core.package.kind.extension' => 'إضافة',
     'core.package.kind.theme' => 'قالب',
     'core.package.source' => 'المصدر',
+    'core.package.source_official' => 'مصدر رسمي',
     'core.package.newer' => '{version} متاح',
     'core.package.current' => 'محدَّث',
     'core.package.update' => 'التحديث إلى {version}',

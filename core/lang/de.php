@@ -1342,6 +1342,7 @@ return [
     'core.package.kind.extension' => 'Erweiterung',
     'core.package.kind.theme' => 'Theme',
     'core.package.source' => 'Quelle',
+    'core.package.source_official' => 'Offizielle Quelle',
     'core.package.newer' => '{version} verfügbar',
     'core.package.current' => 'aktuell',
     'core.package.update' => 'Auf {version} aktualisieren',

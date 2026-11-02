@@ -58,7 +58,7 @@
                     </form>
                 {% endif %}
                 {% if item.tracked %}
-                    <p class="ext-source"><small>{{ trans('core.package.source') }}: {{ item.repo }}</small></p>
+                    <p class="ext-source"><small>{{ trans('core.package.source') }}: {{ item.repo starts with 'license:' ? trans('core.package.source_official') : item.repo }}</small></p>
                     {% if not item.in_use %}
                         <form method="post" action="{{ url('/admin/packages/' ~ item.kind ~ '/' ~ item.id ~ '/remove') }}" class="inline-form">
                             {{ csrf_field() }}
