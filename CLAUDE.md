@@ -13,6 +13,13 @@ PDO. GPL-3.0-or-later. Zielgruppe: Leute, die eine eigene Plattform betreiben
 wollen, ohne SaaS-Miete, per gewöhnlichem Webhosting (kein SSH nötig für den
 Betrieb — Updates laufen über die Administration).
 
+Bewusst **ohne** Frontend-Framework, npm/Build-Step oder CDN-Scripts: alles
+JS ist handgeschriebenes Vanilla-JS, direkt unter `assets/` ausgeliefert
+(kein `package.json` im Projekt, keine externen `<script src="https://…">`).
+Einzige PHP-Abhängigkeiten (`composer.json`): Twig und `vlucas/phpdotenv`.
+Das passt zur Zielgruppe (gewöhnliches Webhosting, kein Build-Prozess nötig)
+und soll bei neuem Code so bleiben.
+
 ## Repo-Struktur (dieses Repo: `/home/alex/Dokumente/Projekte/modulento`)
 
 - `core/src/` — der eigentliche Kern (App, Kernel, Controller, Support-Klassen).
