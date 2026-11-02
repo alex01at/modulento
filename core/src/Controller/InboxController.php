@@ -20,10 +20,47 @@ final class InboxController extends Controller
 
     public function index(array $params): void
     {
+        $accountId = (int) $this->app->auth->account()['id'];
+        $providerId = $this->providerId($accountId);
+        $threads = $this->threads($accountId, $providerId);
+
+        $page = max(1, (int) ($_GET['page'] ?? 1));
+        $pages = max(1, (int) ceil(count($threads) / self::PER_PAGE));
+
+        // The full message history and the reply form's target are only
+        // resolved for the threads actually shown on this page.
+        $shown = array_map(
+            fn (array $thread) => $thread + $this->detail($thread, $accountId, $providerId),
+            array_slice($threads, (min($page, $pages) - 1) * self::PER_PAGE, self::PER_PAGE)
+        );
+
+        $this->render('account/inbox.twig', [
+            'threads' => $shown,
+            'page' => $page,
+            'pages' => $pages,
+        ]);
+    }
+
+    /** The header's own dropdown: the newest few threads, without their full message history. */
+    public function preview(array $params): void
+    {
+        $accountId = (int) $this->app->auth->account()['id'];
+        $threads = $this->threads($accountId, $this->providerId($accountId));
+
+        $this->render('account/_inbox_preview.twig', ['threads' => array_slice($threads, 0, 5)]);
+    }
+
+    private function providerId(int $accountId): ?int
+    {
+        $provider = $this->app->providers->findByAccount($accountId);
+
+        return $provider !== null ? (int) $provider['id'] : null;
+    }
+
+    /** @return array<int, array<string, mixed>> every conversation of the account, newest activity first */
+    private function threads(int $accountId, ?int $providerId): array
+    {
         $app = $this->app;
-        $accountId = (int) $app->auth->account()['id'];
-        $provider = $app->providers->findByAccount($accountId);
-        $providerId = $provider !== null ? (int) $provider['id'] : null;
         $locale = $app->translator->locale();
 
         $orderThreads = array_map(fn (array $row) => [
@@ -67,21 +104,7 @@ final class InboxController extends Controller
         $threads = [...$orderThreads, ...$offerThreads];
         usort($threads, fn (array $a, array $b) => $b['created_at'] <=> $a['created_at']);
 
-        $page = max(1, (int) ($_GET['page'] ?? 1));
-        $pages = max(1, (int) ceil(count($threads) / self::PER_PAGE));
-
-        // The full message history and the reply form's target are only
-        // resolved for the threads actually shown on this page.
-        $shown = array_map(
-            fn (array $thread) => $thread + $this->detail($thread, $accountId, $providerId),
-            array_slice($threads, (min($page, $pages) - 1) * self::PER_PAGE, self::PER_PAGE)
-        );
-
-        $this->render('account/inbox.twig', [
-            'threads' => $shown,
-            'page' => $page,
-            'pages' => $pages,
-        ]);
+        return $threads;
     }
 
     /** @return array{messages: array<int, array{mine: bool, label: string, body: string, hidden: bool, created_at: string}>, reply_action: string, reply_field: string} */

@@ -1,0 +1,22 @@
+{# The envelope icon's own dropdown - fetched into place on first open
+   (dropdown.js). Links straight to the thread's own page instead of the
+   <details> the full inbox opens in place. #}
+{% if threads is empty %}
+    <p class="dropdown-empty">{{ trans('core.inbox.none') }}</p>
+{% else %}
+    <ul class="inbox-list">
+        {% for thread in threads %}
+            <li class="{{ thread.unread ? 'is-unread' }}">
+                <a href="{{ url(thread.path) }}">
+                    <span class="sender">{{ thread.counterpart }}</span>
+                    <p class="inbox-body">
+                        <small>{{ trans('core.inbox.type.' ~ thread.type) }}</small> · {{ thread.context }}
+                        — {{ thread.hidden ? trans('core.message.hidden_notice') : thread.body }}
+                    </p>
+                    <small>{{ thread.created_at }} UTC</small>
+                </a>
+            </li>
+        {% endfor %}
+    </ul>
+{% endif %}
+<a class="dropdown-all" href="{{ url('/account/messages') }}">{{ trans('core.inbox.title') }}</a>

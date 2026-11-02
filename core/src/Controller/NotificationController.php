@@ -37,4 +37,16 @@ final class NotificationController extends Controller
         header('Cache-Control: no-store');
         echo json_encode(['count' => $this->app->notifications->unreadCount((int) $this->app->auth->account()['id'])]);
     }
+
+    /**
+     * The header bell's own dropdown: the newest few, read or not - opening
+     * it is just a peek, only the full page (index(), above) marks them read.
+     */
+    public function preview(array $params): void
+    {
+        $accountId = (int) $this->app->auth->account()['id'];
+        $list = $this->app->notifications->list($accountId, 1, 5);
+
+        $this->render('account/_notification_preview.twig', ['notifications' => $list['rows']]);
+    }
 }

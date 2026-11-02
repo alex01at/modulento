@@ -256,6 +256,19 @@ img.avatar { display: block; object-fit: cover; }
 .inbox-list li.is-unread .subject-preview { color: var(--text); }
 .inbox-list .thread-detail { padding: 0 1rem 1rem; border-top: 1px solid var(--line); }
 .inbox-list .thread-detail .thread-messages { margin-top: 1rem; }
+.inbox-list li a { display: block; padding: .6rem 1rem; color: inherit; text-decoration: none; }
+.inbox-list li a:hover { background: var(--surface); }
+.inbox-body { margin: .2rem 0; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* The header's own bell and envelope: a dropdown panel fetched into place
+   on first open (dropdown.js). Works without it too - the trigger stays a
+   real link to the full page. */
+.dropdown { position: relative; }
+.dropdown-panel { position: absolute; inset-inline-end: 0; top: 100%; margin-top: .5rem; width: 22rem; max-width: calc(100vw - 2rem); max-height: 70vh; overflow-y: auto; background: var(--ground); border: 1px solid var(--line); border-radius: .5rem; box-shadow: 0 10px 30px rgba(0, 0, 0, .18); z-index: 50; }
+.dropdown-panel .inbox-list { margin: 0; border: none; border-radius: 0; }
+.dropdown-empty { margin: 0; padding: .9rem 1rem; color: var(--muted); font-size: .9rem; }
+.dropdown-all { display: block; padding: .6rem 1rem; text-align: center; font-weight: 600; color: inherit; text-decoration: none; border-top: 1px solid var(--line); }
+.dropdown-all:hover { background: var(--surface); }
 
 /* The account settings: each tab is a grid of cards, one column on a phone. */
 .account-tab { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr)); gap: 1.25rem; align-items: start; margin-top: 1.25rem; }

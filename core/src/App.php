@@ -166,6 +166,8 @@ final class App
     private ?View $view = null;
     /** @var array<int, array{label_key: string, path: string, permission: string}> */
     private array $adminMenu = [];
+    /** @var array<int, array{permission: string, provider: \Closure}> */
+    private array $adminNotices = [];
     /** @var array<int, array{label_key: string, path: string}> */
     private array $navigation = [];
     /** @var array<int, array{label_key: string, path: string}> */
@@ -350,6 +352,37 @@ final class App
     public function adminMenu(): array
     {
         return $this->adminMenu;
+    }
+
+    /**
+     * A pending-action count the administration's notification bell should
+     * show, e.g. open content reports - alongside whatever the core itself
+     * already watches for. Checked fresh whenever the bell's badge or panel
+     * is asked for (Controller\AdminNoticeController); $provider returns
+     * null, or a count of 0, when there is nothing to show right now.
+     *
+     * @param Closure(App): ?array{count: int, label_key: string, link: string} $provider
+     */
+    public function addAdminNotice(string $permission, \Closure $provider): void
+    {
+        $this->adminNotices[] = ['permission' => $permission, 'provider' => $provider];
+    }
+
+    /** @return array<int, array{count: int, label_key: string, link: string}> every notice the current admin may see and that has something to show right now */
+    public function adminNotices(): array
+    {
+        $notices = [];
+        foreach ($this->adminNotices as $notice) {
+            if (!$this->auth->can($notice['permission'])) {
+                continue;
+            }
+            $result = ($notice['provider'])($this);
+            if ($result !== null && $result['count'] > 0) {
+                $notices[] = $result;
+            }
+        }
+
+        return $notices;
     }
 
     /** An entry of the site's main menu that an extension brings along. */

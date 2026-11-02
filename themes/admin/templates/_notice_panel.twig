@@ -1,0 +1,12 @@
+{# The administration header's bell: fetched as-is into its dropdown panel
+   (Controller\AdminNoticeController::preview()), and included again on the
+   full page (notices.twig) for when there is no script to open it. #}
+{% if notices is empty %}
+    <p class="notice-empty">{{ trans('core.admin.notice.empty') }}</p>
+{% else %}
+    <ul class="notice-list">
+        {% for notice in notices %}
+            <li><a href="{{ url(notice.link) }}">{{ trans(notice.label_key, {count: notice.count}) }}</a></li>
+        {% endfor %}
+    </ul>
+{% endif %}

@@ -362,6 +362,18 @@ final class Registrar
         $this->app->addAdminMenu($labelKey, $path, $permission, $group);
     }
 
+    /**
+     * A pending-action count for the administration's notification bell,
+     * e.g. "3 open requests" - checked fresh every time the bell is asked
+     * for, only for an administrator who already has $permission.
+     *
+     * @param Closure(App): ?array{count: int, label_key: string, link: string} $provider
+     */
+    public function adminNotice(string $permission, Closure $provider): void
+    {
+        $this->app->addAdminNotice($permission, $provider);
+    }
+
     private function prefixed(string $name, string $kind): string
     {
         if (!str_starts_with($name, $this->manifest->id . '.')) {

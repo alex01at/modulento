@@ -1297,6 +1297,12 @@ return [
     'core.admin.layout.details' => 'التفاصيل',
     'core.admin.layout.danger_zone' => 'الحظر والحذف',
     'core.admin.layout.submenu' => 'عناصر {label}',
+    'core.admin.notice.bell' => 'التنبيهات ({count} مفتوحة)',
+    'core.admin.notice.title' => 'التنبيهات',
+    'core.admin.notice.empty' => 'لا شيء في انتظارك الآن.',
+    'core.admin.notice.reports' => 'بلاغات المحتوى: {count} مفتوح',
+    'core.admin.notice.offers_pending' => 'عروض في انتظار الموافقة: {count}',
+    'core.admin.notice.requests_pending' => 'طلبات في انتظار الموافقة: {count}',
     'core.admin.settings.section.general' => 'عام',
     'core.admin.settings.section.catalogue' => 'مزوّدو الخدمة والعروض',
 

@@ -1297,6 +1297,12 @@ return [
     'core.admin.layout.details' => 'Angaben',
     'core.admin.layout.danger_zone' => 'Sperren und löschen',
     'core.admin.layout.submenu' => 'Unterpunkte von {label}',
+    'core.admin.notice.bell' => 'Meldungen ({count} offen)',
+    'core.admin.notice.title' => 'Meldungen',
+    'core.admin.notice.empty' => 'Es gibt gerade nichts, das auf dich wartet.',
+    'core.admin.notice.reports' => 'Meldungen zu Inhalten: {count} offen',
+    'core.admin.notice.offers_pending' => 'Angebote zur Freigabe: {count} offen',
+    'core.admin.notice.requests_pending' => 'Anfragen zur Freigabe: {count} offen',
     'core.admin.settings.section.general' => 'Allgemein',
     'core.admin.settings.section.catalogue' => 'Anbieter und Angebote',
 

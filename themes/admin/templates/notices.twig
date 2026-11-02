@@ -1,0 +1,11 @@
+{% extends '@admin/layout.twig' %}
+
+{% block title %}{{ trans('core.admin.notice.title') }} – {{ site_name }}{% endblock %}
+
+{% block admin %}
+{% include '@admin/_page_header.twig' with {heading: trans('core.admin.notice.title')} only %}
+
+<section class="card-box">
+    {% include '@admin/_notice_panel.twig' with {notices: notices} only %}
+</section>
+{% endblock %}

@@ -1,0 +1,18 @@
+{# The notification bell's own dropdown - fetched into place on first open
+   (dropdown.js). Opening this is just a peek: unlike the full page
+   (account/notifications.twig), it never marks anything read. #}
+{% if notifications is empty %}
+    <p class="dropdown-empty">{{ trans('core.notification.none') }}</p>
+{% else %}
+    <ul class="inbox-list">
+        {% for notification in notifications %}
+            <li class="{{ notification.unread ? 'is-unread' }}">
+                <a href="{{ url(notification.link) }}">
+                    <p class="inbox-body">{{ trans(notification.message_key, notification.params) }}</p>
+                    <small>{{ notification.created_at }} UTC</small>
+                </a>
+            </li>
+        {% endfor %}
+    </ul>
+{% endif %}
+<a class="dropdown-all" href="{{ url('/account/notifications') }}">{{ trans('core.notification.title') }}</a>

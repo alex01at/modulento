@@ -9,6 +9,7 @@ use Modulento\Core\Controller\AdminAccountController;
 use Modulento\Core\Controller\AdminCatalogueController;
 use Modulento\Core\Controller\AdminCustomFieldController;
 use Modulento\Core\Controller\AdminController;
+use Modulento\Core\Controller\AdminNoticeController;
 use Modulento\Core\Controller\BackupController;
 use Modulento\Core\Controller\AdminBadWordsController;
 use Modulento\Core\Controller\AdminHomeController;
@@ -259,6 +260,9 @@ final class Kernel
         $router->get('/admin', [AdminController::class, 'index'], 'core.admin.access');
         $router->get('/admin/docs', [AdminController::class, 'docs'], 'core.admin.access');
         $router->get('/admin/section/{id}', [AdminController::class, 'section'], 'core.admin.access');
+        $router->get('/admin/notices', [AdminNoticeController::class, 'index'], 'core.admin.access');
+        $router->get('/admin/notices/preview', [AdminNoticeController::class, 'preview'], 'core.admin.access');
+        $router->get('/admin/notices/count', [AdminNoticeController::class, 'count'], 'core.admin.access');
 
         // Optional functions (Administration → Modules). A module that is
         // switched off has no routes and no menu entries; its data stays.
@@ -280,6 +284,7 @@ final class Kernel
         // messages themselves (on their order or offer page) are unaffected.
         if ($modules->enabled('inbox')) {
             $router->get('/account/messages', [InboxController::class, 'index']);
+            $router->get('/account/messages/preview', [InboxController::class, 'preview']);
             $router->get('/account/unread', [AccountController::class, 'unread']);
         }
         // The bell: an overview of what happened, written at the points
@@ -288,6 +293,7 @@ final class Kernel
         // (the check lives in the service, not at each call site).
         if ($modules->enabled('notifications')) {
             $router->get('/account/notifications', [NotificationController::class, 'index']);
+            $router->get('/account/notifications/preview', [NotificationController::class, 'preview']);
             $router->get('/account/notifications/unread', [NotificationController::class, 'unread']);
         }
         // Requests: a buyer describes what they need, providers apply, one
@@ -559,6 +565,29 @@ final class Kernel
         $app->addAdminMenu('core.admin.menu.backup', '/admin/backup', 'core.backup.manage', 'system');
         $app->addAdminMenu('core.admin.menu.export', '/admin/export', 'core.settings.manage', 'system');
         $app->addAdminMenu('core.admin.docs.title', '/admin/docs', 'core.admin.access', 'system');
+
+        // Pending-action counts behind the administration header's own bell -
+        // the same sections already listed above, just surfaced before an
+        // administrator would otherwise stumble onto them.
+        if ($app->modules->enabled('reports')) {
+            $app->addAdminNotice('core.reports.manage', static function (App $app): ?array {
+                $count = $app->reports->openCount();
+
+                return $count > 0 ? ['count' => $count, 'label_key' => 'core.admin.notice.reports', 'link' => '/admin/reports'] : null;
+            });
+        }
+        $app->addAdminNotice('core.offers.manage', static function (App $app): ?array {
+            $count = $app->offers->counts()['pending'] ?? 0;
+
+            return $count > 0 ? ['count' => $count, 'label_key' => 'core.admin.notice.offers_pending', 'link' => '/admin/offers?status=pending'] : null;
+        });
+        if ($app->modules->enabled('requests')) {
+            $app->addAdminNotice('core.requests.manage', static function (App $app): ?array {
+                $count = $app->requests->counts()['pending'] ?? 0;
+
+                return $count > 0 ? ['count' => $count, 'label_key' => 'core.admin.notice.requests_pending', 'link' => '/admin/requests?status=pending'] : null;
+            });
+        }
 
         // What Administration -> Export/Import can write to a file and read back - every one of
         // these already cleans up anything handed to it, so an imported file goes through no

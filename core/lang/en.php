@@ -1297,6 +1297,12 @@ return [
     'core.admin.layout.details' => 'Details',
     'core.admin.layout.danger_zone' => 'Block and delete',
     'core.admin.layout.submenu' => 'Entries of {label}',
+    'core.admin.notice.bell' => 'Notices ({count} open)',
+    'core.admin.notice.title' => 'Notices',
+    'core.admin.notice.empty' => 'Nothing is waiting for you right now.',
+    'core.admin.notice.reports' => 'Content reports: {count} open',
+    'core.admin.notice.offers_pending' => 'Offers awaiting approval: {count}',
+    'core.admin.notice.requests_pending' => 'Requests awaiting approval: {count}',
     'core.admin.settings.section.general' => 'General',
     'core.admin.settings.section.catalogue' => 'Providers and offers',
 

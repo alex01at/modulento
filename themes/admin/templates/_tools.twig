@@ -8,8 +8,19 @@
         {% endif %}
     {% endfor %}
     <a class="topbar-link" href="{{ url('/') }}" target="_blank" rel="noopener">{{ icons.icon('external') }}<span class="topbar-label">{{ trans('core.nav.to_site') }}</span></a>
-    {# The same menu as on the site: picture, settings, colour scheme, log out. #}
     {% if account %}
+        {# Open content reports, offers/requests waiting for approval, and
+           whatever an extension adds through Registrar::adminNotice() - the
+           badge is filled in by unread.js, the panel by dropdown.js, both
+           already loaded for the site's own header further down this file. #}
+        <div class="dropdown" data-dropdown>
+            <a class="topbar-link notice-link" href="{{ url('/admin/notices') }}" data-dropdown-toggle aria-haspopup="true" aria-expanded="false" aria-label="{{ trans('core.admin.notice.title') }}">
+                {{ icons.icon('bell') }}
+                <span class="unread-badge" hidden data-unread data-url="{{ url('/admin/notices/count') }}" data-poll="{{ poll_seconds() }}" data-label="{{ trans('core.admin.notice.bell') }}"></span>
+            </a>
+            <div class="dropdown-panel" hidden data-dropdown-panel data-dropdown-url="{{ url('/admin/notices/preview') }}"></div>
+        </div>
+        {# The same menu as on the site: picture, settings, colour scheme, log out. #}
         {% include 'layout/_account_menu.twig' %}
     {% endif %}
 </nav>

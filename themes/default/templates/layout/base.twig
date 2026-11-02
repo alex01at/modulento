@@ -54,6 +54,7 @@
     {% if account %}
         <script src="{{ theme_asset('account-menu.js') }}" defer></script>
         <script src="{{ theme_asset('unread.js') }}" defer></script>
+        <script src="{{ theme_asset('dropdown.js') }}" defer></script>
     {# The text editor for the text fields of the page being edited in place. #}
     {% if edit_mode() %}<script src="{{ admin_asset('editor.js') }}" defer></script>
     <script src="{{ admin_asset('inline-edit.js') }}" defer></script>{% endif %}
@@ -96,17 +97,23 @@
             {% endif %}
             <a href="{{ url('/account') }}">{{ trans('core.nav.dashboard') }}</a>
             {% if module('inbox') %}
-                <a class="inbox-link" href="{{ url('/account/messages') }}" aria-label="{{ trans('core.inbox.nav') }}">
-                    <span aria-hidden="true">✉</span>
-                    {# Filled in by unread.js, which asks the server for the count every few seconds. #}
-                    <span class="unread-badge" hidden data-unread data-url="{{ url('/account/unread') }}" data-poll="{{ poll_seconds() }}" data-label="{{ trans('core.account.unread.label') }}"></span>
-                </a>
+                <div class="dropdown" data-dropdown>
+                    <a class="inbox-link" href="{{ url('/account/messages') }}" data-dropdown-toggle aria-haspopup="true" aria-expanded="false" aria-label="{{ trans('core.inbox.nav') }}">
+                        <span aria-hidden="true">✉</span>
+                        {# Filled in by unread.js, which asks the server for the count every few seconds. #}
+                        <span class="unread-badge" hidden data-unread data-url="{{ url('/account/unread') }}" data-poll="{{ poll_seconds() }}" data-label="{{ trans('core.account.unread.label') }}"></span>
+                    </a>
+                    <div class="dropdown-panel" hidden data-dropdown-panel data-dropdown-url="{{ url('/account/messages/preview') }}"></div>
+                </div>
             {% endif %}
             {% if module('notifications') %}
-                <a class="inbox-link" href="{{ url('/account/notifications') }}" aria-label="{{ trans('core.notification.nav') }}">
-                    <span aria-hidden="true">🔔</span>
-                    <span class="unread-badge" hidden data-unread data-url="{{ url('/account/notifications/unread') }}" data-poll="{{ poll_seconds() }}" data-label="{{ trans('core.account.unread.label') }}"></span>
-                </a>
+                <div class="dropdown" data-dropdown>
+                    <a class="inbox-link" href="{{ url('/account/notifications') }}" data-dropdown-toggle aria-haspopup="true" aria-expanded="false" aria-label="{{ trans('core.notification.nav') }}">
+                        <span aria-hidden="true">🔔</span>
+                        <span class="unread-badge" hidden data-unread data-url="{{ url('/account/notifications/unread') }}" data-poll="{{ poll_seconds() }}" data-label="{{ trans('core.account.unread.label') }}"></span>
+                    </a>
+                    <div class="dropdown-panel" hidden data-dropdown-panel data-dropdown-url="{{ url('/account/notifications/preview') }}"></div>
+                </div>
             {% endif %}
             {% include 'layout/_account_menu.twig' %}
         {% else %}
