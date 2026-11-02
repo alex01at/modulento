@@ -43,8 +43,9 @@ final class UpdateController extends Controller
     public function check(array $params): void
     {
         $checks = new UpdateChecks($this->app);
-        foreach ($checks->refresh() as $problem) {
-            Session::flash('error', $problem);
+        $problems = $checks->refresh();
+        if ($problems !== []) {
+            Session::flash('error', implode("\n", $problems));
         }
         $count = count($checks->available());
         Session::flash('success', $count > 0
@@ -110,8 +111,8 @@ final class UpdateController extends Controller
             Migrator::runAll($this->app->db, $this->app->config['app']['root']);
         }
 
-        foreach ($errors as $error) {
-            Session::flash('error', $error);
+        if ($errors !== []) {
+            Session::flash('error', implode("\n", $errors));
         }
         if ($updated > 0) {
             Session::flash('success', $this->trans('core.update.applied_all', ['count' => $updated]));

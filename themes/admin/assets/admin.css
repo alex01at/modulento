@@ -431,7 +431,7 @@ td form { display: flex; justify-content: flex-end; }
 .tabs a:hover { border-color: var(--link); color: var(--link); }
 .tabs a[aria-current] { border-color: var(--primary); background: var(--primary); color: #fff; }
 
-.flash { margin: 0 0 1.5rem; padding: .85rem 1.1rem; border: 1px solid var(--flash-line); border-radius: 6px; background: var(--card); }
+.flash { margin: 0 0 1.5rem; padding: .85rem 1.1rem; border: 1px solid var(--flash-line); border-radius: 6px; background: var(--card); white-space: pre-line; }
 .flash-error { border-color: var(--error-line); background: var(--error-soft); color: var(--error); }
 .flash-success { border-color: var(--success-line); background: var(--success-soft); color: var(--success); }
 
