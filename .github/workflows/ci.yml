@@ -18,12 +18,17 @@ jobs:
       # The tests drive the core through these two extensions, which live
       # in repositories of their own. They come after the checkout above:
       # that one empties the workspace, these only touch their own path.
+      # These four are private repositories; this (public) repo's own
+      # GITHUB_TOKEN cannot read a private repo regardless of that repo's
+      # own Actions access settings (those only cover a private caller), so
+      # a PAT with read access to them is required here instead.
       - name: Checkout extension freelancer
         uses: actions/checkout@v4
         with:
           repository: alex01at/modulento-ext-freelancer
           ref: main
           path: extensions/freelancer
+          token: ${{ secrets.EXTENSIONS_TOKEN }}
 
       - name: Checkout extension auction
         uses: actions/checkout@v4
@@ -31,6 +36,7 @@ jobs:
           repository: alex01at/modulento-ext-auction
           ref: main
           path: extensions/auction
+          token: ${{ secrets.EXTENSIONS_TOKEN }}
 
       - name: Checkout extension shop
         uses: actions/checkout@v4
@@ -38,6 +44,7 @@ jobs:
           repository: alex01at/modulento-ext-shop
           ref: main
           path: extensions/shop
+          token: ${{ secrets.EXTENSIONS_TOKEN }}
 
       - name: Checkout extension card
         uses: actions/checkout@v4
@@ -45,6 +52,7 @@ jobs:
           repository: alex01at/modulento-ext-card
           ref: main
           path: extensions/card
+          token: ${{ secrets.EXTENSIONS_TOKEN }}
 
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
