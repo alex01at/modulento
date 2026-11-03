@@ -508,6 +508,15 @@ final class Orders
         return $stmt->fetch() !== false;
     }
 
+    /** Whether $accountId has a paid order for $offerId - for an offer page or card to mark "already bought". */
+    public function hasPurchased(int $accountId, int $offerId): bool
+    {
+        $stmt = $this->db->prepare("SELECT 1 FROM orders WHERE buyer_id = :account AND offer_id = :offer AND payment_state = 'paid' LIMIT 1");
+        $stmt->execute(['account' => $accountId, 'offer' => $offerId]);
+
+        return $stmt->fetchColumn() !== false;
+    }
+
     /**
      * How many orders an account has on one side, for an overview.
      *

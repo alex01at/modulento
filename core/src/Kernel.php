@@ -45,6 +45,7 @@ use Modulento\Core\Controller\RequestController;
 use Modulento\Core\Controller\AccountRatingController;
 use Modulento\Core\Controller\ReviewController;
 use Modulento\Core\Controller\SettingsController;
+use Modulento\Core\Controller\TranslationController;
 use Modulento\Core\Controller\UpdateController;
 use Modulento\Core\Controller\ReportController;
 use Modulento\Core\Controller\WithdrawalController;
@@ -363,6 +364,9 @@ final class Kernel
 
         $router->get('/admin/settings', [SettingsController::class, 'index'], 'core.settings.manage');
         $router->post('/admin/settings', [SettingsController::class, 'save'], 'core.settings.manage');
+        $router->get('/admin/translations', [TranslationController::class, 'index'], 'core.settings.manage');
+        $router->post('/admin/translations', [TranslationController::class, 'save'], 'core.settings.manage');
+        $router->post('/admin/translations/reset', [TranslationController::class, 'reset'], 'core.settings.manage');
         $router->get('/admin/payments', [AdminPaymentController::class, 'index'], 'core.settings.manage');
         $router->post('/admin/payments', [AdminPaymentController::class, 'save'], 'core.settings.manage');
 
@@ -523,6 +527,7 @@ final class Kernel
         $app->addPermission('core.demo_data.manage', 'core.permission.demo_data_manage');
 
         $app->addAdminMenu('core.admin.menu.settings', '/admin/settings', 'core.settings.manage', 'system');
+        $app->addAdminMenu('core.admin.menu.translations', '/admin/translations', 'core.settings.manage', 'system');
         $app->addAdminMenu('core.admin.menu.payments', '/admin/payments', 'core.settings.manage', 'marketplace');
         $app->addAdminMenu('core.admin.menu.pages', '/admin/pages', 'core.pages.manage', 'content');
         $app->addAdminMenu('core.admin.menu.widgets', '/admin/widgets', 'core.settings.manage', 'content');

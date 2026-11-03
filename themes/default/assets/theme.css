@@ -167,6 +167,7 @@ a.button { display: inline-block; margin-top: .5rem; padding: .45rem .8rem; bord
 .badge-verified { background: var(--accent); color: var(--on-accent); }
 .badge-earned, .badge-skill { border: 1px solid var(--line); }
 .badge-availability-available { background: var(--success); color: #fff; }
+.badge-success { background: var(--success); color: #fff; }
 .badge-availability-busy { background: var(--surface); color: var(--muted); }
 .badge-availability-paused { border: 1px solid var(--line); }
 

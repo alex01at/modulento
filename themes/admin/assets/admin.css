@@ -355,6 +355,12 @@ label.checkbox input { flex: none; margin: .2rem 0 0; }
 .danger-form > * { margin: 0; }
 .danger-form .field { justify-self: stretch; }
 
+/* --- Translation editor -------------------------------------------------- */
+.translations-table th[scope="row"] { width: 22rem; word-break: break-word; }
+.translations-table code { font-size: .8rem; }
+.translation-form { display: flex; gap: .5rem; align-items: flex-start; }
+.translation-form textarea { min-height: 2.75rem; }
+
 /* --- Tables ------------------------------------------------------------- */
 .table-wrap { overflow-x: auto; }
 table { width: 100%; border-collapse: collapse; }
@@ -371,7 +377,7 @@ td form { display: flex; justify-content: flex-end; }
 
 /* --- Badges, tabs, messages --------------------------------------------- */
 .badge { display: inline-block; padding: .15rem .65rem; border-radius: 999px; background: var(--primary-soft); color: var(--link-strong); font-size: .8125rem; font-weight: 600; white-space: nowrap; }
-.badge-approved, .badge-published, .badge-active, .badge-enabled, .badge-ok, .badge-paid { background: var(--success-soft); color: var(--success); }
+.badge-approved, .badge-published, .badge-active, .badge-enabled, .badge-ok, .badge-paid, .badge-success { background: var(--success-soft); color: var(--success); }
 .badge-pending, .badge-changed, .badge-running { background: var(--warning-soft); color: var(--warning); }
 .badge-rejected, .badge-suspended, .badge-blocked, .badge-hidden, .badge-failed, .badge-incompatible { background: var(--error-soft); color: var(--error); }
 .badge-draft, .badge-paused, .badge-disabled, .badge-unpaid, .badge-closed { background: var(--neutral-soft); color: var(--neutral); }

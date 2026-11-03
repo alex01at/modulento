@@ -1,0 +1,76 @@
+{% extends '@admin/layout.twig' %}
+{% import '@admin/_icons.twig' as icons %}
+
+{% block title %}{{ trans('core.admin.translations.title') }} – {{ site_name }}{% endblock %}
+
+{% block admin %}
+{% include '@admin/_page_header.twig' with {heading: trans('core.admin.translations.title'), subtitle: trans('core.admin.translations.intro')} only %}
+
+<section class="card-box">
+    <div class="card-head">
+        <form method="get" action="{{ url('/admin/translations') }}" class="search-form" role="search">
+            {% if locales|length > 1 %}
+                <label class="visually-hidden" for="locale">{{ trans('core.nav.language') }}</label>
+                <select id="locale" name="locale">
+                    {% for code in locales %}
+                        <option value="{{ code }}" {{ code == locale ? 'selected' }}>{{ code|upper }}</option>
+                    {% endfor %}
+                </select>
+            {% else %}
+                <input type="hidden" name="locale" value="{{ locale }}">
+            {% endif %}
+            <label class="visually-hidden" for="q">{{ trans('core.admin.translations.search') }}</label>
+            <input id="q" name="q" type="search" value="{{ q }}" placeholder="{{ trans('core.admin.translations.search') }}">
+            <button type="submit">{{ icons.icon('search') }}<span>{{ trans('core.admin.accounts.search_submit') }}</span></button>
+        </form>
+        <p><small>{{ trans('core.admin.translations.total', {count: total}) }}</small></p>
+    </div>
+
+    {% if texts is empty %}
+        <p>{{ trans('core.admin.translations.none') }}</p>
+    {% else %}
+        <div class="table-wrap">
+            <table class="translations-table">
+                <thead>
+                <tr>
+                    <th scope="col">{{ trans('core.admin.translations.key') }}</th>
+                    <th scope="col">{{ trans('core.admin.translations.text') }}</th>
+                    <th scope="col"></th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for key, value in texts %}
+                    <tr>
+                        <th scope="row"><code>{{ key }}</code>{% if overridden[key] is defined %} <span class="badge">{{ trans('core.admin.translations.customized') }}</span>{% endif %}</th>
+                        <td>
+                            <form method="post" action="{{ url('/admin/translations') }}" class="translation-form">
+                                {{ csrf_field() }}
+                                <input type="hidden" name="locale" value="{{ locale }}">
+                                <input type="hidden" name="q" value="{{ q }}">
+                                <input type="hidden" name="key" value="{{ key }}">
+                                <label class="visually-hidden" for="value-{{ loop.index }}">{{ key }}</label>
+                                <textarea id="value-{{ loop.index }}" name="value" rows="1">{{ value }}</textarea>
+                                <button type="submit" class="btn btn-sm">{{ trans('core.admin.translations.save') }}</button>
+                            </form>
+                        </td>
+                        <td>
+                            {% if overridden[key] is defined %}
+                                <form method="post" action="{{ url('/admin/translations/reset') }}">
+                                    {{ csrf_field() }}
+                                    <input type="hidden" name="locale" value="{{ locale }}">
+                                    <input type="hidden" name="q" value="{{ q }}">
+                                    <input type="hidden" name="key" value="{{ key }}">
+                                    <button type="submit" class="btn btn-outline btn-sm">{{ trans('core.admin.translations.reset') }}</button>
+                                </form>
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% endif %}
+
+    {% include '@admin/_pager.twig' with {path: '/admin/translations', page: page, pages: pages, extra: '&locale=' ~ locale ~ (q ? '&q=' ~ q|url_encode : '')} only %}
+</section>
+{% endblock %}

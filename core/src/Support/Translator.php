@@ -109,6 +109,85 @@ final class Translator
         }
     }
 
+    /**
+     * Every text known for $locale, merged core -> extensions -> active
+     * theme -> this installation's own overrides (the same order and
+     * result trans() uses), for the administration's translation editor.
+     *
+     * @return array<string, string>
+     */
+    public function texts(string $locale): array
+    {
+        return $this->catalog($locale);
+    }
+
+    /**
+     * The installation's own rewording of $locale (lang/<locale>.php),
+     * exactly as that file reads - never the core/extension/theme text
+     * it may override.
+     *
+     * @return array<string, string>
+     */
+    public function overrides(string $locale): array
+    {
+        $dir = $this->overridesDir();
+        $file = $dir !== null ? $dir . '/' . $locale . '.php' : null;
+        if ($file === null || !self::isLocaleCode($locale) || !is_file($file)) {
+            return [];
+        }
+
+        $texts = require $file;
+
+        return is_array($texts) ? $texts : [];
+    }
+
+    /** Rewords $key in $locale by writing it into the installation's own override file. */
+    public function setOverride(string $locale, string $key, string $value): void
+    {
+        $texts = $this->overrides($locale);
+        $texts[$key] = $value;
+        $this->writeOverrides($locale, $texts);
+    }
+
+    /** Undoes setOverride(): $key goes back to the text the core/extension/theme ships. */
+    public function clearOverride(string $locale, string $key): void
+    {
+        $texts = $this->overrides($locale);
+        unset($texts[$key]);
+        $this->writeOverrides($locale, $texts);
+    }
+
+    /** @param array<string, string> $texts */
+    private function writeOverrides(string $locale, array $texts): void
+    {
+        $dir = $this->overridesDir();
+        if ($dir === null || !self::isLocaleCode($locale)) {
+            throw new LogicException("Cannot write language overrides for \"{$locale}\".");
+        }
+
+        ksort($texts);
+        $php = "<?php\n\ndeclare(strict_types=1);\n\nreturn [\n";
+        foreach ($texts as $key => $value) {
+            $php .= '    ' . var_export($key, true) . ' => ' . var_export($value, true) . ",\n";
+        }
+        $php .= "];\n";
+
+        file_put_contents($dir . '/' . $locale . '.php', $php);
+        $this->catalogs = [];
+    }
+
+    /** The installation's own language folder (loadOverrides()), or null if none was registered. */
+    private function overridesDir(): ?string
+    {
+        foreach ($this->sources as $source) {
+            if ($source['prefix'] === null) {
+                return $source['dir'];
+            }
+        }
+
+        return null;
+    }
+
     /** @return string[] locales that have a file in $langDir, sorted */
     public static function localesIn(string $langDir): array
     {
