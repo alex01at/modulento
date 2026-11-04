@@ -333,6 +333,20 @@ final class View
         // Seconds between two asks for new messages; 0 switches the asking off (Administration → Settings).
         $this->twig->addFunction(new TwigFunction('poll_seconds', fn (): int => (int) $app->settings->get('core.poll_seconds', '60')));
         $this->twig->addFunction(new TwigFunction('has_catalogue', fn () => $app->offers->types() !== []));
+        // Unlike has_catalogue() (any offer type at all), this is true only
+        // once at least one registered type can actually be ordered - an
+        // app like jobs has a catalogue (so a provider profile still makes
+        // sense) but no OrderFlow, so its account dashboard should not
+        // show an "orders" section that can only ever be empty.
+        $this->twig->addFunction(new TwigFunction('has_order_flow', function () use ($app): bool {
+            foreach (array_keys($app->offers->types()) as $type) {
+                if ($app->orders->flowForOfferType($type) !== null) {
+                    return true;
+                }
+            }
+
+            return false;
+        }));
         // Entries extensions add to the main menu, as title/url.
         $this->twig->addFunction(new TwigFunction('nav_links', fn () => array_map(
             fn (array $link) => ['title' => $app->translator->trans($link['label_key']), 'url' => $app->url($link['path']), 'path' => $link['path']],

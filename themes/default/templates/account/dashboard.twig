@@ -32,12 +32,13 @@
             {% endif %}
             <p class="dashboard-welcome">{{ trans('core.dashboard.welcome') }} <strong>{{ name }}</strong></p>
             <ul class="dashboard-links">
-                {# Without a catalogue there is nothing to order or to offer. #}
-                {% set shop = has_catalogue() or provider or purchases.open + purchases.closed > 0 %}
+                {# An app's catalogue can exist without any OrderFlow at all (e.g. jobs: postings, but
+                   applications, not orders) - the "orders" links would then only ever be empty. #}
+                {% set shop = has_order_flow() or purchases.open + purchases.closed > 0 %}
                 {% if shop %}<li><a href="{{ url('/account/orders') }}">{{ trans('core.order.list.buyer') }}</a></li>{% endif %}
                 {% if provider %}
                     <li><a href="{{ url('/account/offers') }}">{{ trans('core.offer.mine.title') }}</a></li>
-                    <li><a href="{{ url('/account/sales') }}">{{ trans('core.order.list.provider') }}</a></li>
+                    {% if has_order_flow() %}<li><a href="{{ url('/account/sales') }}">{{ trans('core.order.list.provider') }}</a></li>{% endif %}
                     <li><a href="{{ url('/account/provider') }}">{{ trans('core.provider.title') }}</a></li>
                     <li><a href="{{ url('/account/payments') }}">{{ trans('core.payment.settings.title') }}</a></li>
                 {% endif %}
