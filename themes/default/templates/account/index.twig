@@ -10,7 +10,7 @@
 <h1>{{ trans('core.account.title') }}</h1>
 
 <nav class="tabs" aria-label="{{ trans('core.account.title') }}">
-    {% for name in ['profile', 'security', 'orders', 'data'] %}
+    {% for name in tabs %}
         <a href="{{ url('/account/settings') }}?tab={{ name }}" {{ tab == name ? 'aria-current="page"' }}>{{ trans('core.account.tabs.' ~ name) }}</a>
     {% endfor %}
 </nav>
@@ -59,6 +59,7 @@
         </form>
     </section>
 
+    {% if has_order_flow() %}
     <section>
         <h2>{{ trans('core.account.billing.title') }}</h2>
         <p><small>{{ trans('core.account.billing.hint') }}</small></p>
@@ -93,6 +94,7 @@
             <button type="submit">{{ trans('core.account.save') }}</button>
         </form>
     </section>
+    {% endif %}
 
     {% if is_admin %}
     <section>
@@ -212,6 +214,7 @@
     {% endif %}
 </div>
 
+{% if has_order_flow() %}
 <div id="tab-orders" class="account-tab" {{ tab != 'orders' ? 'hidden' }}>
     <section>
         <h2>{{ trans('core.order.list.buyer') }}</h2>
@@ -230,6 +233,7 @@
         {% endif %}
     </section>
 </div>
+{% endif %}
 
 <div id="tab-data" class="account-tab" {{ tab != 'data' ? 'hidden' }}>
     <section>

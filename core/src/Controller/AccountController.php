@@ -144,8 +144,15 @@ final class AccountController extends Controller
 
     public function index(array $params): void
     {
+        // The "orders" tab (buyer/provider order lists) only makes sense
+        // once an OrderFlow is actually registered - otherwise it can
+        // only ever be empty, e.g. for an app like jobs (postings, but
+        // applications, not orders).
+        $tabs = $this->app->hasOrderFlow() ? self::TABS : array_values(array_diff(self::TABS, ['orders']));
+
         $this->render('account/index.twig', [
-            'tab' => $this->tab(self::TABS),
+            'tab' => $this->tab($tabs),
+            'tabs' => $tabs,
             'avatar' => $this->app->modules->enabled('avatars') ? $this->app->avatars->url($this->accountId()) : null,
             'locales' => $this->app->locales->enabled(),
             'color_schemes' => Preferences::COLOR_SCHEMES,

@@ -438,6 +438,24 @@ final class App
     }
 
     /**
+     * Whether at least one registered offer type can actually become an
+     * order - unlike a catalogue existing at all (an app can have offer
+     * types with no OrderFlow, e.g. jobs: postings, but applications, not
+     * orders). Account pages use this to hide order-related sections that
+     * would otherwise always stay empty.
+     */
+    public function hasOrderFlow(): bool
+    {
+        foreach (array_keys($this->offers->types()) as $type) {
+            if ($this->orders->flowForOfferType($type) !== null) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * A way for an extension's offer type to take part in Administration →
      * Demo data: given a provider and, where one exists, a category, it
      * creates one demo offer of its own type and returns the new offer's
