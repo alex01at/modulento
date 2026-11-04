@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace Modulento\Core\Controller;
 
 use Modulento\Core\Support\CurlHttpClient;
+use Modulento\Core\Support\Migrator;
 use Modulento\Core\Support\Session;
 use Modulento\Core\Support\ShopCatalog;
+use Modulento\Core\Support\UpdateException;
 use RuntimeException;
 
 /**
@@ -14,6 +16,13 @@ use RuntimeException;
  * sells, and buy a product straight from here through Stripe Checkout -
  * the license it produces is entered under Administration -> Extensions
  * and themes automatically, no copy-pasting a key.
+ *
+ * A master license (one key, valid for every product the license server
+ * sells, not just one - see License\LicenseKeys::saveMaster()) skips
+ * Stripe entirely: install() below copies it under the specific product
+ * id being installed and runs the ordinary "license:<id>" install flow,
+ * exactly as if that key had been entered by hand under Administration ->
+ * Extensions and themes first.
  */
 final class ShopController extends Controller
 {
@@ -32,11 +41,75 @@ final class ShopController extends Controller
             $purchase = $status + ['reference' => $reference];
         }
 
+        $masterKey = $app->licenseKeys->findMaster();
+
         $this->render('@admin/shop.twig', [
             'enabled' => (string) ($app->config['update']['license_server'] ?? '') !== '',
             'products' => array_values(array_filter($catalog->fetch(), fn (array $product): bool => !$this->isInstalled($product['id']))),
             'purchase' => $purchase,
+            'master_license' => $masterKey !== null ? '••••' . substr($masterKey, -4) : null,
         ]);
+    }
+
+    /** Stores (or replaces) the master license key - no product id of its own, see License\LicenseKeys::saveMaster(). */
+    public function saveMasterLicense(array $params): void
+    {
+        $key = trim((string) ($_POST['license_key'] ?? ''));
+        if ($key === '') {
+            Session::flash('error', $this->trans('core.license.error.invalid'));
+        } else {
+            $this->app->licenseKeys->saveMaster($key);
+            Session::flash('success', $this->trans('core.admin.shop.master_saved'));
+        }
+
+        $this->redirect('/admin/shop');
+    }
+
+    public function removeMasterLicense(array $params): void
+    {
+        $this->app->licenseKeys->removeMaster();
+        Session::flash('success', $this->trans('core.admin.shop.master_removed'));
+        $this->redirect('/admin/shop');
+    }
+
+    /**
+     * Installs a product straight from the master license, no Stripe
+     * involved: copies the master key under this product's own id (so it
+     * shows up and keeps working under Administration -> Extensions and
+     * themes exactly like one entered by hand) and installs
+     * "license:<id>" the same way PackageController::install() does.
+     */
+    public function install(array $params): void
+    {
+        $app = $this->app;
+        $productId = $params['product'];
+
+        if ($this->isInstalled($productId)) {
+            Session::flash('error', $this->trans('core.admin.shop.error.already_installed'));
+            $this->redirect('/admin/shop');
+            return;
+        }
+
+        $masterKey = $app->licenseKeys->findMaster();
+        if ($masterKey === null) {
+            Session::flash('error', $this->trans('core.admin.shop.error.no_master'));
+            $this->redirect('/admin/shop');
+            return;
+        }
+        $app->licenseKeys->save($productId, $masterKey);
+
+        @set_time_limit(0);
+        try {
+            $result = $app->packages->install('license:' . $productId);
+            if ($result['kind'] === 'extension') {
+                Migrator::runAll($app->db, $app->config['app']['root']);
+            }
+            Session::flash('success', $this->trans('core.package.installed.' . $result['kind'], ['id' => $result['id'], 'version' => $result['version']]));
+        } catch (UpdateException $e) {
+            Session::flash('error', $this->trans($e->messageKey, $e->params));
+        }
+
+        $this->redirect('/admin/shop');
     }
 
     /**

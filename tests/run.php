@@ -5053,6 +5053,44 @@ check('shop buy: buying an already-installed product is refused server-side too,
 $pdo->exec("DELETE FROM package WHERE kind = 'extension' AND id = 'exklusiv'");
 $pdo->exec("DELETE FROM package WHERE kind = 'theme' AND id = 'audigo'");
 
+// --- Shop: a master license skips Stripe entirely, for every product at once ---
+$_SESSION = [];
+$r = request($pdo, $shopConfig($twoProductsHttp()), 'POST', '/admin/shop/ext-exklusiv/install', 3, []);
+check('shop install: without a master license, refused with its own error, no key saved', $r['status'] === 302
+    && str_contains($_SESSION['_flash']['error'] ?? '', 'Keine Masterlizenz'));
+
+$r = request($pdo, $shopConfig($twoProductsHttp()), 'GET', '/admin/shop', 3);
+check('shop (no master yet): the input form shows, not a masked value', str_contains($r['body'], 'id="license_key"') && !str_contains($r['body'], 'Hinterlegt:'));
+
+$_SESSION = [];
+$masterSaveResponse = request($pdo, $shopConfig($twoProductsHttp()), 'POST', '/admin/shop/master', 3, ['license_key' => 'mlk_live_master_abcdef']);
+check('shop master: saving redirects back to the shop page', $masterSaveResponse['status'] === 302);
+check('shop master: the key is really stored (found under the reserved master slot)', $app->licenseKeys->findMaster() === 'mlk_live_master_abcdef');
+
+$r = request($pdo, $shopConfig($twoProductsHttp()), 'GET', '/admin/shop', 3);
+check('shop (master on file): shown masked, never in full', str_contains($r['body'], 'Hinterlegt:') && str_contains($r['body'], '••••cdef') && !str_contains($r['body'], 'mlk_live_master_abcdef'));
+check('shop (master on file): every product offers "Installieren" instead of "Kaufen", no Stripe form at all', str_contains($r['body'], '/admin/shop/ext-exklusiv/install') && str_contains($r['body'], '/admin/shop/audigo/install')
+    && !str_contains($r['body'], '/buy"'));
+
+$pdo->prepare('INSERT INTO package (kind, id, repo, version, installed_at) VALUES (?, ?, ?, ?, ?)')
+    ->execute(['extension', 'exklusiv', 'acme/modulento-ext-exklusiv', '1.0.0', '2026-01-01 00:00:00']);
+$_SESSION = [];
+$r = request($pdo, $shopConfig($twoProductsHttp()), 'POST', '/admin/shop/ext-exklusiv/install', 3, []);
+check('shop install: an already-installed product is refused the same way "buy" refuses it', $r['status'] === 302 && str_contains($_SESSION['_flash']['error'] ?? '', 'bereits installiert'));
+$pdo->exec("DELETE FROM package WHERE kind = 'extension' AND id = 'exklusiv'");
+
+check('shop install: no key copied yet under this product\'s own id before the actual attempt', $app->licenseKeys->find('ext-exklusiv') === null);
+$_SESSION = [];
+$installResponse = request($pdo, $shopConfig($twoProductsHttp()), 'POST', '/admin/shop/ext-exklusiv/install', 3, []);
+check('shop install: the master key is copied under the product\'s own id either way - it keeps working under Administration -> Extensions afterwards, exactly like one entered by hand', $app->licenseKeys->find('ext-exklusiv') === 'mlk_live_master_abcdef');
+check('shop install: redirects back to the shop page, not a crash, regardless of how the install itself turns out (no fixture serves a real licensed release here)', $installResponse['status'] === 302);
+
+$removeResponse = request($pdo, $shopConfig($twoProductsHttp()), 'POST', '/admin/shop/master/remove', 3, []);
+check('shop master: removing clears it, findMaster() answers null again', $removeResponse['status'] === 302 && $app->licenseKeys->findMaster() === null);
+$r = request($pdo, $shopConfig($twoProductsHttp()), 'GET', '/admin/shop', 3);
+check('shop (master removed): back to "Kaufen" for everything, the input form shows again', str_contains($r['body'], '/admin/shop/ext-exklusiv/buy') && str_contains($r['body'], 'id="license_key"'));
+$app->licenseKeys->remove('ext-exklusiv');
+
 // --- Shop: buying a product through Stripe Checkout (phase 2) --------------
 $buyOkHttp = new FakeLicenseHttp(200, json_encode(['reference' => 'pur_test123', 'checkout_url' => 'https://checkout.stripe.com/fake/pur_test123']));
 $r = request($pdo, $shopConfig($buyOkHttp), 'POST', '/admin/shop/ext-exklusiv/buy', 3, []);

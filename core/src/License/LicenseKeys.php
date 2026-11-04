@@ -17,6 +17,17 @@ use PDO;
  */
 final class LicenseKeys
 {
+    /**
+     * Reserved product id for a master license (Administration -> Shop):
+     * one key the operator holds for every product the license server
+     * sells, not just one. Stored in the very same table/encryption as an
+     * ordinary per-product key - only this id is never a real product's,
+     * since every real one comes from Package\Packages::OFFICIAL or the
+     * license server's own catalog, neither of which ever starts with an
+     * underscore.
+     */
+    private const MASTER_ID = '__master__';
+
     public function __construct(private PDO $db, private Secrets $secrets)
     {
     }
@@ -31,16 +42,35 @@ final class LicenseKeys
         return $stored !== false ? $this->secrets->decrypt((string) $stored) : null;
     }
 
+    public function findMaster(): ?string
+    {
+        return $this->find(self::MASTER_ID);
+    }
+
+    public function saveMaster(string $key): void
+    {
+        $this->save(self::MASTER_ID, $key);
+    }
+
+    public function removeMaster(): void
+    {
+        $this->remove(self::MASTER_ID);
+    }
+
     /**
      * Every product id a key is stored for, with the key's last four
      * characters only - enough for an operator to recognise which one is
-     * which, never enough to use it.
+     * which, never enough to use it. The master license (if any) is not
+     * one of "every product id" - Controller\ShopController shows it
+     * separately.
      *
      * @return array<int, array{product_id: string, masked: string, added_at: string}>
      */
     public function all(): array
     {
-        $rows = $this->db->query('SELECT product_id, key_encrypted, added_at FROM license_key ORDER BY product_id')->fetchAll();
+        $stmt = $this->db->prepare('SELECT product_id, key_encrypted, added_at FROM license_key WHERE product_id != :master ORDER BY product_id');
+        $stmt->execute(['master' => self::MASTER_ID]);
+        $rows = $stmt->fetchAll();
 
         return array_map(function (array $row): array {
             $key = $this->secrets->decrypt((string) $row['key_encrypted']);
