@@ -14,7 +14,8 @@
         "ext-pdo_mysql": "*",
         "ext-zip": "*",
         "twig/twig": "^3.28",
-        "vlucas/phpdotenv": "^5.7"
+        "vlucas/phpdotenv": "^5.7",
+        "smalot/pdfparser": "^2.13"
     },
     "autoload": {
         "psr-4": {

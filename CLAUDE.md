@@ -16,9 +16,13 @@ Betrieb — Updates laufen über die Administration).
 Bewusst **ohne** Frontend-Framework, npm/Build-Step oder CDN-Scripts: alles
 JS ist handgeschriebenes Vanilla-JS, direkt unter `assets/` ausgeliefert
 (kein `package.json` im Projekt, keine externen `<script src="https://…">`).
-Einzige PHP-Abhängigkeiten (`composer.json`): Twig und `vlucas/phpdotenv`.
-Das passt zur Zielgruppe (gewöhnliches Webhosting, kein Build-Prozess nötig)
-und soll bei neuem Code so bleiben.
+PHP-Abhängigkeiten (`composer.json`): Twig, `vlucas/phpdotenv`, dazu
+`smalot/pdfparser` (reines PHP, kein Build-Prozess, für `modulento-ext-jobs`'
+CV-Autofill - Erweiterungen haben kein eigenes `composer.json`, eine
+Erweiterungs-Abhängigkeit muss also hier landen). Grundsatz bleibt: möglichst
+wenige, nur reines PHP ohne Build-Schritt, passend zur Zielgruppe
+(gewöhnliches Webhosting) - nicht "nur diese zwei", aber jede neue
+Abhängigkeit ist eine bewusste Ausnahme, kein Normalfall.
 
 ## Repo-Struktur (dieses Repo: `/home/alex/Dokumente/Projekte/modulento`)
 
