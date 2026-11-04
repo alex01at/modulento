@@ -1337,6 +1337,7 @@ return [
     'core.admin.shop.error.not_for_sale' => 'هذا المنتج لم يعد متاحًا للبيع.',
     'core.admin.shop.error.rate_limited' => 'عدد كبير جدًا من المحاولات. الرجاء المحاولة مرة أخرى بعد قليل.',
     'core.admin.shop.error.unreachable' => 'تعذّر الوصول إلى خادم الترخيص.',
+    'core.admin.shop.error.already_installed' => 'هذا المنتج مثبَّت بالفعل.',
     'core.permission.demo_data_manage' => 'إنشاء بيانات تجريبية وإزالتها',
     'core.admin.menu.demo_data' => 'بيانات تجريبية',
     'core.admin.demo_data.title' => 'بيانات تجريبية',

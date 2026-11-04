@@ -34,14 +34,42 @@ final class ShopController extends Controller
 
         $this->render('@admin/shop.twig', [
             'enabled' => (string) ($app->config['update']['license_server'] ?? '') !== '',
-            'products' => $catalog->fetch(),
+            'products' => array_values(array_filter($catalog->fetch(), fn (array $product): bool => !$this->isInstalled($product['id']))),
             'purchase' => $purchase,
         ]);
+    }
+
+    /**
+     * Whether a catalog product is already installed - by the naming
+     * convention the operator's own product ids follow (see
+     * Package\Packages::OFFICIAL and the license server's own README):
+     * "ext-<id>" for an extension/app, a bare theme id otherwise. The
+     * catalog never carries the GitHub repo itself (Support\ShopCatalog
+     * deliberately only exposes what a buyer needs to see), so this is
+     * the only signal available here to begin with.
+     */
+    private function isInstalled(string $productId): bool
+    {
+        $app = $this->app;
+        [$kind, $id] = str_starts_with($productId, 'ext-')
+            ? ['extension', substr($productId, 4)]
+            : ['theme', $productId];
+
+        return $app->packages->find($kind, $id) !== null;
     }
 
     public function buy(array $params): void
     {
         $app = $this->app;
+
+        // Defense in depth: the catalog itself already leaves out anything
+        // installed (index() above), but this is a plain POST a crafted
+        // request could still reach directly.
+        if ($this->isInstalled($params['product'])) {
+            Session::flash('error', $this->trans('core.admin.shop.error.already_installed'));
+            $this->redirect('/admin/shop');
+            return;
+        }
 
         try {
             $result = $this->catalog()->startPurchase(

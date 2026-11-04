@@ -5027,6 +5027,32 @@ $downHttp = new FakeLicenseHttp(500, 'internal error');
 $r = request($pdo, $shopConfig($downHttp), 'GET', '/admin/shop', 3);
 check('shop: an unreachable or failing server shows an empty catalog, not a broken page', $r['status'] === 200 && str_contains($r['body'], 'Derzeit werden keine Erweiterungen angeboten'));
 
+// --- Shop: something already installed never shows up as still buyable -----
+$twoProductsHttp = fn () => new FakeLicenseHttp(200, json_encode(['products' => [
+    ['id' => 'ext-exklusiv', 'name' => 'Exklusiv', 'description' => '', 'price_cents' => 4990, 'currency' => 'EUR', 'screenshot_url' => null],
+    ['id' => 'audigo', 'name' => 'Audigo', 'description' => '', 'price_cents' => 2490, 'currency' => 'EUR', 'screenshot_url' => null],
+]]));
+$r = request($pdo, $shopConfig($twoProductsHttp()), 'GET', '/admin/shop', 3);
+check('shop: before either is installed, both the extension and the theme show up', $r['status'] === 200 && str_contains($r['body'], 'Exklusiv') && str_contains($r['body'], 'Audigo'));
+
+$pdo->prepare('INSERT INTO package (kind, id, repo, version, installed_at) VALUES (?, ?, ?, ?, ?)')
+    ->execute(['extension', 'exklusiv', 'acme/modulento-ext-exklusiv', '1.0.0', '2026-01-01 00:00:00']);
+$r = request($pdo, $shopConfig($twoProductsHttp()), 'GET', '/admin/shop', 3);
+check('shop: an installed extension ("ext-<id>") is left out of the catalog, the still-uninstalled theme stays', $r['status'] === 200 && !str_contains($r['body'], 'Exklusiv') && str_contains($r['body'], 'Audigo'));
+
+$pdo->prepare('INSERT INTO package (kind, id, repo, version, installed_at) VALUES (?, ?, ?, ?, ?)')
+    ->execute(['theme', 'audigo', 'acme/modulento-theme-audigo', '1.0.0', '2026-01-01 00:00:00']);
+$r = request($pdo, $shopConfig($twoProductsHttp()), 'GET', '/admin/shop', 3);
+check('shop: an installed theme (bare id, no "ext-" prefix) is left out too - both now gone, catalog says so', $r['status'] === 200 && !str_contains($r['body'], 'Exklusiv') && !str_contains($r['body'], 'Audigo')
+    && str_contains($r['body'], 'Derzeit werden keine Erweiterungen angeboten'));
+
+check('shop buy: buying an already-installed product is refused server-side too, not just hidden from the list',
+    request($pdo, $shopConfig($twoProductsHttp()), 'POST', '/admin/shop/ext-exklusiv/buy', 3, [])['status'] === 302
+    && str_contains($_SESSION['_flash']['error'] ?? '', 'bereits installiert'));
+
+$pdo->exec("DELETE FROM package WHERE kind = 'extension' AND id = 'exklusiv'");
+$pdo->exec("DELETE FROM package WHERE kind = 'theme' AND id = 'audigo'");
+
 // --- Shop: buying a product through Stripe Checkout (phase 2) --------------
 $buyOkHttp = new FakeLicenseHttp(200, json_encode(['reference' => 'pur_test123', 'checkout_url' => 'https://checkout.stripe.com/fake/pur_test123']));
 $r = request($pdo, $shopConfig($buyOkHttp), 'POST', '/admin/shop/ext-exklusiv/buy', 3, []);

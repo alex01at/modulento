@@ -1337,6 +1337,7 @@ return [
     'core.admin.shop.error.not_for_sale' => 'Dieses Produkt wird nicht (mehr) verkauft.',
     'core.admin.shop.error.rate_limited' => 'Zu viele Versuche. Bitte in Kürze erneut versuchen.',
     'core.admin.shop.error.unreachable' => 'Der Lizenzserver ist nicht erreichbar.',
+    'core.admin.shop.error.already_installed' => 'Dieses Produkt ist bereits installiert.',
     'core.permission.demo_data_manage' => 'Demodaten erzeugen und löschen',
     'core.admin.menu.demo_data' => 'Demodaten',
     'core.admin.demo_data.title' => 'Demodaten',
