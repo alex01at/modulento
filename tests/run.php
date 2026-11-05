@@ -1345,6 +1345,10 @@ check('maintenance: switching it off restores the site for everyone', $get('/', 
 $pdo->exec("UPDATE extension SET enabled = 1 WHERE id = 'example'");
 check('providerSection(): the extension\'s block is rendered on the public provider page', str_contains($get('/providers/mueller-design', null)['body'], 'Vom Beispiel-Profilblock') && str_contains($get('/providers/mueller-design', null)['body'], 'Müller Design'));
 check('accountLink(): the extension\'s link is in the account navigation', str_contains($get('/account/settings', 1)['body'], 'Beispiel-Konto-Link'));
+check('dashboardLink(): the extension\'s link is in the dashboard\'s own quick-link list', str_contains($get('/account', 1)['body'], 'Beispiel-Dashboard-Link'));
+Modulento\Example\Extension::$hideDashboardLink = true;
+check('dashboardLink(): its own $visible can hide it again, same as accountLink()\'s', !str_contains($get('/account', 1)['body'], 'Beispiel-Dashboard-Link'));
+Modulento\Example\Extension::$hideDashboardLink = false;
 $pdo->exec("UPDATE extension SET enabled = 0 WHERE id = 'example'");
 check('disabled again: neither shows up', !str_contains($get('/providers/mueller-design', null)['body'], 'Vom Beispiel-Profilblock') && !str_contains($get('/account/settings', 1)['body'], 'Beispiel-Konto-Link'));
 

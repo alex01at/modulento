@@ -251,10 +251,42 @@ final class Registrar
         $this->app->addDashboardSection($template, $data);
     }
 
-    /** An entry in the logged-in account's own navigation, e.g. a profile page the extension adds. */
-    public function accountLink(string $labelKey, string $path): void
+    /**
+     * An entry in the logged-in account's own navigation, e.g. a profile
+     * page the extension adds. $visible, if given, is checked on every
+     * request - e.g. jobs' own "Firmenprofil" link only for an employer
+     * account, never a candidate's; omitted (or null), the link always
+     * shows, as before.
+     *
+     * @param ?Closure(App): bool $visible
+     */
+    public function accountLink(string $labelKey, string $path, ?Closure $visible = null): void
     {
-        $this->app->addAccountLink($labelKey, $path);
+        $this->app->addAccountLink($labelKey, $path, $visible);
+    }
+
+    /**
+     * An entry in the dashboard's own quick-link list (the card at the top
+     * of the account area) - same reasoning as accountLink(), a separate
+     * list because the dashboard's is a shorter, curated one, not every
+     * account link belongs there.
+     *
+     * @param ?Closure(App): bool $visible
+     */
+    public function dashboardLink(string $labelKey, string $path, ?Closure $visible = null): void
+    {
+        $this->app->addDashboardLink($labelKey, $path, $visible);
+    }
+
+    /**
+     * An app switches off one of the account area's own built-in items it
+     * has no use for, e.g. the generic "requests" or "orders" link. Only
+     * an app (never an addon) should call this - see App::suppressAccountDefault()
+     * for why no further guard is needed, and for the known item names.
+     */
+    public function suppressAccountDefault(string $item): void
+    {
+        $this->app->suppressAccountDefault($item);
     }
 
     /**

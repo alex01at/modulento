@@ -62,13 +62,31 @@ etablierte Muster mit einer lazy ausgewerteten Closure).
 
 **Wichtige `Registrar`-Hooks** (`core/src/Extension/Registrar.php`):
 `routes()`, `permission()`, `adminMenu()`, `navigation()`, `footerLink()`,
-`accountLink()`, `homeSection()`, `providerSection()`, `offerSection()`,
+`accountLink()`, `dashboardLink()`, `suppressAccountDefault()`,
+`homeSection()`, `providerSection()`, `offerSection()`,
 `dashboardSection()`, `adminAccountSection()`, `checkoutSection()`,
 `orderDiscount()`, `module()`, `offerType()`, `orderFlow()`,
 `paymentMethod()`, `demoOffers()`, `subscriptionFeature()`,
 `subscriptionProvider()`, `stripeWebhook()`, `task()`, `listen()`,
-`pageBlockType()`. `Registrar::$app` und `Registrar::$manifest` sind
-öffentlich lesbar.
+`pageBlockType()`, `registrationSection()`, `registrationGuard()`.
+`Registrar::$app` und `Registrar::$manifest` sind öffentlich lesbar.
+
+**`accountLink()`/`dashboardLink()` — optionale Sichtbarkeit:** beide nehmen
+optional einen dritten Parameter `?Closure(App): bool $visible` (z. B. ein
+Jobbörse-Menüpunkt nur für Arbeitgeber, nie für Kandidat:innen); ohne ihn
+wird der Link wie bisher immer gezeigt. `dashboardLink()` landet in der
+kurzen Schnellzugriffsliste oben im Dashboard (eigene, kuratierte Liste,
+nicht identisch mit `accountLink()`s Kontomenü).
+
+**`suppressAccountDefault(item)`** — eine **App**-Erweiterung (nie ein
+Addon) schaltet damit einen der im Kern fest verdrahteten
+Konto-/Dashboard-Einträge für sich ab, die ihr Konzept nicht passt (z. B.
+Jobbörse: generisches "Anfragen", "Bestellungen", "Anbieter werden" - dort
+übernehmen `AccountRole`/eigene `accountLink()`/`dashboardLink()`-Einträge
+die Rolle). Bekannte Namen: `inbox`, `notifications`, `orders`, `requests`,
+`browse`, `become_provider`. Braucht keine zusätzliche Bedingung am
+Aufrufort: `register()` einer App läuft ohnehin nur, während sie die aktive
+App ist (eine zweite App zu aktivieren schaltet die erste ab).
 
 **`offerType()` — optionale Zusatz-Interfaces** (`core/src/Catalogue/`):
 Ein registrierter `OfferType` kann zusätzlich `FilterableOfferType`

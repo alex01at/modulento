@@ -15,6 +15,7 @@ return [
     'example.footer_link' => 'Example footer link',
     'example.home.title' => 'From the example extension',
     'example.account_link' => 'Example account link',
+    'example.dashboard_link' => 'Example dashboard link',
     'example.provider.title' => 'From the example profile block',
     'example.offer.title' => 'From the example offer block',
     'example.checkout.title' => 'From the example checkout block',

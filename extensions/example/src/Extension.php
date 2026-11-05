@@ -46,6 +46,9 @@ final class Extension implements ExtensionContract
     /** Set by a test to make the registration guard below refuse the next attempt. */
     public static bool $blockRegistration = false;
 
+    /** Set by a test to see dashboardLink()'s own $visible in effect. */
+    public static bool $hideDashboardLink = false;
+
     public function register(Registrar $registrar): void
     {
         $registrar->permission('example.logins.view', 'example.permission.logins_view');
@@ -59,7 +62,12 @@ final class Extension implements ExtensionContract
         $registrar->navigation('example.nav', '/example');
         $registrar->footerLink('example.footer_link', '/example');
         $registrar->homeSection('@example/home.twig', fn (App $app): array => ['site' => $app->siteName()]);
+        // $visible omitted here (always shown) - see $blockDashboardLink
+        // below for the conditional form, on dashboardLink() instead so
+        // both accountLink()'s and dashboardLink()'s own $visible get
+        // exercised once each.
         $registrar->accountLink('example.account_link', '/example');
+        $registrar->dashboardLink('example.dashboard_link', '/example', fn (App $app): bool => !self::$hideDashboardLink);
         $registrar->providerSection('@example/provider.twig', fn (array $provider, App $app): array => [
             'site' => $app->siteName(),
             'provider_name' => $provider['name'],

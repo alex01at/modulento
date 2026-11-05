@@ -364,8 +364,15 @@ final class View
         // Entries extensions add to the logged-in account's own navigation.
         $this->twig->addFunction(new TwigFunction('account_links', fn () => array_map(
             fn (array $link) => ['title' => $app->translator->trans($link['label_key']), 'url' => $app->url($link['path'])],
-            $app->accountLinks()
+            array_filter($app->accountLinks(), fn (array $link) => $link['visible'] === null || ($link['visible'])($app))
         )));
+        // Entries extensions add to the dashboard's own quick-link list.
+        $this->twig->addFunction(new TwigFunction('dashboard_links', fn () => array_map(
+            fn (array $link) => ['title' => $app->translator->trans($link['label_key']), 'url' => $app->url($link['path'])],
+            array_filter($app->dashboardLinks(), fn (array $link) => $link['visible'] === null || ($link['visible'])($app))
+        )));
+        // Whether the active app switched off one of the account area's own built-in items - Registrar::suppressAccountDefault().
+        $this->twig->addFunction(new TwigFunction('account_default_hidden', fn (string $item) => $app->accountDefaultHidden($item)));
         // Templates extensions want included on the home page.
         $this->twig->addFunction(new TwigFunction('home_sections', fn () => $app->homeSections()));
         // Banners extensions want shown on every page, e.g. a cookie-consent addon's own.

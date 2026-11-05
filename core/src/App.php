@@ -196,8 +196,12 @@ final class App
     private array $registrationGuards = [];
     /** @var array<int, array{template: string, data: ?\Closure}> */
     private array $registrationSections = [];
-    /** @var array<int, array{label_key: string, path: string}> */
+    /** @var array<int, array{label_key: string, path: string, visible: ?\Closure}> */
     private array $accountLinks = [];
+    /** @var array<int, array{label_key: string, path: string, visible: ?\Closure}> */
+    private array $dashboardLinks = [];
+    /** @var array<string, true> item name => suppressed - see Registrar::suppressAccountDefault() */
+    private array $suppressedAccountDefaults = [];
     /** @var array<string, string> permission name => label key */
     private array $permissions = [];
     /** @var array<string, array{label_key: string, text_fields: string[], template: string, data: ?\Closure}> block type id => its schema */
@@ -687,16 +691,60 @@ final class App
         );
     }
 
-    /** A link an extension adds to the account area, e.g. to a profile page of its own. */
-    public function addAccountLink(string $labelKey, string $path): void
+    /**
+     * A link an extension adds to the account area, e.g. to a profile page
+     * of its own. $visible, if given, decides per request whether the link
+     * is actually shown (e.g. only for an employer account, never a
+     * candidate's) - true (always shown) when omitted.
+     *
+     * @param ?\Closure(App): bool $visible
+     */
+    public function addAccountLink(string $labelKey, string $path, ?\Closure $visible = null): void
     {
-        $this->accountLinks[] = ['label_key' => $labelKey, 'path' => $path];
+        $this->accountLinks[] = ['label_key' => $labelKey, 'path' => $path, 'visible' => $visible];
     }
 
-    /** @return array<int, array{label_key: string, path: string}> */
+    /** @return array<int, array{label_key: string, path: string, visible: ?\Closure}> everything registered, $visible not yet evaluated - see View's account_links() */
     public function accountLinks(): array
     {
         return $this->accountLinks;
+    }
+
+    /**
+     * A link an extension adds to the dashboard's own quick-link list, next
+     * to (or - together with Registrar::suppressAccountDefault() - instead
+     * of) its built-in ones. Same shape and reasoning as addAccountLink().
+     *
+     * @param ?\Closure(App): bool $visible
+     */
+    public function addDashboardLink(string $labelKey, string $path, ?\Closure $visible = null): void
+    {
+        $this->dashboardLinks[] = ['label_key' => $labelKey, 'path' => $path, 'visible' => $visible];
+    }
+
+    /** @return array<int, array{label_key: string, path: string, visible: ?\Closure}> everything registered, $visible not yet evaluated - see View's dashboard_links() */
+    public function dashboardLinks(): array
+    {
+        return $this->dashboardLinks;
+    }
+
+    /**
+     * An app switches off one of the account area's own built-in items it
+     * has no use for - e.g. the generic "orders" link when its own
+     * OrderFlow is a different one entirely. Only ever meaningful while
+     * that app is the active one: its register() runs only then (enabling
+     * an app disables any other), so this needs no further guard at the
+     * call site. Known item names: 'inbox', 'notifications', 'orders',
+     * 'requests', 'browse', 'become_provider'.
+     */
+    public function suppressAccountDefault(string $item): void
+    {
+        $this->suppressedAccountDefaults[$item] = true;
+    }
+
+    public function accountDefaultHidden(string $item): bool
+    {
+        return isset($this->suppressedAccountDefaults[$item]);
     }
 
     /** Null while no Google client id/secret is configured, or the secret cannot be read any more. */

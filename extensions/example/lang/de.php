@@ -15,6 +15,7 @@ return [
     'example.footer_link' => 'Beispiel-Footer-Link',
     'example.home.title' => 'Aus der Beispiel-Erweiterung',
     'example.account_link' => 'Beispiel-Konto-Link',
+    'example.dashboard_link' => 'Beispiel-Dashboard-Link',
     'example.provider.title' => 'Vom Beispiel-Profilblock',
     'example.offer.title' => 'Vom Beispiel-Angebotsblock',
     'example.checkout.title' => 'Vom Beispiel-Checkout-Block',

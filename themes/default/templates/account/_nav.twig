@@ -1,13 +1,13 @@
 {# The pages of the logged-in account, shown on top of each of them. #}
 <nav class="account-nav" aria-label="{{ trans('core.nav.account') }}">
     <a href="{{ url('/account') }}">{{ trans('core.dashboard.title') }}</a>
-    {% if module('inbox') %}
+    {% if module('inbox') and not account_default_hidden('inbox') %}
         <a href="{{ url('/account/messages') }}">{{ trans('core.inbox.title') }}</a>
     {% endif %}
-    {% if module('notifications') %}
+    {% if module('notifications') and not account_default_hidden('notifications') %}
         <a href="{{ url('/account/notifications') }}">{{ trans('core.notification.title') }}</a>
     {% endif %}
-    {% if has_catalogue() or provider_status() %}
+    {% if (has_catalogue() or provider_status()) and not account_default_hidden('orders') %}
         <a href="{{ url('/account/orders') }}">{{ trans('core.order.list.buyer') }}</a>
     {% endif %}
     {% if provider_status() %}
@@ -15,10 +15,10 @@
         <a href="{{ url('/account/sales') }}">{{ trans('core.order.list.provider') }}</a>
         <a href="{{ url('/account/provider') }}">{{ trans('core.provider.title') }}</a>
         <a href="{{ url('/account/payments') }}">{{ trans('core.payment.settings.title') }}</a>
-    {% elseif has_catalogue() %}
+    {% elseif has_catalogue() and not account_default_hidden('become_provider') %}
         <a href="{{ url('/account/provider') }}">{{ trans('core.provider.create') }}</a>
     {% endif %}
-    {% if module('requests') %}
+    {% if module('requests') and not account_default_hidden('requests') %}
         {% if provider_status() %}
             <a href="{{ url('/requests') }}">{{ trans('core.request.open.title') }}</a>
             <a href="{{ url('/account/applications') }}">{{ trans('core.request.applications.mine_title') }}</a>
