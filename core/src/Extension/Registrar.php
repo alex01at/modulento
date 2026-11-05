@@ -356,6 +356,20 @@ final class Registrar
     }
 
     /**
+     * A snippet included on every page, right before </body> - e.g. a
+     * cookie-free analytics addon's own tiny beacon script. The template
+     * is one of this extension's ("@id/script.twig"); a theme may override
+     * it like any other. $data runs on every page view; return null (or
+     * omit $data) for nothing extra.
+     *
+     * @param ?Closure(App): array<string, mixed>|null $data
+     */
+    public function bodyScript(string $template, ?Closure $data = null): void
+    {
+        $this->app->addBodyScript($template, $data);
+    }
+
+    /**
      * A way to refuse a registration with this extension's own reason - e.g.
      * an anti-spam addon rejecting a disposable email address or a failed
      * CAPTCHA answer. Runs after the core's own checks and before the

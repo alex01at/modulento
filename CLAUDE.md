@@ -63,6 +63,7 @@ etablierte Muster mit einer lazy ausgewerteten Closure).
 **Wichtige `Registrar`-Hooks** (`core/src/Extension/Registrar.php`):
 `routes()`, `permission()`, `adminMenu()`, `navigation()`, `footerLink()`,
 `accountLink()`, `dashboardLink()`, `suppressAccountDefault()`,
+`bodyScript()`, `cookieBanner()`, `cookieCategory()`, `consentProvider()`,
 `homeSection()`, `providerSection()`, `offerSection()`,
 `dashboardSection()`, `adminAccountSection()`, `checkoutSection()`,
 `orderDiscount()`, `module()`, `offerType()`, `orderFlow()`,
@@ -165,7 +166,10 @@ bei `modulento-ext-shop`), `modulento-ext-custom-fields`
 (eigene Angebotstypen mit eigenen Feldern, in der Administration
 zusammengestellt — ein Hotel mit Sternen, eine Veranstaltung mit Datum;
 Referenz-Implementierung für die `offerType()`-Zusatz-Interfaces und
-`pageBlockType()`, siehe oben)
+`pageBlockType()`, siehe oben), `modulento-ext-stat` (DSGVO-konforme
+Besucherstatistik ohne Cookies/Einwilligung — Besucher-Hash rotiert
+täglich, siehe `HitRecorder`; Referenz-Implementierung für
+`Registrar::bodyScript()`)
 
 **Themes:** `modulento-theme-indigo`, `modulento-theme-audigo`,
 `modulento-theme-card`, `modulento-theme-merchigo`

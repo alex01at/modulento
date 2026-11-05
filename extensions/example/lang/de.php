@@ -24,6 +24,7 @@ return [
     'example.cookie.label' => 'Beispiel-Cookie',
     'example.cookie.description' => 'Zeigt nur, ob das Beispiel-Cookie-Banner zustimmt.',
     'example.banner.title' => 'Beispiel-Cookie-Banner',
+    'example.body_script.title' => 'Beispiel-Body-Script',
     'example.banner.granted' => 'zugestimmt',
     'example.banner.not_granted' => 'nicht zugestimmt',
     'example.register.title' => 'Vom Beispiel-Registrierungsblock',

@@ -192,6 +192,8 @@ final class App
     private array $orderDiscounts = [];
     /** @var array<int, array{template: string, data: ?\Closure}> */
     private array $cookieBanners = [];
+    /** @var array<int, array{template: string, data: ?\Closure}> */
+    private array $bodyScripts = [];
     /** @var array<int, \Closure> */
     private array $registrationGuards = [];
     /** @var array<int, array{template: string, data: ?\Closure}> */
@@ -643,6 +645,28 @@ final class App
         return array_map(
             fn (array $banner) => ['template' => $banner['template'], 'data' => $banner['data'] !== null ? ($banner['data'])($this) : []],
             $this->cookieBanners
+        );
+    }
+
+    /**
+     * A snippet an extension wants included on every page, right before
+     * </body> - e.g. a cookie-free analytics addon's own tiny beacon
+     * script. Same shape and reasoning as addCookieBanner(); a separate
+     * list because not everything shown on every page is a visible banner.
+     *
+     * @param \Closure(App): array<string, mixed>|null $data
+     */
+    public function addBodyScript(string $template, ?\Closure $data = null): void
+    {
+        $this->bodyScripts[] = ['template' => $template, 'data' => $data];
+    }
+
+    /** @return array<int, array{template: string, data: array<string, mixed>}> */
+    public function bodyScripts(): array
+    {
+        return array_map(
+            fn (array $script) => ['template' => $script['template'], 'data' => $script['data'] !== null ? ($script['data'])($this) : []],
+            $this->bodyScripts
         );
     }
 

@@ -154,5 +154,8 @@
         </nav>
     {% endif %}
 </footer>
+{% for script in body_scripts() %}
+    {% include script.template with script.data %}
+{% endfor %}
 </body>
 </html>

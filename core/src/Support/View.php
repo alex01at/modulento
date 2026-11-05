@@ -377,6 +377,8 @@ final class View
         $this->twig->addFunction(new TwigFunction('home_sections', fn () => $app->homeSections()));
         // Banners extensions want shown on every page, e.g. a cookie-consent addon's own.
         $this->twig->addFunction(new TwigFunction('cookie_banners', fn () => $app->cookieBanners()));
+        // Snippets extensions want included on every page, right before </body>.
+        $this->twig->addFunction(new TwigFunction('body_scripts', fn () => $app->bodyScripts()));
         // Whether the visitor has agreed to a category of cookie an extension declared with Registrar::cookieCategory().
         $this->twig->addFunction(new TwigFunction('consent', fn (string $category) => $app->consent->granted($category)));
         $this->twig->addFunction(new TwigFunction('registration_open', fn () => $app->settings->get('core.registration', 'open') === 'open'));

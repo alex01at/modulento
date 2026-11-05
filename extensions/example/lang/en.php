@@ -24,6 +24,7 @@ return [
     'example.cookie.label' => 'Example cookie',
     'example.cookie.description' => 'Only shows whether the example cookie banner was agreed to.',
     'example.banner.title' => 'Example cookie banner',
+    'example.body_script.title' => 'Example body script',
     'example.banner.granted' => 'agreed',
     'example.banner.not_granted' => 'not agreed',
     'example.register.title' => 'From the example registration block',

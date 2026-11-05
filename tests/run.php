@@ -543,6 +543,7 @@ $pdo->exec("UPDATE extension SET enabled = 1 WHERE id = 'example'");
 $r = $get('/register', null);
 check('registrationSection(): the extension\'s block is rendered on the registration form', str_contains($r['body'], 'Vom Beispiel-Registrierungsblock'));
 check('cookieBanner(): shown on every page, consent not granted without a provider that says so', str_contains($r['body'], 'Beispiel-Cookie-Banner') && str_contains($r['body'], '– nicht zugestimmt'));
+check('bodyScript(): shown on every page, right before </body>', str_contains($r['body'], 'Beispiel-Body-Script') && strpos($r['body'], 'Beispiel-Body-Script') > strpos($r['body'], '</footer>'));
 
 Modulento\Example\Extension::$blockRegistration = true;
 $r = $post('/register', ['email' => 'antispam-blocked@example.test', 'password' => $pw, 'password_repeat' => $pw], null);
