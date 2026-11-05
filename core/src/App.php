@@ -194,6 +194,8 @@ final class App
     private array $cookieBanners = [];
     /** @var array<int, array{template: string, data: ?\Closure}> */
     private array $bodyScripts = [];
+    /** @var array<int, array{id: string, label_key: string, features: string[], offer_limits: array<string, int>, max_images_per_offer: ?int, per_seat: bool, min_quantity: int}> */
+    private array $planTemplates = [];
     /** @var array<int, \Closure> */
     private array $registrationGuards = [];
     /** @var array<int, array{template: string, data: ?\Closure}> */
@@ -668,6 +670,33 @@ final class App
             fn (array $script) => ['template' => $script['template'], 'data' => $script['data'] !== null ? ($script['data'])($this) : []],
             $this->bodyScripts
         );
+    }
+
+    /**
+     * A ready-made subscription plan an app suggests for itself (a
+     * sensible name, features, catalogue limits) - a billing addon
+     * (modulento-ext-abos) can offer it so an operator only has to set a
+     * price, not design a plan from nothing. Only an app (never an addon)
+     * should call this - same reasoning as suppressAccountDefault(): an
+     * app's register() runs only while it is the active one, so every
+     * template present at any moment already belongs to that one app,
+     * with no id of its own to tag it by.
+     *
+     * @param list<string> $features declared feature keys (core's or this app's own via Registrar::subscriptionFeature())
+     * @param array<string, int> $offerLimits offer type id => how many; a catalogue-less app (one with no OfferType of its own) leaves this empty
+     */
+    public function addPlanTemplate(string $id, string $labelKey, array $features, array $offerLimits, ?int $maxImagesPerOffer, bool $perSeat, int $minQuantity): void
+    {
+        $this->planTemplates[] = [
+            'id' => $id, 'label_key' => $labelKey, 'features' => $features, 'offer_limits' => $offerLimits,
+            'max_images_per_offer' => $maxImagesPerOffer, 'per_seat' => $perSeat, 'min_quantity' => $minQuantity,
+        ];
+    }
+
+    /** @return array<int, array{id: string, label_key: string, features: string[], offer_limits: array<string, int>, max_images_per_offer: ?int, per_seat: bool, min_quantity: int}> */
+    public function planTemplates(): array
+    {
+        return $this->planTemplates;
     }
 
     /**

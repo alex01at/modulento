@@ -97,6 +97,21 @@ final class Registrar
     }
 
     /**
+     * A ready-made subscription plan this app suggests for itself - a
+     * billing addon (modulento-ext-abos) can offer it so an operator only
+     * sets a price, not design a plan from nothing. See
+     * App::addPlanTemplate()'s own doc comment for why no further guard
+     * (an app id, an "only while active" check) is needed here.
+     *
+     * @param list<string> $features declared feature keys - this app's own (subscriptionFeature()) or a core one (core.offer.auto_approve, core.provider.featured_badge, core.catalogue.priority_placement)
+     * @param array<string, int> $offerLimits this app's own offer type id(s) => how many; leave empty for an app with no catalogue offer type of its own
+     */
+    public function planTemplate(string $id, string $labelKey, array $features = [], array $offerLimits = [], ?int $maxImagesPerOffer = null, bool $perSeat = false, int $minQuantity = 1): void
+    {
+        $this->app->addPlanTemplate($id, $labelKey, $features, $offerLimits, $maxImagesPerOffer, $perSeat, $minQuantity);
+    }
+
+    /**
      * How this extension answers every question the core (and other
      * extensions, like a feature sold through subscriptionFeature()) asks
      * Subscriptions - the other half of a billing addon (modulento-ext-abos).

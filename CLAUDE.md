@@ -69,7 +69,8 @@ etablierte Muster mit einer lazy ausgewerteten Closure).
 `orderDiscount()`, `module()`, `offerType()`, `orderFlow()`,
 `paymentMethod()`, `demoOffers()`, `subscriptionFeature()`,
 `subscriptionProvider()`, `stripeWebhook()`, `task()`, `listen()`,
-`pageBlockType()`, `registrationSection()`, `registrationGuard()`.
+`pageBlockType()`, `registrationSection()`, `registrationGuard()`,
+`subscriptionFeature()`, `subscriptionProvider()`, `planTemplate()`.
 `Registrar::$app` und `Registrar::$manifest` sind öffentlich lesbar.
 
 **`accountLink()`/`dashboardLink()` — optionale Sichtbarkeit:** beide nehmen
@@ -88,6 +89,14 @@ die Rolle). Bekannte Namen: `inbox`, `notifications`, `orders`, `requests`,
 `browse`, `become_provider`. Braucht keine zusätzliche Bedingung am
 Aufrufort: `register()` einer App läuft ohnehin nur, während sie die aktive
 App ist (eine zweite App zu aktivieren schaltet die erste ab).
+
+**`planTemplate(id, labelKey, features, offerLimits, …)`** — eine **App**
+meldet eine fertige Abo-Vorlage für sich (Name, Features, Angebots-Limits je
+Tarif, z. B. "Starter: 3 Stellenanzeigen"). `modulento-ext-abos` zeigt die
+Vorlagen der gerade aktiven App im Plan-Formular an; der Operator setzt nur
+noch den Preis. Gleicher Grund wie bei `suppressAccountDefault()`: keine
+zusätzliche Bedingung nötig, `register()` läuft ohnehin nur während die App
+aktiv ist.
 
 **`offerType()` — optionale Zusatz-Interfaces** (`core/src/Catalogue/`):
 Ein registrierter `OfferType` kann zusätzlich `FilterableOfferType`
