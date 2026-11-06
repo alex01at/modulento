@@ -61,17 +61,24 @@ geladen sein müssen — siehe `modulento-ext-abos/src/Plans.php` für das
 etablierte Muster mit einer lazy ausgewerteten Closure).
 
 **Wichtige `Registrar`-Hooks** (`core/src/Extension/Registrar.php`):
-`routes()`, `permission()`, `adminMenu()`, `navigation()`, `footerLink()`,
-`accountLink()`, `dashboardLink()`, `suppressAccountDefault()`,
+`routes()`, `permission()`, `adminMenu()`, `adminNotice()`, `navigation()`,
+`footerLink()`, `accountLink()`, `dashboardLink()`, `suppressAccountDefault()`,
 `bodyScript()`, `cookieBanner()`, `cookieCategory()`, `consentProvider()`,
 `homeSection()`, `providerSection()`, `offerSection()`,
 `dashboardSection()`, `adminAccountSection()`, `checkoutSection()`,
-`orderDiscount()`, `module()`, `offerType()`, `orderFlow()`,
-`paymentMethod()`, `demoOffers()`, `subscriptionFeature()`,
-`subscriptionProvider()`, `stripeWebhook()`, `task()`, `listen()`,
-`pageBlockType()`, `registrationSection()`, `registrationGuard()`,
-`subscriptionFeature()`, `subscriptionProvider()`, `planTemplate()`.
+`orderDiscount()`, `module()`, `moduleEnabled()`, `exportable()`,
+`offerType()`, `orderFlow()`, `paymentMethod()`, `demoOffers()`,
+`subscriptionFeature()`, `subscriptionProvider()`, `planTemplate()`,
+`stripeWebhook()`, `task()`, `listen()`, `pageBlockType()`,
+`registrationSection()`, `registrationGuard()`.
 `Registrar::$app` und `Registrar::$manifest` sind öffentlich lesbar.
+
+**Jeder neue/geänderte Hook gehört sofort auch in
+`themes/admin/templates/docs/{de,en}.twig`** (Administration → Dokumentation,
+gruppierte Tabellen je Einsatzgebiet) nachgetragen — das ist die einzige für
+Dritt-Entwickler:innen gedachte Referenz aller `Registrar`-Methoden und darf
+nicht wieder veralten, wie es bis zu dieser Änderung der Fall war (nur 10 von
+37 Methoden dokumentiert).
 
 **`accountLink()`/`dashboardLink()` — optionale Sichtbarkeit:** beide nehmen
 optional einen dritten Parameter `?Closure(App): bool $visible` (z. B. ein

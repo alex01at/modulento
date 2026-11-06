@@ -79,16 +79,101 @@ final class Extension implements ExtensionContract
         $registrar->navigation('myextension.nav', '/hello');
     }
 }</code></pre>
+    <p>Every method of <code>Registrar</code> (<code>core/src/Extension/Registrar.php</code>), grouped by what it is for. Each method's own docblock in the source names its exact signature.</p>
+
+    <h3>The basics</h3>
     <div class="table-wrap">
         <table>
             <thead><tr><th scope="col">Registrar</th><th scope="col">What for</th></tr></thead>
             <tbody>
                 <tr><th scope="row"><code>routes()</code></th><td>Addresses. Every route states its access: <code>Router::PUBLIC</code>, logged in (the default) or a permission.</td></tr>
-                <tr><th scope="row"><code>permission()</code>, <code>adminMenu()</code></th><td>A permission of its own and an entry in the administration's menu.</td></tr>
-                <tr><th scope="row"><code>navigation()</code>, <code>homeSection()</code></th><td>An entry in the site's main menu, a section on the home page.</td></tr>
-                <tr><th scope="row"><code>listen()</code></th><td>React to events, e.g. an account's data export or deletion.</td></tr>
+                <tr><th scope="row"><code>permission()</code></th><td>A permission of its own, which a route or an admin menu entry can require.</td></tr>
+                <tr><th scope="row"><code>adminMenu()</code></th><td>An entry in the administration's menu, under one of its groups (<code>content</code>, <code>marketplace</code>, <code>moderation</code>, <code>people</code>, <code>system</code>, otherwise "More").</td></tr>
                 <tr><th scope="row"><code>task()</code></th><td>Run something regularly through cron.</td></tr>
-                <tr><th scope="row"><code>offerType()</code>, <code>orderFlow()</code>, <code>paymentMethod()</code></th><td>A kind of offer, its order flow, a payment method.</td></tr>
+                <tr><th scope="row"><code>listen()</code></th><td>React to one of the core's own events, e.g. a data export, a login or an account's deletion.</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <h3>Website &amp; account</h3>
+    <div class="table-wrap">
+        <table>
+            <thead><tr><th scope="col">Registrar</th><th scope="col">What for</th></tr></thead>
+            <tbody>
+                <tr><th scope="row"><code>navigation()</code></th><td>An entry in the site's main menu.</td></tr>
+                <tr><th scope="row"><code>footerLink()</code></th><td>An entry in the site's footer.</td></tr>
+                <tr><th scope="row"><code>homeSection()</code></th><td>A section on the home page.</td></tr>
+                <tr><th scope="row"><code>pageBlockType()</code></th><td>A new block type for the block editor (the home page and any other page built from blocks), alongside the built-in ones (hero, text, categories, …).</td></tr>
+                <tr><th scope="row"><code>providerSection()</code></th><td>A section on a provider's own public page.</td></tr>
+                <tr><th scope="row"><code>offerSection()</code></th><td>A section on an offer's own public page.</td></tr>
+                <tr><th scope="row"><code>checkoutSection()</code></th><td>A section on the order form, between the offer type's own fields and the choice of payment method.</td></tr>
+                <tr><th scope="row"><code>dashboardSection()</code></th><td>A section on the logged-in account's own dashboard (<code>/account</code>).</td></tr>
+                <tr><th scope="row"><code>accountLink()</code>, <code>dashboardLink()</code></th><td>An entry in the account menu, or in the dashboard's own short quick-link list - optionally with a condition for when it is shown at all.</td></tr>
+                <tr><th scope="row"><code>suppressAccountDefault()</code></th><td>An app only: switches off one of the account/dashboard area's own built-in entries that does not fit it (e.g. "requests", "orders", "become a provider").</td></tr>
+                <tr><th scope="row"><code>bodyScript()</code></th><td>A script of its own on every page, right before <code>&lt;/body&gt;</code>.</td></tr>
+                <tr><th scope="row"><code>adminAccountSection()</code></th><td>A section on the administration's own account detail page.</td></tr>
+                <tr><th scope="row"><code>adminNotice()</code></th><td>A count for the administration's own notification bell, e.g. "3 open requests".</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <h3>Catalogue &amp; orders</h3>
+    <div class="table-wrap">
+        <table>
+            <thead><tr><th scope="col">Registrar</th><th scope="col">What for</th></tr></thead>
+            <tbody>
+                <tr><th scope="row"><code>offerType()</code></th><td>A kind of offer of its own in the catalogue.</td></tr>
+                <tr><th scope="row"><code>orderFlow()</code></th><td>The order flow for an offer type of its own.</td></tr>
+                <tr><th scope="row"><code>paymentMethod()</code></th><td>A payment method of its own.</td></tr>
+                <tr><th scope="row"><code>orderDiscount()</code></th><td>Adjusts an order's line items before they are totalled - e.g. a coupon code.</td></tr>
+                <tr><th scope="row"><code>demoOffers()</code></th><td>How this offer type creates a sample offer under Administration → Demo data.</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <h3>Subscriptions &amp; payments</h3>
+    <div class="table-wrap">
+        <table>
+            <thead><tr><th scope="col">Registrar</th><th scope="col">What for</th></tr></thead>
+            <tbody>
+                <tr><th scope="row"><code>subscriptionFeature()</code></th><td>A feature sold through a subscription plan - shows up as a checkbox when a plan is built.</td></tr>
+                <tr><th scope="row"><code>planTemplate()</code></th><td>A ready-made plan (name, features, offer limits) this app suggests for Administration → Subscriptions - an operator only has to set a price.</td></tr>
+                <tr><th scope="row"><code>subscriptionProvider()</code></th><td>A billing system of its own, behind the core's generic subscriptions facade (like <code>modulento-ext-abos</code>).</td></tr>
+                <tr><th scope="row"><code>stripeWebhook()</code></th><td>React to a verified Stripe webhook notification.</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <h3>Cookies &amp; consent</h3>
+    <div class="table-wrap">
+        <table>
+            <thead><tr><th scope="col">Registrar</th><th scope="col">What for</th></tr></thead>
+            <tbody>
+                <tr><th scope="row"><code>cookieCategory()</code></th><td>A category of cookie of its own, only ever set once consent for it is given.</td></tr>
+                <tr><th scope="row"><code>consentProvider()</code></th><td>A consent system of its own, behind the core's generic consent facade (like <code>modulento-ext-cookie</code>).</td></tr>
+                <tr><th scope="row"><code>cookieBanner()</code></th><td>A banner of its own, shown on every page.</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <h3>Registration</h3>
+    <div class="table-wrap">
+        <table>
+            <thead><tr><th scope="col">Registrar</th><th scope="col">What for</th></tr></thead>
+            <tbody>
+                <tr><th scope="row"><code>registrationSection()</code></th><td>A form field of its own on the registration page, between the password fields and the terms checkbox.</td></tr>
+                <tr><th scope="row"><code>registrationGuard()</code></th><td>Refuse a registration with a reason of its own (e.g. a disposable e-mail address, a failed CAPTCHA).</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <h3>Everything else</h3>
+    <div class="table-wrap">
+        <table>
+            <thead><tr><th scope="col">Registrar</th><th scope="col">What for</th></tr></thead>
+            <tbody>
+                <tr><th scope="row"><code>module()</code>, <code>moduleEnabled()</code></th><td>A feature of its own, switched on and off under Administration → Modules; <code>moduleEnabled()</code> also asks about another extension's or a core module.</td></tr>
+                <tr><th scope="row"><code>exportable()</code></th><td>Makes an extension's own, hand-maintained data portable under Administration → Export/Import.</td></tr>
             </tbody>
         </table>
     </div>

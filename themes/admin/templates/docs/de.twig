@@ -79,16 +79,101 @@ final class Extension implements ExtensionContract
         $registrar->navigation('meineerweiterung.nav', '/hallo');
     }
 }</code></pre>
+    <p>Jede Methode von <code>Registrar</code> (<code>core/src/Extension/Registrar.php</code>), gruppiert nach Einsatzgebiet. Der eigene Docblock jeder Methode im Quellcode nennt die genaue Signatur.</p>
+
+    <h3>Grundlegend</h3>
     <div class="table-wrap">
         <table>
             <thead><tr><th scope="col">Registrar</th><th scope="col">Wofür</th></tr></thead>
             <tbody>
                 <tr><th scope="row"><code>routes()</code></th><td>Adressen. Jede Route nennt ihren Zugriff: <code>Router::PUBLIC</code>, angemeldet (Standard) oder ein Recht.</td></tr>
-                <tr><th scope="row"><code>permission()</code>, <code>adminMenu()</code></th><td>Ein eigenes Recht und ein Eintrag im Menü der Administration.</td></tr>
-                <tr><th scope="row"><code>navigation()</code>, <code>homeSection()</code></th><td>Eintrag im Hauptmenü der Website, Abschnitt auf der Startseite.</td></tr>
-                <tr><th scope="row"><code>listen()</code></th><td>Auf Ereignisse reagieren, z. B. Datenexport oder Löschung eines Kontos.</td></tr>
+                <tr><th scope="row"><code>permission()</code></th><td>Ein eigenes Recht, das eine Route oder ein Admin-Menüpunkt verlangen kann.</td></tr>
+                <tr><th scope="row"><code>adminMenu()</code></th><td>Eintrag im Menü der Administration, einer Gruppe zugeordnet (<code>content</code>, <code>marketplace</code>, <code>moderation</code>, <code>people</code>, <code>system</code>, sonst „Mehr").</td></tr>
                 <tr><th scope="row"><code>task()</code></th><td>Etwas regelmäßig über den Cron ausführen.</td></tr>
-                <tr><th scope="row"><code>offerType()</code>, <code>orderFlow()</code>, <code>paymentMethod()</code></th><td>Eine Art von Angebot, ihr Bestellablauf, eine Zahlungsart.</td></tr>
+                <tr><th scope="row"><code>listen()</code></th><td>Auf ein Ereignis des Kerns reagieren, z. B. Datenexport, Login oder Löschung eines Kontos.</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <h3>Website &amp; Konto</h3>
+    <div class="table-wrap">
+        <table>
+            <thead><tr><th scope="col">Registrar</th><th scope="col">Wofür</th></tr></thead>
+            <tbody>
+                <tr><th scope="row"><code>navigation()</code></th><td>Eintrag im Hauptmenü der Website.</td></tr>
+                <tr><th scope="row"><code>footerLink()</code></th><td>Eintrag im Footer der Website.</td></tr>
+                <tr><th scope="row"><code>homeSection()</code></th><td>Abschnitt auf der Startseite.</td></tr>
+                <tr><th scope="row"><code>pageBlockType()</code></th><td>Neuer Block-Typ für den Seiten-Baukasten (Startseite und jede normale Seite), neben den eingebauten (Hero, Text, Kategorien, …).</td></tr>
+                <tr><th scope="row"><code>providerSection()</code></th><td>Abschnitt auf der öffentlichen Seite eines Anbieters.</td></tr>
+                <tr><th scope="row"><code>offerSection()</code></th><td>Abschnitt auf der öffentlichen Seite eines Angebots.</td></tr>
+                <tr><th scope="row"><code>checkoutSection()</code></th><td>Abschnitt im Bestellformular, zwischen der Angebotsart und der Zahlungsart.</td></tr>
+                <tr><th scope="row"><code>dashboardSection()</code></th><td>Abschnitt auf dem eigenen Konto-Dashboard (<code>/account</code>).</td></tr>
+                <tr><th scope="row"><code>accountLink()</code>, <code>dashboardLink()</code></th><td>Eintrag im Konto-Menü bzw. in der kurzen Schnellzugriffsliste oben im Dashboard - optional mit einer Bedingung, wann er überhaupt gezeigt wird.</td></tr>
+                <tr><th scope="row"><code>suppressAccountDefault()</code></th><td>Nur für eine App: schaltet einen fest eingebauten Konto-/Dashboard-Eintrag ab, der zur eigenen App nicht passt (z. B. „Anfragen", „Bestellungen", „Anbieter werden").</td></tr>
+                <tr><th scope="row"><code>bodyScript()</code></th><td>Eigenes Skript auf jeder Seite, unmittelbar vor <code>&lt;/body&gt;</code>.</td></tr>
+                <tr><th scope="row"><code>adminAccountSection()</code></th><td>Abschnitt auf der Konto-Detailseite in der Administration.</td></tr>
+                <tr><th scope="row"><code>adminNotice()</code></th><td>Zähler für die Benachrichtigungsglocke der Administration, z. B. „3 offene Anfragen".</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <h3>Katalog &amp; Bestellungen</h3>
+    <div class="table-wrap">
+        <table>
+            <thead><tr><th scope="col">Registrar</th><th scope="col">Wofür</th></tr></thead>
+            <tbody>
+                <tr><th scope="row"><code>offerType()</code></th><td>Eine eigene Art von Angebot im Katalog.</td></tr>
+                <tr><th scope="row"><code>orderFlow()</code></th><td>Der Bestellablauf für eine eigene Angebotsart.</td></tr>
+                <tr><th scope="row"><code>paymentMethod()</code></th><td>Eine eigene Zahlungsart.</td></tr>
+                <tr><th scope="row"><code>orderDiscount()</code></th><td>Passt die Positionen einer Bestellung an, bevor sie summiert werden - z. B. ein Gutschein-Code.</td></tr>
+                <tr><th scope="row"><code>demoOffers()</code></th><td>Wie die eigene Angebotsart unter Administration → Demodaten ein Beispiel-Angebot erzeugt.</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <h3>Abos &amp; Zahlungen</h3>
+    <div class="table-wrap">
+        <table>
+            <thead><tr><th scope="col">Registrar</th><th scope="col">Wofür</th></tr></thead>
+            <tbody>
+                <tr><th scope="row"><code>subscriptionFeature()</code></th><td>Ein Feature, das über ein Abo verkauft wird - erscheint als Auswahlpunkt beim Anlegen eines Plans.</td></tr>
+                <tr><th scope="row"><code>planTemplate()</code></th><td>Fertige Plan-Vorlage dieser App (Name, Features, Angebots-Limits) für Administration → Abos - ein Operator muss dann nur noch den Preis setzen.</td></tr>
+                <tr><th scope="row"><code>subscriptionProvider()</code></th><td>Eigenes Abo-/Billing-System hinter der generischen Abo-Facade des Kerns (wie <code>modulento-ext-abos</code>).</td></tr>
+                <tr><th scope="row"><code>stripeWebhook()</code></th><td>Auf eine verifizierte Stripe-Benachrichtigung reagieren.</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <h3>Cookies &amp; Einwilligung</h3>
+    <div class="table-wrap">
+        <table>
+            <thead><tr><th scope="col">Registrar</th><th scope="col">Wofür</th></tr></thead>
+            <tbody>
+                <tr><th scope="row"><code>cookieCategory()</code></th><td>Eine eigene Kategorie von Cookie, die erst nach Einwilligung gesetzt werden darf.</td></tr>
+                <tr><th scope="row"><code>consentProvider()</code></th><td>Eigenes Einwilligungssystem hinter der generischen Consent-Facade des Kerns (wie <code>modulento-ext-cookie</code>).</td></tr>
+                <tr><th scope="row"><code>cookieBanner()</code></th><td>Eigenes Banner, das auf jeder Seite erscheinen kann.</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <h3>Registrierung</h3>
+    <div class="table-wrap">
+        <table>
+            <thead><tr><th scope="col">Registrar</th><th scope="col">Wofür</th></tr></thead>
+            <tbody>
+                <tr><th scope="row"><code>registrationSection()</code></th><td>Eigenes Formularfeld auf der Registrierungsseite, zwischen Passwort und AGB-Haken.</td></tr>
+                <tr><th scope="row"><code>registrationGuard()</code></th><td>Eine Registrierung mit eigenem Grund ablehnen (z. B. eine Wegwerf-E-Mail-Adresse oder eine falsche CAPTCHA-Antwort).</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <h3>Sonstiges</h3>
+    <div class="table-wrap">
+        <table>
+            <thead><tr><th scope="col">Registrar</th><th scope="col">Wofür</th></tr></thead>
+            <tbody>
+                <tr><th scope="row"><code>module()</code>, <code>moduleEnabled()</code></th><td>Ein eigenes, unter Administration → Module ein- und ausschaltbares Feature; <code>moduleEnabled()</code> fragt dabei auch ein fremdes oder ein Kern-Modul ab.</td></tr>
+                <tr><th scope="row"><code>exportable()</code></th><td>Eigene, von Hand gepflegte Daten unter Administration → Export/Import mitnehmbar machen.</td></tr>
             </tbody>
         </table>
     </div>
