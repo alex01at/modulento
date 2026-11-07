@@ -79,7 +79,9 @@
 
     <div class="dashboard-main">
         {% for section in dashboard_sections %}
-            {% include section.template with section.data %}
+            {% if section.data is not empty %}
+                {% include section.template with section.data %}
+            {% endif %}
         {% endfor %}
 
         <h1>{{ trans('core.dashboard.greeting', {name: name}) }}</h1>
