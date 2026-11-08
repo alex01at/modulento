@@ -575,8 +575,14 @@ final class Kernel
         $app->addAdminMenu('core.admin.docs.title', '/admin/docs', 'core.admin.access', 'system');
 
         // Pending-action counts behind the administration header's own bell -
-        // the same sections already listed above, just surfaced before an
+        // the same sections already listed in AdminController::stats()'s own
+        // "wartet auf Prüfung" dashboard widget, just surfaced before an
         // administrator would otherwise stumble onto them.
+        $app->addAdminNotice('core.providers.manage', static function (App $app): ?array {
+            $count = $app->providers->counts()['pending'] ?? 0;
+
+            return $count > 0 ? ['count' => $count, 'label_key' => 'core.admin.notice.providers_pending', 'link' => '/admin/providers?status=pending'] : null;
+        });
         if ($app->modules->enabled('reports')) {
             $app->addAdminNotice('core.reports.manage', static function (App $app): ?array {
                 $count = $app->reports->openCount();
@@ -596,6 +602,11 @@ final class Kernel
                 return $count > 0 ? ['count' => $count, 'label_key' => 'core.admin.notice.requests_pending', 'link' => '/admin/requests?status=pending'] : null;
             });
         }
+        $app->addAdminNotice('core.messages.manage', static function (App $app): ?array {
+            $count = $app->orders->flaggedMessageCount() + $app->offerMessages->flaggedCount();
+
+            return $count > 0 ? ['count' => $count, 'label_key' => 'core.admin.notice.messages_flagged', 'link' => '/admin/messages'] : null;
+        });
 
         // What Administration -> Export/Import can write to a file and read back - every one of
         // these already cleans up anything handed to it, so an imported file goes through no
