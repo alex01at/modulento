@@ -464,7 +464,11 @@ final class HomeLayout
         $colour = $settings['text_color'] ?? null;
         $style = is_string($colour) && self::validColour($colour) ? 'color: ' . $colour . ' !important;' : '';
         if (!empty($settings['shadow'])) {
-            $style .= ($style !== '' ? ' ' : '') . 'text-shadow: 0 2px 10px rgb(0 0 0 / .45) !important;';
+            // A soft blur alone all but disappears against a busy photo - a
+            // four-direction dark outline (the standard "legible over any
+            // image" trick) plus a wider, softer blur behind it for depth.
+            $style .= ($style !== '' ? ' ' : '') . 'text-shadow: -1px -1px 2px rgb(0 0 0 / .8), 1px -1px 2px rgb(0 0 0 / .8), '
+                . '-1px 1px 2px rgb(0 0 0 / .8), 1px 1px 2px rgb(0 0 0 / .8), 0 4px 16px rgb(0 0 0 / .55) !important;';
         }
 
         return $style;
