@@ -7,11 +7,13 @@ namespace Modulento\Core\Support;
 use Modulento\Core\App;
 use Modulento\Core\Catalogue\OfferView;
 use Modulento\Core\Content\HomeLayout;
+use Modulento\Core\Content\Shortcodes;
 use Modulento\Core\Controller\AssetController;
 use Modulento\Core\Controller\DesignController;
 use Modulento\Core\Provider\ProviderView;
 use Twig\Environment;
 use Twig\Loader\FilesystemLoader;
+use Twig\TwigFilter;
 use Twig\TwigFunction;
 
 /**
@@ -329,22 +331,29 @@ final class View
         // The current accent colour (Administration → Design), for <meta name="theme-color">.
         $this->twig->addFunction(new TwigFunction('design_accent', fn (): string => (string) $app->design->values()['accent']));
         // The blocks of the home page, in the current language, enabled ones only.
-        $this->twig->addFunction(new TwigFunction('home_blocks', fn (bool $all = false): array => $app->homeLayout->view(
+        $this->twig->addFunction(new TwigFunction('home_blocks', fn (bool $all = false): array => self::withShortcodes($app, $app->homeLayout->view(
             $app->translator->locale(),
             $app->locales->default(),
             fn (string $key, array $params = []) => $translator->trans($key, $params),
             $app->siteName(),
             $all,
             $app->pageBlockTypes()
-        )));
+        ), $all)));
         // The blocks of a content page, in the current language, enabled ones only.
-        $this->twig->addFunction(new TwigFunction('page_blocks', fn (int $pageId, bool $all = false): array => $app->pages->view(
+        $this->twig->addFunction(new TwigFunction('page_blocks', fn (int $pageId, bool $all = false): array => self::withShortcodes($app, $app->pages->view(
             $pageId,
             $app->translator->locale(),
             $app->locales->default(),
             $all,
             $app->pageBlockTypes()
-        )));
+        ), $all)));
+        // Placeholders an extension registered (Registrar::shortcode()) in a piece of admin-written HTML.
+        $this->twig->addFilter(new TwigFilter('shortcodes', fn (string $html): string => Shortcodes::expand($html, $app, $app->shortcodes()), ['is_safe' => ['html']]));
+        // One usage line per registered placeholder, for the hint under a text editor.
+        $this->twig->addFunction(new TwigFunction('shortcode_hints', fn (): array => array_values(array_map(
+            fn (array $code) => $translator->trans($code['usage_key']),
+            $app->shortcodes()
+        ))));
         // Seconds between two asks for new messages; 0 switches the asking off (Administration → Settings).
         $this->twig->addFunction(new TwigFunction('poll_seconds', fn (): int => (int) $app->settings->get('core.poll_seconds', '60')));
         $this->twig->addFunction(new TwigFunction('has_catalogue', fn () => $app->offers->types() !== []));
@@ -441,6 +450,28 @@ final class View
     public function renderBlock(string $template, string $block, array $data = []): string
     {
         return $this->twig->load($template)->renderBlock($block, $data);
+    }
+
+    /**
+     * The text blocks' bodies with their placeholders replaced - not while
+     * the page is edited in place ($editing), where the placeholder itself
+     * has to be what the editor shows and saves back.
+     *
+     * @param list<array<string, mixed>> $blocks
+     * @return list<array<string, mixed>>
+     */
+    private static function withShortcodes(App $app, array $blocks, bool $editing): array
+    {
+        if ($editing || $app->shortcodes() === []) {
+            return $blocks;
+        }
+        foreach ($blocks as &$block) {
+            if ($block['type'] === 'text' && ($block['texts']['body'] ?? '') !== '') {
+                $block['texts']['body'] = Shortcodes::expand($block['texts']['body'], $app, $app->shortcodes());
+            }
+        }
+
+        return $blocks;
     }
 
     private static function assetUrl(string $prefix, string $path, ?string $file): string

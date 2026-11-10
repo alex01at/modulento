@@ -224,6 +224,29 @@ final class Registrar
     }
 
     /**
+     * A placeholder an administrator can type into a text block of the home
+     * page or of any other page ("[gallery summer]"), replaced by this
+     * extension's own HTML wherever that text is shown - never while the
+     * text is edited, so the placeholder itself is what gets saved. Syntax:
+     * "[name]", "[name:value]", "[name value]", "[name key=value key2=\"two
+     * words\"]"; a bare value is argument 0, named ones are keyed by name.
+     * Only these admin-written texts are scanned - never what providers or
+     * visitors wrote. A name no extension registered is left as typed.
+     *
+     * @param string $name lowercase letters, digits, "_" and "-"; must be this extension's id or start with it followed by "_" or "-"
+     * @param string $usageKey language key of a one-line usage hint shown under the text editor, e.g. "[gallery address] - an album"
+     * @param Closure(App, array<int|string, string>, string): string $render gets the app, the arguments and the name; returns HTML (escape everything that came from the arguments or the database)
+     */
+    public function shortcode(string $name, string $usageKey, Closure $render): void
+    {
+        $id = $this->manifest->id;
+        if (preg_match('/^[a-z][a-z0-9_-]{0,39}$/', $name) !== 1 || ($name !== $id && !str_starts_with($name, $id . '_') && !str_starts_with($name, $id . '-'))) {
+            throw new LogicException("Shortcode \"{$name}\" must be \"{$id}\" or start with \"{$id}_\" or \"{$id}-\"");
+        }
+        $this->app->addShortcode($name, $usageKey, $render);
+    }
+
+    /**
      * A section on a provider's public profile, e.g. a freelancer's skills
      * and portfolio. The template is one of this extension's
      * ("@id/provider.twig"); a theme may override it like any other. $data

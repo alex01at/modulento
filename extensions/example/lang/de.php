@@ -29,4 +29,5 @@ return [
     'example.banner.not_granted' => 'nicht zugestimmt',
     'example.register.title' => 'Vom Beispiel-Registrierungsblock',
     'example.register.error.blocked' => 'Die Registrierung wurde vom Beispiel blockiert.',
+    'example.shortcode.usage' => '[example Name] – Beispiel-Platzhalter',
 ];

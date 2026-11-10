@@ -103,6 +103,8 @@ final class Extension implements ExtensionContract
             'granted' => $app->consent->granted('example.demo_cookie'),
         ]);
         $registrar->bodyScript('@example/script.twig');
+        $registrar->shortcode('example', 'example.shortcode.usage', fn (App $app, array $args): string
+            => '<span class="example-shortcode">' . htmlspecialchars('hello ' . ($args[0] ?? '') . ($args['to'] ?? ''), ENT_QUOTES) . '</span>');
 
         // A real anti-spam addon (modulento-ext-antispam) would check a
         // CAPTCHA answer or a disposable-email blocklist; this exists only

@@ -4470,6 +4470,35 @@ $post('/admin/home', ['action' => 'save', 'blocks' => [$pagesBlock['id'] => ['en
 check('home pages block: a count of 1 shows just the first', !str_contains($get('/')['body'], 'Neuigkeit Zwei'));
 $post('/admin/home', ['action' => 'delete:' . $pagesBlock['id']], 3);
 
+// --- Shortcodes: placeholders an extension turns into HTML (Registrar::shortcode()) -------------
+$codes = [
+    'demo' => ['usage_key' => 'x', 'render' => fn ($a, array $args, string $name): string => '<b>' . htmlspecialchars($name . '|' . json_encode($args), ENT_QUOTES) . '</b>'],
+    'boom' => ['usage_key' => 'x', 'render' => function (): string { throw new RuntimeException('kaputt'); }],
+];
+$expand = fn (string $html): string => Modulento\Core\Content\Shortcodes::expand($html, $app, $codes);
+check('shortcodes: a placeholder without arguments', $expand('Vor [demo] nach') === 'Vor <b>demo|[]</b> nach');
+check('shortcodes: "[name:value]" and "[name value]" both give a positional argument', $expand('[demo:abc]') === '<b>demo|[&quot;abc&quot;]</b>' && $expand('[demo abc]') === $expand('[demo:abc]'));
+check('shortcodes: named and quoted arguments, HTML entities from the editor are decoded', $expand('[demo count=3 title=&quot;Zwei Worte&quot;]') === '<b>demo|{&quot;count&quot;:&quot;3&quot;,&quot;title&quot;:&quot;Zwei Worte&quot;}</b>');
+check('shortcodes: an unregistered name and ordinary brackets are left as typed', $expand('[unbekannt] [1] [a b]') === '[unbekannt] [1] [a b]');
+check('shortcodes: a placeholder alone in its paragraph loses the <p>', $expand('<p>[demo]</p><p>Text [demo]</p>') === '<b>demo|[]</b><p>Text <b>demo|[]</b></p>');
+$oldLog = ini_set('error_log', '/dev/null');
+check('shortcodes: a failing one disappears, the rest of the text stays', $expand('A [boom] B') === 'A  B');
+ini_set('error_log', (string) $oldLog);
+check('shortcodes: at most ' . Modulento\Core\Content\Shortcodes::MAX_PER_TEXT . ' per text', substr_count($expand(str_repeat('[demo]', 40)), '<b>') === Modulento\Core\Content\Shortcodes::MAX_PER_TEXT);
+$exampleBefore = $pdo->query("SELECT enabled FROM extension WHERE id = 'example'")->fetchColumn();
+$pdo->exec("INSERT OR REPLACE INTO extension (id, version, enabled) VALUES ('example', '0.1.0', 1)");
+$layoutBefore = $pdo->query("SELECT value FROM setting WHERE name = 'core.home_layout'")->fetchColumn();
+$layout = json_encode([['id' => 'sc', 'type' => 'text', 'enabled' => true, 'texts' => ['de' => ['heading' => 'Hi', 'body' => '<p>[example:welt to=!]</p>']], 'settings' => []]]);
+$pdo->prepare("INSERT OR REPLACE INTO setting (name, value) VALUES ('core.home_layout', ?)")->execute([$layout]);
+check('shortcodes: an extension\'s placeholder is replaced on the home page', str_contains($get('/')['body'], '<span class="example-shortcode">hello welt!</span>') && !str_contains($get('/')['body'], '[example:welt'));
+check('shortcodes: while editing in place, the placeholder itself is shown (so it is what gets saved)', str_contains($get('/?edit=1', 3)['body'], '[example:welt to=!]'));
+check('shortcodes: the editor lists the usage hints', str_contains($get('/?edit=1', 3)['body'], '[example Name]'));
+$pdo->prepare("DELETE FROM setting WHERE name = 'core.home_layout'")->execute();
+if ($layoutBefore !== false) {
+    $pdo->prepare("INSERT INTO setting (name, value) VALUES ('core.home_layout', ?)")->execute([$layoutBefore]);
+}
+$pdo->exec($exampleBefore === false ? "DELETE FROM extension WHERE id = 'example'" : "UPDATE extension SET enabled = " . (int) $exampleBefore . " WHERE id = 'example'");
+
 // --- The maintenance page's own background picture ---------------------------------------------
 $post('/admin/settings', ['site_name' => 'Testseite', 'mail_from' => 'noreply@example.test', 'registration' => 'open', 'default_locale' => 'de', 'locales' => ['de', 'en'], 'maintenance_enabled' => '1', 'maintenance_message' => 'Gleich zurück.', 'maintenance_background' => '/media/library/../evil.png'], 3);
 check('settings: a maintenance background outside the media library is not kept', $pdo->query("SELECT value FROM setting WHERE name = 'core.maintenance_background'")->fetchColumn() === '');

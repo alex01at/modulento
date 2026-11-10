@@ -150,6 +150,7 @@
                         <label for="{{ field }}-{{ id }}">{{ trans(field_key) }}</label>
                         {% if field == 'body' %}
                             <textarea id="{{ field }}-{{ id }}" name="{{ name }}" rows="8" lang="{{ locale }}" placeholder="{{ hint|striptags }}" data-editor="{{ editor() }}">{{ value }}</textarea>
+                            {% if block.type == 'text' and shortcode_hints() %}<small>{{ trans('core.home.shortcodes_hint') }} {{ shortcode_hints()|join(' · ') }}</small>{% endif %}
                         {% elseif field == 'items' or field == 'checklist' %}
                             <textarea id="{{ field }}-{{ id }}" name="{{ name }}" rows="4" placeholder="{{ hint }}">{{ value }}</textarea>
                             {% if field == 'items' %}<small>{{ trans('core.home.items_hint') }}</small>{% endif %}

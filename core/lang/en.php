@@ -1669,6 +1669,7 @@ return [
     'core.home.type.image' => 'Picture',
     'core.home.type.links' => 'Link list',
     'core.home.type.pages' => 'Pages (blog preview)',
+    'core.home.shortcodes_hint' => 'Placeholders:',
     'core.home.pages' => 'Latest',
     'core.home.field.title' => 'Heading',
     'core.home.field.text' => 'Text',

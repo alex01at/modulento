@@ -1669,6 +1669,7 @@ return [
     'core.home.type.image' => 'Bild',
     'core.home.type.links' => 'Linkliste',
     'core.home.type.pages' => 'Seiten (Blog-Vorschau)',
+    'core.home.shortcodes_hint' => 'Platzhalter:',
     'core.home.pages' => 'Aktuelles',
     'core.home.field.title' => 'Überschrift',
     'core.home.field.text' => 'Text',

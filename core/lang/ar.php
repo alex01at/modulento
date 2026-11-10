@@ -1669,6 +1669,7 @@ return [
     'core.home.type.image' => 'صورة',
     'core.home.type.links' => 'قائمة روابط',
     'core.home.type.pages' => 'الصفحات (معاينة المدونة)',
+    'core.home.shortcodes_hint' => 'عناصر نائبة:',
     'core.home.pages' => 'الأحدث',
     'core.home.field.title' => 'العنوان',
     'core.home.field.text' => 'نص',

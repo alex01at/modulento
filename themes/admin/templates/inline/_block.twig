@@ -161,6 +161,7 @@
                             <label for="{{ field }}-{{ id }}">{{ trans(field_key) }}</label>
                             {% if field == 'body' %}
                                 <textarea id="{{ field }}-{{ id }}" name="{{ name }}" rows="8" data-editor="{{ editor() }}">{{ value }}</textarea>
+                                {% if block.type == 'text' and shortcode_hints() %}<small>{{ trans('core.home.shortcodes_hint') }} {{ shortcode_hints()|join(' · ') }}</small>{% endif %}
                             {% elseif field == 'button_url' or field == 'button2_url' %}
                                 <input id="{{ field }}-{{ id }}" name="{{ name }}" value="{{ value }}" maxlength="500" placeholder="/offers oder https://…">
                             {% elseif field == 'items' or field == 'text' or field == 'checklist' %}

@@ -210,6 +210,8 @@ final class App
     private array $permissions = [];
     /** @var array<string, array{label_key: string, text_fields: string[], template: string, data: ?\Closure}> block type id => its schema */
     private array $pageBlockTypes = [];
+    /** @var array<string, array{render: \Closure, usage_key: string}> */
+    private array $shortcodes = [];
 
     public function __construct(public readonly array $config, public readonly PDO $db, string $locale = 'en')
     {
@@ -527,6 +529,21 @@ final class App
     public function addPageBlockType(string $id, string $labelKey, array $textFields, string $template, ?\Closure $data = null): void
     {
         $this->pageBlockTypes[$id] = ['label_key' => $labelKey, 'text_fields' => $textFields, 'template' => $template, 'data' => $data];
+    }
+
+    /**
+     * A placeholder an admin can type into a text block ("[name ...]"),
+     * which the extension turns into its own HTML - see Shortcodes.
+     */
+    public function addShortcode(string $name, string $usageKey, \Closure $render): void
+    {
+        $this->shortcodes[$name] = ['render' => $render, 'usage_key' => $usageKey];
+    }
+
+    /** @return array<string, array{render: \Closure, usage_key: string}> */
+    public function shortcodes(): array
+    {
+        return $this->shortcodes;
     }
 
     /** @return array<string, array{label_key: string, text_fields: string[], template: string, data: ?\Closure}> */

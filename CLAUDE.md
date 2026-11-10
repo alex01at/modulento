@@ -70,7 +70,7 @@ etablierte Muster mit einer lazy ausgewerteten Closure).
 `offerType()`, `orderFlow()`, `paymentMethod()`, `demoOffers()`,
 `subscriptionFeature()`, `subscriptionProvider()`, `planTemplate()`,
 `stripeWebhook()`, `task()`, `listen()`, `pageBlockType()`,
-`registrationSection()`, `registrationGuard()`.
+`registrationSection()`, `registrationGuard()`, `shortcode()`.
 `Registrar::$app` und `Registrar::$manifest` sind öffentlich lesbar.
 
 **Jeder neue/geänderte Hook gehört sofort auch in
@@ -125,6 +125,17 @@ für Inhalte jenseits reiner Texte (z. B. eine live aus der DB geladene
 Liste) — läuft bei jeder Anzeige neu. `id` muss mit der Erweiterungs-ID
 beginnen. Beispiel: `modulento-ext-custom-fields/src/Extension.php`
 (Block "Liste einer Angebotsart").
+
+**`shortcode(name, usageKey, render)`** — Platzhalter `[name wert]` /
+`[name:wert]` / `[name schluessel=wert]`, den Admins in Textblöcke von
+Startseite und Seiten tippen; die Erweiterung liefert dafür HTML
+(`Closure(App, array $args, string $name): string`, alles Eingehende
+escapen). Name = Erweiterungs-ID oder `<id>_…`/`<id>-…`. Im
+Bearbeitungsmodus (`?edit=1`) bleibt der Platzhalter stehen, damit er
+gespeichert wird; ausgewertet werden nur Admin-Texte (nie Anbieter-/
+Besuchertexte, nie Angebotsseiten). Zusätzlich Twig-Filter `|shortcodes`.
+Beispiele: `modulento-ext-gallery` (`[gallery adresse]`),
+`extensions/example`.
 
 **Scoping-Konvention** (für alles, was "je nach aktiver Erweiterung/App
 anders" sein soll, z. B. FAQ pro Erweiterung, Abo-Pläne/Coupons pro App):
