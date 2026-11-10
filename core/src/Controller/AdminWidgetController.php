@@ -77,6 +77,17 @@ final class AdminWidgetController extends Controller
             }
         }
 
+        // Its own checkbox, not a "type" select: see AdminHomeController::fromForm()'s own comment.
+        if (!empty($postedSettings['text_color_enabled'])) {
+            $colour = strtolower(trim((string) ($postedSettings['text_color'] ?? '')));
+            if (HomeLayout::validColour($colour)) {
+                $settings['text_color'] = $colour;
+            }
+        }
+        if (!empty($postedSettings['shadow'])) {
+            $settings['shadow'] = true;
+        }
+
         $saved = $app->widgets->saveOwn($name, ['type' => $type, 'texts' => $texts, 'settings' => $settings]);
         if (!$saved) {
             $this->renderForm($_POST, [$this->trans('core.widget.invalid_name')]);

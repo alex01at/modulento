@@ -86,6 +86,25 @@
                     </select>
                 </div>
             </fieldset>
+            <fieldset>
+                <legend>{{ trans('core.home.text_style') }}</legend>
+                <div class="field">
+                    <label class="checkbox">
+                        <input type="checkbox" name="settings[text_color_enabled]" value="1" {{ input.settings.text_color ?? '' ? 'checked' }}>
+                        <span>{{ trans('core.home.text_color_enable') }}</span>
+                    </label>
+                </div>
+                <div class="field">
+                    <label for="text-color">{{ trans('core.home.text_color') }}</label>
+                    <input id="text-color" type="color" name="settings[text_color]" value="{{ input.settings.text_color ?? '#ffffff' }}">
+                </div>
+                <div class="field">
+                    <label class="checkbox">
+                        <input type="checkbox" name="settings[shadow]" value="1" {{ input.settings.shadow ?? false ? 'checked' }}>
+                        <span>{{ trans('core.home.text_shadow') }}</span>
+                    </label>
+                </div>
+            </fieldset>
         </section>
 
         {% for code in locales %}

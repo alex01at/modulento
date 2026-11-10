@@ -6,6 +6,7 @@ namespace Modulento\Core\Support;
 
 use Modulento\Core\App;
 use Modulento\Core\Catalogue\OfferView;
+use Modulento\Core\Content\HomeLayout;
 use Modulento\Core\Controller\AssetController;
 use Modulento\Core\Provider\ProviderView;
 use Twig\Environment;
@@ -305,10 +306,16 @@ final class View
             return ['name' => ($account['display_name'] ?? '') !== '' ? $account['display_name'] : $account['email']];
         }));
         // The stylesheet of the design values, named after its content: "/design/<name>.css".
-        // The name includes the home layout's own backgrounds too (served together,
-        // see DesignController::stylesheet()), so either changing busts the cache.
-        $this->twig->addFunction(new TwigFunction('design_url', fn (): string => '/design/'
-            . substr(sha1($app->design->css() . $app->homeLayout->backgroundCss()), 0, 16) . '.css'));
+        // The name includes every block's own background/text style too (home and every
+        // normal page alike, served together - see DesignController::stylesheet()), so
+        // any of them changing busts the cache.
+        $this->twig->addFunction(new TwigFunction('design_url', function () use ($app): string {
+            $extra = $app->pageBlockTypes();
+
+            return '/design/' . substr(sha1(
+                $app->design->css() . HomeLayout::cssFor($app->homeLayout->blocks($extra)) . $app->pages->blockCss($extra)
+            ), 0, 16) . '.css';
+        }));
         // A language the way <meta property="og:locale"> expects it ("de_DE").
         $this->twig->addFunction(new TwigFunction('og_locale', fn (string $locale): string => Locales::ogLocale($locale)));
         // The current accent colour (Administration → Design), for <meta name="theme-color">.

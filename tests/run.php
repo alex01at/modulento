@@ -1013,6 +1013,25 @@ check('page blocks: a block can be duplicated', count((new Pages($pdo, $locales(
 $post('/admin/pages/' . $imprint['page_id'] . '/blocks', ['action' => 'delete:' . $imprintBlocks[0]['id']], 3);
 check('page blocks: a block can be removed again', count((new Pages($pdo, $locales()))->blocksFor((int) $imprint['page_id'])) === 1);
 
+// A normal page's own block background/text style: the same CSS as a home block's, served through
+// the same design stylesheet (Pages::blockCss()) - unlike a home block, a page's blocks sit in that
+// page's own "blocks" column, so nothing emitted them there until this was built.
+$remainingBlock = (new Pages($pdo, $locales()))->blocksFor((int) $imprint['page_id'])[0];
+$post('/admin/pages/' . $imprint['page_id'] . '/blocks', ['action' => 'save', 'blocks' => [
+    $remainingBlock['id'] => ['enabled' => '1', 'settings' => [
+        'background_type' => 'color', 'background_color' => '#abcdef', 'text_color_enabled' => '1', 'text_color' => '#112233', 'shadow' => '1',
+    ], 'texts' => ['de' => ['heading' => 'Angaben']]],
+]], 3);
+preg_match('#href="(/design/[a-f0-9]+\.css)"#', $get('/impressum', null)['body'], $pageCssMatch);
+$designCss = $get($pageCssMatch[1], null)['body'];
+check('page blocks: a normal page\'s own block background and text colour/shadow reach the design stylesheet too, not just the home page\'s',
+    str_contains($designCss, '[data-home-block="' . $remainingBlock['id'] . '"] {') && str_contains($designCss, 'background: #abcdef;')
+    && str_contains($designCss, '[data-home-block="' . $remainingBlock['id'] . '"], [data-home-block="' . $remainingBlock['id'] . '"] *:not(.button) {')
+    && str_contains($designCss, 'color: #112233 !important;') && str_contains($designCss, 'text-shadow: 0 2px 10px rgb(0 0 0 / .45) !important;'));
+$post('/admin/pages/' . $imprint['page_id'] . '/blocks', ['action' => 'save', 'blocks' => [
+    $remainingBlock['id'] => ['enabled' => '1', 'settings' => [], 'texts' => ['de' => ['heading' => 'Angaben']]],
+]], 3);
+
 // A page saved before blocks existed keeps its old "body" text until opened in the
 // new editor - synthesized as a single text block, nothing lost, nothing rewritten.
 $pdo->exec("UPDATE page SET blocks = NULL WHERE id = {$imprint['page_id']}");
@@ -4345,6 +4364,31 @@ check('home: the design stylesheet styles the in-place edit dialog, and the hove
 $post('/admin/home', ['action' => 'save', 'blocks' => ['default-hero' => ['enabled' => '1', 'settings' => ['background_type' => 'image', 'background_media' => '/media/library/../evil.png'], 'texts' => ['de' => ['title' => 'Hallo']]]]], 3);
 $heroBlock = array_values(array_filter($homeBlocks(), fn (array $b) => $b['id'] === 'default-hero'))[0];
 check('home editor: a picture background outside the media library is not kept', ($heroBlock['settings']['background_media'] ?? null) === '');
+
+// --- A block's own text colour/shadow: its own checkbox, not gated behind "type" like the background above ---
+$post('/admin/home', ['action' => 'save', 'blocks' => ['default-hero' => ['enabled' => '1', 'settings' => [
+    'text_color_enabled' => '1', 'text_color' => '#ffee00', 'shadow' => '1',
+], 'texts' => ['de' => ['title' => 'Hallo']]]]], 3);
+$heroBlock = array_values(array_filter($homeBlocks(), fn (array $b) => $b['id'] === 'default-hero'))[0];
+check('home editor: a text colour and shadow are saved for any block type', $heroBlock['settings']['text_color'] === '#ffee00' && $heroBlock['settings']['shadow'] === true);
+$designCss = $get('/design/' . $app->design->fileName(), null)['body'];
+check('home: the design stylesheet carries the text colour on the block and every descendant (so headings/paragraphs pick it up over a theme\'s own element rules), plus the shadow - never an inline style attribute',
+    str_contains($designCss, '[data-home-block="default-hero"], [data-home-block="default-hero"] *:not(.button) {') && str_contains($designCss, 'color: #ffee00 !important;') && str_contains($designCss, 'text-shadow: 0 2px 10px rgb(0 0 0 / .45) !important;')
+    && !str_contains($get('/', null)['body'], 'style="'));
+
+$post('/admin/home', ['action' => 'save', 'blocks' => ['default-hero' => ['enabled' => '1', 'settings' => [
+    'text_color' => '#ff0000',
+], 'texts' => ['de' => ['title' => 'Hallo']]]]], 3);
+$heroBlock = array_values(array_filter($homeBlocks(), fn (array $b) => $b['id'] === 'default-hero'))[0];
+check('home editor: a text colour without its own "enabled" checkbox is not stored - an untouched colour input always posts something, so the checkbox is the only way to tell "never asked for this" from "asked for black"',
+    !isset($heroBlock['settings']['text_color']) && !isset($heroBlock['settings']['shadow']));
+
+$post('/admin/home', ['action' => 'save', 'blocks' => ['default-hero' => ['enabled' => '1', 'settings' => [
+    'text_color_enabled' => '1', 'text_color' => 'not-a-colour',
+], 'texts' => ['de' => ['title' => 'Hallo']]]]], 3);
+$heroBlock = array_values(array_filter($homeBlocks(), fn (array $b) => $b['id'] === 'default-hero'))[0];
+check('home editor: an invalid text colour is refused, nothing stored for it', !isset($heroBlock['settings']['text_color']));
+$post('/admin/home', ['action' => 'save', 'blocks' => ['default-hero' => ['enabled' => '1', 'settings' => [], 'texts' => ['de' => ['title' => 'Hallo']]]]], 3);
 
 // Text formatting from the editor's toolbar (font, colour, size, as a span) survives a save and reaches the visitor.
 $post('/admin/home', ['action' => 'add', 'add_type' => 'text'], 3);

@@ -291,6 +291,17 @@ final class PageController extends Controller
                 }
             }
 
+            // Its own checkbox, not a "type" select: see AdminHomeController::fromForm()'s own comment.
+            if (!empty($input['settings']['text_color_enabled'])) {
+                $colour = strtolower(trim((string) ($input['settings']['text_color'] ?? '')));
+                if (HomeLayout::validColour($colour)) {
+                    $settings['text_color'] = $colour;
+                }
+            }
+            if (!empty($input['settings']['shadow'])) {
+                $settings['shadow'] = true;
+            }
+
             $blocks[] = ['id' => $id, 'type' => $type, 'enabled' => isset($input['enabled']), 'texts' => $texts, 'settings' => $settings];
         }
 

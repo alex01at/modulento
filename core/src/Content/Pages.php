@@ -209,10 +209,30 @@ final class Pages
                 'background_color' => (string) ($block['settings']['background_color'] ?? ''),
                 'background_color2' => (string) ($block['settings']['background_color2'] ?? ''),
                 'background_media' => (string) ($block['settings']['background_media'] ?? ''),
+                'text_color' => (string) ($block['settings']['text_color'] ?? ''),
+                'shadow' => (bool) ($block['settings']['shadow'] ?? false),
             ];
         }
 
         return $view;
+    }
+
+    /**
+     * The same per-block background/text CSS HomeLayout::cssFor() builds
+     * for the home page, for every normal page's own blocks - appended to
+     * the same design stylesheet (DesignController::stylesheet()), since a
+     * page's blocks are otherwise never looked at there at all.
+     *
+     * @param array<string, array{label_key: string, text_fields: string[], template: string}> $extra App::pageBlockTypes()
+     */
+    public function blockCss(array $extra = []): string
+    {
+        $css = '';
+        foreach (array_keys($this->all()) as $id) {
+            $css .= HomeLayout::cssFor($this->blocksFor($id, $extra));
+        }
+
+        return $css;
     }
 
     /**

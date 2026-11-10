@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modulento\Core\Controller;
 
+use Modulento\Core\Content\HomeLayout;
 use Modulento\Core\Support\Design;
 use Modulento\Core\Support\Session;
 
@@ -15,10 +16,16 @@ final class DesignController extends Controller
     {
         header('Content-Type: text/css; charset=utf-8');
         header('Cache-Control: public, max-age=300');
-        // The home layout's own block backgrounds are served together with the
-        // design values - one stylesheet every theme already loads on every page,
-        // and the one place inline style is allowed to live under this site's CSP.
-        echo $this->app->design->css() . $this->app->homeLayout->backgroundCss();
+        // Every block's own background and/or text colour/shadow - the home
+        // page's and every normal page's alike - is served together with the
+        // design values - one stylesheet every theme already loads on every
+        // page, and the one place inline style is allowed to live under this
+        // site's CSP.
+        $app = $this->app;
+        $extra = $app->pageBlockTypes();
+        echo $app->design->css()
+            . HomeLayout::cssFor($app->homeLayout->blocks($extra))
+            . $app->pages->blockCss($extra);
     }
 
     public function index(array $params): void

@@ -157,6 +157,21 @@ final class AdminHomeController extends Controller
                 }
             }
 
+            // Text colour is its own checkbox, not a "type" select like the
+            // background above: a bare <input type="color"> always posts
+            // some value (black, untouched), so without an explicit opt-in
+            // every block would otherwise end up with a stored colour -
+            // silently turning its text black the moment the form is saved.
+            if (!empty($input['settings']['text_color_enabled'])) {
+                $colour = strtolower(trim((string) ($input['settings']['text_color'] ?? '')));
+                if (HomeLayout::validColour($colour)) {
+                    $settings['text_color'] = $colour;
+                }
+            }
+            if (!empty($input['settings']['shadow'])) {
+                $settings['shadow'] = true;
+            }
+
             $blocks[] = [
                 'id' => $id,
                 'type' => $type,

@@ -176,11 +176,13 @@ final class HomeLayout
                 'links' => self::links($texts['items'] ?? ''),
                 // The raw values, for the admin form to show what is set - the computed
                 // CSS itself is never inline (the site's CSP has no style-src 'unsafe-inline'),
-                // it lives in backgroundCss() below, served as part of the design stylesheet.
+                // it lives in css() below, served as part of the design stylesheet.
                 'background_type' => (string) ($block['settings']['background_type'] ?? ''),
                 'background_color' => (string) ($block['settings']['background_color'] ?? ''),
                 'background_color2' => (string) ($block['settings']['background_color2'] ?? ''),
                 'background_media' => (string) ($block['settings']['background_media'] ?? ''),
+                'text_color' => (string) ($block['settings']['text_color'] ?? ''),
+                'shadow' => (bool) ($block['settings']['shadow'] ?? false),
             ];
         }
 
@@ -377,22 +379,45 @@ final class HomeLayout
     }
 
     /**
-     * CSS rules for every block that has its own background, one rule per
-     * block targeted by `[data-home-block="{id}"]` (an attribute, not an id -
-     * a theme's own block may already carry a fixed id of its own, e.g. as a
-     * page anchor, and must not collide with this one) - never an inline
-     * `style=""` (the site's Content-Security-Policy allows no
-     * `style-src 'unsafe-inline'`, only same-origin stylesheets). Meant to be
-     * appended to the design stylesheet, which every theme already loads on
-     * every page.
+     * CSS rules for every block of this list that has its own background
+     * and/or text colour/shadow, one rule per block targeted by
+     * `[data-home-block="{id}"]` (an attribute, not an id - a theme's own
+     * block may already carry a fixed id of its own, e.g. as a page anchor,
+     * and must not collide with this one) - never an inline `style=""`
+     * (the site's Content-Security-Policy allows no `style-src
+     * 'unsafe-inline'`, only same-origin stylesheets). Meant to be appended
+     * to the design stylesheet, which every theme already loads on every
+     * page. Public and static, over a plain block list rather than
+     * `$this->blocks()`: Pages::blockCss() builds the same rules for every
+     * page's own blocks, not just the home page's.
+     *
+     * @param list<array{id: string, settings: array<string, mixed>}> $blocks
      */
-    public function backgroundCss(): string
+    public static function cssFor(array $blocks): string
     {
         $css = '';
-        foreach ($this->blocks() as $block) {
-            $style = self::backgroundStyle($block['settings']);
-            if ($style !== '') {
-                $css .= '[data-home-block="' . $block['id'] . '"] {' . "\n    " . $style . "\n}\n";
+        foreach ($blocks as $block) {
+            $background = self::backgroundStyle($block['settings']);
+            if ($background !== '') {
+                $css .= '[data-home-block="' . $block['id'] . '"] {' . "\n    " . $background . "\n}\n";
+            }
+            // The text colour/shadow apply to the block itself and every
+            // descendant, not just what it inherits from - the same
+            // specificity (one attribute selector) as a theme's own
+            // elemental rules (e.g. "h1, h2, h3 { color: ... }"), so this
+            // wins only because the design stylesheet loads after a
+            // theme's own, the same way backgroundStyle() above already
+            // relies on for the block's background. A `.button`'s own
+            // class selector still outranks it, so button text stays
+            // exactly as the theme styles it.
+            $text = self::textStyle($block['settings']);
+            if ($text !== '') {
+                // ":not(.button)" - a button inside the block (the hero's or
+                // a text block's own button_label/button_url) keeps the
+                // theme's own button colour; it sits on its own background,
+                // and a flat text colour meant for the block's prose could
+                // easily make it illegible against it.
+                $css .= '[data-home-block="' . $block['id'] . '"], [data-home-block="' . $block['id'] . '"] *:not(.button) {' . "\n    " . $text . "\n}\n";
             }
         }
 
@@ -417,6 +442,32 @@ final class HomeLayout
                 => 'background-image: url(' . self::cleanMedia((string) $settings['background_media']) . '); background-size: cover; background-position: center;',
             default => '',
         };
+    }
+
+    /**
+     * A block's own text colour and/or shadow, as a ready "property: value;"
+     * string - empty for none. `!important`, deliberately, unlike
+     * backgroundStyle(): that one only has to outrank a same-specificity
+     * theme rule on the very same element, which it already does by
+     * loading after a theme's own stylesheet, but this one reaches into
+     * the block's descendants (its own heading, its own paragraph, ...),
+     * where a theme may well have a more specific rule of its own (e.g.
+     * Audigo's own ".hero-auction h1"/ ".hero-auction .lead") - this is an
+     * administrator's explicit, per-block choice, the same kind of
+     * override an inline `style=""` would be if the site's CSP allowed
+     * one (Design::css()'s own ".edit-page" rule already sets the same
+     * precedent, for the same reason). Public for the same reason
+     * backgroundStyle() is: Pages reuses it for a normal page's blocks.
+     */
+    public static function textStyle(array $settings): string
+    {
+        $colour = $settings['text_color'] ?? null;
+        $style = is_string($colour) && self::validColour($colour) ? 'color: ' . $colour . ' !important;' : '';
+        if (!empty($settings['shadow'])) {
+            $style .= ($style !== '' ? ' ' : '') . 'text-shadow: 0 2px 10px rgb(0 0 0 / .45) !important;';
+        }
+
+        return $style;
     }
 
     /**
