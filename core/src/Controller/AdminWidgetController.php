@@ -51,7 +51,7 @@ final class AdminWidgetController extends Controller
         }
 
         $settings = [];
-        if ($type === 'offers' || $type === 'providers') {
+        if ($type === 'offers' || $type === 'providers' || $type === 'pages') {
             $settings['count'] = max(1, min(12, (int) ($postedSettings['count'] ?? 6)));
         }
         if ($type === 'image') {

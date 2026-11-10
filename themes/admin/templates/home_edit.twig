@@ -26,7 +26,7 @@
                 <span>{{ trans('core.home.enabled') }}</span>
             </label>
 
-            {% if block.type == 'offers' or block.type == 'providers' %}
+            {% if block.type == 'offers' or block.type == 'providers' or block.type == 'pages' %}
                 <div class="field">
                     <label for="count-{{ id }}">{{ trans('core.home.count') }}</label>
                     <input id="count-{{ id }}" name="blocks[{{ id }}][settings][count]" type="number" min="1" max="12" value="{{ block.settings.count ?? 6 }}">
@@ -140,15 +140,28 @@
                     {% set value = block.texts[locale][field] ?? '' %}
                     {% set hint = block.texts[default_locale][field] ?? '' %}
                     {% set name = 'blocks[' ~ id ~ '][texts][' ~ locale ~ '][' ~ field ~ ']' %}
+                    {# The built-in types share one catalogue of field labels; a type an extension
+                       registered (pageBlockType()) has none there, so it gets its own, next to its
+                       own label (e.g. "jobs.block.employer_pitch" + ".field.badge") - the same
+                       fallback the inline editor's own _block.twig already uses. #}
+                    {% set field_key = field in ['title', 'text', 'button_label', 'button_url', 'heading', 'body', 'caption', 'items']
+                        ? 'core.home.field.' ~ field : block.label_key ~ '.field.' ~ field %}
                     <div class="field">
-                        <label for="{{ field }}-{{ id }}">{{ trans('core.home.field.' ~ field) }}</label>
+                        <label for="{{ field }}-{{ id }}">{{ trans(field_key) }}</label>
                         {% if field == 'body' %}
                             <textarea id="{{ field }}-{{ id }}" name="{{ name }}" rows="8" lang="{{ locale }}" placeholder="{{ hint|striptags }}" data-editor="{{ editor() }}">{{ value }}</textarea>
-                        {% elseif field == 'items' %}
+                        {% elseif field == 'items' or field == 'checklist' %}
                             <textarea id="{{ field }}-{{ id }}" name="{{ name }}" rows="4" placeholder="{{ hint }}">{{ value }}</textarea>
-                            <small>{{ trans('core.home.items_hint') }}</small>
+                            {% if field == 'items' %}<small>{{ trans('core.home.items_hint') }}</small>{% endif %}
                         {% elseif field == 'text' %}
                             <textarea id="{{ field }}-{{ id }}" name="{{ name }}" rows="3" maxlength="2000" placeholder="{{ hint }}">{{ value }}</textarea>
+                        {% elseif field == 'image' %}
+                            <select id="{{ field }}-{{ id }}" name="{{ name }}">
+                                <option value="">{{ trans('core.home.picture_none') }}</option>
+                                {% for picture in pictures %}
+                                    <option value="{{ picture.url }}" {{ picture.url == value ? 'selected' }}>{{ picture.title ?: picture.url }}</option>
+                                {% endfor %}
+                            </select>
                         {% else %}
                             <input id="{{ field }}-{{ id }}" name="{{ name }}" value="{{ value }}" maxlength="300" placeholder="{{ hint }}">
                         {% endif %}

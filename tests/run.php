@@ -248,9 +248,9 @@ $pdo->exec("CREATE TABLE provider (id INTEGER PRIMARY KEY, account_id INTEGER UN
     vat_id TEXT, tax_id TEXT, company_register TEXT, self_certified_at TEXT, details_changed_at TEXT, decided_at TEXT, decided_by INTEGER, created_at TEXT, updated_at TEXT,
     avg_response_minutes INTEGER, response_sample_count INTEGER NOT NULL DEFAULT 0)");
 $pdo->exec("CREATE TABLE provider_translation (provider_id INTEGER REFERENCES provider (id) ON DELETE CASCADE, locale TEXT, headline TEXT, description TEXT, PRIMARY KEY (provider_id, locale))");
-$pdo->exec("CREATE TABLE page (id INTEGER PRIMARY KEY, status TEXT, role TEXT UNIQUE, parent_id INTEGER REFERENCES page (id), in_header INTEGER, in_footer INTEGER, position INTEGER, blocks TEXT, created_at TEXT, updated_at TEXT)");
+$pdo->exec("CREATE TABLE page (id INTEGER PRIMARY KEY, status TEXT, role TEXT UNIQUE, parent_id INTEGER REFERENCES page (id), in_header INTEGER, in_footer INTEGER, in_home INTEGER NOT NULL DEFAULT 0, teaser_image TEXT, position INTEGER, blocks TEXT, created_at TEXT, updated_at TEXT)");
 $pdo->exec("CREATE TABLE page_translation (page_id INTEGER REFERENCES page (id) ON DELETE CASCADE, locale TEXT, title TEXT, slug TEXT,
-    meta_description TEXT, body TEXT, PRIMARY KEY (page_id, locale), UNIQUE (locale, slug))");
+    meta_description TEXT, teaser TEXT, body TEXT, PRIMARY KEY (page_id, locale), UNIQUE (locale, slug))");
 $pdo->exec("CREATE TABLE account_identity (id INTEGER PRIMARY KEY, account_id INTEGER REFERENCES account (id) ON DELETE CASCADE,
     provider TEXT, subject TEXT, created_at TEXT, UNIQUE (provider, subject))");
 $pdo->exec("CREATE TABLE account_token (id INTEGER PRIMARY KEY, account_id INTEGER REFERENCES account (id) ON DELETE CASCADE,
@@ -4439,6 +4439,36 @@ check('home editor: an unknown shape/size is refused, the default stands', (func
     return !isset($block['settings']['shape_style']) && !isset($block['settings']['shape_size']) && $block['settings']['shape_opacity'] === 100;
 })());
 $post('/admin/home', ['action' => 'save', 'blocks' => ['default-hero' => ['enabled' => '1', 'settings' => [], 'texts' => ['de' => ['title' => 'Hallo']]]]], 3);
+
+// --- Generic field-name conventions any pageBlockType() extension can reuse ------------------------
+check('home block clean(): button2_url gets the same URL validation as button_url, by field name alone, for any block type', Modulento\Core\Content\HomeLayout::clean('an-extensions-own-type', 'button2_url', 'javascript:alert(1)') === ''
+    && Modulento\Core\Content\HomeLayout::clean('an-extensions-own-type', 'button2_url', '/account/provider') === '/account/provider');
+check('home block clean(): an "image" field is sanitized as a media library path, by field name alone, for any block type', Modulento\Core\Content\HomeLayout::clean('an-extensions-own-type', 'image', '/media/library/../../etc/passwd') === ''
+    && Modulento\Core\Content\HomeLayout::clean('an-extensions-own-type', 'image', '/media/library/' . str_repeat('a', 32) . '.webp') === '/media/library/' . str_repeat('a', 32) . '.webp');
+
+// --- Pages as blog-style teasers on the home page (the "pages" block) ---------------------------
+$teaserImage = '/media/library/' . str_repeat('b', 32) . '.webp';
+$post('/admin/pages/new', ['status' => 'published', 'in_home' => '1', 'teaser_image' => $teaserImage,
+    'text' => ['de' => ['title' => 'Neuigkeit Eins', 'slug' => 'neuigkeit-eins', 'meta_description' => '', 'teaser' => 'Ein kurzer Anreißer.']]], 3);
+$post('/admin/pages/new', ['status' => 'published', 'text' => ['de' => ['title' => 'Nicht auf der Startseite', 'slug' => 'nicht-start', 'meta_description' => '', 'teaser' => 'Soll fehlen.']]], 3);
+$post('/admin/pages/new', ['status' => 'draft', 'in_home' => '1', 'text' => ['de' => ['title' => 'Entwurf', 'slug' => 'entwurf-start', 'meta_description' => '', 'teaser' => 'Auch fehlen.']]], 3);
+$post('/admin/pages/new', ['status' => 'published', 'in_home' => '1', 'teaser_image' => '/media/library/../evil.png',
+    'text' => ['de' => ['title' => 'Neuigkeit Zwei', 'slug' => 'neuigkeit-zwei', 'meta_description' => '', 'teaser' => '']]], 3);
+$teasers = $app->pages->teasersForHome(6, 'de');
+check('home pages block: only published pages that opted in are offered, in page order', array_column($teasers, 'title') === ['Neuigkeit Eins', 'Neuigkeit Zwei']);
+check('home pages block: teaser text and a valid library picture are kept, an invalid picture path is dropped', $teasers[0]['teaser'] === 'Ein kurzer Anreißer.'
+    && $teasers[0]['image'] === $teaserImage && $teasers[1]['image'] === null && $teasers[0]['path'] === '/neuigkeit-eins');
+check('home pages block: the count limits how many are shown', count($app->pages->teasersForHome(1, 'de')) === 1);
+$post('/admin/home', ['action' => 'add', 'add_type' => 'pages'], 3);
+$pagesBlock = array_values(array_filter($homeBlocks(), fn (array $b) => $b['type'] === 'pages'))[0] ?? null;
+check('home pages block: can be added, starting with a count of 6', $pagesBlock !== null && $pagesBlock['settings']['count'] === 6);
+$homePage = $get('/')['body'];
+check('home pages block: the home page shows the opted-in teasers with picture and teaser text, not the others',
+    str_contains($homePage, 'Neuigkeit Eins') && str_contains($homePage, 'Ein kurzer Anreißer.') && str_contains($homePage, $teaserImage)
+    && !str_contains($homePage, 'Nicht auf der Startseite') && !str_contains($homePage, 'Entwurf'));
+$post('/admin/home', ['action' => 'save', 'blocks' => [$pagesBlock['id'] => ['enabled' => '1', 'settings' => ['count' => '1'], 'texts' => ['de' => ['heading' => 'Aktuelles']]]]], 3);
+check('home pages block: a count of 1 shows just the first', !str_contains($get('/')['body'], 'Neuigkeit Zwei'));
+$post('/admin/home', ['action' => 'delete:' . $pagesBlock['id']], 3);
 
 // --- The maintenance page's own background picture ---------------------------------------------
 $post('/admin/settings', ['site_name' => 'Testseite', 'mail_from' => 'noreply@example.test', 'registration' => 'open', 'default_locale' => 'de', 'locales' => ['de', 'en'], 'maintenance_enabled' => '1', 'maintenance_message' => 'Gleich zurück.', 'maintenance_background' => '/media/library/../evil.png'], 3);

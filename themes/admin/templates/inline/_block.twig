@@ -46,7 +46,7 @@
                     {{ csrf_field() }}
                     <input type="hidden" name="return" value="{{ current_path() }}?edit=1">
                     {% if block.enabled %}<input type="hidden" name="blocks[{{ id }}][enabled]" value="1">{% endif %}
-                    {% if block.type == 'offers' or block.type == 'providers' %}
+                    {% if block.type == 'offers' or block.type == 'providers' or block.type == 'pages' %}
                         <div class="field">
                             <label for="count-{{ id }}">{{ trans('core.home.count') }}</label>
                             <input id="count-{{ id }}" name="blocks[{{ id }}][settings][count]" type="number" min="1" max="12" value="{{ block.count }}">
@@ -161,10 +161,17 @@
                             <label for="{{ field }}-{{ id }}">{{ trans(field_key) }}</label>
                             {% if field == 'body' %}
                                 <textarea id="{{ field }}-{{ id }}" name="{{ name }}" rows="8" data-editor="{{ editor() }}">{{ value }}</textarea>
-                            {% elseif field == 'button_url' %}
+                            {% elseif field == 'button_url' or field == 'button2_url' %}
                                 <input id="{{ field }}-{{ id }}" name="{{ name }}" value="{{ value }}" maxlength="500" placeholder="/offers oder https://…">
-                            {% elseif field == 'items' or field == 'text' %}
+                            {% elseif field == 'items' or field == 'text' or field == 'checklist' %}
                                 <textarea id="{{ field }}-{{ id }}" name="{{ name }}" rows="3">{{ value }}</textarea>
+                            {% elseif field == 'image' %}
+                                <select id="{{ field }}-{{ id }}" name="{{ name }}">
+                                    <option value="">{{ trans('core.home.picture_none') }}</option>
+                                    {% for picture in library_pictures() %}
+                                        <option value="{{ picture.url }}" {{ picture.url == value ? 'selected' }}>{{ picture.title ?: picture.url }}</option>
+                                    {% endfor %}
+                                </select>
                             {% else %}
                                 <input id="{{ field }}-{{ id }}" name="{{ name }}" value="{{ value }}" maxlength="300">
                             {% endif %}

@@ -171,6 +171,12 @@ final class View
             'top_providers',
             fn (int $limit = 3) => ProviderView::all($app->providers->top($limit), $app)
         ));
+        // Published pages opted into the home page's "pages" block
+        // (Pages::teasersForHome()), as blog-style teaser cards.
+        $this->twig->addFunction(new TwigFunction(
+            'home_page_teasers',
+            fn (int $limit = 6) => $app->pages->teasersForHome(max(1, min(12, $limit)), $app->translator->locale())
+        ));
         // The logged-in account's provider profile: its status, or null
         // without one. For menus that show a provider's own pages.
         $this->twig->addFunction(new TwigFunction('provider_status', function () use ($app, $auth): ?string {

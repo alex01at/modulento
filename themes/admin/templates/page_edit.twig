@@ -37,6 +37,11 @@
                 <label for="meta_{{ code }}">{{ trans('core.admin.pages.field.meta') }}</label>
                 <input id="meta_{{ code }}" name="text[{{ code }}][meta_description]" value="{{ text.meta_description ?? '' }}" maxlength="300" lang="{{ code }}">
             </div>
+            <div class="field field-wide">
+                <label for="teaser_{{ code }}">{{ trans('core.admin.pages.field.teaser') }}</label>
+                <textarea id="teaser_{{ code }}" name="text[{{ code }}][teaser]" rows="2" maxlength="300" lang="{{ code }}">{{ text.teaser ?? '' }}</textarea>
+                <small>{{ trans('core.admin.pages.field.teaser_hint') }}</small>
+            </div>
         </div>
 
         {% set otherLocales = locales|filter(l => l != code) %}
@@ -106,6 +111,19 @@
             <input type="checkbox" name="in_footer" value="1" {{ page and page.in_footer ? 'checked' }}>
             <span>{{ trans('core.admin.pages.field.in_footer') }}</span>
         </label>
+        <label class="checkbox">
+            <input type="checkbox" name="in_home" value="1" {{ page and page.in_home ? 'checked' }}>
+            <span>{{ trans('core.admin.pages.field.in_home') }}</span>
+        </label>
+        <div class="field">
+            <label for="teaser_image">{{ trans('core.admin.pages.field.teaser_image') }}</label>
+            <select id="teaser_image" name="teaser_image">
+                <option value="">{{ trans('core.home.picture_none') }}</option>
+                {% for picture in library_pictures() %}
+                    <option value="{{ picture.url }}" {{ page and page.teaser_image == picture.url ? 'selected' }}>{{ picture.title ?: picture.url }}</option>
+                {% endfor %}
+            </select>
+        </div>
 
         <div class="button-row">
             <button type="submit">{{ trans('core.account.save') }}</button>

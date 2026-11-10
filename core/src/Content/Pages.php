@@ -379,8 +379,41 @@ final class Pages
     }
 
     /**
-     * @param array{status: string, role: ?string, in_header: bool, in_footer: bool, position: int, parent_id: ?int} $fields
-     * @param array<string, array{title: string, slug: string, meta_description: string}> $translations
+     * Up to $limit published pages opted into the home page's "pages" block
+     * (in_home, the same convention as in_header/in_footer), as blog-style
+     * teasers: title, teaser text and picture, in page order - for
+     * View::home_page_teasers(), the same pattern as latest_offers()/top_providers().
+     *
+     * @return list<array{title: string, teaser: string, image: ?string, path: string}>
+     */
+    public function teasersForHome(int $limit, string $locale): array
+    {
+        $teasers = [];
+        foreach ($this->all() as $page) {
+            if ($page['status'] !== 'published' || !$page['in_home']) {
+                continue;
+            }
+            $text = $page['translations'][$locale] ?? $page['translations'][$this->locales->default()] ?? null;
+            if ($text === null) {
+                continue;
+            }
+            $teasers[] = [
+                'title' => $text['title'],
+                'teaser' => (string) ($text['teaser'] ?? ''),
+                'image' => ($page['teaser_image'] ?? '') !== '' ? $page['teaser_image'] : null,
+                'path' => '/' . $text['slug'],
+            ];
+            if (count($teasers) >= $limit) {
+                break;
+            }
+        }
+
+        return $teasers;
+    }
+
+    /**
+     * @param array{status: string, role: ?string, in_header: bool, in_footer: bool, in_home: bool, teaser_image: ?string, position: int, parent_id: ?int} $fields
+     * @param array<string, array{title: string, slug: string, meta_description: string, teaser: string}> $translations
      *        by locale; a language whose title is empty is removed from the page
      * @return array{id: ?int, errors: array<int, array{key: string, params: array}>}
      */
@@ -425,6 +458,7 @@ final class Pages
                 'title' => mb_substr($title, 0, 200),
                 'slug' => $slug,
                 'meta_description' => trim($text['meta_description']) !== '' ? mb_substr(trim($text['meta_description']), 0, 300) : null,
+                'teaser' => trim($text['teaser'] ?? '') !== '' ? mb_substr(trim($text['teaser']), 0, 300) : null,
                 'body' => $existingBodies[$locale] ?? '',
             ];
         }
@@ -447,21 +481,23 @@ final class Pages
             'parent_id' => $parentId,
             'in_header' => (int) $fields['in_header'],
             'in_footer' => (int) $fields['in_footer'],
+            'in_home' => (int) $fields['in_home'],
+            'teaser_image' => $fields['teaser_image'],
             'position' => $fields['position'],
             'now' => Clock::now(),
         ];
 
         if ($id === null) {
             $stmt = $this->db->prepare(
-                'INSERT INTO page (status, role, parent_id, in_header, in_footer, position, created_at, updated_at)
-                 VALUES (:status, :role, :parent_id, :in_header, :in_footer, :position, :now, :now2)'
+                'INSERT INTO page (status, role, parent_id, in_header, in_footer, in_home, teaser_image, position, created_at, updated_at)
+                 VALUES (:status, :role, :parent_id, :in_header, :in_footer, :in_home, :teaser_image, :position, :now, :now2)'
             );
             $stmt->execute($values + ['now2' => $values['now']]);
             $id = (int) $this->db->lastInsertId();
         } else {
             $stmt = $this->db->prepare(
                 'UPDATE page SET status = :status, role = :role, parent_id = :parent_id, in_header = :in_header, in_footer = :in_footer,
-                     position = :position, updated_at = :now WHERE id = :id'
+                     in_home = :in_home, teaser_image = :teaser_image, position = :position, updated_at = :now WHERE id = :id'
             );
             $stmt->execute($values + ['id' => $id]);
         }
@@ -470,8 +506,8 @@ final class Pages
         $delete->execute(['id' => $id]);
 
         $insert = $this->db->prepare(
-            'INSERT INTO page_translation (page_id, locale, title, slug, meta_description, body)
-             VALUES (:page_id, :locale, :title, :slug, :meta_description, :body)'
+            'INSERT INTO page_translation (page_id, locale, title, slug, meta_description, teaser, body)
+             VALUES (:page_id, :locale, :title, :slug, :meta_description, :teaser, :body)'
         );
         foreach ($rows as $locale => $row) {
             $insert->execute(['page_id' => $id, 'locale' => $locale] + $row);

@@ -49,7 +49,7 @@ final class AdminHomeController extends Controller
         if ($action === 'add') {
             $type = (string) ($_POST['add_type'] ?? '');
             if (in_array($type, HomeLayout::types($extra), true)) {
-                $blocks[] = HomeLayout::newBlock($type) + ($type === 'offers' ? ['settings' => ['count' => 6]] : []);
+                $blocks[] = HomeLayout::insertAfter([], 'start', $type)[0];
             }
         } elseif (preg_match('/^insert:([a-z0-9-]{1,32})$/', $action, $match) === 1) {
             $choice = (string) ($_POST['add_type'] ?? '');
@@ -129,7 +129,7 @@ final class AdminHomeController extends Controller
             }
 
             $settings = [];
-            if ($type === 'offers' || $type === 'providers') {
+            if ($type === 'offers' || $type === 'providers' || $type === 'pages') {
                 $settings['count'] = max(1, min(12, (int) ($input['settings']['count'] ?? 6)));
             }
             if ($type === 'image') {

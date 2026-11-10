@@ -19,7 +19,7 @@ use Modulento\Core\Support\Settings;
 final class HomeLayout
 {
     public const SETTING = 'core.home_layout';
-    public const TYPES = ['hero', 'categories', 'text', 'offers', 'providers', 'image', 'links'];
+    public const TYPES = ['hero', 'categories', 'text', 'offers', 'providers', 'image', 'links', 'pages'];
     /** The text fields of each type. */
     public const TEXT_FIELDS = [
         'hero' => ['title', 'text', 'button_label', 'button_url'],
@@ -29,6 +29,7 @@ final class HomeLayout
         'providers' => ['heading'],
         'image' => ['caption'],
         'links' => ['heading', 'items'],
+        'pages' => ['heading'],
     ];
     public const MAX_BLOCKS = 30;
     private const MAX_LINE = 300;
@@ -296,7 +297,7 @@ final class HomeLayout
     public static function insertAfter(array $blocks, string $afterId, string $type): array
     {
         $new = self::newBlock($type);
-        if ($type === 'offers') {
+        if ($type === 'offers' || $type === 'pages') {
             $new['settings'] = ['count' => 6];
         }
 
@@ -346,8 +347,11 @@ final class HomeLayout
         if ($type === 'text' && $field === 'body') {
             return HtmlSanitizer::clean(mb_substr($value, 0, self::MAX_BODY));
         }
-        if ($field === 'button_url') {
+        if ($field === 'button_url' || $field === 'button2_url') {
             return self::validUrl($value) ? $value : '';
+        }
+        if ($field === 'image') {
+            return self::cleanMedia($value);
         }
         if ($field === 'items') {
             // "Title | address" per line; lines without a usable address are dropped.
@@ -570,6 +574,7 @@ final class HomeLayout
             $type === 'categories' && $field === 'heading' => 'core.offers.categories',
             $type === 'offers' && $field === 'heading' => 'core.offers.latest',
             $type === 'providers' && $field === 'heading' => 'core.home.providers',
+            $type === 'pages' && $field === 'heading' => 'core.home.pages',
             default => null,
         };
 

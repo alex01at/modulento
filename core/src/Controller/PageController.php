@@ -96,6 +96,8 @@ final class PageController extends Controller
             'parent_id' => $parentId > 0 ? $parentId : null,
             'in_header' => isset($_POST['in_header']),
             'in_footer' => isset($_POST['in_footer']),
+            'in_home' => isset($_POST['in_home']),
+            'teaser_image' => HomeLayout::cleanMedia((string) ($_POST['teaser_image'] ?? '')) ?: null,
             'position' => (int) ($_POST['position'] ?? 0),
         ];
 
@@ -113,6 +115,7 @@ final class PageController extends Controller
                     'title' => (string) ($input['title'] ?? ''),
                     'slug' => (string) ($input['slug'] ?? ''),
                     'meta_description' => (string) ($input['meta_description'] ?? ''),
+                    'teaser' => (string) ($input['teaser'] ?? ''),
                 ];
                 continue;
             }
@@ -122,6 +125,7 @@ final class PageController extends Controller
                     'title' => $existingText['title'],
                     'slug' => $existingText['slug'],
                     'meta_description' => (string) ($existingText['meta_description'] ?? ''),
+                    'teaser' => (string) ($existingText['teaser'] ?? ''),
                 ];
             }
         }
@@ -166,7 +170,7 @@ final class PageController extends Controller
         if ($action === 'add') {
             $type = (string) ($_POST['add_type'] ?? '');
             if (in_array($type, $this->blockTypes(), true)) {
-                $blocks[] = HomeLayout::newBlock($type) + ($type === 'offers' ? ['settings' => ['count' => 6]] : []);
+                $blocks[] = HomeLayout::insertAfter([], 'start', $type)[0];
             }
         } elseif (preg_match('/^insert:([a-z0-9-]{1,32})$/', $action, $match) === 1) {
             $choice = (string) ($_POST['add_type'] ?? '');
@@ -264,7 +268,7 @@ final class PageController extends Controller
             }
 
             $settings = [];
-            if ($type === 'offers' || $type === 'providers') {
+            if ($type === 'offers' || $type === 'providers' || $type === 'pages') {
                 $settings['count'] = max(1, min(12, (int) ($input['settings']['count'] ?? 6)));
             }
             if ($type === 'image') {

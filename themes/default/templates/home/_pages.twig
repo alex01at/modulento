@@ -1,0 +1,21 @@
+{# Receives block: texts (heading), count. Published pages opted into the
+   home page via their own "Auf der Startseite zeigen" setting
+   (Pages::teasersForHome()), in page order, same card look as
+   offer/_cards.twig. #}
+{% set teasers = home_page_teasers(block.count) %}
+{% if teasers %}
+<section data-home-block="{{ block.id }}">
+    <h2 data-field="heading">{{ block.texts.heading }}</h2>
+    <ul class="card-list">
+        {% for teaser in teasers %}
+            <li>
+                {% if teaser.image %}
+                    <a href="{{ url(teaser.path) }}" tabindex="-1" aria-hidden="true"><img src="{{ teaser.image }}" alt="" loading="lazy"></a>
+                {% endif %}
+                <a href="{{ url(teaser.path) }}"><strong>{{ teaser.title }}</strong></a>
+                {% if teaser.teaser %}<p>{{ teaser.teaser }}</p>{% endif %}
+            </li>
+        {% endfor %}
+    </ul>
+</section>
+{% endif %}
