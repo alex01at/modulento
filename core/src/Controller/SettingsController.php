@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modulento\Core\Controller;
 
+use Modulento\Core\Content\HomeLayout;
 use Modulento\Core\Support\Session;
 
 /** Site-wide settings an administrator changes in the browser instead of in .env. */
@@ -40,6 +41,7 @@ final class SettingsController extends Controller
                 'google_client_secret_hint' => $secret !== null ? substr($secret, -4) : null,
                 'maintenance_enabled' => $app->settings->get('core.maintenance_enabled') === '1',
                 'maintenance_message' => $app->settings->get('core.maintenance_message'),
+                'maintenance_background' => $app->settings->get('core.maintenance_background'),
             ],
             'available_locales' => $app->locales->available(),
             'enabled_locales' => $app->locales->enabled(),
@@ -127,6 +129,7 @@ final class SettingsController extends Controller
 
         $app->settings->set('core.maintenance_enabled', isset($_POST['maintenance_enabled']) ? '1' : '');
         $app->settings->set('core.maintenance_message', mb_substr(trim((string) ($_POST['maintenance_message'] ?? '')), 0, 2000));
+        $app->settings->set('core.maintenance_background', HomeLayout::cleanMedia((string) ($_POST['maintenance_background'] ?? '')));
 
         // The administrator's own language may just have been switched off,
         // or the default - and with it every address - may have changed.

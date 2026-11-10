@@ -214,6 +214,9 @@ final class Pages
                 'shape_top' => (bool) ($block['settings']['shape_top'] ?? false),
                 'shape_bottom' => (bool) ($block['settings']['shape_bottom'] ?? false),
                 'shape_color' => (string) ($block['settings']['shape_color'] ?? ''),
+                'shape_style' => (string) ($block['settings']['shape_style'] ?? 'wave'),
+                'shape_opacity' => max(0, min(100, (int) ($block['settings']['shape_opacity'] ?? 100))),
+                'shape_size' => (string) ($block['settings']['shape_size'] ?? 'md'),
             ];
         }
 

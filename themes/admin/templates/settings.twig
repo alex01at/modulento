@@ -160,6 +160,15 @@
             <label for="maintenance_message">{{ trans('core.admin.settings.maintenance_message') }}</label>
             <textarea id="maintenance_message" name="maintenance_message" rows="3" maxlength="2000">{{ settings.maintenance_message }}</textarea>
         </div>
+        <div class="field">
+            <label for="maintenance_background">{{ trans('core.admin.settings.maintenance_background') }}</label>
+            <select id="maintenance_background" name="maintenance_background">
+                <option value="">{{ trans('core.home.picture_none') }}</option>
+                {% for picture in library_pictures() %}
+                    <option value="{{ picture.url }}" {{ picture.url == settings.maintenance_background ? 'selected' }}>{{ picture.title ?: picture.url }}</option>
+                {% endfor %}
+            </select>
+        </div>
     </section>
 
     <div class="button-row">

@@ -4418,7 +4418,46 @@ $post('/admin/home', ['action' => 'save', 'blocks' => ['default-hero' => ['enabl
 $heroBlock = array_values(array_filter($homeBlocks(), fn (array $b) => $b['id'] === 'default-hero'))[0];
 check('home editor: a wave colour without either edge checked is not stored - "top"/"bottom" are the only opt-in, same reasoning as text colour\'s own checkbox',
     !isset($heroBlock['settings']['shape_top']) && !isset($heroBlock['settings']['shape_bottom']) && !isset($heroBlock['settings']['shape_color']));
+
+// --- The wave's own shape, size and opacity - every one of HomeLayout::SHAPES, not just the original double wave ---
+$post('/admin/home', ['action' => 'save', 'blocks' => ['default-hero' => ['enabled' => '1', 'settings' => [
+    'shape_bottom' => '1', 'shape_style' => 'triangle', 'shape_size' => 'lg', 'shape_opacity' => '40',
+], 'texts' => ['de' => ['title' => 'Hallo']]]]], 3);
+$heroBlock = array_values(array_filter($homeBlocks(), fn (array $b) => $b['id'] === 'default-hero'))[0];
+check('home editor: shape, size and opacity are saved alongside the edges', $heroBlock['settings']['shape_style'] === 'triangle'
+    && $heroBlock['settings']['shape_size'] === 'lg' && $heroBlock['settings']['shape_opacity'] === 40);
+$designCss = $get('/design/' . $app->design->fileName(), null)['body'];
+check('home: the design stylesheet draws the chosen shape\'s own path, at the "lg" height, with the opacity as its own declaration (so the colour itself stays fully opaque to blend from)',
+    str_contains($designCss, Modulento\Core\Content\HomeLayout::SHAPES['triangle']) && str_contains($designCss, 'height: 10vw; min-height: 3.5rem; max-height: 9rem;') && str_contains($designCss, 'opacity: 0.4;'));
+
+check('home editor: an unknown shape/size is refused, the default stands', (function () use ($post, $homeBlocks): bool {
+    $post('/admin/home', ['action' => 'save', 'blocks' => ['default-hero' => ['enabled' => '1', 'settings' => [
+        'shape_bottom' => '1', 'shape_style' => 'hexagon', 'shape_size' => 'xl', 'shape_opacity' => '150',
+    ], 'texts' => ['de' => ['title' => 'Hallo']]]]], 3);
+    $block = array_values(array_filter($homeBlocks(), fn (array $b) => $b['id'] === 'default-hero'))[0];
+
+    return !isset($block['settings']['shape_style']) && !isset($block['settings']['shape_size']) && $block['settings']['shape_opacity'] === 100;
+})());
 $post('/admin/home', ['action' => 'save', 'blocks' => ['default-hero' => ['enabled' => '1', 'settings' => [], 'texts' => ['de' => ['title' => 'Hallo']]]]], 3);
+
+// --- The maintenance page's own background picture ---------------------------------------------
+$post('/admin/settings', ['site_name' => 'Testseite', 'mail_from' => 'noreply@example.test', 'registration' => 'open', 'default_locale' => 'de', 'locales' => ['de', 'en'], 'maintenance_enabled' => '1', 'maintenance_message' => 'Gleich zurück.', 'maintenance_background' => '/media/library/../evil.png'], 3);
+check('settings: a maintenance background outside the media library is not kept', $pdo->query("SELECT value FROM setting WHERE name = 'core.maintenance_background'")->fetchColumn() === '');
+$maintenanceImage = '/media/library/' . str_repeat('d', 32) . '.webp';
+$post('/admin/settings', ['site_name' => 'Testseite', 'mail_from' => 'noreply@example.test', 'registration' => 'open', 'default_locale' => 'de', 'locales' => ['de', 'en'], 'maintenance_enabled' => '1', 'maintenance_message' => 'Gleich zurück.', 'maintenance_background' => $maintenanceImage], 3);
+check('settings: a maintenance background from the media library is kept', $pdo->query("SELECT value FROM setting WHERE name = 'core.maintenance_background'")->fetchColumn() === $maintenanceImage);
+$maintenancePage = $get('/', null)['body'];
+check('maintenance: a visitor sees the maintenance page, wrapped for its own background styling', $get('/', null)['status'] === 503
+    && str_contains($maintenancePage, 'class="maintenance-page"') && str_contains($maintenancePage, 'Gleich zurück.'));
+check('maintenance: an administrator still sees the real site', $get('/', 3)['status'] === 200);
+preg_match('#href="(/design/[a-f0-9]+\.css)"#', $maintenancePage, $maintenanceCssMatch);
+$maintenanceCss = $get($maintenanceCssMatch[1], null)['body'];
+check('maintenance: the design stylesheet carries the background picture with a dark overlay and white text for legibility - never an inline style attribute',
+    str_contains($maintenanceCss, '.maintenance-page {') && str_contains($maintenanceCss, "linear-gradient(rgb(0 0 0 / .45), rgb(0 0 0 / .45)), url({$maintenanceImage})")
+    && str_contains($maintenanceCss, 'color: #fff;') && !str_contains($maintenancePage, 'style="'));
+$post('/admin/settings', ['site_name' => 'Testseite', 'mail_from' => 'noreply@example.test', 'registration' => 'open', 'default_locale' => 'de', 'locales' => ['de', 'en'], 'maintenance_message' => 'Gleich zurück.'], 3);
+check('settings: an empty value clears the maintenance background again, and maintenance mode itself is off again (omitted "maintenance_enabled")',
+    $pdo->query("SELECT value FROM setting WHERE name = 'core.maintenance_background'")->fetchColumn() === '' && $get('/', null)['status'] === 200);
 
 // Text formatting from the editor's toolbar (font, colour, size, as a span) survives a save and reaches the visitor.
 $post('/admin/home', ['action' => 'add', 'add_type' => 'text'], 3);

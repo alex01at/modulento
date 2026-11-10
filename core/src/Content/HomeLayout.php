@@ -186,6 +186,9 @@ final class HomeLayout
                 'shape_top' => (bool) ($block['settings']['shape_top'] ?? false),
                 'shape_bottom' => (bool) ($block['settings']['shape_bottom'] ?? false),
                 'shape_color' => (string) ($block['settings']['shape_color'] ?? ''),
+                'shape_style' => (string) ($block['settings']['shape_style'] ?? 'wave'),
+                'shape_opacity' => max(0, min(100, (int) ($block['settings']['shape_opacity'] ?? 100))),
+                'shape_size' => (string) ($block['settings']['shape_size'] ?? 'md'),
             ];
         }
 
@@ -428,12 +431,22 @@ final class HomeLayout
         return $css;
     }
 
+    /** The SVG path data of each shape, in a 0 0 1440 120 box - the curve/edge first, always closing down across the bottom. */
+    public const SHAPES = [
+        'wave' => 'M0,64 C240,120 480,0 720,32 C960,64 1200,120 1440,64 L1440,120 L0,120 Z',
+        'curve' => 'M0,0 Q720,120 1440,0 L1440,120 L0,120 Z',
+        'slant' => 'M0,40 L1440,0 L1440,120 L0,120 Z',
+        'triangle' => 'M0,120 L720,0 L1440,120 Z',
+    ];
+
     /**
-     * The decorative wave divider(s) a block's own settings ask for, at its
-     * top and/or bottom edge - a self-contained CSS shape (an SVG data URI
-     * on a pseudo-element, `fill="currentColor"` picking up the `color`
-     * declaration right next to it), not a template change: every theme's
-     * existing `[data-home-block]` element already carries this for free.
+     * The decorative divider(s) a block's own settings ask for, at its top
+     * and/or bottom edge - a self-contained CSS shape (an SVG data URI on a
+     * pseudo-element, `fill="currentColor"` picking up the `color`
+     * declaration right next to it, `opacity` its own, separate property so
+     * a half-transparent shape still has a fully opaque colour to blend
+     * from), not a template change: every theme's existing
+     * `[data-home-block]` element already carries this for free.
      * `position: relative` only applies when a shape is actually asked for,
      * so a block without one is never nudged into a new stacking context it
      * did not have before.
@@ -446,10 +459,18 @@ final class HomeLayout
             return '';
         }
 
+        $style = is_string($settings['shape_style'] ?? null) && isset(self::SHAPES[$settings['shape_style']]) ? $settings['shape_style'] : 'wave';
         $colour = is_string($settings['shape_color'] ?? null) && self::validColour($settings['shape_color']) ? $settings['shape_color'] : '#ffffff';
-        $svg = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1440 120' preserveAspectRatio='none'%3E%3Cpath fill='currentColor' d='M0,64 C240,120 480,0 720,32 C960,64 1200,120 1440,64 L1440,120 L0,120 Z'/%3E%3C/svg%3E";
-        $shared = "content: ''; position: absolute; left: 0; width: 100%; height: 7vw; min-height: 2.5rem; max-height: 6rem;"
-            . " background-image: url(\"{$svg}\"); background-size: 100% 100%; background-repeat: no-repeat; color: {$colour}; pointer-events: none;";
+        $opacity = max(0, min(100, (int) ($settings['shape_opacity'] ?? 100))) / 100;
+        $size = match (is_string($settings['shape_size'] ?? null) ? $settings['shape_size'] : 'md') {
+            'sm' => '4vw; min-height: 1.5rem; max-height: 3.5rem;',
+            'lg' => '10vw; min-height: 3.5rem; max-height: 9rem;',
+            default => '7vw; min-height: 2.5rem; max-height: 6rem;',
+        };
+        $svg = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1440 120' preserveAspectRatio='none'%3E%3Cpath fill='currentColor' d='"
+            . self::SHAPES[$style] . "'/%3E%3C/svg%3E";
+        $shared = "content: ''; position: absolute; left: 0; width: 100%; height: {$size}"
+            . " background-image: url(\"{$svg}\"); background-size: 100% 100%; background-repeat: no-repeat; color: {$colour}; opacity: {$opacity}; pointer-events: none;";
 
         $css = '[data-home-block="' . $id . '"] { position: relative; }' . "\n";
         if ($top) {

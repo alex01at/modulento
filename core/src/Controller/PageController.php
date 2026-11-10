@@ -312,6 +312,17 @@ final class PageController extends Controller
                 if (HomeLayout::validColour($shapeColour)) {
                     $settings['shape_color'] = $shapeColour;
                 }
+                $shapeStyle = (string) ($input['settings']['shape_style'] ?? '');
+                if (isset(HomeLayout::SHAPES[$shapeStyle])) {
+                    $settings['shape_style'] = $shapeStyle;
+                }
+                $shapeSize = (string) ($input['settings']['shape_size'] ?? '');
+                if (in_array($shapeSize, ['sm', 'md', 'lg'], true)) {
+                    $settings['shape_size'] = $shapeSize;
+                }
+                if (is_numeric($input['settings']['shape_opacity'] ?? null)) {
+                    $settings['shape_opacity'] = max(0, min(100, (int) $input['settings']['shape_opacity']));
+                }
             }
 
             $blocks[] = ['id' => $id, 'type' => $type, 'enabled' => isset($input['enabled']), 'texts' => $texts, 'settings' => $settings];

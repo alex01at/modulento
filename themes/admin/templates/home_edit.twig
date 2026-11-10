@@ -111,6 +111,26 @@
                     <label for="shape-color-{{ id }}">{{ trans('core.home.shape_color') }}</label>
                     <input id="shape-color-{{ id }}" type="color" name="blocks[{{ id }}][settings][shape_color]" value="{{ block.settings.shape_color ?? '#ffffff' }}">
                 </div>
+                <div class="field">
+                    <label for="shape-style-{{ id }}">{{ trans('core.home.shape_style') }}</label>
+                    <select id="shape-style-{{ id }}" name="blocks[{{ id }}][settings][shape_style]">
+                        {% for name in ['wave', 'curve', 'slant', 'triangle'] %}
+                            <option value="{{ name }}" {{ (block.settings.shape_style ?? 'wave') == name ? 'selected' }}>{{ trans('core.home.shape_style.' ~ name) }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="field">
+                    <label for="shape-size-{{ id }}">{{ trans('core.home.shape_size') }}</label>
+                    <select id="shape-size-{{ id }}" name="blocks[{{ id }}][settings][shape_size]">
+                        {% for name in ['sm', 'md', 'lg'] %}
+                            <option value="{{ name }}" {{ (block.settings.shape_size ?? 'md') == name ? 'selected' }}>{{ trans('core.home.shape_size.' ~ name) }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="field">
+                    <label for="shape-opacity-{{ id }}">{{ trans('core.home.shape_opacity') }}</label>
+                    <input id="shape-opacity-{{ id }}" type="number" min="0" max="100" name="blocks[{{ id }}][settings][shape_opacity]" value="{{ block.settings.shape_opacity ?? 100 }}">
+                </div>
             </fieldset>
 
             {% set locale = locale %}

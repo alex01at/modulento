@@ -3,6 +3,8 @@
 {% block title %}{{ trans('core.maintenance.title') }} – {{ site_name }}{% endblock %}
 
 {% block content %}
-<h1>{{ trans('core.maintenance.title') }}</h1>
-<p>{{ message ?: trans('core.maintenance.default_message') }}</p>
+<div class="maintenance-page">
+    <h1>{{ trans('core.maintenance.title') }}</h1>
+    <p>{{ message ?: trans('core.maintenance.default_message') }}</p>
+</div>
 {% endblock %}

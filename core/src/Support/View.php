@@ -8,6 +8,7 @@ use Modulento\Core\App;
 use Modulento\Core\Catalogue\OfferView;
 use Modulento\Core\Content\HomeLayout;
 use Modulento\Core\Controller\AssetController;
+use Modulento\Core\Controller\DesignController;
 use Modulento\Core\Provider\ProviderView;
 use Twig\Environment;
 use Twig\Loader\FilesystemLoader;
@@ -314,6 +315,7 @@ final class View
 
             return '/design/' . substr(sha1(
                 $app->design->css() . HomeLayout::cssFor($app->homeLayout->blocks($extra)) . $app->pages->blockCss($extra)
+                . DesignController::maintenanceCss((string) $app->settings->get('core.maintenance_background'))
             ), 0, 16) . '.css';
         }));
         // A language the way <meta property="og:locale"> expects it ("de_DE").

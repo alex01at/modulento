@@ -25,7 +25,27 @@ final class DesignController extends Controller
         $extra = $app->pageBlockTypes();
         echo $app->design->css()
             . HomeLayout::cssFor($app->homeLayout->blocks($extra))
-            . $app->pages->blockCss($extra);
+            . $app->pages->blockCss($extra)
+            . self::maintenanceCss($app->settings->get('core.maintenance_background'));
+    }
+
+    /**
+     * The maintenance page's own background picture, if one is set - same
+     * "no inline style" reasoning as every block's own. A dark overlay and
+     * white text come bundled, not a separate setting: a photo background
+     * needs one or the other to stay legible regardless of what is in the
+     * picture (the same lesson a block's own text colour/shadow exists for),
+     * and an operator who only wants a scenic photo and nothing else can
+     * already get that from a block's own background, which has no overlay.
+     */
+    public static function maintenanceCss(string $background): string
+    {
+        $background = HomeLayout::cleanMedia($background);
+
+        return $background === '' ? '' : ".maintenance-page {\n"
+            . "    background-image: linear-gradient(rgb(0 0 0 / .45), rgb(0 0 0 / .45)), url({$background});\n"
+            . "    background-size: cover; background-position: center; color: #fff;\n"
+            . "}\n.maintenance-page a { color: #fff; }\n";
     }
 
     public function index(array $params): void

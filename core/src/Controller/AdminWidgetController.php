@@ -98,6 +98,17 @@ final class AdminWidgetController extends Controller
             if (HomeLayout::validColour($shapeColour)) {
                 $settings['shape_color'] = $shapeColour;
             }
+            $shapeStyle = (string) ($postedSettings['shape_style'] ?? '');
+            if (isset(HomeLayout::SHAPES[$shapeStyle])) {
+                $settings['shape_style'] = $shapeStyle;
+            }
+            $shapeSize = (string) ($postedSettings['shape_size'] ?? '');
+            if (in_array($shapeSize, ['sm', 'md', 'lg'], true)) {
+                $settings['shape_size'] = $shapeSize;
+            }
+            if (is_numeric($postedSettings['shape_opacity'] ?? null)) {
+                $settings['shape_opacity'] = max(0, min(100, (int) $postedSettings['shape_opacity']));
+            }
         }
 
         $saved = $app->widgets->saveOwn($name, ['type' => $type, 'texts' => $texts, 'settings' => $settings]);

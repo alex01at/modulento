@@ -123,6 +123,26 @@
                     <label for="shape-color">{{ trans('core.home.shape_color') }}</label>
                     <input id="shape-color" type="color" name="settings[shape_color]" value="{{ input.settings.shape_color ?? '#ffffff' }}">
                 </div>
+                <div class="field">
+                    <label for="shape-style">{{ trans('core.home.shape_style') }}</label>
+                    <select id="shape-style" name="settings[shape_style]">
+                        {% for name in ['wave', 'curve', 'slant', 'triangle'] %}
+                            <option value="{{ name }}" {{ (input.settings.shape_style ?? 'wave') == name ? 'selected' }}>{{ trans('core.home.shape_style.' ~ name) }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="field">
+                    <label for="shape-size">{{ trans('core.home.shape_size') }}</label>
+                    <select id="shape-size" name="settings[shape_size]">
+                        {% for name in ['sm', 'md', 'lg'] %}
+                            <option value="{{ name }}" {{ (input.settings.shape_size ?? 'md') == name ? 'selected' }}>{{ trans('core.home.shape_size.' ~ name) }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="field">
+                    <label for="shape-opacity">{{ trans('core.home.shape_opacity') }}</label>
+                    <input id="shape-opacity" type="number" min="0" max="100" name="settings[shape_opacity]" value="{{ input.settings.shape_opacity ?? 100 }}">
+                </div>
             </fieldset>
         </section>
 
