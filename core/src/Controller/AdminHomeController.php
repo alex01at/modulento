@@ -172,6 +172,19 @@ final class AdminHomeController extends Controller
                 $settings['shadow'] = true;
             }
 
+            // The colour needs no checkbox of its own here: "top"/"bottom"
+            // already gate whether it has any effect at all.
+            $shapeTop = !empty($input['settings']['shape_top']);
+            $shapeBottom = !empty($input['settings']['shape_bottom']);
+            if ($shapeTop || $shapeBottom) {
+                $settings['shape_top'] = $shapeTop;
+                $settings['shape_bottom'] = $shapeBottom;
+                $shapeColour = strtolower(trim((string) ($input['settings']['shape_color'] ?? '')));
+                if (HomeLayout::validColour($shapeColour)) {
+                    $settings['shape_color'] = $shapeColour;
+                }
+            }
+
             $blocks[] = [
                 'id' => $id,
                 'type' => $type,

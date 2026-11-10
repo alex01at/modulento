@@ -110,6 +110,25 @@
                             </label>
                         </div>
                     </fieldset>
+                    <fieldset>
+                        <legend>{{ trans('core.home.shape') }}</legend>
+                        <div class="field">
+                            <label class="checkbox">
+                                <input type="checkbox" name="blocks[{{ id }}][settings][shape_top]" value="1" {{ block.shape_top ? 'checked' }}>
+                                <span>{{ trans('core.home.shape_top') }}</span>
+                            </label>
+                        </div>
+                        <div class="field">
+                            <label class="checkbox">
+                                <input type="checkbox" name="blocks[{{ id }}][settings][shape_bottom]" value="1" {{ block.shape_bottom ? 'checked' }}>
+                                <span>{{ trans('core.home.shape_bottom') }}</span>
+                            </label>
+                        </div>
+                        <div class="field">
+                            <label for="shape-color-{{ id }}">{{ trans('core.home.shape_color') }}</label>
+                            <input id="shape-color-{{ id }}" type="color" name="blocks[{{ id }}][settings][shape_color]" value="{{ block.shape_color ?: '#ffffff' }}">
+                        </div>
+                    </fieldset>
                     {% for field in fields %}
                         {% set value = block.texts[locale()][field] ?? '' %}
                         {% set name = 'blocks[' ~ id ~ '][texts][' ~ locale() ~ '][' ~ field ~ ']' %}

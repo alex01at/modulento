@@ -211,6 +211,9 @@ final class Pages
                 'background_media' => (string) ($block['settings']['background_media'] ?? ''),
                 'text_color' => (string) ($block['settings']['text_color'] ?? ''),
                 'shadow' => (bool) ($block['settings']['shadow'] ?? false),
+                'shape_top' => (bool) ($block['settings']['shape_top'] ?? false),
+                'shape_bottom' => (bool) ($block['settings']['shape_bottom'] ?? false),
+                'shape_color' => (string) ($block['settings']['shape_color'] ?? ''),
             ];
         }
 

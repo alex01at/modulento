@@ -4390,6 +4390,36 @@ $heroBlock = array_values(array_filter($homeBlocks(), fn (array $b) => $b['id'] 
 check('home editor: an invalid text colour is refused, nothing stored for it', !isset($heroBlock['settings']['text_color']));
 $post('/admin/home', ['action' => 'save', 'blocks' => ['default-hero' => ['enabled' => '1', 'settings' => [], 'texts' => ['de' => ['title' => 'Hallo']]]]], 3);
 
+// --- A block's own decorative wave divider(s), top and/or bottom - a CSS-only pseudo-element, no template change ---
+$post('/admin/home', ['action' => 'save', 'blocks' => ['default-hero' => ['enabled' => '1', 'settings' => [
+    'shape_top' => '1', 'shape_bottom' => '1', 'shape_color' => '#ABCDEF',
+], 'texts' => ['de' => ['title' => 'Hallo']]]]], 3);
+$heroBlock = array_values(array_filter($homeBlocks(), fn (array $b) => $b['id'] === 'default-hero'))[0];
+check('home editor: both wave edges and the wave colour are saved for any block type, the colour lower-cased',
+    $heroBlock['settings']['shape_top'] === true && $heroBlock['settings']['shape_bottom'] === true && $heroBlock['settings']['shape_color'] === '#abcdef');
+$designCss = $get('/design/' . $app->design->fileName(), null)['body'];
+check('home: the design stylesheet carries a pseudo-element wave at each requested edge, filled with the chosen colour via currentColor - never an inline style attribute',
+    str_contains($designCss, '[data-home-block="default-hero"] { position: relative; }')
+    && str_contains($designCss, '[data-home-block="default-hero"]::before {') && str_contains($designCss, 'top: -1px; transform: scaleY(-1);')
+    && str_contains($designCss, '[data-home-block="default-hero"]::after {') && str_contains($designCss, 'bottom: -1px;')
+    && str_contains($designCss, "color: #abcdef;") && str_contains($designCss, 'background-image: url("data:image/svg+xml,')
+    && !str_contains($get('/', null)['body'], 'style="'));
+
+$post('/admin/home', ['action' => 'save', 'blocks' => ['default-hero' => ['enabled' => '1', 'settings' => [
+    'shape_top' => '1', 'shape_color' => 'not-a-colour',
+], 'texts' => ['de' => ['title' => 'Hallo']]]]], 3);
+$heroBlock = array_values(array_filter($homeBlocks(), fn (array $b) => $b['id'] === 'default-hero'))[0];
+check('home editor: only the requested edge is saved, an invalid wave colour is refused (the generated CSS then falls back to white, see shapeCss())',
+    $heroBlock['settings']['shape_top'] === true && $heroBlock['settings']['shape_bottom'] === false && !isset($heroBlock['settings']['shape_color']));
+
+$post('/admin/home', ['action' => 'save', 'blocks' => ['default-hero' => ['enabled' => '1', 'settings' => [
+    'shape_color' => '#abcdef',
+], 'texts' => ['de' => ['title' => 'Hallo']]]]], 3);
+$heroBlock = array_values(array_filter($homeBlocks(), fn (array $b) => $b['id'] === 'default-hero'))[0];
+check('home editor: a wave colour without either edge checked is not stored - "top"/"bottom" are the only opt-in, same reasoning as text colour\'s own checkbox',
+    !isset($heroBlock['settings']['shape_top']) && !isset($heroBlock['settings']['shape_bottom']) && !isset($heroBlock['settings']['shape_color']));
+$post('/admin/home', ['action' => 'save', 'blocks' => ['default-hero' => ['enabled' => '1', 'settings' => [], 'texts' => ['de' => ['title' => 'Hallo']]]]], 3);
+
 // Text formatting from the editor's toolbar (font, colour, size, as a span) survives a save and reaches the visitor.
 $post('/admin/home', ['action' => 'add', 'add_type' => 'text'], 3);
 $formattedId = $idOf('text');

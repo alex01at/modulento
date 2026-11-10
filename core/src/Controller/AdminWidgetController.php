@@ -88,6 +88,18 @@ final class AdminWidgetController extends Controller
             $settings['shadow'] = true;
         }
 
+        // See AdminHomeController::fromForm()'s own comment: "top"/"bottom" gate the colour, no separate checkbox needed for it.
+        $shapeTop = !empty($postedSettings['shape_top']);
+        $shapeBottom = !empty($postedSettings['shape_bottom']);
+        if ($shapeTop || $shapeBottom) {
+            $settings['shape_top'] = $shapeTop;
+            $settings['shape_bottom'] = $shapeBottom;
+            $shapeColour = strtolower(trim((string) ($postedSettings['shape_color'] ?? '')));
+            if (HomeLayout::validColour($shapeColour)) {
+                $settings['shape_color'] = $shapeColour;
+            }
+        }
+
         $saved = $app->widgets->saveOwn($name, ['type' => $type, 'texts' => $texts, 'settings' => $settings]);
         if (!$saved) {
             $this->renderForm($_POST, [$this->trans('core.widget.invalid_name')]);

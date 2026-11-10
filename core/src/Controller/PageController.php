@@ -302,6 +302,18 @@ final class PageController extends Controller
                 $settings['shadow'] = true;
             }
 
+            // See AdminHomeController::fromForm()'s own comment: "top"/"bottom" gate the colour, no separate checkbox needed for it.
+            $shapeTop = !empty($input['settings']['shape_top']);
+            $shapeBottom = !empty($input['settings']['shape_bottom']);
+            if ($shapeTop || $shapeBottom) {
+                $settings['shape_top'] = $shapeTop;
+                $settings['shape_bottom'] = $shapeBottom;
+                $shapeColour = strtolower(trim((string) ($input['settings']['shape_color'] ?? '')));
+                if (HomeLayout::validColour($shapeColour)) {
+                    $settings['shape_color'] = $shapeColour;
+                }
+            }
+
             $blocks[] = ['id' => $id, 'type' => $type, 'enabled' => isset($input['enabled']), 'texts' => $texts, 'settings' => $settings];
         }
 

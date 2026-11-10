@@ -183,6 +183,9 @@ final class HomeLayout
                 'background_media' => (string) ($block['settings']['background_media'] ?? ''),
                 'text_color' => (string) ($block['settings']['text_color'] ?? ''),
                 'shadow' => (bool) ($block['settings']['shadow'] ?? false),
+                'shape_top' => (bool) ($block['settings']['shape_top'] ?? false),
+                'shape_bottom' => (bool) ($block['settings']['shape_bottom'] ?? false),
+                'shape_color' => (string) ($block['settings']['shape_color'] ?? ''),
             ];
         }
 
@@ -419,6 +422,43 @@ final class HomeLayout
                 // easily make it illegible against it.
                 $css .= '[data-home-block="' . $block['id'] . '"], [data-home-block="' . $block['id'] . '"] *:not(.button) {' . "\n    " . $text . "\n}\n";
             }
+            $css .= self::shapeCss($block['id'], $block['settings']);
+        }
+
+        return $css;
+    }
+
+    /**
+     * The decorative wave divider(s) a block's own settings ask for, at its
+     * top and/or bottom edge - a self-contained CSS shape (an SVG data URI
+     * on a pseudo-element, `fill="currentColor"` picking up the `color`
+     * declaration right next to it), not a template change: every theme's
+     * existing `[data-home-block]` element already carries this for free.
+     * `position: relative` only applies when a shape is actually asked for,
+     * so a block without one is never nudged into a new stacking context it
+     * did not have before.
+     */
+    private static function shapeCss(string $id, array $settings): string
+    {
+        $top = !empty($settings['shape_top']);
+        $bottom = !empty($settings['shape_bottom']);
+        if (!$top && !$bottom) {
+            return '';
+        }
+
+        $colour = is_string($settings['shape_color'] ?? null) && self::validColour($settings['shape_color']) ? $settings['shape_color'] : '#ffffff';
+        $svg = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1440 120' preserveAspectRatio='none'%3E%3Cpath fill='currentColor' d='M0,64 C240,120 480,0 720,32 C960,64 1200,120 1440,64 L1440,120 L0,120 Z'/%3E%3C/svg%3E";
+        $shared = "content: ''; position: absolute; left: 0; width: 100%; height: 7vw; min-height: 2.5rem; max-height: 6rem;"
+            . " background-image: url(\"{$svg}\"); background-size: 100% 100%; background-repeat: no-repeat; color: {$colour}; pointer-events: none;";
+
+        $css = '[data-home-block="' . $id . '"] { position: relative; }' . "\n";
+        if ($top) {
+            // The same shape as the bottom one, flipped: its flat edge now touches the block's own top edge,
+            // the curve dips down into the block's content rather than out of it.
+            $css .= '[data-home-block="' . $id . '"]::before {' . "\n    " . $shared . ' top: -1px; transform: scaleY(-1); z-index: 1;' . "\n}\n";
+        }
+        if ($bottom) {
+            $css .= '[data-home-block="' . $id . '"]::after {' . "\n    " . $shared . ' bottom: -1px; z-index: 1;' . "\n}\n";
         }
 
         return $css;
