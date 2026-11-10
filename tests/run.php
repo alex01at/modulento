@@ -1026,7 +1026,7 @@ preg_match('#href="(/design/[a-f0-9]+\.css)"#', $get('/impressum', null)['body']
 $designCss = $get($pageCssMatch[1], null)['body'];
 check('page blocks: a normal page\'s own block background and text colour/shadow reach the design stylesheet too, not just the home page\'s',
     str_contains($designCss, '[data-home-block="' . $remainingBlock['id'] . '"] {') && str_contains($designCss, 'background: #abcdef;')
-    && str_contains($designCss, '[data-home-block="' . $remainingBlock['id'] . '"], [data-home-block="' . $remainingBlock['id'] . '"] *:not(.button) {')
+    && str_contains($designCss, '[data-home-block="' . $remainingBlock['id'] . '"], [data-home-block="' . $remainingBlock['id'] . '"] *:not(.button):not(input):not(select):not(textarea) {')
     && str_contains($designCss, 'color: #112233 !important;') && str_contains($designCss, 'text-shadow: -1px -1px 2px rgb(0 0 0 / .8),') && str_contains($designCss, '0 4px 16px rgb(0 0 0 / .55) !important;'));
 $post('/admin/pages/' . $imprint['page_id'] . '/blocks', ['action' => 'save', 'blocks' => [
     $remainingBlock['id'] => ['enabled' => '1', 'settings' => [], 'texts' => ['de' => ['heading' => 'Angaben']]],
@@ -4373,7 +4373,7 @@ $heroBlock = array_values(array_filter($homeBlocks(), fn (array $b) => $b['id'] 
 check('home editor: a text colour and shadow are saved for any block type', $heroBlock['settings']['text_color'] === '#ffee00' && $heroBlock['settings']['shadow'] === true);
 $designCss = $get('/design/' . $app->design->fileName(), null)['body'];
 check('home: the design stylesheet carries the text colour on the block and every descendant (so headings/paragraphs pick it up over a theme\'s own element rules), plus the shadow - never an inline style attribute',
-    str_contains($designCss, '[data-home-block="default-hero"], [data-home-block="default-hero"] *:not(.button) {') && str_contains($designCss, 'color: #ffee00 !important;') && str_contains($designCss, 'text-shadow: -1px -1px 2px rgb(0 0 0 / .8),') && str_contains($designCss, '0 4px 16px rgb(0 0 0 / .55) !important;')
+    str_contains($designCss, '[data-home-block="default-hero"], [data-home-block="default-hero"] *:not(.button):not(input):not(select):not(textarea) {') && str_contains($designCss, 'color: #ffee00 !important;') && str_contains($designCss, 'text-shadow: -1px -1px 2px rgb(0 0 0 / .8),') && str_contains($designCss, '0 4px 16px rgb(0 0 0 / .55) !important;')
     && !str_contains($get('/', null)['body'], 'style="'));
 
 $post('/admin/home', ['action' => 'save', 'blocks' => ['default-hero' => ['enabled' => '1', 'settings' => [

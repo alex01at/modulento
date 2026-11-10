@@ -413,17 +413,18 @@ final class HomeLayout
             // elemental rules (e.g. "h1, h2, h3 { color: ... }"), so this
             // wins only because the design stylesheet loads after a
             // theme's own, the same way backgroundStyle() above already
-            // relies on for the block's background. A `.button`'s own
-            // class selector still outranks it, so button text stays
-            // exactly as the theme styles it.
+            // relies on for the block's background.
             $text = self::textStyle($block['settings']);
             if ($text !== '') {
-                // ":not(.button)" - a button inside the block (the hero's or
-                // a text block's own button_label/button_url) keeps the
-                // theme's own button colour; it sits on its own background,
-                // and a flat text colour meant for the block's prose could
-                // easily make it illegible against it.
-                $css .= '[data-home-block="' . $block['id'] . '"], [data-home-block="' . $block['id'] . '"] *:not(.button) {' . "\n    " . $text . "\n}\n";
+                // Excluded: a `.button`'s own class selector already
+                // outranks this, so it is listed only for clarity, not
+                // because it is load-bearing - but an input/select/textarea
+                // (a hero's own search field, say) sits on its own,
+                // usually white field background, not on the block's
+                // photo/colour, and has no class of its own to protect it
+                // the way a button does; the block's text colour/shadow
+                // would otherwise smear right across its placeholder text.
+                $css .= '[data-home-block="' . $block['id'] . '"], [data-home-block="' . $block['id'] . '"] *:not(.button):not(input):not(select):not(textarea) {' . "\n    " . $text . "\n}\n";
             }
             $css .= self::shapeCss($block['id'], $block['settings']);
         }
