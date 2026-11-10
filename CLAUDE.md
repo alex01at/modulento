@@ -51,7 +51,7 @@ sich über `Registrar::register()` beim Kern an.
 - **App** (`freelancer`, `shop`, `auction`, `card`, `blog`) — immer nur eine
   gleichzeitig aktiv; eine zweite App zu aktivieren schaltet die erste ab
   (Daten bleiben erhalten, nur abgeschaltet).
-- **Addon** (`faq`, `newsletter`, `bookmark`, `abos`, `coupons`) — beliebig
+- **Addon** (`faq`, `newsletter`, `bookmark`, `abos`, `coupons`, `gallery`) — beliebig
   viele gleichzeitig aktiv.
 
 Die aktuell aktive App ermitteln: `$app->extensions->loaded()` nach dem
@@ -168,7 +168,7 @@ Alle liegen unter `/home/alex/Dokumente/Projekte/` neben diesem Ordner.
 **Apps:** `modulento-ext-freelancer`, `modulento-ext-shop`,
 `modulento-ext-auction`, `modulento-ext-card`, `modulento-ext-blog`
 
-**Addons:** `modulento-ext-faq`, `modulento-ext-newsletter`,
+**Addons:** `modulento-ext-gallery` (Fotoalben aus der Medienbibliothek, `/gallery` mit Lightbox, Seiten-Block `gallery.album`), `modulento-ext-faq`, `modulento-ext-newsletter`,
 `modulento-ext-bookmark`, `modulento-ext-abos` (Abo-Pläne/Rechnungen für
 Abos, ersetzt den früheren Kern-Modul `subscriptions`), `modulento-ext-coupons`
 (Rabattcodes — wirkt nur im generischen Bestellpfad, aktuell nur
