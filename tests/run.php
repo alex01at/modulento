@@ -4129,7 +4129,7 @@ foreach (glob($root . '/{core/src,extensions/*/src}/{,*/}*.php', GLOB_BRACE) as 
     preg_match_all("/(?:trans\\(|flash\\('[a-z]+', \\\$this->trans\\(|'key' => |back\\([^,]+, '[a-z]+', |Key\\) => |return |\\\$errors\\[\\] = |UpdateException\\(|result\\([a-z]+, '[a-z_]+', )'((?:core|" . implode('|', array_map('basename', glob($root . '/extensions/*', GLOB_ONLYDIR))) . ")\\.[a-z0-9_.]+[a-z0-9])'/", (string) file_get_contents($file), $found);
     foreach ($found[1] as $key) {
         // Offer type ids look like keys but are not.
-        if (!isset($knownKeys[$key]) && !in_array($key, ['freelancer.service', 'auction.lot', 'auction.sale', 'core.offline', 'shop.product'], true)) {
+        if (!isset($knownKeys[$key]) && !in_array($key, ['freelancer.service', 'auction.lot', 'auction.sale', 'core.offline', 'shop.product', 'jobs.posting'], true)) {
             $missingKeys[] = $key . ' in ' . basename($file);
         }
     }
