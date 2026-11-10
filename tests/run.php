@@ -4398,11 +4398,11 @@ $heroBlock = array_values(array_filter($homeBlocks(), fn (array $b) => $b['id'] 
 check('home editor: both wave edges and the wave colour are saved for any block type, the colour lower-cased',
     $heroBlock['settings']['shape_top'] === true && $heroBlock['settings']['shape_bottom'] === true && $heroBlock['settings']['shape_color'] === '#abcdef');
 $designCss = $get('/design/' . $app->design->fileName(), null)['body'];
-check('home: the design stylesheet carries a pseudo-element wave at each requested edge, filled with the chosen colour via currentColor - never an inline style attribute',
+check('home: the design stylesheet carries a pseudo-element wave at each requested edge, the chosen colour baked straight into the SVG\'s own fill (never "currentColor" - a background-image is its own, isolated image resource and never sees the page\'s colour) - never an inline style attribute',
     str_contains($designCss, '[data-home-block="default-hero"] { position: relative; }')
     && str_contains($designCss, '[data-home-block="default-hero"]::before {') && str_contains($designCss, 'top: -1px; transform: scaleY(-1);')
     && str_contains($designCss, '[data-home-block="default-hero"]::after {') && str_contains($designCss, 'bottom: -1px;')
-    && str_contains($designCss, "color: #abcdef;") && str_contains($designCss, 'background-image: url("data:image/svg+xml,')
+    && str_contains($designCss, "fill='%23abcdef'") && str_contains($designCss, 'background-image: url("data:image/svg+xml,')
     && !str_contains($get('/', null)['body'], 'style="'));
 
 $post('/admin/home', ['action' => 'save', 'blocks' => ['default-hero' => ['enabled' => '1', 'settings' => [

@@ -468,10 +468,18 @@ final class HomeLayout
             'lg' => '10vw; min-height: 3.5rem; max-height: 9rem;',
             default => '7vw; min-height: 2.5rem; max-height: 6rem;',
         };
-        $svg = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1440 120' preserveAspectRatio='none'%3E%3Cpath fill='currentColor' d='"
+        // The colour is baked straight into the SVG's own fill, not left as
+        // "currentColor" picked up from this element's `color`: a
+        // background-image is decoded as its own, isolated image resource
+        // - it never sees the embedding page's styles at all, "currentColor"
+        // included, so that would always have rendered black regardless of
+        // what the admin picked (percent-encoded "#" - a literal "#" would
+        // truncate the data URI at the fragment it looks like it starts).
+        $fill = '%23' . ltrim($colour, '#');
+        $svg = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1440 120' preserveAspectRatio='none'%3E%3Cpath fill='{$fill}' d='"
             . self::SHAPES[$style] . "'/%3E%3C/svg%3E";
         $shared = "content: ''; position: absolute; left: 0; width: 100%; height: {$size}"
-            . " background-image: url(\"{$svg}\"); background-size: 100% 100%; background-repeat: no-repeat; color: {$colour}; opacity: {$opacity}; pointer-events: none;";
+            . " background-image: url(\"{$svg}\"); background-size: 100% 100%; background-repeat: no-repeat; opacity: {$opacity}; pointer-events: none;";
 
         $css = '[data-home-block="' . $id . '"] { position: relative; }' . "\n";
         if ($top) {
