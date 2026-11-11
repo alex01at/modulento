@@ -71,6 +71,10 @@
                         {% endfor %}
                     </select>
                 </div>
+                <div class="field" data-background-field="image">
+                    <label for="bg-opacity-{{ id }}">{{ trans('core.home.background_opacity') }}</label>
+                    <input id="bg-opacity-{{ id }}" type="number" min="0" max="100" name="blocks[{{ id }}][settings][background_opacity]" value="{{ block.settings.background_opacity ?? 100 }}">
+                </div>
             </fieldset>
 
             <fieldset>

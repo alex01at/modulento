@@ -182,6 +182,7 @@ final class HomeLayout
                 'background_color' => (string) ($block['settings']['background_color'] ?? ''),
                 'background_color2' => (string) ($block['settings']['background_color2'] ?? ''),
                 'background_media' => (string) ($block['settings']['background_media'] ?? ''),
+                'background_opacity' => max(0, min(100, (int) ($block['settings']['background_opacity'] ?? 100))),
                 'text_color' => (string) ($block['settings']['text_color'] ?? ''),
                 'shadow' => (bool) ($block['settings']['shadow'] ?? false),
                 'shape_top' => (bool) ($block['settings']['shape_top'] ?? false),
@@ -507,15 +508,32 @@ final class HomeLayout
     {
         $type = $settings['background_type'] ?? null;
         $colour = fn (string $key) => is_string($settings[$key] ?? null) && self::validColour($settings[$key]) ? $settings[$key] : null;
+        $media = $type === 'image' ? self::cleanMedia((string) ($settings['background_media'] ?? '')) : '';
 
         return match (true) {
             $type === 'color' && $colour('background_color') !== null => 'background: ' . $colour('background_color') . ';',
             $type === 'gradient' && $colour('background_color') !== null && $colour('background_color2') !== null
                 => 'background: linear-gradient(135deg, ' . $colour('background_color') . ', ' . $colour('background_color2') . ');',
-            $type === 'image' && self::cleanMedia((string) ($settings['background_media'] ?? '')) !== ''
-                => 'background-image: url(' . self::cleanMedia((string) $settings['background_media']) . '); background-size: cover; background-position: center;',
+            $type === 'image' && $media !== '' => self::imageBackgroundStyle($media, $settings),
             default => '',
         };
+    }
+
+    /**
+     * A background picture, faded toward the page's own --ground the
+     * lower its own "Deckkraft" (background_opacity, 0-100, default 100 -
+     * fully opaque, unchanged from before this setting existed) is set to.
+     * A flat colour layered under the picture, not CSS opacity on the
+     * block itself, which would just as well fade its text and children.
+     */
+    private static function imageBackgroundStyle(string $url, array $settings): string
+    {
+        $opacity = max(0, min(100, (int) ($settings['background_opacity'] ?? 100)));
+        $scrim = $opacity < 100
+            ? 'linear-gradient(color-mix(in srgb, var(--ground) ' . (100 - $opacity) . '%, transparent), color-mix(in srgb, var(--ground) ' . (100 - $opacity) . '%, transparent)), '
+            : '';
+
+        return 'background-image: ' . $scrim . 'url(' . $url . '); background-size: cover; background-position: center;';
     }
 
     /**

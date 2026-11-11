@@ -1685,6 +1685,7 @@ return [
     'core.home.count' => 'Anzahl',
     'core.home.picture' => 'Bild aus der Mediathek',
     'core.home.picture_none' => 'kein Bild',
+    'core.home.background_opacity' => 'Deckkraft des Bildes (%)',
     'core.home.background' => 'Hintergrund',
     'core.home.background_type' => 'Art',
     'core.home.background_option_none' => 'Keiner',

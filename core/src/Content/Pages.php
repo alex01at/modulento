@@ -209,6 +209,7 @@ final class Pages
                 'background_color' => (string) ($block['settings']['background_color'] ?? ''),
                 'background_color2' => (string) ($block['settings']['background_color2'] ?? ''),
                 'background_media' => (string) ($block['settings']['background_media'] ?? ''),
+                'background_opacity' => max(0, min(100, (int) ($block['settings']['background_opacity'] ?? 100))),
                 'text_color' => (string) ($block['settings']['text_color'] ?? ''),
                 'shadow' => (bool) ($block['settings']['shadow'] ?? false),
                 'shape_top' => (bool) ($block['settings']['shape_top'] ?? false),

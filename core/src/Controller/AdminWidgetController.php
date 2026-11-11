@@ -74,6 +74,9 @@ final class AdminWidgetController extends Controller
             }
             if ($backgroundType === 'image') {
                 $settings['background_media'] = HomeLayout::cleanMedia((string) ($postedSettings['background_media'] ?? ''));
+                if (is_numeric($postedSettings['background_opacity'] ?? null)) {
+                    $settings['background_opacity'] = max(0, min(100, (int) $postedSettings['background_opacity']));
+                }
             }
         }
 

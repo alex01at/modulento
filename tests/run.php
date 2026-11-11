@@ -1028,6 +1028,19 @@ check('page blocks: a normal page\'s own block background and text colour/shadow
     str_contains($designCss, '[data-home-block="' . $remainingBlock['id'] . '"] {') && str_contains($designCss, 'background: #abcdef;')
     && str_contains($designCss, '[data-home-block="' . $remainingBlock['id'] . '"], [data-home-block="' . $remainingBlock['id'] . '"] *:not(.button):not(input):not(select):not(textarea) {')
     && str_contains($designCss, 'color: #112233 !important;') && str_contains($designCss, 'text-shadow: -1px -1px 2px rgb(0 0 0 / .8),') && str_contains($designCss, '0 4px 16px rgb(0 0 0 / .55) !important;'));
+
+$pageImage = '/media/library/' . str_repeat('d', 32) . '.webp';
+$post('/admin/pages/' . $imprint['page_id'] . '/blocks', ['action' => 'save', 'blocks' => [
+    $remainingBlock['id'] => ['enabled' => '1', 'settings' => [
+        'background_type' => 'image', 'background_media' => $pageImage, 'background_opacity' => '25',
+    ], 'texts' => ['de' => ['heading' => 'Angaben']]],
+]], 3);
+check('page blocks: a picture background\'s own opacity is saved here too, PageController keeping its own copy of the same rule',
+    (new Pages($pdo, $locales()))->blocksFor((int) $imprint['page_id'])[0]['settings']['background_opacity'] === 25);
+$designCss = $get($pageCssMatch[1], null)['body'];
+check('page blocks: and reaches the stylesheet as the same colour-mix scrim a home block\'s picture gets',
+    str_contains($designCss, 'background-image: linear-gradient(color-mix(in srgb, var(--ground) 75%, transparent), color-mix(in srgb, var(--ground) 75%, transparent)), url(' . $pageImage . ');'));
+
 $post('/admin/pages/' . $imprint['page_id'] . '/blocks', ['action' => 'save', 'blocks' => [
     $remainingBlock['id'] => ['enabled' => '1', 'settings' => [], 'texts' => ['de' => ['heading' => 'Angaben']]],
 ]], 3);
@@ -1959,6 +1972,14 @@ check('widgets: created directly from the overview, cleaned, every language kept
 check('widgets: the new own widget shows on the overview', str_contains($get('/admin/widgets', 3)['body'], 'Teaser'));
 $post('/admin/widgets/new', ['type' => 'text', 'name' => '', 'texts' => ['de' => ['heading' => 'x']]], 3);
 check('widgets: an empty name is refused, nothing new created', count((new Modulento\Core\Content\Widgets(new Modulento\Core\Support\Settings($pdo)))->own()) === 2);
+$widgetImage = '/media/library/' . str_repeat('e', 32) . '.webp';
+$post('/admin/widgets/new', ['type' => 'text', 'name' => 'Mit Bild', 'texts' => ['de' => ['heading' => 'Hallo']], 'settings' => [
+    'background_type' => 'image', 'background_media' => $widgetImage, 'background_opacity' => '70',
+]], 3);
+$ownWidget = array_values(array_filter($app->widgets->own(), fn (array $w) => $w['name'] === 'Mit Bild'))[0];
+check('widgets: a picture background\'s own opacity is kept here too, AdminWidgetController keeping its own copy of the same rule', $ownWidget['settings']['background_opacity'] === 70);
+$post('/admin/widgets/' . $ownWidget['id'] . '/delete', [], 3);
+
 $post('/admin/widgets/' . $teaser['id'] . '/delete', [], 3);
 check('widgets: removed again from the overview, shipped ones untouched', !str_contains($get('/admin/widgets', 3)['body'], 'Teaser')
     && str_contains($get('/admin/widgets', 3)['body'], 'Aufruf mit Schaltfläche'));
@@ -4368,6 +4389,27 @@ check('home: the design stylesheet styles the in-place edit dialog, and the hove
 $post('/admin/home', ['action' => 'save', 'blocks' => ['default-hero' => ['enabled' => '1', 'settings' => ['background_type' => 'image', 'background_media' => '/media/library/../evil.png'], 'texts' => ['de' => ['title' => 'Hallo']]]]], 3);
 $heroBlock = array_values(array_filter($homeBlocks(), fn (array $b) => $b['id'] === 'default-hero'))[0];
 check('home editor: a picture background outside the media library is not kept', ($heroBlock['settings']['background_media'] ?? null) === '');
+
+// --- A picture background's own opacity ("Deckkraft") - faded toward --ground, not CSS opacity on the block itself ---
+$post('/admin/home', ['action' => 'save', 'blocks' => ['default-hero' => ['enabled' => '1', 'settings' => [
+    'background_type' => 'image', 'background_media' => $heroImage, 'background_opacity' => '40',
+], 'texts' => ['de' => ['title' => 'Hallo']]]]], 3);
+$heroBlock = array_values(array_filter($homeBlocks(), fn (array $b) => $b['id'] === 'default-hero'))[0];
+check('home editor: a picture\'s own opacity is saved, clamped to 0-100', $heroBlock['settings']['background_opacity'] === 40);
+$designCss = $get('/design/' . $app->design->fileName(), null)['body'];
+check('home: below 100%, the picture is layered under a flat colour scrim mixed from --ground, not a CSS opacity on the block (which would fade its text too)',
+    str_contains($designCss, 'background-image: linear-gradient(color-mix(in srgb, var(--ground) 60%, transparent), color-mix(in srgb, var(--ground) 60%, transparent)), url(' . $heroImage . '); background-size: cover; background-position: center;')
+    && !str_contains($designCss, '[data-home-block="default-hero"] { opacity:'));
+
+$post('/admin/home', ['action' => 'save', 'blocks' => ['default-hero' => ['enabled' => '1', 'settings' => [
+    'background_type' => 'image', 'background_media' => $heroImage, 'background_opacity' => '140',
+], 'texts' => ['de' => ['title' => 'Hallo']]]]], 3);
+$heroBlock = array_values(array_filter($homeBlocks(), fn (array $b) => $b['id'] === 'default-hero'))[0];
+check('home editor: an opacity over 100 is clamped to 100', $heroBlock['settings']['background_opacity'] === 100);
+$designCss = $get('/design/' . $app->design->fileName(), null)['body'];
+check('home: at 100% (the default, unchanged from before this setting existed), the picture has no scrim layered under it at all',
+    str_contains($designCss, 'background-image: url(' . $heroImage . '); background-size: cover; background-position: center;')
+    && !str_contains($designCss, 'color-mix'));
 
 // --- A block's own text colour/shadow: its own checkbox, not gated behind "type" like the background above ---
 $post('/admin/home', ['action' => 'save', 'blocks' => ['default-hero' => ['enabled' => '1', 'settings' => [

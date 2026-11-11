@@ -1685,6 +1685,7 @@ return [
     'core.home.count' => 'Number',
     'core.home.picture' => 'Picture from the media library',
     'core.home.picture_none' => 'no picture',
+    'core.home.background_opacity' => 'Picture opacity (%)',
     'core.home.background' => 'Background',
     'core.home.background_type' => 'Type',
     'core.home.background_option_none' => 'None',

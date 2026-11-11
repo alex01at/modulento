@@ -292,6 +292,9 @@ final class PageController extends Controller
                 }
                 if ($backgroundType === 'image') {
                     $settings['background_media'] = HomeLayout::cleanMedia((string) ($input['settings']['background_media'] ?? ''));
+                    if (is_numeric($input['settings']['background_opacity'] ?? null)) {
+                        $settings['background_opacity'] = max(0, min(100, (int) $input['settings']['background_opacity']));
+                    }
                 }
             }
 
