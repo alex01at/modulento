@@ -463,6 +463,22 @@ final class Registrar
     }
 
     /**
+     * Renames one of the menu's own sections, e.g. "marketplace" to
+     * something that matches what this app actually calls it ("Jobbörse",
+     * "Auction house"). Only for an **app** (never an addon): what "the
+     * marketplace" is varies by app, the other sections do not, and
+     * register() of an app only runs while it is the active one anyway -
+     * no extra condition needed at the call site, the same reasoning as
+     * suppressAccountDefault()'s own doc comment.
+     *
+     * @param string $group one of App::ADMIN_GROUPS; anything else is ignored
+     */
+    public function adminMenuGroupLabel(string $group, string $labelKey): void
+    {
+        $this->app->setAdminMenuGroupLabel($group, $labelKey);
+    }
+
+    /**
      * A pending-action count for the administration's notification bell,
      * e.g. "3 open requests" - checked fresh every time the bell is asked
      * for, only for an administrator who already has $permission.

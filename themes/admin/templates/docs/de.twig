@@ -97,6 +97,7 @@ final class Extension implements ExtensionContract
                 <tr><th scope="row"><code>routes()</code></th><td>Adressen. Jede Route nennt ihren Zugriff: <code>Router::PUBLIC</code>, angemeldet (Standard) oder ein Recht.</td></tr>
                 <tr><th scope="row"><code>permission()</code></th><td>Ein eigenes Recht, das eine Route oder ein Admin-Menüpunkt verlangen kann.</td></tr>
                 <tr><th scope="row"><code>adminMenu()</code></th><td>Eintrag im Menü der Administration, einer Gruppe zugeordnet (<code>content</code>, <code>marketplace</code>, <code>moderation</code>, <code>people</code>, <code>system</code>, sonst „Mehr").</td></tr>
+                <tr><th scope="row"><code>adminMenuGroupLabel()</code></th><td>Nur für eine App: benennt eine der festen Menü-Gruppen um, z. B. „Marktplatz" zu „Jobbörse" - passend dazu, wie die eigene App das nennt.</td></tr>
                 <tr><th scope="row"><code>task()</code></th><td>Etwas regelmäßig über den Cron ausführen.</td></tr>
                 <tr><th scope="row"><code>listen()</code></th><td>Auf ein Ereignis des Kerns reagieren, z. B. Datenexport, Login oder Löschung eines Kontos.</td></tr>
             </tbody>

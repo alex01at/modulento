@@ -4212,6 +4212,10 @@ check('administration: the menu comes in sections, in a fixed order', array_valu
 $extensionApp = new Modulento\Core\App($config, $pdo);
 $extensionApp->addAdminMenu('x.menu', '/admin/x', 'x.manage', 'nonsense');
 check('administration: an entry without a known section goes to "more"', $extensionApp->adminMenu()[0]['group'] === 'more');
+$extensionApp->setAdminMenuGroupLabel('marketplace', 'x.group.renamed');
+check('administration: an app can rename one of the menu\'s own sections', $extensionApp->adminMenuGroupLabels()['marketplace'] === 'x.group.renamed');
+$extensionApp->setAdminMenuGroupLabel('nonsense', 'x.whatever');
+check('administration: renaming an unknown section is ignored', !isset($extensionApp->adminMenuGroupLabels()['nonsense']));
 $r = $get('/admin', 2);
 preg_match_all('#<summary id="menu-group-([a-z]+)">#', $r['body'], $sections);
 check('administration: a section the account sees nothing of is left out', !in_array('people', $sections[1], true) && !in_array('system', $sections[1], true));

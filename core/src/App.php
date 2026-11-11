@@ -166,6 +166,8 @@ final class App
     private ?View $view = null;
     /** @var array<int, array{label_key: string, path: string, permission: string}> */
     private array $adminMenu = [];
+    /** @var array<string, string> menu group id => language key overriding "core.admin.group.<id>" */
+    private array $adminGroupLabels = [];
     /** @var array<int, array{permission: string, provider: \Closure}> */
     private array $adminNotices = [];
     /** @var array<int, array{label_key: string, path: string}> */
@@ -364,6 +366,28 @@ final class App
     public function adminMenu(): array
     {
         return $this->adminMenu;
+    }
+
+    /**
+     * Renames a menu section for the rest of this request - what "the
+     * marketplace" is called is inherently app-specific (a job board calls
+     * it something else than an auction house), unlike the other sections,
+     * which stay the same regardless of which app is active. Meant for an
+     * app (Registrar::adminMenuGroupLabel()'s own doc comment explains
+     * why that needs no extra condition at the call site); an unknown
+     * group name is ignored, same as addAdminMenu() falling back silently.
+     */
+    public function setAdminMenuGroupLabel(string $group, string $labelKey): void
+    {
+        if (in_array($group, self::ADMIN_GROUPS, true)) {
+            $this->adminGroupLabels[$group] = $labelKey;
+        }
+    }
+
+    /** @return array<string, string> menu group id => language key, only for a group actually renamed */
+    public function adminMenuGroupLabels(): array
+    {
+        return $this->adminGroupLabels;
     }
 
     /**

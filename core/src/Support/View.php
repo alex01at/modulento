@@ -81,7 +81,7 @@ final class View
         foreach (App::ADMIN_GROUPS as $group) {
             $items = array_values(array_filter($menu, fn (array $item) => $item['group'] === $group));
             if ($items !== []) {
-                $groups[] = ['id' => $group, 'label_key' => 'core.admin.group.' . $group, 'items' => $items];
+                $groups[] = ['id' => $group, 'label_key' => $app->adminMenuGroupLabels()[$group] ?? 'core.admin.group.' . $group, 'items' => $items];
             }
         }
         $this->twig->addGlobal('admin_menu_groups', $groups);

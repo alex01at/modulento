@@ -61,7 +61,7 @@ geladen sein müssen — siehe `modulento-ext-abos/src/Plans.php` für das
 etablierte Muster mit einer lazy ausgewerteten Closure).
 
 **Wichtige `Registrar`-Hooks** (`core/src/Extension/Registrar.php`):
-`routes()`, `permission()`, `adminMenu()`, `adminNotice()`, `navigation()`,
+`routes()`, `permission()`, `adminMenu()`, `adminMenuGroupLabel()`, `adminNotice()`, `navigation()`,
 `footerLink()`, `accountLink()`, `dashboardLink()`, `suppressAccountDefault()`,
 `bodyScript()`, `cookieBanner()`, `cookieCategory()`, `consentProvider()`,
 `homeSection()`, `providerSection()`, `offerSection()`,
@@ -96,6 +96,13 @@ die Rolle). Bekannte Namen: `inbox`, `notifications`, `orders`, `requests`,
 `browse`, `become_provider`. Braucht keine zusätzliche Bedingung am
 Aufrufort: `register()` einer App läuft ohnehin nur, während sie die aktive
 App ist (eine zweite App zu aktivieren schaltet die erste ab).
+
+**`adminMenuGroupLabel(group, labelKey)`** — eine **App** benennt eine der
+festen Menü-Gruppen der Administration um (`App::ADMIN_GROUPS`:
+`content`, `marketplace`, `moderation`, `people`, `system`), z. B.
+„Marktplatz" zu „Jobbörse". Gleicher Grund wie bei
+`suppressAccountDefault()`: keine zusätzliche Bedingung nötig, `register()`
+läuft ohnehin nur während die App aktiv ist.
 
 **`planTemplate(id, labelKey, features, offerLimits, …)`** — eine **App**
 meldet eine fertige Abo-Vorlage für sich (Name, Features, Angebots-Limits je
