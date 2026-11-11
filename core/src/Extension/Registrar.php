@@ -142,6 +142,22 @@ final class Registrar
         $this->app->addAdminAccountSection($template, $data);
     }
 
+    /**
+     * A template an extension wants shown on the administration's own
+     * provider detail page - e.g. a catalogue app's own company profile
+     * (industry, logo, pitch) that the generic provider fields don't
+     * cover and that would otherwise never be reviewable by an operator.
+     * The template is one of this extension's ("@id/admin_provider.twig");
+     * a theme may override it like any other. $data gets the raw provider
+     * row and runs only when that page is shown.
+     *
+     * @param Closure(array<string, mixed>, App): array<string, mixed> $data
+     */
+    public function adminProviderSection(string $template, Closure $data): void
+    {
+        $this->app->addAdminProviderSection($template, $data);
+    }
+
     /** An entry in the site's main menu, e.g. "Blog". The path is one of this extension's public routes. */
     public function navigation(string $labelKey, string $path): void
     {

@@ -404,7 +404,7 @@ final class OfferController extends Controller
                     // now on.
                     $max = $this->offerQuota($provider, $type->id());
                     if ($max !== null && $app->offers->listAll((int) $provider['id'], null, 1, 1, $type->id())['total'] >= $max) {
-                        Session::flash('error', $this->trans('core.offer.error.too_many', ['max' => $max]));
+                        Session::flash('error', $this->trans($this->offerQuotaErrorKey(), ['max' => $max]));
                         $this->redirect('/account/offers');
                         return;
                     }
@@ -483,7 +483,7 @@ final class OfferController extends Controller
         // Offers take room and an administrator's time.
         $max = $this->offerQuota($provider, $typeId);
         $problem = match (true) {
-            $offer === null && $max !== null && $app->offers->listAll((int) $provider['id'], null, 1, 1, $typeId)['total'] >= $max => $this->trans('core.offer.error.too_many', ['max' => $max]),
+            $offer === null && $max !== null && $app->offers->listAll((int) $provider['id'], null, 1, 1, $typeId)['total'] >= $max => $this->trans($this->offerQuotaErrorKey(), ['max' => $max]),
             (new RateLimiter($app->db))->hit('offer-save', (string) $provider['account_id'], 60, 3600) => $this->trans('core.error.too_many_requests'),
             default => null,
         };
@@ -642,6 +642,17 @@ final class OfferController extends Controller
         }
 
         return $this->app->subscriptions->offerLimit($provider['account_id'], $typeId);
+    }
+
+    /**
+     * Which wording fits the quota offerQuota() just computed: the
+     * "approval" reason only applies without a billing addon installed -
+     * once one is, the limit comes entirely from the account's plan, and
+     * provider approval has nothing to do with it.
+     */
+    private function offerQuotaErrorKey(): string
+    {
+        return $this->app->subscriptions->hasProvider() ? 'core.offer.error.too_many_plan' : 'core.offer.error.too_many';
     }
 
     /** Same idea as offerQuota(), for pictures per offer. */

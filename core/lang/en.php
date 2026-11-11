@@ -919,6 +919,7 @@ return [
     'core.offer.error.category' => 'Please choose a category.',
     'core.offer.error.no_text' => 'The offer needs a title in at least one language.',
     'core.offer.error.too_many' => 'You have reached the maximum of {max} offers. It is lower as long as your provider profile has not been approved.',
+    'core.offer.error.too_many_plan' => 'You have reached the maximum of {max} offers your current plan allows. A higher plan makes room for more.',
     'core.offer.error.text' => 'Every language that is filled in needs a title; a text may be too long.',
     'core.offer.mine.title' => 'My offers',
     'core.offer.mine.new' => 'New: {type}',

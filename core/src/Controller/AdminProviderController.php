@@ -39,7 +39,14 @@ final class AdminProviderController extends Controller
             return;
         }
 
-        $this->render('@admin/provider.twig', ['provider' => $provider]);
+        $this->render('@admin/provider.twig', [
+            'provider' => $provider,
+            'custom_fields' => $this->app->customFields->display('provider', (int) $provider['id'], null, $this->app->translator->locale()),
+            'extension_blocks' => array_map(
+                fn (array $section) => ['template' => $section['template'], 'data' => ($section['data'])($provider, $this->app)],
+                $this->app->adminProviderSections()
+            ),
+        ]);
     }
 
     public function decide(array $params): void

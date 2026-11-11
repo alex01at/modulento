@@ -178,6 +178,8 @@ final class App
     private array $exportables = [];
     /** @var array<int, array{template: string, data: \Closure}> */
     private array $adminAccountSections = [];
+    /** @var array<int, array{template: string, data: \Closure}> */
+    private array $adminProviderSections = [];
     /** @var array<int, array{template: string, data: ?\Closure}> */
     private array $homeSections = [];
     /** @var array<int, array{template: string, data: \Closure}> */
@@ -501,6 +503,26 @@ final class App
     public function adminAccountSections(): array
     {
         return $this->adminAccountSections;
+    }
+
+    /**
+     * A template an extension wants shown on the administration's own
+     * provider detail page (Administration → Providers → one provider) -
+     * e.g. a catalogue app's own company profile (industry, logo, pitch)
+     * that has no other place to be reviewed from. $data gets the raw
+     * provider row and runs only when that page is shown.
+     *
+     * @param \Closure(array<string, mixed>, App): array<string, mixed> $data
+     */
+    public function addAdminProviderSection(string $template, \Closure $data): void
+    {
+        $this->adminProviderSections[] = ['template' => $template, 'data' => $data];
+    }
+
+    /** @return array<int, array{template: string, data: \Closure}> unresolved - the caller supplies the provider */
+    public function adminProviderSections(): array
+    {
+        return $this->adminProviderSections;
     }
 
     /**

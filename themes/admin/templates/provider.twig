@@ -34,6 +34,22 @@
                 <p>{{ text.description|nl2br }}</p>
             </section>
         {% endfor %}
+
+        {% if custom_fields is not empty %}
+            <section class="card-box">
+                <h2>{{ trans('core.admin.menu.custom_fields') }}</h2>
+                <dl>
+                    {% for field in custom_fields %}
+                        <dt>{{ field.label }}</dt>
+                        <dd>{{ field.value is same as(true) ? '✓' : field.value }}</dd>
+                    {% endfor %}
+                </dl>
+            </section>
+        {% endif %}
+
+        {% for block in extension_blocks %}
+            {% include block.template with block.data %}
+        {% endfor %}
     </div>
 
     <div>

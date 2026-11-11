@@ -919,6 +919,7 @@ return [
     'core.offer.error.category' => 'Bitte wähle eine Kategorie.',
     'core.offer.error.no_text' => 'Das Angebot braucht in mindestens einer Sprache einen Titel.',
     'core.offer.error.too_many' => 'Du hast die Höchstzahl von {max} Angeboten erreicht. Solange dein Anbieterprofil nicht freigegeben ist, liegt sie niedriger.',
+    'core.offer.error.too_many_plan' => 'Du hast die Höchstzahl von {max} Angeboten erreicht, die dein aktuelles Abo erlaubt. Ein höherer Plan schafft mehr Platz.',
     'core.offer.error.text' => 'Jede ausgefüllte Sprache braucht einen Titel; ein Text ist möglicherweise zu lang.',
     'core.offer.mine.title' => 'Meine Angebote',
     'core.offer.mine.new' => 'Neu: {type}',

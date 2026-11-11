@@ -65,7 +65,7 @@ etablierte Muster mit einer lazy ausgewerteten Closure).
 `footerLink()`, `accountLink()`, `dashboardLink()`, `suppressAccountDefault()`,
 `bodyScript()`, `cookieBanner()`, `cookieCategory()`, `consentProvider()`,
 `homeSection()`, `providerSection()`, `offerSection()`,
-`dashboardSection()`, `adminAccountSection()`, `checkoutSection()`,
+`dashboardSection()`, `adminAccountSection()`, `adminProviderSection()`, `checkoutSection()`,
 `orderDiscount()`, `module()`, `moduleEnabled()`, `exportable()`,
 `offerType()`, `orderFlow()`, `paymentMethod()`, `demoOffers()`,
 `subscriptionFeature()`, `subscriptionProvider()`, `planTemplate()`,
