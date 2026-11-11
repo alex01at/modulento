@@ -9,14 +9,17 @@
 <table>
     <thead><tr><th scope="col">Bereich</th><th scope="col">Was dort passiert</th></tr></thead>
     <tbody>
-        <tr><td>Inhalte</td><td>Seiten, Mediathek, Startseite, Angebotsseite, Design</td></tr>
-        <tr><td>Marktplatz</td><td>Angebote, Kategorien, Anbieter, Bestellungen, Widerrufe, Zahlungsarten, Abos</td></tr>
-        <tr><td>Moderation</td><td>Bewertungen, Meldungen, Nachrichten, Wortfilter</td></tr>
+        <tr><td>Inhalte</td><td>Seiten (mit Startseite direkt bearbeiten), Mediathek, Angebotsseite, Menü, Widgets</td></tr>
+        <tr><td>Marktplatz</td><td>Angebote, Kategorien, Eigene Felder, Anbieter, Anfragen, Bestellungen, Widerrufe, Zahlungsarten</td></tr>
+        <tr><td>Moderation</td><td>Bewertungen, Konto-Bewertungen, Meldungen, Nachrichten, Wortfilter</td></tr>
         <tr><td>Personen</td><td>Konten, Rollen</td></tr>
-        <tr><td>System</td><td>Einstellungen, Module, Themes, Pakete, Erweiterungen, Aufgaben, Updates, Dokumentation, Handbuch</td></tr>
+        <tr><td>System</td><td>Einstellungen, Übersetzungen, Design, Module, Themes, Pakete, Erweiterungen, Shop, Demodaten, Datensicherung, Export/Import, Aufgaben, Updates, Dokumentation, Handbuch</td></tr>
     </tbody>
 </table>
-<p>Der Bereich „Marktplatz“ erscheint nur, wenn eine Erweiterung läuft, die einen Katalog mitbringt; dasselbe gilt für Unterpunkte wie Angebote oder Kategorien.</p>
+<p>Der Bereich „Marktplatz“ erscheint nur, wenn eine App-Erweiterung läuft, die einen Katalog mitbringt; dasselbe gilt für Unterpunkte wie Angebote oder Kategorien. Ein eingeschaltetes Addon kann einen eigenen Menüpunkt hinzufügen, zum Beispiel „Abos“ (nur mit <code>modulento-ext-abos</code>) oder „FAQ“ - Addons ohne eigene Gruppe landen unter „Weitere“.</p>
+
+<h2>Module ein- und ausschalten</h2>
+<p>Unter <strong>Administration → Module</strong> lässt sich eine eingebaute Funktion des Kerns abschalten, ohne ihre Daten zu verlieren: Bewertungen, das Kontaktformular, Widerrufe, Meldungen, Profilbilder, „Angemeldet bleiben“, der Posteingang, Benachrichtigungen und Anfragen. Aus heißt: keine Routen, kein Menüpunkt, kein Link mehr dorthin - die Tabellen bleiben, und ein wieder eingeschaltetes Modul zeigt seine alten Daten sofort wieder. Eine Erweiterung kann hier ein eigenes Modul ergänzen.</p>
 
 <h2>Rechte statt Rollen im Menü</h2>
 <p>Was ein Konto im Menü sieht, folgt nicht seinem Namen, sondern seinen Rechten. Ein Konto ohne <code>core.admin.access</code> sieht die Administration überhaupt nicht, egal was es sonst dürfte. Alles Weitere dazu steht im Kapitel „Konten, Rollen und Rechte“.</p>

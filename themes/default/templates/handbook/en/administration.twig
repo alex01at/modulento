@@ -9,14 +9,17 @@
 <table>
     <thead><tr><th scope="col">Section</th><th scope="col">What happens there</th></tr></thead>
     <tbody>
-        <tr><td>Content</td><td>Pages, media library, home page, offer page, design</td></tr>
-        <tr><td>Marketplace</td><td>Offers, categories, providers, orders, withdrawals, payment methods, subscriptions</td></tr>
-        <tr><td>Moderation</td><td>Reviews, reports, messages, word filter</td></tr>
+        <tr><td>Content</td><td>Pages (with editing the home page in place), media library, offer page, menu, widgets</td></tr>
+        <tr><td>Marketplace</td><td>Offers, categories, custom fields, providers, requests, orders, withdrawals, payment methods</td></tr>
+        <tr><td>Moderation</td><td>Reviews, account ratings, reports, messages, word filter</td></tr>
         <tr><td>People</td><td>Accounts, roles</td></tr>
-        <tr><td>System</td><td>Settings, modules, themes, packages, extensions, tasks, updates, documentation, handbook</td></tr>
+        <tr><td>System</td><td>Settings, translations, design, modules, themes, packages, extensions, shop, demo data, backup, export/import, tasks, updates, documentation, handbook</td></tr>
     </tbody>
 </table>
-<p>The "Marketplace" section only appears while an extension that brings a catalogue is running; the same goes for entries such as offers or categories.</p>
+<p>The "Marketplace" section only appears while an app extension that brings a catalogue is running; the same goes for entries such as offers or categories. An enabled addon can add a menu entry of its own, such as "Subscriptions" (only with <code>modulento-ext-abos</code>) or "FAQ" - addons with no group of their own end up under "More".</p>
+
+<h2>Switching modules on and off</h2>
+<p>Under <strong>Administration → Modules</strong>, a built-in function of the core can be switched off without losing its data: reviews, the contact form, withdrawals, reports, avatars, "stay signed in", the inbox, notifications and requests. Off means: no routes, no menu entry, no link to it anywhere - the tables stay, and switching it back on shows its old data at once. An extension can add a module of its own here.</p>
 
 <h2>Permissions decide the menu, not roles by name</h2>
 <p>What an account sees in the menu follows its permissions, not its name. An account without <code>core.admin.access</code> never sees the administration at all, whatever else it may do. More on this in the chapter "Accounts, roles and permissions".</p>

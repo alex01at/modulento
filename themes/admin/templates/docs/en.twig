@@ -81,6 +81,14 @@ final class Extension implements ExtensionContract
 }</code></pre>
     <p>Every method of <code>Registrar</code> (<code>core/src/Extension/Registrar.php</code>), grouped by what it is for. Each method's own docblock in the source names its exact signature.</p>
 
+    <h3>App or addon</h3>
+    <p>The optional manifest field <code>"type"</code> (defaulting to <code>"app"</code> when missing) decides how an extension is switched on and off:</p>
+    <ul>
+        <li><strong>App</strong> (<code>"type": "app"</code>, the default): decides what the platform fundamentally is. Only one app is active at a time - switching on a second one automatically switches the previous one off (its data stays).</li>
+        <li><strong>Addon</strong> (<code>"type": "addon"</code>): adds a feature regardless of which app is active. Any number of addons can be active at the same time.</li>
+    </ul>
+    <p>Which app is currently active is found with <code>$app->extensions->loaded()</code>, searched for the one manifest with <code>type === 'app'</code> - at runtime, never synchronously inside your own <code>register()</code>, since other extensions may not be loaded yet at that point. <code>Registrar::$app</code> and <code>Registrar::$manifest</code> are public and readable for this.</p>
+
     <h3>The basics</h3>
     <div class="table-wrap">
         <table>

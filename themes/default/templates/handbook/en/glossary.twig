@@ -1,8 +1,12 @@
 <dl>
     <dt>Account</dt>
     <dd>An access to the site, with an e-mail address, a password and a language.</dd>
+    <dt>Addon</dt>
+    <dd>An extension that adds an extra feature regardless of the active app - a gallery or a newsletter, for example. Any number of addons can be active at the same time.</dd>
+    <dt>App</dt>
+    <dd>An extension that decides what the platform fundamentally is - its kinds of offer and order flows, freelancer or shop, for example. Only one app is active at a time.</dd>
     <dt>Extension</dt>
-    <dd>A folder that adds a feature to the core - a kind of catalogue, for example. Only one is active at a time.</dd>
+    <dd>A folder that adds a feature to the core. See "App" and "Addon" for the two kinds.</dd>
     <dt>Feature (of an extension)</dt>
     <dd>Something a plan can unlock. What a feature actually does is decided by the relevant extension.</dd>
     <dt>Invoice</dt>
@@ -10,11 +14,13 @@
     <dt>Category</dt>
     <dd>A point in the tree that offers are filed under.</dd>
     <dt>Module</dt>
-    <dd>A built-in function of the core that can be switched off, for example reviews or subscriptions. Off means: no routes, no menu entry, the data stays.</dd>
+    <dd>A built-in function of the core that can be switched off, for example reviews or requests. Off means: no routes, no menu entry, the data stays.</dd>
     <dt>Offer</dt>
-    <dd>What a provider lists in the catalogue: a service, an auction lot and the like, depending on the active extension.</dd>
+    <dd>What a provider lists in the catalogue: a service, an auction lot and the like, depending on the active app.</dd>
     <dt>Order</dt>
     <dd>The purchase of an offer, with its history, messages and payment.</dd>
+    <dt>Request</dt>
+    <dd>The other direction from an offer: an account describes what it needs, providers apply with a price, and an accepted application becomes an order.</dd>
     <dt>Package</dt>
     <dd>The delivery of an extension or a theme as a downloadable zip file, through a repository or by upload.</dd>
     <dt>Permission</dt>
@@ -26,7 +32,7 @@
     <dt>Role</dt>
     <dd>A set of permissions assigned to an account.</dd>
     <dt>Subscription</dt>
-    <dd>A plan the operator sells directly - independent of the marketplace. See the chapter "Subscriptions".</dd>
+    <dd>A plan the operator sells directly - independent of the marketplace, not a core feature. Only the addon <code>modulento-ext-abos</code> turns this into something usable.</dd>
     <dt>Theme</dt>
     <dd>A folder that decides what the public site looks like. Only one is active at a time.</dd>
     <dt>Webhook</dt>
