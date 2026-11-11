@@ -260,8 +260,8 @@ $pdo->exec("CREATE TABLE account_login_token (id INTEGER PRIMARY KEY, account_id
 $pdo->exec("CREATE TABLE rate_limit_attempt (id INTEGER PRIMARY KEY, action TEXT, identifier TEXT, created_at TEXT)");
 $pdo->exec("CREATE TABLE task_run (name TEXT PRIMARY KEY, last_started_at TEXT, last_finished_at TEXT, last_status TEXT, last_error TEXT)");
 $pdo->exec("CREATE TABLE x_example_login (id INTEGER PRIMARY KEY, account_id INTEGER REFERENCES account (id) ON DELETE CASCADE, logged_in_at TEXT)");
-$pdo->exec("CREATE TABLE category (id INTEGER PRIMARY KEY, parent_id INTEGER REFERENCES category (id), position INTEGER, created_at TEXT)");
-$pdo->exec("CREATE TABLE category_translation (category_id INTEGER REFERENCES category (id) ON DELETE CASCADE, locale TEXT, name TEXT, slug TEXT, PRIMARY KEY (category_id, locale), UNIQUE (locale, slug))");
+$pdo->exec("CREATE TABLE category (id INTEGER PRIMARY KEY, parent_id INTEGER REFERENCES category (id), position INTEGER, icon TEXT, created_at TEXT)");
+$pdo->exec("CREATE TABLE category_translation (category_id INTEGER REFERENCES category (id) ON DELETE CASCADE, locale TEXT, name TEXT, description TEXT NOT NULL DEFAULT '', slug TEXT, PRIMARY KEY (category_id, locale), UNIQUE (locale, slug))");
 $pdo->exec("CREATE TABLE offer (id INTEGER PRIMARY KEY, provider_id INTEGER REFERENCES provider (id) ON DELETE CASCADE, type TEXT, category_id INTEGER REFERENCES category (id) ON DELETE SET NULL,
     status TEXT, status_note TEXT, price_from INTEGER, currency TEXT, decided_at TEXT, decided_by INTEGER, published_at TEXT, created_at TEXT, updated_at TEXT)");
 $pdo->exec("CREATE TABLE offer_translation (offer_id INTEGER REFERENCES offer (id) ON DELETE CASCADE, locale TEXT, title TEXT, slug TEXT, summary TEXT, description TEXT, PRIMARY KEY (offer_id, locale), UNIQUE (locale, slug))");
@@ -1403,6 +1403,23 @@ $post('/admin/categories/' . $catId, ['parent_id' => $childId, 'text' => $name('
 check('categories: a category with children cannot become a child', $pdo->query("SELECT parent_id FROM category WHERE id = {$catId}")->fetchColumn() === null);
 $post('/admin/categories/' . $catId . '/delete', [], 3);
 check('categories: a category with children is not deleted', $pdo->query('SELECT COUNT(*) FROM category')->fetchColumn() == 2);
+
+$post('/admin/categories/' . $catId, ['icon' => '🎨', 'text' => ['de' => ['name' => 'Grafik & Design', 'slug' => '', 'description' => 'Alles rund um Grafik.'], 'en' => ['name' => 'Graphics & Design', 'slug' => '']]], 3);
+check('categories: icon and description are saved',
+    $pdo->query("SELECT icon FROM category WHERE id = {$catId}")->fetchColumn() === '🎨'
+    && $pdo->query("SELECT description FROM category_translation WHERE category_id = {$catId} AND locale = 'de'")->fetchColumn() === 'Alles rund um Grafik.');
+
+$csvPath = tempnam(sys_get_temp_dir(), 'cat');
+file_put_contents($csvPath, "name,description,icon\nFotografie,Bilder und mehr,📷\nGrafik & Design,Schon da,\n");
+$_FILES['file'] = ['name' => 'categories.csv', 'type' => 'text/csv', 'tmp_name' => $csvPath, 'error' => UPLOAD_ERR_OK, 'size' => filesize($csvPath)];
+check('csv import needs its permission', $post('/admin/categories/import', [], 1)['status'] === 403);
+$r = $post('/admin/categories/import', [], 3);
+check('csv import: creates new top categories and skips an existing name', str_contains($r['body'], '1 angelegt, 1 übersprungen')
+    && $pdo->query("SELECT icon FROM category WHERE id = (SELECT category_id FROM category_translation WHERE slug = 'fotografie')")->fetchColumn() === '📷');
+unlink($csvPath);
+unset($_FILES['file']);
+
+check('csv import: no file uploaded', $post('/admin/categories/import', [], 3)['status'] === 302 && ($_SESSION['_flash']['error'] ?? '') !== '');
 
 // Account 1 is an approved business provider, account 2 an approved private one.
 $pdo->exec("UPDATE provider SET status = 'approved' WHERE account_id IN (1, 2)");

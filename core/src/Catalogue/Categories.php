@@ -33,7 +33,9 @@ final class Categories
 
         foreach ($this->db->query('SELECT * FROM category_translation')->fetchAll() as $row) {
             if (isset($categories[(int) $row['category_id']])) {
-                $categories[(int) $row['category_id']]['translations'][$row['locale']] = ['name' => $row['name'], 'slug' => $row['slug']];
+                $categories[(int) $row['category_id']]['translations'][$row['locale']] = [
+                    'name' => $row['name'], 'slug' => $row['slug'], 'description' => $row['description'],
+                ];
             }
         }
 
@@ -70,12 +72,15 @@ final class Categories
         return array_values($tree);
     }
 
-    /** @return array{id: int, name: string, path: string}|null */
+    /** @return array{id: int, name: string, path: string, icon: ?string, description: string}|null */
     public function view(array $category, string $locale): ?array
     {
         $text = $category['translations'][$locale] ?? $category['translations'][$this->locales->default()] ?? null;
 
-        return $text !== null ? ['id' => $category['id'], 'name' => $text['name'], 'path' => '/categories/' . $text['slug']] : null;
+        return $text !== null ? [
+            'id' => $category['id'], 'name' => $text['name'], 'path' => '/categories/' . $text['slug'],
+            'icon' => $category['icon'] ?? null, 'description' => $text['description'] ?? '',
+        ] : null;
     }
 
     /** The category that has this address in a language (or in the default language, where it has no own name). */
@@ -109,13 +114,15 @@ final class Categories
     }
 
     /**
-     * @param array<string, array{name: string, slug: string}> $translations by locale; a language with an empty name is removed
+     * @param array<string, array{name: string, slug: string, description?: string}> $translations by locale; a language with an empty name is removed
      * @return array{id: ?int, errors: array<int, array{key: string, params: array}>}
      */
-    public function save(?int $id, ?int $parentId, int $position, array $translations): array
+    public function save(?int $id, ?int $parentId, int $position, ?string $icon, array $translations): array
     {
         $errors = [];
         $all = $this->all();
+        $icon = trim((string) $icon);
+        $icon = $icon !== '' ? mb_substr($icon, 0, 50) : null;
 
         if ($parentId !== null) {
             $parent = $all[$parentId] ?? null;
@@ -144,7 +151,7 @@ final class Categories
                     continue 2;
                 }
             }
-            $rows[$locale] = ['name' => mb_substr($name, 0, 150), 'slug' => $slug];
+            $rows[$locale] = ['name' => mb_substr($name, 0, 150), 'slug' => $slug, 'description' => mb_substr(trim((string) ($text['description'] ?? '')), 0, 500)];
         }
 
         if ($rows === [] && $errors === []) {
@@ -157,17 +164,17 @@ final class Categories
         $this->db->beginTransaction();
 
         if ($id === null) {
-            $stmt = $this->db->prepare('INSERT INTO category (parent_id, position, created_at) VALUES (:parent, :position, :now)');
-            $stmt->execute(['parent' => $parentId, 'position' => $position, 'now' => Clock::now()]);
+            $stmt = $this->db->prepare('INSERT INTO category (parent_id, position, icon, created_at) VALUES (:parent, :position, :icon, :now)');
+            $stmt->execute(['parent' => $parentId, 'position' => $position, 'icon' => $icon, 'now' => Clock::now()]);
             $id = (int) $this->db->lastInsertId();
         } else {
-            $stmt = $this->db->prepare('UPDATE category SET parent_id = :parent, position = :position WHERE id = :id');
-            $stmt->execute(['parent' => $parentId, 'position' => $position, 'id' => $id]);
+            $stmt = $this->db->prepare('UPDATE category SET parent_id = :parent, position = :position, icon = :icon WHERE id = :id');
+            $stmt->execute(['parent' => $parentId, 'position' => $position, 'icon' => $icon, 'id' => $id]);
         }
 
         $delete = $this->db->prepare('DELETE FROM category_translation WHERE category_id = :id');
         $delete->execute(['id' => $id]);
-        $insert = $this->db->prepare('INSERT INTO category_translation (category_id, locale, name, slug) VALUES (:id, :locale, :name, :slug)');
+        $insert = $this->db->prepare('INSERT INTO category_translation (category_id, locale, name, slug, description) VALUES (:id, :locale, :name, :slug, :description)');
         foreach ($rows as $locale => $row) {
             $insert->execute(['id' => $id, 'locale' => $locale] + $row);
         }

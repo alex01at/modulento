@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modulento\Core\Controller;
 
 use Modulento\Core\App;
+use Modulento\Core\Catalogue\CategoryCsvImport;
 use Modulento\Core\Catalogue\OfferImages;
 use Modulento\Core\Catalogue\Offers;
 use Modulento\Core\Event\OfferStatusChanged;
@@ -109,7 +110,49 @@ final class AdminCatalogueController extends Controller
     {
         $locale = $this->app->translator->locale();
 
-        $this->render('@admin/categories.twig', ['tree' => $this->app->categories->tree($locale)]);
+        $this->render('@admin/categories.twig', ['tree' => $this->app->categories->tree($locale), 'import_result' => null]);
+    }
+
+    /** Bulk-creates top-level categories from an uploaded CSV file (name, description, icon), in the administration's current language. */
+    public function importCategories(array $params): void
+    {
+        $upload = is_array($_FILES['file'] ?? null) ? $_FILES['file'] : [];
+        if (($upload['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK || !is_file($upload['tmp_name'] ?? '')) {
+            Session::flash('error', $this->trans('core.admin.categories.import.error.upload'));
+            $this->redirect('/admin/categories');
+            return;
+        }
+
+        $app = $this->app;
+        $locale = $app->translator->locale();
+        $result = (new CategoryCsvImport())->import($upload['tmp_name'], $locale, $app->categories);
+
+        if ($result['fatal'] !== null) {
+            Session::flash('error', $this->trans($result['fatal']));
+            $this->redirect('/admin/categories');
+            return;
+        }
+
+        $this->render('@admin/categories.twig', [
+            'tree' => $app->categories->tree($locale),
+            'import_result' => [
+                'created' => $result['created'],
+                'skipped' => $result['skipped'],
+                'errors' => array_map(fn (array $error) => $this->trans($error['key'], $error['params']), $result['errors']),
+            ],
+        ]);
+    }
+
+    /** A ready-to-fill-in CSV, in the administration's current language. */
+    public function categoryImportTemplate(array $params): void
+    {
+        header('Content-Type: text/csv; charset=utf-8');
+        header('Content-Disposition: attachment; filename="categories-template.csv"');
+
+        $out = fopen('php://output', 'w');
+        fputcsv($out, CategoryCsvImport::TEMPLATE_HEADER);
+        fputcsv($out, [$this->trans('core.admin.categories.import.example_name'), $this->trans('core.admin.categories.import.example_description'), '🛍️']);
+        fclose($out);
     }
 
     public function editCategory(array $params): void
@@ -132,14 +175,17 @@ final class AdminCatalogueController extends Controller
         $translations = [];
         foreach ($this->app->locales->enabled() as $locale) {
             $input = is_array($_POST['text'][$locale] ?? null) ? $_POST['text'][$locale] : [];
-            $translations[$locale] = ['name' => (string) ($input['name'] ?? ''), 'slug' => (string) ($input['slug'] ?? '')];
+            $translations[$locale] = [
+                'name' => (string) ($input['name'] ?? ''), 'slug' => (string) ($input['slug'] ?? ''),
+                'description' => (string) ($input['description'] ?? ''),
+            ];
         }
 
-        $result = $this->app->categories->save($id, $parentId, $position, $translations);
+        $result = $this->app->categories->save($id, $parentId, $position, (string) ($_POST['icon'] ?? ''), $translations);
 
         if ($result['errors'] !== []) {
             $this->renderCategory(
-                ['id' => $id, 'parent_id' => $parentId, 'position' => $position, 'translations' => $translations],
+                ['id' => $id, 'parent_id' => $parentId, 'position' => $position, 'icon' => (string) ($_POST['icon'] ?? ''), 'translations' => $translations],
                 array_map(fn (array $error) => $this->trans($error['key'], $error['params']), $result['errors'])
             );
             return;

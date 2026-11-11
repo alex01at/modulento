@@ -28,6 +28,10 @@
                     <label for="slug_{{ code }}">{{ trans('core.admin.pages.field.slug') }}</label>
                     <input id="slug_{{ code }}" name="text[{{ code }}][slug]" value="{{ text.slug ?? '' }}" maxlength="160">
                 </div>
+                <div class="field">
+                    <label for="description_{{ code }}">{{ trans('core.admin.categories.field.description') }}</label>
+                    <textarea id="description_{{ code }}" name="text[{{ code }}][description]" rows="2" maxlength="500" lang="{{ code }}">{{ text.description ?? '' }}</textarea>
+                </div>
             </fieldset>
         {% endfor %}
     </div>
@@ -46,6 +50,11 @@
             <div class="field">
                 <label for="position">{{ trans('core.admin.pages.field.position') }}</label>
                 <input id="position" name="position" type="number" value="{{ category ? category.position : 0 }}">
+            </div>
+            <div class="field">
+                <label for="icon">{{ trans('core.admin.categories.field.icon') }}</label>
+                <input id="icon" name="icon" value="{{ category.icon ?? '' }}" maxlength="50">
+                <small>{{ trans('core.admin.categories.field.icon_hint') }}</small>
             </div>
         </div>
         <button type="submit">{{ trans('core.account.save') }}</button>

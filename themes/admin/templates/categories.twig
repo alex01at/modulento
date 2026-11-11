@@ -18,11 +18,11 @@
         <ul class="tree">
             {% for top in tree %}
                 <li>
-                    <a href="{{ url('/admin/categories/' ~ top.id) }}">{{ top.name }}</a>
+                    <a href="{{ url('/admin/categories/' ~ top.id) }}">{{ top.icon ? top.icon ~ ' ' : '' }}{{ top.name }}</a>
                     {% if top.children %}
                         <ul>
                             {% for child in top.children %}
-                                <li><a href="{{ url('/admin/categories/' ~ child.id) }}">{{ child.name }}</a></li>
+                                <li><a href="{{ url('/admin/categories/' ~ child.id) }}">{{ child.icon ? child.icon ~ ' ' : '' }}{{ child.name }}</a></li>
                             {% endfor %}
                         </ul>
                     {% endif %}
@@ -30,5 +30,32 @@
             {% endfor %}
         </ul>
     {% endif %}
+</section>
+
+<section class="card-box">
+    <h2>{{ trans('core.admin.categories.import.title') }}</h2>
+    <p>{{ trans('core.admin.categories.import.hint') }}</p>
+
+    {% if import_result %}
+        <p class="flash flash-success">{{ trans('core.admin.categories.import.result', {created: import_result.created, skipped: import_result.skipped|length}) }}</p>
+        {% if import_result.skipped is not empty %}
+            <p>{{ trans('core.admin.categories.import.skipped_list', {names: import_result.skipped|join(', ')}) }}</p>
+        {% endif %}
+        {% for error in import_result.errors %}
+            <p class="flash flash-error" role="alert">{{ error }}</p>
+        {% endfor %}
+    {% endif %}
+
+    <form method="post" action="{{ url('/admin/categories/import') }}" enctype="multipart/form-data" class="stack-form">
+        {{ csrf_field() }}
+        <div class="field">
+            <label for="import_file">{{ trans('core.admin.categories.import.file') }}</label>
+            <input id="import_file" type="file" name="file" accept=".csv,text/csv" required>
+        </div>
+        <div class="card-head">
+            <button type="submit">{{ trans('core.admin.categories.import.submit') }}</button>
+            <a class="btn" href="{{ url('/admin/categories/import/template') }}">{{ trans('core.admin.categories.import.template') }}</a>
+        </div>
+    </form>
 </section>
 {% endblock %}

@@ -425,6 +425,8 @@ final class Kernel
         $router->post('/admin/offers/{id}/decide', [AdminCatalogueController::class, 'decide'], 'core.offers.manage');
 
         $router->get('/admin/categories', [AdminCatalogueController::class, 'categories'], 'core.categories.manage');
+        $router->post('/admin/categories/import', [AdminCatalogueController::class, 'importCategories'], 'core.categories.manage');
+        $router->get('/admin/categories/import/template', [AdminCatalogueController::class, 'categoryImportTemplate'], 'core.categories.manage');
         $router->get('/admin/categories/new', [AdminCatalogueController::class, 'editCategory'], 'core.categories.manage');
         $router->post('/admin/categories/new', [AdminCatalogueController::class, 'saveCategory'], 'core.categories.manage');
         $router->get('/admin/categories/{id}', [AdminCatalogueController::class, 'editCategory'], 'core.categories.manage');
