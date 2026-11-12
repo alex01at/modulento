@@ -92,6 +92,11 @@ final class Router
                 return;
             }
 
+            if ($method === 'POST' && $this->demoBlocks($path)) {
+                $this->rejectDemo();
+                return;
+            }
+
             if (!$this->allowed($route['access'], $method)) {
                 return;
             }
@@ -171,6 +176,37 @@ final class Router
         }
 
         Session::flash('error', $this->app->translator->trans($messageKey));
+        header('Location: ' . $this->sameOriginReferer());
+    }
+
+    /**
+     * An administrator put this account into demo mode: it may still look
+     * at everything, but this is the one place every POST request passes
+     * through, so this is where every save/change/delete is refused for
+     * it - no controller has to remember a check of its own, and an
+     * extension's own route is covered the same way. Logging out and
+     * leaving an impersonation are not a change to anything, so a demo
+     * account is never trapped in its own session.
+     */
+    private function demoBlocks(string $path): bool
+    {
+        if (in_array($path, ['/logout', '/account/stop-impersonating'], true)) {
+            return false;
+        }
+
+        $account = $this->app->auth->account();
+
+        return $account !== null && $account['demo_mode'];
+    }
+
+    private function rejectDemo(): void
+    {
+        if ($this->isAjax()) {
+            $this->fail(403, 'core.demo_mode.blocked');
+            return;
+        }
+
+        Session::flash('error', $this->app->translator->trans('core.demo_mode.blocked'));
         header('Location: ' . $this->sameOriginReferer());
     }
 

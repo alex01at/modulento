@@ -454,6 +454,8 @@ final class Kernel
         $router->get('/admin/accounts/{id}', [AdminAccountController::class, 'show'], 'core.accounts.manage');
         $router->post('/admin/accounts/{id}/block', [AdminAccountController::class, 'block'], 'core.accounts.manage');
         $router->post('/admin/accounts/{id}/unblock', [AdminAccountController::class, 'unblock'], 'core.accounts.manage');
+        $router->post('/admin/accounts/{id}/demo-mode/enable', [AdminAccountController::class, 'enableDemoMode'], 'core.accounts.manage');
+        $router->post('/admin/accounts/{id}/demo-mode/disable', [AdminAccountController::class, 'disableDemoMode'], 'core.accounts.manage');
         $router->post('/admin/accounts/{id}/verify', [AdminAccountController::class, 'verify'], 'core.accounts.manage');
         $router->get('/admin/accounts/{id}/identity/files/{file}', [AdminAccountController::class, 'identityFile'], 'core.accounts.manage');
         $router->post('/admin/accounts/{id}/identity/decide', [AdminAccountController::class, 'decideIdentity'], 'core.accounts.manage');

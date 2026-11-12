@@ -128,7 +128,7 @@ final class Auth
      * changed password (the session's stamp no longer matches, which logs
      * out a session an intruder may still hold).
      *
-     * @return array{id: int, email: string, display_name: ?string, locale: string, created_at: string}|null
+     * @return array{id: int, email: string, display_name: ?string, locale: string, created_at: string, demo_mode: bool}|null
      */
     public function account(): ?array
     {
@@ -143,7 +143,7 @@ final class Auth
         }
 
         $stmt = $this->db->prepare(
-            "SELECT id, email, display_name, locale, created_at, password_hash
+            "SELECT id, email, display_name, locale, created_at, password_hash, demo_mode
              FROM account WHERE id = :id AND status = 'active'"
         );
         $stmt->execute(['id' => (int) $accountId]);
@@ -165,6 +165,7 @@ final class Auth
 
         unset($row['password_hash']);
         $row['id'] = (int) $row['id'];
+        $row['demo_mode'] = $row['demo_mode'] === 1 || $row['demo_mode'] === '1';
         $this->account = $row;
 
         return $this->account;

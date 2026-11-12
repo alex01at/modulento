@@ -107,7 +107,7 @@ final class Accounts
         $count->execute($params);
 
         $stmt = $this->db->prepare(
-            "SELECT id, email, display_name, status, email_verified_at, created_at, last_login_at, is_demo FROM account {$where}
+            "SELECT id, email, display_name, status, email_verified_at, created_at, last_login_at, is_demo, demo_mode FROM account {$where}
              ORDER BY id DESC LIMIT " . max(1, $perPage) . ' OFFSET ' . max(0, (min($page, 100000) - 1) * $perPage)
         );
         $stmt->execute($params);
@@ -124,6 +124,18 @@ final class Accounts
             'note' => $status === 'blocked' && $note !== null && trim($note) !== '' ? trim($note) : null,
             'id' => $id,
         ]);
+    }
+
+    /**
+     * Demo mode: the account can still log in and look around, but every
+     * write (Support\Router::dispatch() refuses any POST request for it)
+     * is blocked - for a public demo installation where visitors should
+     * not be able to change or delete anything.
+     */
+    public function setDemoMode(int $id, bool $enabled): void
+    {
+        $stmt = $this->db->prepare('UPDATE account SET demo_mode = :demo WHERE id = :id');
+        $stmt->execute(['demo' => $enabled ? 1 : 0, 'id' => $id]);
     }
 
     /** Whether deleting this account would leave nobody who may do everything. */

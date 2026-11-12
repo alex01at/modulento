@@ -168,6 +168,34 @@ final class AdminAccountController extends Controller
         $this->back($account, 'success', 'core.admin.accounts.unblocked');
     }
 
+    /**
+     * Never on the administrator's own account or the last one that may do
+     * everything, same as target() - demo mode is enforced on every POST
+     * request, so turning it off again would itself be refused.
+     */
+    public function enableDemoMode(array $params): void
+    {
+        $account = $this->target($params);
+        if ($account === null) {
+            return;
+        }
+
+        $this->app->accounts->setDemoMode((int) $account['id'], true);
+        $this->back($account, 'success', 'core.admin.accounts.demo_mode.enabled');
+    }
+
+    public function disableDemoMode(array $params): void
+    {
+        $account = $this->app->accounts->findById((int) $params['id']);
+        if ($account === null) {
+            $this->redirect('/admin/accounts');
+            return;
+        }
+
+        $this->app->accounts->setDemoMode((int) $account['id'], false);
+        $this->back($account, 'success', 'core.admin.accounts.demo_mode.disabled');
+    }
+
     public function verify(array $params): void
     {
         $account = $this->app->accounts->findById((int) $params['id']);

@@ -325,6 +325,7 @@ $pdo->exec("ALTER TABLE provider ADD COLUMN rating_sum INTEGER NOT NULL DEFAULT 
 $pdo->exec("ALTER TABLE account ADD COLUMN rating_count INTEGER NOT NULL DEFAULT 0");
 $pdo->exec("ALTER TABLE account ADD COLUMN rating_sum INTEGER NOT NULL DEFAULT 0");
 $pdo->exec("ALTER TABLE account ADD COLUMN is_demo INTEGER NOT NULL DEFAULT 0");
+$pdo->exec("ALTER TABLE account ADD COLUMN demo_mode INTEGER NOT NULL DEFAULT 0");
 $pdo->exec("ALTER TABLE provider ADD COLUMN is_demo INTEGER NOT NULL DEFAULT 0");
 $pdo->exec("ALTER TABLE offer ADD COLUMN is_demo INTEGER NOT NULL DEFAULT 0");
 $pdo->exec("ALTER TABLE request ADD COLUMN is_demo INTEGER NOT NULL DEFAULT 0");
@@ -493,6 +494,17 @@ $r = request($pdo, $config, 'POST', '/save', 1, ['_csrf' => 'wrong']);
 check('the same request without declaring JSON gets the browser redirect instead', !$r['called'] && $r['status'] === 302 && $r['body'] === '');
 $r = request($pdo, $config, 'POST', '/save', 1, ['_csrf' => 'test-token']);
 check('POST with CSRF token runs', $r['called']);
+
+// --- Demo mode: every POST is refused centrally in Router, before any handler runs ---
+$pdo->exec("UPDATE account SET demo_mode = 1 WHERE id = 1");
+$r = request($pdo, $config, 'POST', '/save', 1, ['_csrf' => 'test-token']);
+check('demo mode: a valid POST is still refused, the handler never runs', !$r['called'] && $r['status'] === 302
+    && str_contains($_SESSION['_flash']['error'] ?? '', 'Demo-Modus'));
+$r = request($pdo, $config, 'GET', '/members', 1);
+check('demo mode: reading is unaffected, only writes are blocked', $r['called']);
+request($pdo, $config, 'POST', '/logout', 1, ['_csrf' => 'test-token']);
+check('demo mode: logging out is exempt, so the account is never trapped in its own session', ($_SESSION['account_id'] ?? null) === null);
+$pdo->exec("UPDATE account SET demo_mode = 0 WHERE id = 1");
 $r = request($pdo, $config, 'POST', '/save', 1, ['_csrf' => ['x']]);
 check('POST with a token that is not text does not run and does not fail', !$r['called'] && $r['status'] !== 500);
 $r = request($pdo, $config, 'POST', '/login', null, ['email' => ['a'], 'password' => ['b']]);
@@ -3146,6 +3158,21 @@ $post('/admin/accounts/3/block', ['note' => 'x'], 3);
 check('block: not the own account', $row('admin@example.test')['status'] === 'active');
 $post('/admin/accounts/3/delete', [], 3);
 check('delete: not the own account', $row('admin@example.test') !== false);
+
+// --- Demo mode, set from the administration: a real save by the account itself is refused ---
+$post('/admin/accounts/1/demo-mode/enable', [], 3);
+check('demo mode: enabled from the administration', (bool) $row('plain@example.test')['demo_mode']);
+$post('/account/profile', ['display_name' => 'Should Not Save', 'locale' => 'de'], 1);
+check('demo mode: a real save by the account itself is refused, not just the test stub above', $row('plain@example.test')['display_name'] !== 'Should Not Save');
+check('demo mode: the account can still read its own page', $get('/account', 1)['status'] === 200);
+$post('/admin/accounts/3/demo-mode/enable', [], 3);
+check('demo mode: refused on the administrator\'s own account, same guard as block/delete', !(bool) $row('admin@example.test')['demo_mode']);
+$post('/admin/accounts/1/demo-mode/disable', [], 3);
+check('demo mode: disabled again from the administration', !(bool) $row('plain@example.test')['demo_mode']);
+$post('/account/profile', ['display_name' => 'Now Saves', 'locale' => 'de'], 1);
+check('demo mode: once disabled, the account can save again', $row('plain@example.test')['display_name'] === 'Now Saves');
+// Later tests rely on this account having no display name (its avatar initial comes from the e-mail).
+$pdo->exec("UPDATE account SET display_name = NULL WHERE id = 1");
 
 $pdo->exec("UPDATE account SET email_verified_at = NULL WHERE id = 1");
 $post('/admin/accounts/1/verify', [], 3);

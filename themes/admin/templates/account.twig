@@ -13,6 +13,7 @@
                 <table class="details">
                     <tr><th scope="row">{{ trans('core.account.profile.display_name') }}</th><td>{{ target.display_name }}</td></tr>
                     <tr><th scope="row">{{ trans('core.admin.extensions.status') }}</th><td><span class="badge badge-{{ target.status }}">{{ trans('core.admin.accounts.status.' ~ target.status) }}</span>{% if target.status_note %} – {{ target.status_note }}{% endif %}</td></tr>
+                    <tr><th scope="row">{{ trans('core.admin.accounts.demo_mode.title') }}</th><td>{% if target.demo_mode %}<span class="badge">{{ trans('core.admin.accounts.demo_mode.active') }}</span>{% else %}–{% endif %}</td></tr>
                     <tr><th scope="row">{{ trans('core.admin.accounts.verified_at') }}</th><td>{{ target.email_verified_at ? target.email_verified_at ~ ' UTC' : trans('core.admin.accounts.unverified') }}</td></tr>
                     <tr><th scope="row">{{ trans('core.nav.language') }}</th><td>{{ locale_name(target.locale) }}</td></tr>
                     <tr><th scope="row">{{ trans('core.admin.providers.created') }}</th><td>{{ target.created_at }} UTC</td></tr>
@@ -92,7 +93,19 @@
                     <button type="submit">{{ trans('core.admin.accounts.unblock') }}</button>
                 </form>
             {% endif %}
+            {% if target.demo_mode %}
+                <form method="post" action="{{ url('/admin/accounts/' ~ target.id ~ '/demo-mode/disable') }}" class="inline-form">
+                    {{ csrf_field() }}
+                    <button type="submit">{{ trans('core.admin.accounts.demo_mode.disable') }}</button>
+                </form>
+            {% elseif not is_self and not is_last_admin %}
+                <form method="post" action="{{ url('/admin/accounts/' ~ target.id ~ '/demo-mode/enable') }}" class="inline-form">
+                    {{ csrf_field() }}
+                    <button type="submit" class="btn-outline">{{ trans('core.admin.accounts.demo_mode.enable') }}</button>
+                </form>
+            {% endif %}
             </div>
+            {% if not target.demo_mode %}<p><small>{{ trans('core.admin.accounts.demo_mode.hint') }}</small></p>{% endif %}
         </section>
 
         <section class="card-box">
