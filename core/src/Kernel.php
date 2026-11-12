@@ -55,6 +55,7 @@ use Modulento\Core\Event\AccountLoggedIn;
 use Modulento\Core\Support\ClientIp;
 use Modulento\Core\Support\Database;
 use Modulento\Core\Support\RateLimiter;
+use Modulento\Core\Support\SupportNotices;
 use Modulento\Core\Support\RememberCookie;
 use Modulento\Core\Support\Router;
 use Modulento\Core\Support\Session;
@@ -618,6 +619,11 @@ final class Kernel
 
             return $count > 0 ? ['count' => $count, 'label_key' => 'core.admin.notice.messages_flagged', 'link' => '/admin/messages'] : null;
         });
+        $app->addAdminNotice('core.packages.manage', static function (App $app): ?array {
+            $count = SupportNotices::unreadCount($app);
+
+            return $count > 0 ? ['count' => $count, 'label_key' => 'core.admin.notice.support_answered', 'link' => '/admin/support'] : null;
+        });
 
         // What Administration -> Export/Import can write to a file and read back - every one of
         // these already cleans up anything handed to it, so an imported file goes through no
@@ -649,6 +655,11 @@ final class Kernel
             60,
             fn (App $app) => (new RateLimiter($app->db))->cleanup()
         );
+        // Keeps Support's own bell count fresh without a license-server
+        // request on every page load (App::addAdminNotice() below just
+        // reads what this already cached) - a no-op where no license
+        // server is configured at all.
+        $app->scheduler->register('core.support-notices', 15, fn (App $app) => SupportNotices::refresh($app));
         // Deadlines of orders: what happens when nobody acts in time.
         $app->scheduler->register('core.order-deadlines', 5, fn (App $app) => $app->orders->runDeadlines($app));
         // Expired mail links and "stay logged in" tokens, and registrations

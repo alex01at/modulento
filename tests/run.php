@@ -5158,6 +5158,7 @@ $licenseKeys->save('ext-exklusiv', 'sk_live_abcdef123456');
 final class FakeLicenseHttp implements Modulento\Core\Support\HttpClient
 {
     public ?array $lastRequest = null;
+    public int $callCount = 0;
 
     public function __construct(private int $status, private string $body)
     {
@@ -5165,6 +5166,7 @@ final class FakeLicenseHttp implements Modulento\Core\Support\HttpClient
 
     public function request(string $method, string $url, array $headers = [], ?string $body = null): array
     {
+        $this->callCount++;
         $this->lastRequest = ['method' => $method, 'url' => $url, 'headers' => $headers, 'body' => $body];
 
         return ['status' => $this->status, 'body' => $this->body];
@@ -5439,6 +5441,47 @@ $r = request($pdo, $shopConfig($replyServerHttp), 'POST', '/admin/support/tkt_ne
 check('support reply: tries the stored key, sends the message, flashes success', $r['status'] === 302 && str_contains($_SESSION['_flash']['success'] ?? '', 'Antwort gesendet')
     && json_decode($replyServerHttp->lastRequest['body'], true)['message'] === 'Noch da?');
 
+// --- Support: the same key under more than one credential (master + an
+// installed product's own copy, see ShopController::install()) must never
+// show its tickets more than once, and must only ever be asked once. ---
+$app->licenseKeys->saveMaster('mlk_live_support_test');
+$dupHttp = new FakeLicenseHttp(200, json_encode(['tickets' => [['reference' => 'tkt_dup1', 'subject' => 'Export schlägt fehl', 'status' => 'open', 'updated_at' => '2026-01-01 00:00:00']]]));
+$r = request($pdo, $shopConfig($dupHttp), 'GET', '/admin/support', 3);
+check('support: a key stored twice (master + a product copy of it) is asked only once', $dupHttp->callCount === 1);
+check('support: ...and its tickets are listed only once, not once per credential', $r['status'] === 200 && substr_count($r['body'], 'Export schlägt fehl') === 1);
+$app->licenseKeys->removeMaster();
+
+// --- Support: the admin bell ------------------------------------------------
+$pdo->exec("DELETE FROM setting WHERE name LIKE 'core.support.%'");
+$answeredHttp = new FakeLicenseHttp(200, json_encode(['tickets' => [['reference' => 'tkt_new1', 'subject' => 'Export schlägt fehl', 'status' => 'answered', 'updated_at' => '2026-02-01 00:00:00']]]));
+$refreshConfig = $shopConfig($answeredHttp);
+Modulento\Core\Support\SupportNotices::refresh(new Modulento\Core\App($refreshConfig, $pdo));
+check('support bell: a ticket the operator has answered counts as unread', Modulento\Core\Support\SupportNotices::unreadCount(new Modulento\Core\App($refreshConfig, $pdo)) === 1);
+
+$r = $get('/admin/notices/count', 3);
+check('support bell: the count reaches the header\'s own bell endpoint', $r['status'] === 200 && json_decode($r['body'], true)['count'] >= 1);
+$r = $get('/admin/notices', 3);
+check('support bell: the notice panel names it and links to the ticket', str_contains($r['body'], 'Support beantwortet') && str_contains($r['body'], 'href="/admin/support"'));
+
+$threadForBellHttp = new FakeLicenseHttp(200, json_encode(['reference' => 'tkt_new1', 'subject' => 'Export schlägt fehl', 'status' => 'answered', 'messages' => [
+    ['sender' => 'customer', 'body' => 'x', 'created_at' => '2026-01-15 00:00:00'],
+    ['sender' => 'operator', 'body' => 'Bitte Update einspielen.', 'created_at' => '2026-02-01 00:00:00'],
+]]));
+request($pdo, $shopConfig($threadForBellHttp), 'GET', '/admin/support/tkt_new1', 3);
+check('support bell: actually opening the thread clears it right away, no need to wait for the next scheduled check', Modulento\Core\Support\SupportNotices::unreadCount(new Modulento\Core\App($refreshConfig, $pdo)) === 0);
+
+Modulento\Core\Support\SupportNotices::refresh(new Modulento\Core\App($refreshConfig, $pdo));
+check('support bell: refreshing again does not resurrect a ticket already seen in its current state', Modulento\Core\Support\SupportNotices::unreadCount(new Modulento\Core\App($refreshConfig, $pdo)) === 0);
+
+$repliedAgainHttp = new FakeLicenseHttp(200, json_encode(['tickets' => [['reference' => 'tkt_new1', 'subject' => 'Export schlägt fehl', 'status' => 'answered', 'updated_at' => '2026-02-02 00:00:00']]]));
+Modulento\Core\Support\SupportNotices::refresh(new Modulento\Core\App($shopConfig($repliedAgainHttp), $pdo));
+check('support bell: a further reply after that becomes unread again', Modulento\Core\Support\SupportNotices::unreadCount(new Modulento\Core\App($refreshConfig, $pdo)) === 1);
+
+$pdo->exec("DELETE FROM setting WHERE name LIKE 'core.support.%'");
+Modulento\Core\Support\SupportNotices::refresh(new Modulento\Core\App($config, $pdo));
+check('support bell: no license server configured at all is a no-op, not an error', Modulento\Core\Support\SupportNotices::unreadCount(new Modulento\Core\App($config, $pdo)) === 0);
+
+$pdo->exec("DELETE FROM setting WHERE name LIKE 'core.support.%'");
 $app->licenseKeys->remove('ext-exklusiv');
 
 // --- Administration -> Extensions: tiles, filter, toggle without a reload ---

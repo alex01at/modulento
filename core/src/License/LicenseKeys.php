@@ -26,7 +26,7 @@ final class LicenseKeys
      * license server's own catalog, neither of which ever starts with an
      * underscore.
      */
-    private const MASTER_ID = '__master__';
+    public const MASTER_ID = '__master__';
 
     public function __construct(private PDO $db, private Secrets $secrets)
     {
@@ -81,6 +81,32 @@ final class LicenseKeys
                 'added_at' => $row['added_at'],
             ];
         }, $rows);
+    }
+
+    /**
+     * Every key this installation can actually authenticate a request
+     * with right now - the master key first (if any), then each
+     * product's own, in full (unlike all()'s masked display list).
+     *
+     * @return array<int, array{id: string, key: string}> id is a product
+     *         id, or self::MASTER_ID for the master key
+     */
+    public function usable(): array
+    {
+        $keys = [];
+
+        $master = $this->findMaster();
+        if ($master !== null) {
+            $keys[] = ['id' => self::MASTER_ID, 'key' => $master];
+        }
+        foreach ($this->all() as $entry) {
+            $key = $this->find($entry['product_id']);
+            if ($key !== null) {
+                $keys[] = ['id' => $entry['product_id'], 'key' => $key];
+            }
+        }
+
+        return $keys;
     }
 
     public function save(string $productId, string $key): void

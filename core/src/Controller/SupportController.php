@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace Modulento\Core\Controller;
 
+use Modulento\Core\License\LicenseKeys;
 use Modulento\Core\Support\CurlHttpClient;
 use Modulento\Core\Support\Session;
+use Modulento\Core\Support\SupportNotices;
 use Modulento\Core\Support\TicketClient;
 
 /**
@@ -32,12 +34,27 @@ final class SupportController extends Controller
         $credentials = $this->credentials();
         $domain = (string) ($app->config['app']['url'] ?? '');
 
+        // The same physical key often sits under more than one credential
+        // here (a master key an app installed from the Shop is also
+        // copied under that product's own id - ShopController::install())
+        // - asking twice for the same key would just answer with the same
+        // tickets twice, so both the asking and the merging dedupe.
         $tickets = [];
+        $seenKeys = [];
+        $seenReferences = [];
         foreach ($credentials as $credential) {
+            if (isset($seenKeys[$credential['key']])) {
+                continue;
+            }
+            $seenKeys[$credential['key']] = true;
+
             $result = $this->client()->list($credential['key'], $domain);
             if ($result['ok']) {
                 foreach ($result['tickets'] as $ticket) {
-                    $tickets[] = $ticket;
+                    if (!isset($seenReferences[$ticket['reference']])) {
+                        $seenReferences[$ticket['reference']] = true;
+                        $tickets[] = $ticket;
+                    }
                 }
             }
         }
@@ -64,7 +81,7 @@ final class SupportController extends Controller
             return;
         }
 
-        $product = $credential['id'] !== '__master__' ? $credential['id'] : null;
+        $product = $credential['id'] !== LicenseKeys::MASTER_ID ? $credential['id'] : null;
         $result = $this->client()->open($credential['key'], (string) ($app->config['app']['url'] ?? ''), $product, $subject, $message);
 
         if (!$result['ok']) {
@@ -86,6 +103,8 @@ final class SupportController extends Controller
         foreach ($this->credentials() as $credential) {
             $result = $this->client()->thread($credential['key'], $domain, $reference);
             if ($result['ok']) {
+                $lastMessage = end($result['messages']);
+                SupportNotices::markSeen($app, $reference, $lastMessage !== false ? $lastMessage['created_at'] : '');
                 $this->render('@admin/support_thread.twig', ['ticket' => $result]);
                 return;
             }
@@ -122,21 +141,10 @@ final class SupportController extends Controller
     /** @return array<int, array{id: string, label: string, key: string}> every license key this installation actually holds, usable for a ticket right away */
     private function credentials(): array
     {
-        $app = $this->app;
-        $credentials = [];
-
-        $master = $app->licenseKeys->findMaster();
-        if ($master !== null) {
-            $credentials[] = ['id' => '__master__', 'label' => $this->trans('core.admin.support.master'), 'key' => $master];
-        }
-        foreach ($app->licenseKeys->all() as $entry) {
-            $key = $app->licenseKeys->find($entry['product_id']);
-            if ($key !== null) {
-                $credentials[] = ['id' => $entry['product_id'], 'label' => $entry['product_id'], 'key' => $key];
-            }
-        }
-
-        return $credentials;
+        return array_map(
+            fn (array $usable) => $usable + ['label' => $usable['id'] === LicenseKeys::MASTER_ID ? $this->trans('core.admin.support.master') : $usable['id']],
+            $this->app->licenseKeys->usable()
+        );
     }
 
     private function findCredential(string $id): ?array

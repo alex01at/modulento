@@ -1347,6 +1347,7 @@ return [
     'core.admin.notice.offers_pending' => 'Offers awaiting approval: {count}',
     'core.admin.notice.requests_pending' => 'Requests awaiting approval: {count}',
     'core.admin.notice.messages_flagged' => 'Flagged messages: {count}',
+    'core.admin.notice.support_answered' => 'Support answered: {count}',
     'core.admin.settings.section.general' => 'General',
     'core.admin.settings.section.catalogue' => 'Providers and offers',
 

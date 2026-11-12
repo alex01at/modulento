@@ -1347,6 +1347,7 @@ return [
     'core.admin.notice.offers_pending' => 'Angebote zur Freigabe: {count} offen',
     'core.admin.notice.requests_pending' => 'Anfragen zur Freigabe: {count} offen',
     'core.admin.notice.messages_flagged' => 'Nachrichten markiert: {count} offen',
+    'core.admin.notice.support_answered' => 'Support beantwortet: {count}',
     'core.admin.settings.section.general' => 'Allgemein',
     'core.admin.settings.section.catalogue' => 'Anbieter und Angebote',
 
