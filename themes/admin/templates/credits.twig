@@ -1,0 +1,30 @@
+{% extends '@admin/layout.twig' %}
+
+{% block title %}{{ trans('core.admin.credits.title') }} – {{ site_name }}{% endblock %}
+
+{% block admin %}
+{% include '@admin/_page_header.twig' with {heading: trans('core.admin.credits.title')} only %}
+
+<section class="card-box">
+    <p>{{ trans('core.admin.credits.intro') }}</p>
+
+    <table>
+        <thead>
+            <tr>
+                <th>{{ trans('core.admin.credits.package') }}</th>
+                <th>{{ trans('core.admin.credits.authors') }}</th>
+                <th>{{ trans('core.admin.credits.license') }}</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for package in packages %}
+                <tr>
+                    <td>{% if package.homepage %}<a href="{{ package.homepage }}" target="_blank" rel="noopener">{{ package.name }}</a>{% else %}{{ package.name }}{% endif %}</td>
+                    <td>{{ package.authors }}</td>
+                    <td>{{ package.license }}</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</section>
+{% endblock %}

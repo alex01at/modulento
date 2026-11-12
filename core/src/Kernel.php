@@ -260,6 +260,7 @@ final class Kernel
 
         $router->get('/admin', [AdminController::class, 'index'], 'core.admin.access');
         $router->get('/admin/docs', [AdminController::class, 'docs'], 'core.admin.access');
+        $router->get('/admin/credits', [AdminController::class, 'credits'], 'core.admin.access');
         $router->get('/admin/section/{id}', [AdminController::class, 'section'], 'core.admin.access');
         $router->get('/admin/notices', [AdminNoticeController::class, 'index'], 'core.admin.access');
         $router->get('/admin/notices/preview', [AdminNoticeController::class, 'preview'], 'core.admin.access');
@@ -567,14 +568,15 @@ final class Kernel
         $app->addAdminMenu('core.admin.menu.extensions', '/admin/extensions', 'core.packages.manage', 'system');
         $app->addAdminMenu('core.admin.menu.modules', '/admin/modules', 'core.settings.manage', 'system');
         $app->addAdminMenu('core.admin.menu.themes', '/admin/themes', 'core.themes.manage', 'system');
-        $app->addAdminMenu('core.admin.menu.handbook', '/handbook', 'core.admin.access', 'system');
+        $app->addAdminMenu('core.admin.menu.handbook', '/handbook', 'core.admin.access', 'help');
         $app->addAdminMenu('core.admin.menu.shop', '/admin/shop', 'core.packages.manage', 'system');
         $app->addAdminMenu('core.admin.menu.demo_data', '/admin/demo-data', 'core.demo_data.manage', 'system');
         $app->addAdminMenu('core.admin.menu.tasks', '/admin/tasks', 'core.tasks.view', 'system');
         $app->addAdminMenu('core.admin.menu.updates', '/admin/updates', 'core.update.manage', 'system');
         $app->addAdminMenu('core.admin.menu.backup', '/admin/backup', 'core.backup.manage', 'system');
         $app->addAdminMenu('core.admin.menu.export', '/admin/export', 'core.settings.manage', 'system');
-        $app->addAdminMenu('core.admin.docs.title', '/admin/docs', 'core.admin.access', 'system');
+        $app->addAdminMenu('core.admin.docs.title', '/admin/docs', 'core.admin.access', 'help');
+        $app->addAdminMenu('core.admin.credits.title', '/admin/credits', 'core.admin.access', 'help');
 
         // Pending-action counts behind the administration header's own bell -
         // the same sections already listed in AdminController::stats()'s own

@@ -160,6 +160,21 @@ final class AdminController extends Controller
         $this->render('@admin/docs.twig');
     }
 
+    /** Every open-source library this installation runs on, read straight from Composer's own records so the list can never go stale. */
+    public function credits(array $params): void
+    {
+        $installed = json_decode((string) file_get_contents($this->app->config['app']['root'] . '/vendor/composer/installed.json'), true);
+        $packages = array_map(fn (array $package) => [
+            'name' => $package['name'],
+            'authors' => implode(', ', array_filter(array_map(fn (array $author) => $author['name'] ?? '', $package['authors'] ?? []))),
+            'license' => implode(', ', $package['license'] ?? []),
+            'homepage' => $package['homepage'] ?? ($package['source']['url'] ?? null),
+        ], $installed['packages'] ?? []);
+        usort($packages, fn (array $a, array $b) => strcasecmp($a['name'], $b['name']));
+
+        $this->render('@admin/credits.twig', ['packages' => $packages]);
+    }
+
     /**
      * Figures for the dashboard, one entry per area the account may manage.
      * "pending" is null where nothing waits for a decision.

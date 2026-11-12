@@ -4799,7 +4799,7 @@ check('admin layout: a section shows its entries as tiles in the content area', 
 // administration, and the pages - but no accounts, roles or settings.
 $pdo->exec("INSERT INTO role_permission VALUES (1, 'core.admin.access'), (1, 'core.pages.manage')");
 check('admin layout: a section without entries for the account does not exist', $get('/admin/section/people', 2)['status'] === 404 && $get('/admin/section/nope', 3)['status'] === 404);
-check('admin layout: a section shows only what the account may open', substr_count($get('/admin/section/system', 2)['body'], 'class="tile" href=') === 2 && str_contains($get('/admin/section/system', 2)['body'], 'href="/admin/docs"') && str_contains($get('/admin/section/system', 2)['body'], 'href="/handbook"'));
+check('admin layout: a section shows only what the account may open', substr_count($get('/admin/section/help', 2)['body'], 'class="tile" href=') === 3 && str_contains($get('/admin/section/help', 2)['body'], 'href="/admin/docs"') && str_contains($get('/admin/section/help', 2)['body'], 'href="/handbook"') && str_contains($get('/admin/section/help', 2)['body'], 'href="/admin/credits"'));
 $pdo->exec("DELETE FROM role_permission WHERE role_id = 1 AND permission IN ('core.admin.access', 'core.pages.manage')");
 check('admin layout: the tiles need the administration permission', $get('/admin/section/content', 1)['status'] === 403);
 $post('/account/admin-layout', ['admin_layout' => 'sidebar'], 3);

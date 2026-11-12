@@ -352,7 +352,7 @@ final class App
      * The sections of the administration's menu, in this order. An entry
      * names its section; one without a known section goes to "more".
      */
-    public const ADMIN_GROUPS = ['content', 'marketplace', 'moderation', 'people', 'more', 'system'];
+    public const ADMIN_GROUPS = ['content', 'marketplace', 'moderation', 'people', 'more', 'system', 'help'];
 
     public function addAdminMenu(string $labelKey, string $path, string $permission, string $group = 'more'): void
     {
