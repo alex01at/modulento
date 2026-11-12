@@ -1,0 +1,28 @@
+{% extends '@admin/layout.twig' %}
+
+{% block title %}{{ ticket.subject }} – {{ site_name }}{% endblock %}
+
+{% block admin %}
+{% include '@admin/_page_header.twig' with {
+    heading: ticket.subject,
+    crumbs: [{label: trans('core.admin.support.title'), path: '/admin/support'}]
+} only %}
+
+<p>{{ trans('core.admin.support.status') }}: {{ trans('core.admin.support.status.' ~ ticket.status) }}</p>
+
+{% for message in ticket.messages %}
+    <section class="card-box">
+        <p><strong>{{ message.sender == 'operator' ? trans('core.admin.support.sender.operator') : trans('core.admin.support.sender.customer') }}</strong> &middot; {{ message.created_at }}</p>
+        <p class="message-body">{{ message.body }}</p>
+    </section>
+{% endfor %}
+
+<section class="card-box">
+    <form method="post" action="{{ url('/admin/support/' ~ ticket.reference ~ '/reply') }}" class="stack-form">
+        {{ csrf_field() }}
+        <label for="message">{{ trans('core.admin.support.field.message') }}</label>
+        <textarea id="message" name="message" rows="5" maxlength="5000" required></textarea>
+        <button type="submit">{{ trans('core.admin.support.reply') }}</button>
+    </form>
+</section>
+{% endblock %}

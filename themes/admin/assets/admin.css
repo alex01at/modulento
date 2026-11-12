@@ -447,6 +447,7 @@ td form { display: flex; justify-content: flex-end; }
 
 code { padding: .1rem .35rem; border: 1px solid var(--line); border-radius: 4px; background: var(--bg); font-size: .875em; overflow-wrap: anywhere; }
 .changelog { margin: 0 0 1rem; padding: 1rem; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); font: inherit; white-space: pre-wrap; }
+.message-body { white-space: pre-wrap; }
 
 .plain-list { display: grid; gap: .75rem; margin: 0 0 1rem; padding: 0; list-style: none; }
 .tree, .tree ul { margin: 0; padding: 0; list-style: none; }

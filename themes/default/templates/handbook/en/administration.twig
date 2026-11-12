@@ -14,10 +14,14 @@
         <tr><td>Moderation</td><td>Reviews, account ratings, reports, messages, word filter</td></tr>
         <tr><td>People</td><td>Accounts, roles</td></tr>
         <tr><td>System</td><td>Settings, translations, design, modules, themes, packages, extensions, shop, demo data, backup, export/import, tasks, updates</td></tr>
-        <tr><td>Help</td><td>Handbook, documentation, credits</td></tr>
+        <tr><td>Help</td><td>Handbook, documentation, credits, support</td></tr>
     </tbody>
 </table>
 <p>The "Marketplace" section only appears while an app extension that brings a catalogue is running; the same goes for entries such as offers or categories. An enabled addon can add a menu entry of its own, such as "Subscriptions" (only with <code>modulento-ext-abos</code>) or "FAQ" - addons with no group of their own end up under "More".</p>
+
+<h2>Shop and support: bought extensions and themes</h2>
+<p><strong>Administration → Shop</strong> shows what the configured license server sells, and buys a product right there through Stripe - the license key that produces lands under <strong>Administration → Extensions</strong> on its own, no copying a key by hand. A master license (one key valid for every product the server sells) skips Stripe entirely: every product then shows "Install" instead of "Buy".</p>
+<p>For any product this installation holds a license key for, <strong>Administration → Support</strong> opens a ticket to the license server's operator - no separate account there, authenticated with that same key. With no license server configured, or no key stored yet, the page says so plainly instead of showing an empty form.</p>
 
 <h2>Switching modules on and off</h2>
 <p>Under <strong>Administration → Modules</strong>, a built-in function of the core can be switched off without losing its data: reviews, the contact form, withdrawals, reports, avatars, "stay signed in", the inbox, notifications and requests. Off means: no routes, no menu entry, no link to it anywhere - the tables stay, and switching it back on shows its old data at once. An extension can add a module of its own here.</p>

@@ -5368,6 +5368,79 @@ $r = request($pdo, $shopConfig($notFoundHttp), 'GET', '/admin/shop?purchase=pur_
 check('shop return: an unknown reference shows plainly that it was not found', $r['status'] === 200 && str_contains($r['body'], 'wurde nicht gefunden'));
 $pdo->exec("DELETE FROM license_key WHERE product_id = 'ext-exklusiv'");
 
+// --- TicketClient: support tickets against the license server --------------
+$ticketHttp = new FakeLicenseHttp(200, json_encode(['reference' => 'tkt_abc', 'status' => 'open']));
+$ticketClient = new Modulento\Core\Support\TicketClient($ticketHttp, 'https://license.example.test');
+$openResult = $ticketClient->open('mlk_live_x', 'https://kunde.de', 'ext-exklusiv', 'Export schlägt fehl', 'Bricht beim Klick ab.');
+check('ticket client: open() reports success with the reference the server handed back', $openResult === ['ok' => true, 'reference' => 'tkt_abc', 'status' => 'open']);
+check('ticket client: open() sends the key, domain, product, subject and message - never anything else', json_decode($ticketHttp->lastRequest['body'], true)
+    === ['license_key' => 'mlk_live_x', 'domain' => 'https://kunde.de', 'product' => 'ext-exklusiv', 'subject' => 'Export schlägt fehl', 'message' => 'Bricht beim Klick ab.']
+    && $ticketHttp->lastRequest['url'] === 'https://license.example.test/v1/tickets');
+check('ticket client: a general question (no product) sends an empty string, never null/missing', $ticketClient->open('mlk_live_x', 'https://kunde.de', null, 'Frage', 'x') !== null
+    && json_decode($ticketHttp->lastRequest['body'], true)['product'] === '');
+
+$listHttp = new FakeLicenseHttp(200, json_encode(['tickets' => [['reference' => 'tkt_abc', 'subject' => 'Export schlägt fehl', 'status' => 'open', 'updated_at' => '2026-01-01 00:00:00']]]));
+$listResult = (new Modulento\Core\Support\TicketClient($listHttp, 'https://license.example.test'))->list('mlk_live_x', 'https://kunde.de');
+check('ticket client: list() reports success with the tickets the server answered', $listResult['ok'] === true && count($listResult['tickets']) === 1 && $listResult['tickets'][0]['reference'] === 'tkt_abc');
+
+$threadHttp = new FakeLicenseHttp(200, json_encode(['reference' => 'tkt_abc', 'subject' => 'Export schlägt fehl', 'status' => 'answered', 'messages' => [['sender' => 'customer', 'body' => 'x', 'created_at' => '2026-01-01 00:00:00']]]));
+$threadResult = (new Modulento\Core\Support\TicketClient($threadHttp, 'https://license.example.test'))->thread('mlk_live_x', 'https://kunde.de', 'tkt_abc');
+check('ticket client: thread() carries the messages through as the server sent them', $threadResult['ok'] === true && count($threadResult['messages']) === 1);
+
+$replyHttp = new FakeLicenseHttp(200, json_encode(['reference' => 'tkt_abc', 'status' => 'open']));
+$replyResult = (new Modulento\Core\Support\TicketClient($replyHttp, 'https://license.example.test'))->reply('mlk_live_x', 'https://kunde.de', 'tkt_abc', 'Noch da?');
+check('ticket client: reply() reports the reopened status', $replyResult === ['ok' => true, 'reference' => 'tkt_abc', 'status' => 'open']);
+
+foreach (['not_found', 'revoked', 'expired', 'domain_mismatch', 'rate_limited'] as $serverError) {
+    $errClient = new Modulento\Core\Support\TicketClient(new FakeLicenseHttp(403, json_encode(['error' => $serverError])), 'https://license.example.test');
+    check("ticket client: a '{$serverError}' answer is reported as-is, not swallowed", $errClient->open('x', 'y', null, 's', 'm') === ['ok' => false, 'error' => $serverError]);
+}
+$oldServerClient = new Modulento\Core\Support\TicketClient(new FakeLicenseHttp(404, "Not found\n"), 'https://license.example.test');
+check('ticket client: a plain-text 404 (a server without this feature at all) is "unavailable", not mistaken for "not_found"', $oldServerClient->open('x', 'y', null, 's', 'm') === ['ok' => false, 'error' => 'unavailable']);
+$unconfiguredClient = new Modulento\Core\Support\TicketClient(new FakeLicenseHttp(200, '{}'), '');
+check('ticket client: no server configured at all never sends a request', $unconfiguredClient->open('x', 'y', null, 's', 'm') === ['ok' => false, 'error' => 'unavailable']);
+
+// --- Administration -> Support ----------------------------------------------
+check('support: needs its permission', $get('/admin/support', 1)['status'] === 403);
+$r = $get('/admin/support', 3);
+check('support: no license server configured at all says so plainly', $r['status'] === 200 && str_contains($r['body'], 'Es ist kein Lizenzserver konfiguriert.'));
+
+$r = request($pdo, $shopConfig(new FakeLicenseHttp(200, json_encode(['tickets' => []]))), 'GET', '/admin/support', 3);
+check('support: a configured server but no license key stored yet points to the shop instead of a form', $r['status'] === 200 && str_contains($r['body'], 'Für Support wird ein hinterlegter Lizenzschlüssel benötigt.') && !str_contains($r['body'], 'id="subject"'));
+
+$app->licenseKeys->save('ext-exklusiv', 'mlk_live_support_test');
+$r = request($pdo, $shopConfig(new FakeLicenseHttp(200, json_encode(['tickets' => []]))), 'GET', '/admin/support', 3);
+check('support: a stored key shows the open-ticket form, with that product as an option', $r['status'] === 200 && str_contains($r['body'], 'id="subject"') && str_contains($r['body'], '>ext-exklusiv<'));
+
+$createHttp = new FakeLicenseHttp(200, json_encode(['reference' => 'tkt_new1', 'status' => 'open']));
+$r = request($pdo, $shopConfig($createHttp), 'POST', '/admin/support', 3, ['credential' => 'ext-exklusiv', 'subject' => 'Export schlägt fehl', 'message' => 'Bricht beim Klick ab.']);
+check('support: opening a ticket uses the right stored key and this installation\'s own domain', $r['status'] === 302
+    && json_decode($createHttp->lastRequest['body'], true) === ['license_key' => 'mlk_live_support_test', 'domain' => 'https://example.test', 'product' => 'ext-exklusiv', 'subject' => 'Export schlägt fehl', 'message' => 'Bricht beim Klick ab.']);
+
+check('support: an empty subject/message is refused locally, no request sent at all', request($pdo, $shopConfig($createHttp), 'POST', '/admin/support', 3, ['credential' => 'ext-exklusiv', 'subject' => '', 'message' => ''])['status'] === 302
+    && str_contains($_SESSION['_flash']['error'] ?? '', 'Betreff und Nachricht'));
+
+$deniedHttp = new FakeLicenseHttp(403, json_encode(['error' => 'expired']));
+$r = request($pdo, $shopConfig($deniedHttp), 'POST', '/admin/support', 3, ['credential' => 'ext-exklusiv', 'subject' => 'x', 'message' => 'y']);
+check('support: the server\'s own error reaches the operator in their language, not a raw code', $r['status'] === 302 && str_contains($_SESSION['_flash']['error'] ?? '', 'abgelaufen'));
+
+$threadServerHttp = new FakeLicenseHttp(200, json_encode(['reference' => 'tkt_new1', 'subject' => 'Export schlägt fehl', 'status' => 'open', 'messages' => [
+    ['sender' => 'customer', 'body' => 'Bricht beim Klick ab.', 'created_at' => '2026-01-01 00:00:00'],
+]]));
+$r = request($pdo, $shopConfig($threadServerHttp), 'GET', '/admin/support/tkt_new1', 3);
+check('support: the thread view shows the subject and every message so far', $r['status'] === 200 && str_contains($r['body'], 'Export schlägt fehl') && str_contains($r['body'], 'Bricht beim Klick ab.'));
+
+$notOwnedHttp = new FakeLicenseHttp(404, json_encode(['error' => 'not_found']));
+$r = request($pdo, $shopConfig($notOwnedHttp), 'GET', '/admin/support/tkt_unknown', 3);
+check('support: a reference none of the stored keys recognise bounces back to the list, not an error page', $r['status'] === 302);
+
+$replyServerHttp = new FakeLicenseHttp(200, json_encode(['reference' => 'tkt_new1', 'status' => 'open']));
+$r = request($pdo, $shopConfig($replyServerHttp), 'POST', '/admin/support/tkt_new1/reply', 3, ['message' => 'Noch da?']);
+check('support reply: tries the stored key, sends the message, flashes success', $r['status'] === 302 && str_contains($_SESSION['_flash']['success'] ?? '', 'Antwort gesendet')
+    && json_decode($replyServerHttp->lastRequest['body'], true)['message'] === 'Noch da?');
+
+$app->licenseKeys->remove('ext-exklusiv');
+
 // --- Administration -> Extensions: tiles, filter, toggle without a reload ---
 check('extensions page: needs its permission', $get('/admin/extensions', 1)['status'] === 403);
 $r = $get('/admin/extensions', 3);

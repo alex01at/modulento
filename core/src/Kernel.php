@@ -35,6 +35,7 @@ use Modulento\Core\Controller\OrderController;
 use Modulento\Core\Controller\DemoDataController;
 use Modulento\Core\Controller\PackageController;
 use Modulento\Core\Controller\ShopController;
+use Modulento\Core\Controller\SupportController;
 use Modulento\Core\Controller\PageController;
 use Modulento\Core\Controller\PaymentController;
 use Modulento\Core\Controller\PaymentSettingsController;
@@ -486,6 +487,11 @@ final class Kernel
         $router->post('/admin/shop/master', [ShopController::class, 'saveMasterLicense'], 'core.packages.manage');
         $router->post('/admin/shop/master/remove', [ShopController::class, 'removeMasterLicense'], 'core.packages.manage');
 
+        $router->get('/admin/support', [SupportController::class, 'index'], 'core.packages.manage');
+        $router->post('/admin/support', [SupportController::class, 'create'], 'core.packages.manage');
+        $router->get('/admin/support/{reference}', [SupportController::class, 'show'], 'core.packages.manage');
+        $router->post('/admin/support/{reference}/reply', [SupportController::class, 'reply'], 'core.packages.manage');
+
         $router->get('/admin/demo-data', [DemoDataController::class, 'index'], 'core.demo_data.manage');
         $router->post('/admin/demo-data/generate', [DemoDataController::class, 'generate'], 'core.demo_data.manage');
         $router->post('/admin/demo-data/clear', [DemoDataController::class, 'clear'], 'core.demo_data.manage');
@@ -577,6 +583,7 @@ final class Kernel
         $app->addAdminMenu('core.admin.menu.export', '/admin/export', 'core.settings.manage', 'system');
         $app->addAdminMenu('core.admin.docs.title', '/admin/docs', 'core.admin.access', 'help');
         $app->addAdminMenu('core.admin.credits.title', '/admin/credits', 'core.admin.access', 'help');
+        $app->addAdminMenu('core.admin.support.title', '/admin/support', 'core.packages.manage', 'help');
 
         // Pending-action counts behind the administration header's own bell -
         // the same sections already listed in AdminController::stats()'s own

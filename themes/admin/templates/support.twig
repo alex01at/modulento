@@ -1,0 +1,63 @@
+{% extends '@admin/layout.twig' %}
+
+{% block title %}{{ trans('core.admin.support.title') }} – {{ site_name }}{% endblock %}
+
+{% block admin %}
+{% include '@admin/_page_header.twig' with {heading: trans('core.admin.support.title')} only %}
+
+<section class="card-box">
+    <p>{{ trans('core.admin.support.intro') }}</p>
+
+    {% if not enabled %}
+        <p class="empty">{{ trans('core.admin.support.disabled') }}</p>
+    {% elseif credentials is empty %}
+        <p class="empty">{{ trans('core.admin.support.no_license') }}</p>
+        <p><a href="{{ url('/admin/shop') }}">{{ trans('core.admin.support.go_shop') }}</a></p>
+    {% else %}
+        <form method="post" action="{{ url('/admin/support') }}" class="stack-form">
+            {{ csrf_field() }}
+            <div class="field">
+                <label for="credential">{{ trans('core.admin.support.field.credential') }}</label>
+                <select id="credential" name="credential">
+                    {% for credential in credentials %}
+                        <option value="{{ credential.id }}">{{ credential.label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="field">
+                <label for="subject">{{ trans('core.admin.support.field.subject') }}</label>
+                <input id="subject" name="subject" maxlength="200" required>
+            </div>
+            <div class="field">
+                <label for="message">{{ trans('core.admin.support.field.message') }}</label>
+                <textarea id="message" name="message" rows="5" maxlength="5000" required></textarea>
+            </div>
+            <button type="submit">{{ trans('core.admin.support.submit') }}</button>
+        </form>
+    {% endif %}
+</section>
+
+{% if tickets is not empty %}
+<section class="card-box">
+    <h2>{{ trans('core.admin.support.own_tickets') }}</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>{{ trans('core.admin.support.field.subject') }}</th>
+                <th>{{ trans('core.admin.support.status') }}</th>
+                <th>{{ trans('core.admin.support.updated') }}</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for ticket in tickets %}
+                <tr>
+                    <td><a href="{{ url('/admin/support/' ~ ticket.reference) }}">{{ ticket.subject }}</a></td>
+                    <td>{{ trans('core.admin.support.status.' ~ ticket.status) }}</td>
+                    <td>{{ ticket.updated_at }}</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</section>
+{% endif %}
+{% endblock %}
