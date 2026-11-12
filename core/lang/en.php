@@ -379,6 +379,8 @@ return [
     'core.admin.credits.package' => 'Library',
     'core.admin.credits.authors' => 'Authors',
     'core.admin.credits.license' => 'License',
+    'core.admin.credits.none' => 'The list of libraries could not be read.',
+    'core.admin.credits.font' => 'This theme\'s font: {name} ({license}).',
     'core.backup.title' => 'Backup',
     'core.backup.intro' => 'A backup holds the database and the whole system - including .env and var/secret.key, without which a restore leaves the stored credentials unusable.',
     'core.backup.contents' => 'Left out: var/cache, var/log, and earlier backups themselves.',

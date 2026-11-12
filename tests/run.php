@@ -4242,6 +4242,9 @@ $r = $get('/admin', 3);
 $r = $get('/admin/docs', 3);
 check('documentation: in the administration, in the administrator\'s language, with the examples as text', $r['status'] === 200 && str_contains($r['body'], 'Ein Theme bauen') && str_contains($r['body'], '&lt;?php')
     && str_contains($r['body'], '{{ theme_asset(') && str_contains($r['body'], 'href="/admin/docs"') && str_contains($get('/en/admin/docs', 3)['body'], 'Building a theme') && $get('/admin/docs', 1)['status'] === 403);
+$r = $get('/admin/credits', 3);
+check('credits: lists the libraries this installation actually runs on, read from Composer\'s own records', $r['status'] === 200 && str_contains($r['body'], 'twig/twig') && str_contains($r['body'], 'BSD-3-Clause')
+    && $get('/admin/credits', 1)['status'] === 403);
 $r = $get('/admin', 3);
 preg_match_all('#<summary id="menu-group-([a-z]+)">#', $r['body'], $sections);
 check('administration: the menu comes in sections, in a fixed order', array_values(array_intersect(Modulento\Core\App::ADMIN_GROUPS, $sections[1])) === $sections[1]

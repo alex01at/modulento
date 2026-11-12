@@ -163,7 +163,8 @@ final class AdminController extends Controller
     /** Every open-source library this installation runs on, read straight from Composer's own records so the list can never go stale. */
     public function credits(array $params): void
     {
-        $installed = json_decode((string) file_get_contents($this->app->config['app']['root'] . '/vendor/composer/installed.json'), true);
+        $file = $this->app->config['app']['root'] . '/vendor/composer/installed.json';
+        $installed = is_file($file) ? json_decode((string) file_get_contents($file), true) : null;
         $packages = array_map(fn (array $package) => [
             'name' => $package['name'],
             'authors' => implode(', ', array_filter(array_map(fn (array $author) => $author['name'] ?? '', $package['authors'] ?? []))),
@@ -172,7 +173,20 @@ final class AdminController extends Controller
         ], $installed['packages'] ?? []);
         usort($packages, fn (array $a, array $b) => strcasecmp($a['name'], $b['name']));
 
-        $this->render('@admin/credits.twig', ['packages' => $packages]);
+        // A theme that bundles its own font (self-hosted, no external request -
+        // see CLAUDE.md's "no CDN scripts" rule) ships that font's license text
+        // right alongside it, e.g. assets/fonts/OFL.txt (SIL Open Font License);
+        // its first line is conventionally "Copyright <year> <font name> ...".
+        $fontCredit = null;
+        $licenseFile = $this->app->themes->activeFile('assets/fonts/OFL.txt');
+        if ($licenseFile !== null) {
+            $firstLine = trim((string) strtok((string) file_get_contents($licenseFile), "\n"));
+            if (preg_match('/^Copyright\s+\d{4}\s+(.+)$/i', $firstLine, $match) === 1) {
+                $fontCredit = ['name' => trim($match[1]), 'license' => 'SIL Open Font License 1.1'];
+            }
+        }
+
+        $this->render('@admin/credits.twig', ['packages' => $packages, 'font_credit' => $fontCredit]);
     }
 
     /**

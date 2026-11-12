@@ -99,7 +99,8 @@ App ist (eine zweite App zu aktivieren schaltet die erste ab).
 
 **`adminMenuGroupLabel(group, labelKey)`** — eine **App** benennt eine der
 festen Menü-Gruppen der Administration um (`App::ADMIN_GROUPS`:
-`content`, `marketplace`, `moderation`, `people`, `system`), z. B.
+`content`, `marketplace`, `moderation`, `people`, `more`, `system`,
+`help`), z. B.
 „Marktplatz" zu „Jobbörse". Gleicher Grund wie bei
 `suppressAccountDefault()`: keine zusätzliche Bedingung nötig, `register()`
 läuft ohnehin nur während die App aktiv ist.

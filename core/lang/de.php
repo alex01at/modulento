@@ -379,6 +379,8 @@ return [
     'core.admin.credits.package' => 'Bibliothek',
     'core.admin.credits.authors' => 'Autor:innen',
     'core.admin.credits.license' => 'Lizenz',
+    'core.admin.credits.none' => 'Die Liste der Bibliotheken konnte nicht gelesen werden.',
+    'core.admin.credits.font' => 'Schriftart dieses Themes: {name} ({license}).',
     'core.backup.title' => 'Datensicherung',
     'core.backup.intro' => 'Eine Sicherung enthält die Datenbank und das gesamte System - inklusive .env und var/secret.key, ohne die eine Wiederherstellung die gespeicherten Zugangsdaten unbrauchbar macht.',
     'core.backup.contents' => 'Ausgenommen: var/cache, var/log und frühere Sicherungen selbst.',

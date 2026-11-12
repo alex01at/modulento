@@ -8,23 +8,31 @@
 <section class="card-box">
     <p>{{ trans('core.admin.credits.intro') }}</p>
 
-    <table>
-        <thead>
-            <tr>
-                <th>{{ trans('core.admin.credits.package') }}</th>
-                <th>{{ trans('core.admin.credits.authors') }}</th>
-                <th>{{ trans('core.admin.credits.license') }}</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for package in packages %}
+    {% if packages is empty %}
+        <p class="empty">{{ trans('core.admin.credits.none') }}</p>
+    {% else %}
+        <table>
+            <thead>
                 <tr>
-                    <td>{% if package.homepage %}<a href="{{ package.homepage }}" target="_blank" rel="noopener">{{ package.name }}</a>{% else %}{{ package.name }}{% endif %}</td>
-                    <td>{{ package.authors }}</td>
-                    <td>{{ package.license }}</td>
+                    <th>{{ trans('core.admin.credits.package') }}</th>
+                    <th>{{ trans('core.admin.credits.authors') }}</th>
+                    <th>{{ trans('core.admin.credits.license') }}</th>
                 </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+            </thead>
+            <tbody>
+                {% for package in packages %}
+                    <tr>
+                        <td>{% if package.homepage %}<a href="{{ package.homepage }}" target="_blank" rel="noopener">{{ package.name }}</a>{% else %}{{ package.name }}{% endif %}</td>
+                        <td>{{ package.authors }}</td>
+                        <td>{{ package.license }}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% endif %}
+
+    {% if font_credit %}
+        <p><small>{{ trans('core.admin.credits.font', {name: font_credit.name, license: font_credit.license}) }}</small></p>
+    {% endif %}
 </section>
 {% endblock %}

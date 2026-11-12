@@ -96,7 +96,7 @@ final class Extension implements ExtensionContract
             <tbody>
                 <tr><th scope="row"><code>routes()</code></th><td>Addresses. Every route states its access: <code>Router::PUBLIC</code>, logged in (the default) or a permission.</td></tr>
                 <tr><th scope="row"><code>permission()</code></th><td>A permission of its own, which a route or an admin menu entry can require.</td></tr>
-                <tr><th scope="row"><code>adminMenu()</code></th><td>An entry in the administration's menu, under one of its groups (<code>content</code>, <code>marketplace</code>, <code>moderation</code>, <code>people</code>, <code>system</code>, otherwise "More").</td></tr>
+                <tr><th scope="row"><code>adminMenu()</code></th><td>An entry in the administration's menu, under one of its groups (<code>content</code>, <code>marketplace</code>, <code>moderation</code>, <code>people</code>, <code>system</code>, <code>help</code>, otherwise "More").</td></tr>
                 <tr><th scope="row"><code>adminMenuGroupLabel()</code></th><td>App only: renames one of the menu's fixed groups, e.g. "Marketplace" to "Job board" - to match what this app actually calls it.</td></tr>
                 <tr><th scope="row"><code>task()</code></th><td>Run something regularly through cron.</td></tr>
                 <tr><th scope="row"><code>listen()</code></th><td>React to one of the core's own events, e.g. a data export, a login or an account's deletion.</td></tr>
