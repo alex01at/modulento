@@ -21,10 +21,10 @@ use Modulento\Core\Support\TicketClient;
  *
  * A ticket belongs to exactly one license server-side; this installation
  * does not remember which stored key a given reference was opened under,
- * so show()/reply() simply try every key it holds in turn until one of
- * them is recognised - with at most a small handful of keys per
- * installation in practice, that is cheaper than keeping a lookup table
- * only to save a few extra requests.
+ * so show()/reply() try each distinct key it holds in turn until one of
+ * them is recognised as the ticket's own - see withOwningCredential()'s
+ * own doc comment for why that has to dedupe by key and stop at the
+ * first answer that is not simply "not this key".
  */
 final class SupportController extends Controller
 {
@@ -75,14 +75,15 @@ final class SupportController extends Controller
         $message = mb_substr(trim((string) ($_POST['message'] ?? '')), 0, 5000);
 
         $credential = $this->findCredential($credentialId);
-        if ($credential === null || $subject === '' || $message === '') {
-            Session::flash('error', $this->trans('core.admin.support.error.form'));
+        $attachment = $this->readAttachment();
+        if ($credential === null || $subject === '' || $message === '' || $attachment === false) {
+            Session::flash('error', $this->trans($attachment === false ? 'core.admin.support.error.attachment_rejected' : 'core.admin.support.error.form'));
             $this->redirect('/admin/support');
             return;
         }
 
         $product = $credential['id'] !== LicenseKeys::MASTER_ID ? $credential['id'] : null;
-        $result = $this->client()->open($credential['key'], (string) ($app->config['app']['url'] ?? ''), $product, $subject, $message);
+        $result = $this->client()->open($credential['key'], (string) ($app->config['app']['url'] ?? ''), $product, $subject, $message, $attachment);
 
         if (!$result['ok']) {
             Session::flash('error', $this->trans($this->errorKey($result['error'] ?? 'unavailable')));
@@ -100,16 +101,17 @@ final class SupportController extends Controller
         $domain = (string) ($app->config['app']['url'] ?? '');
         $reference = (string) $params['reference'];
 
-        foreach ($this->credentials() as $credential) {
-            $result = $this->client()->thread($credential['key'], $domain, $reference);
-            if ($result['ok']) {
-                $lastMessage = end($result['messages']);
-                SupportNotices::markSeen($app, $reference, $lastMessage !== false ? $lastMessage['created_at'] : '');
-                $this->render('@admin/support_thread.twig', ['ticket' => $result]);
-                return;
-            }
+        $result = $this->withOwningCredential(fn (string $key) => $this->client()->thread($key, $domain, $reference));
+        if ($result['ok']) {
+            $lastMessage = end($result['messages']);
+            SupportNotices::markSeen($app, $reference, $lastMessage !== false ? $lastMessage['created_at'] : '');
+            $this->render('@admin/support_thread.twig', ['ticket' => $result]);
+            return;
         }
 
+        if ($result['error'] !== 'not_found') {
+            Session::flash('error', $this->trans($this->errorKey($result['error'])));
+        }
         $this->redirect('/admin/support');
     }
 
@@ -119,23 +121,108 @@ final class SupportController extends Controller
         $domain = (string) ($app->config['app']['url'] ?? '');
         $reference = (string) $params['reference'];
         $message = mb_substr(trim((string) ($_POST['message'] ?? '')), 0, 5000);
+        $attachment = $this->readAttachment();
 
-        if ($message === '') {
+        if ($message === '' || $attachment === false) {
+            if ($attachment === false) {
+                Session::flash('error', $this->trans('core.admin.support.error.attachment_rejected'));
+            }
             $this->redirect('/admin/support/' . $reference);
             return;
         }
 
+        $result = $this->withOwningCredential(fn (string $key) => $this->client()->reply($key, $domain, $reference, $message, $attachment));
+        Session::flash(
+            $result['ok'] ? 'success' : 'error',
+            $this->trans($result['ok'] ? 'core.admin.support.replied' : $this->errorKey($result['error']))
+        );
+        $this->redirect('/admin/support/' . $reference);
+    }
+
+    /** Streams a message's attachment - the license server's own ownership check (message -> ticket -> license) is the only gate; a credential that does not own it just answers not_found, same as thread()/reply(). */
+    public function attachment(array $params): void
+    {
+        $domain = (string) ($this->app->config['app']['url'] ?? '');
+        $messageId = (int) $params['message_id'];
+
+        $result = $this->withOwningCredential(fn (string $key) => $this->client()->downloadAttachment($key, $domain, $messageId));
+        if (!$result['ok']) {
+            $this->redirect('/admin/support');
+            return;
+        }
+
+        // The filename is a display hint from the page that linked here
+        // (already fetched, ownership-checked, over this same connection)
+        // - never itself a path, so there is nothing for it to traverse.
+        // Same header set as OrderController::sendFile() uses for an
+        // order's own uploaded files - never shown by the browser,
+        // whatever the file claims to be.
+        $filename = basename((string) ($_GET['name'] ?? 'anhang'));
+        header('Content-Type: application/octet-stream');
+        header("Content-Disposition: attachment; filename=\"" . preg_replace('/[^A-Za-z0-9._-]/', '_', $filename) . "\"; filename*=UTF-8''" . rawurlencode($filename));
+        header('Content-Length: ' . strlen($result['content']));
+        header('Cache-Control: private, no-store');
+        header('X-Content-Type-Options: nosniff');
+        header("Content-Security-Policy: default-src 'none'; sandbox");
+        echo $result['content'];
+    }
+
+    /**
+     * @return array{name: string, content: string}|null|false null = no
+     *         file chosen, false = a real upload problem (too big for
+     *         this host's own upload_max_filesize, a failed transfer, ...)
+     */
+    private function readAttachment(): array|null|false
+    {
+        $file = $_FILES['attachment'] ?? null;
+        if (!is_array($file) || ($file['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) {
+            return null;
+        }
+        if ($file['error'] !== UPLOAD_ERR_OK || !is_file((string) $file['tmp_name'])) {
+            return false;
+        }
+
+        $content = file_get_contents($file['tmp_name']);
+
+        return $content !== false ? ['name' => (string) $file['name'], 'content' => $content] : false;
+    }
+
+    /**
+     * Tries every distinct stored key in turn against $call (thread() or
+     * reply() for $reference) until one of them is recognised as the
+     * ticket's own - the same key stored under more than one credential
+     * (a master key an app installed from the Shop also copies under
+     * that product's own id - ShopController::install()) is asked only
+     * once, never once per credential: with reply(), asking the very
+     * same key a second time would resend the very same reply, not just
+     * waste a request. A key's own answer that is not "not_found" (rate
+     * limited, revoked, unreachable, ...) is never worth masking by
+     * trying the next key instead - it is returned immediately, as the
+     * real reason this failed.
+     *
+     * @return array{ok: bool, error?: string, ...}
+     */
+    private function withOwningCredential(callable $call): array
+    {
+        $tried = [];
+        $lastError = 'not_found';
         foreach ($this->credentials() as $credential) {
-            $result = $this->client()->reply($credential['key'], $domain, $reference, $message);
+            if (isset($tried[$credential['key']])) {
+                continue;
+            }
+            $tried[$credential['key']] = true;
+
+            $result = $call($credential['key']);
             if ($result['ok']) {
-                Session::flash('success', $this->trans('core.admin.support.replied'));
-                $this->redirect('/admin/support/' . $reference);
-                return;
+                return $result;
+            }
+            $lastError = $result['error'] ?? 'unavailable';
+            if ($lastError !== 'not_found') {
+                return $result;
             }
         }
 
-        Session::flash('error', $this->trans('core.admin.support.error.not_found'));
-        $this->redirect('/admin/support');
+        return ['ok' => false, 'error' => $lastError];
     }
 
     /** @return array<int, array{id: string, label: string, key: string}> every license key this installation actually holds, usable for a ticket right away */
@@ -176,6 +263,7 @@ final class SupportController extends Controller
             'revoked' => 'core.admin.support.error.revoked',
             'not_found' => 'core.admin.support.error.not_found',
             'rate_limited' => 'core.admin.support.error.rate_limited',
+            'attachment_rejected' => 'core.admin.support.error.attachment_rejected',
             default => 'core.admin.support.error.unavailable',
         };
     }

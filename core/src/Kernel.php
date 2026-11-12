@@ -492,6 +492,7 @@ final class Kernel
         $router->post('/admin/support', [SupportController::class, 'create'], 'core.packages.manage');
         $router->get('/admin/support/{reference}', [SupportController::class, 'show'], 'core.packages.manage');
         $router->post('/admin/support/{reference}/reply', [SupportController::class, 'reply'], 'core.packages.manage');
+        $router->get('/admin/support/attachments/{message_id}', [SupportController::class, 'attachment'], 'core.packages.manage');
 
         $router->get('/admin/demo-data', [DemoDataController::class, 'index'], 'core.demo_data.manage');
         $router->post('/admin/demo-data/generate', [DemoDataController::class, 'generate'], 'core.demo_data.manage');

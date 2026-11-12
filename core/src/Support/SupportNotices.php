@@ -16,12 +16,12 @@ use Modulento\Core\App;
  * (SupportController::show()) also corrects it immediately, rather than
  * waiting for the next scheduled run.
  *
- * "Unread" means: the ticket's status is "answered" (the operator's turn
- * ended, this installation's turn to look) and nothing has been seen as
- * recent as its current state - tracked per reference against the
- * timestamp of the last message this installation has actually displayed,
- * never against a merely local clock (a server-issued timestamp is the
- * only one both sides agree on).
+ * "Unread" means: the operator wrote the most recent message - never the
+ * ticket's status, since an operator can reply and close in the same
+ * step, and that reply should still raise the bell. Tracked per
+ * reference against the timestamp of the last message this installation
+ * has actually displayed, never against a merely local clock (a
+ * server-issued timestamp is the only one both sides agree on).
  */
 final class SupportNotices
 {
@@ -68,7 +68,7 @@ final class SupportNotices
                 continue;
             }
             foreach ($result['tickets'] as $ticket) {
-                if ($ticket['status'] === 'answered' && ($seen[$ticket['reference']] ?? '') < $ticket['updated_at']) {
+                if ($ticket['last_sender'] === 'operator' && ($seen[$ticket['reference']] ?? '') < $ticket['last_message_at']) {
                     $unread[$ticket['reference']] = true;
                 }
             }

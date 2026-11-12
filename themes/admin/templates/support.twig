@@ -14,7 +14,7 @@
         <p class="empty">{{ trans('core.admin.support.no_license') }}</p>
         <p><a href="{{ url('/admin/shop') }}">{{ trans('core.admin.support.go_shop') }}</a></p>
     {% else %}
-        <form method="post" action="{{ url('/admin/support') }}" class="stack-form">
+        <form method="post" action="{{ url('/admin/support') }}" class="stack-form" enctype="multipart/form-data">
             {{ csrf_field() }}
             <div class="field">
                 <label for="credential">{{ trans('core.admin.support.field.credential') }}</label>
@@ -31,6 +31,10 @@
             <div class="field">
                 <label for="message">{{ trans('core.admin.support.field.message') }}</label>
                 <textarea id="message" name="message" rows="5" maxlength="5000" required></textarea>
+            </div>
+            <div class="field">
+                <label for="attachment">{{ trans('core.admin.support.field.attachment') }}</label>
+                <input id="attachment" name="attachment" type="file" accept=".png,.jpg,.jpeg,.gif,.webp,.pdf,.txt,.log">
             </div>
             <button type="submit">{{ trans('core.admin.support.submit') }}</button>
         </form>

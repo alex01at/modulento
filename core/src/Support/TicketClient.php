@@ -25,28 +25,75 @@ final class TicketClient
     {
     }
 
-    /** @return array{ok: bool, reference?: string, status?: string, error?: string} */
-    public function open(string $licenseKey, string $domain, ?string $product, string $subject, string $message): array
+    /**
+     * $attachment, when given, is ['name' => original filename, 'content'
+     * => raw bytes] - base64-encoded here, the same way everything else
+     * in this body travels, never multipart. The license server checks
+     * size/type itself (Support\AttachmentStorage on that side) and
+     * answers 'attachment_rejected' if it does not qualify - nothing here
+     * duplicates that check, a customer just sees that answer translated.
+     *
+     * @param array{name: string, content: string}|null $attachment
+     * @return array{ok: bool, reference?: string, status?: string, error?: string}
+     */
+    public function open(string $licenseKey, string $domain, ?string $product, string $subject, string $message, ?array $attachment = null): array
     {
-        return $this->call('/v1/tickets', ['license_key' => $licenseKey, 'domain' => $domain, 'product' => $product ?? '', 'subject' => $subject, 'message' => $message]);
+        $body = ['license_key' => $licenseKey, 'domain' => $domain, 'product' => $product ?? '', 'subject' => $subject, 'message' => $message];
+        if ($attachment !== null) {
+            $body['attachment'] = ['name' => $attachment['name'], 'content' => base64_encode($attachment['content'])];
+        }
+
+        return $this->call('/v1/tickets', $body);
     }
 
-    /** @return array{ok: bool, tickets?: list<array{reference: string, subject: string, status: string, updated_at: string}>, error?: string} */
+    /** @return array{ok: bool, tickets?: list<array{reference: string, subject: string, status: string, updated_at: string, last_sender: string, last_message_at: string}>, error?: string} */
     public function list(string $licenseKey, string $domain): array
     {
         return $this->call('/v1/tickets/list', ['license_key' => $licenseKey, 'domain' => $domain]);
     }
 
-    /** @return array{ok: bool, reference?: string, subject?: string, status?: string, messages?: list<array{sender: string, body: string, created_at: string}>, error?: string} */
+    /** @return array{ok: bool, reference?: string, subject?: string, status?: string, messages?: list<array{id: int, sender: string, body: string, created_at: string, attachment: ?string}>, error?: string} */
     public function thread(string $licenseKey, string $domain, string $reference): array
     {
         return $this->call('/v1/tickets/thread', ['license_key' => $licenseKey, 'domain' => $domain, 'reference' => $reference]);
     }
 
-    /** @return array{ok: bool, status?: string, error?: string} */
-    public function reply(string $licenseKey, string $domain, string $reference, string $message): array
+    /**
+     * @param array{name: string, content: string}|null $attachment see open()'s own doc comment
+     * @return array{ok: bool, status?: string, error?: string}
+     */
+    public function reply(string $licenseKey, string $domain, string $reference, string $message, ?array $attachment = null): array
     {
-        return $this->call('/v1/tickets/reply', ['license_key' => $licenseKey, 'domain' => $domain, 'reference' => $reference, 'message' => $message]);
+        $body = ['license_key' => $licenseKey, 'domain' => $domain, 'reference' => $reference, 'message' => $message];
+        if ($attachment !== null) {
+            $body['attachment'] = ['name' => $attachment['name'], 'content' => base64_encode($attachment['content'])];
+        }
+
+        return $this->call('/v1/tickets/reply', $body);
+    }
+
+    /** @return array{ok: bool, content?: string, error?: string} the raw bytes on success - the license server's own ownership check (message -> ticket -> license) is the only gate, same as everything else this key can read. */
+    public function downloadAttachment(string $licenseKey, string $domain, int $messageId): array
+    {
+        if ($this->serverUrl === '') {
+            return ['ok' => false, 'error' => 'unavailable'];
+        }
+
+        $response = $this->http->request(
+            'POST',
+            rtrim($this->serverUrl, '/') . '/v1/tickets/attachment',
+            ['Content-Type' => 'application/json', 'Accept' => 'application/octet-stream'],
+            json_encode(['license_key' => $licenseKey, 'domain' => $domain, 'message_id' => $messageId], JSON_UNESCAPED_SLASHES)
+        );
+
+        if ($response['status'] === 200) {
+            return ['ok' => true, 'content' => $response['body']];
+        }
+
+        $decoded = json_decode($response['body'], true);
+        $error = is_array($decoded) && is_string($decoded['error'] ?? null) ? $decoded['error'] : 'unavailable';
+
+        return ['ok' => false, 'error' => $error];
     }
 
     /** @return array{ok: bool, error?: string} */

@@ -1406,6 +1406,8 @@ return [
     'core.admin.support.error.not_found' => 'Ticket not found.',
     'core.admin.support.error.rate_limited' => 'Too many requests, please try again later.',
     'core.admin.support.error.unavailable' => 'Support is not available right now.',
+    'core.admin.support.error.attachment_rejected' => 'The attachment was rejected (too large, or not an allowed type - images, PDF, text/log up to 2 MB).',
+    'core.admin.support.field.attachment' => 'Attachment (optional)',
     'core.permission.demo_data_manage' => 'Generate and remove demo data',
     'core.admin.menu.demo_data' => 'Demo data',
     'core.admin.demo_data.title' => 'Demo data',

@@ -5402,6 +5402,20 @@ check('ticket client: a plain-text 404 (a server without this feature at all) is
 $unconfiguredClient = new Modulento\Core\Support\TicketClient(new FakeLicenseHttp(200, '{}'), '');
 check('ticket client: no server configured at all never sends a request', $unconfiguredClient->open('x', 'y', null, 's', 'm') === ['ok' => false, 'error' => 'unavailable']);
 
+$attachHttp = new FakeLicenseHttp(200, json_encode(['reference' => 'tkt_abc', 'status' => 'open']));
+(new Modulento\Core\Support\TicketClient($attachHttp, 'https://license.example.test'))->open('mlk_live_x', 'https://kunde.de', null, 's', 'm', ['name' => 'bild.png', 'content' => 'rohe bytes']);
+check('ticket client: open() with an attachment base64-encodes it, never sends the raw bytes directly', json_decode($attachHttp->lastRequest['body'], true)['attachment'] === ['name' => 'bild.png', 'content' => base64_encode('rohe bytes')]);
+(new Modulento\Core\Support\TicketClient($attachHttp, 'https://license.example.test'))->open('mlk_live_x', 'https://kunde.de', null, 's', 'm');
+check('ticket client: open() without an attachment sends no such field at all', !array_key_exists('attachment', json_decode($attachHttp->lastRequest['body'], true)));
+
+$downloadHttp = new FakeLicenseHttp(200, 'die rohen anhang-bytes');
+$downloadResult = (new Modulento\Core\Support\TicketClient($downloadHttp, 'https://license.example.test'))->downloadAttachment('mlk_live_x', 'https://kunde.de', 42);
+check('ticket client: downloadAttachment() answers the raw bytes on success, never JSON-decoded', $downloadResult === ['ok' => true, 'content' => 'die rohen anhang-bytes']
+    && json_decode($downloadHttp->lastRequest['body'], true) === ['license_key' => 'mlk_live_x', 'domain' => 'https://kunde.de', 'message_id' => 42]);
+$downloadFailHttp = new FakeLicenseHttp(404, json_encode(['error' => 'not_found']));
+check('ticket client: downloadAttachment() reports the server\'s own error on failure', (new Modulento\Core\Support\TicketClient($downloadFailHttp, 'https://license.example.test'))->downloadAttachment('x', 'y', 1) === ['ok' => false, 'error' => 'not_found']);
+check('ticket client: downloadAttachment() with no server configured never sends a request', (new Modulento\Core\Support\TicketClient($downloadHttp, ''))->downloadAttachment('x', 'y', 1) === ['ok' => false, 'error' => 'unavailable']);
+
 // --- Administration -> Support ----------------------------------------------
 check('support: needs its permission', $get('/admin/support', 1)['status'] === 403);
 $r = $get('/admin/support', 3);
@@ -5449,11 +5463,67 @@ $dupHttp = new FakeLicenseHttp(200, json_encode(['tickets' => [['reference' => '
 $r = request($pdo, $shopConfig($dupHttp), 'GET', '/admin/support', 3);
 check('support: a key stored twice (master + a product copy of it) is asked only once', $dupHttp->callCount === 1);
 check('support: ...and its tickets are listed only once, not once per credential', $r['status'] === 200 && substr_count($r['body'], 'Export schlägt fehl') === 1);
+
+// The same duplicate-key situation for reply() is worse than for the list
+// above: asking the same key a second time would resend the very same
+// reply, not just waste a request.
+$dupReplyHttp = new FakeLicenseHttp(200, json_encode(['reference' => 'tkt_dup1', 'status' => 'open']));
+$r = request($pdo, $shopConfig($dupReplyHttp), 'POST', '/admin/support/tkt_dup1/reply', 3, ['message' => 'Einmal genügt.']);
+check('support reply: the same key stored twice sends the reply only once, never once per credential', $r['status'] === 302 && $dupReplyHttp->callCount === 1);
 $app->licenseKeys->removeMaster();
+
+// A distinct key's own answer (here: revoked) is never masked by trying
+// the next, different key instead - it is the real reason this failed.
+$app->licenseKeys->saveMaster('mlk_live_a_revoked_master');
+$revokedThenHttp = new class implements Modulento\Core\Support\HttpClient {
+    public array $seenKeys = [];
+    public function request(string $method, string $url, array $headers = [], ?string $body = null): array
+    {
+        $sent = json_decode((string) $body, true);
+        $this->seenKeys[] = $sent['license_key'];
+
+        return $sent['license_key'] === 'mlk_live_a_revoked_master'
+            ? ['status' => 403, 'body' => json_encode(['error' => 'revoked'])]
+            : ['status' => 200, 'body' => json_encode(['reference' => 'tkt_xyz', 'status' => 'open'])];
+    }
+};
+$r = request($pdo, $shopConfig($revokedThenHttp), 'POST', '/admin/support/tkt_xyz/reply', 3, ['message' => 'x']);
+check('support reply: a credential\'s own "revoked" stops right there - the other, distinct key is never tried', count($revokedThenHttp->seenKeys) === 1
+    && str_contains($_SESSION['_flash']['error'] ?? '', 'gesperrt'));
+$app->licenseKeys->removeMaster();
+
+// --- Support: attachments ----------------------------------------------
+$attachmentFixture = tempnam(sys_get_temp_dir(), 'supportatt');
+file_put_contents($attachmentFixture, 'ein paar testbytes');
+$_FILES['attachment'] = ['name' => 'beweis.png', 'type' => 'image/png', 'tmp_name' => $attachmentFixture, 'error' => UPLOAD_ERR_OK, 'size' => filesize($attachmentFixture)];
+$createWithAttachmentHttp = new FakeLicenseHttp(200, json_encode(['reference' => 'tkt_withatt', 'status' => 'open']));
+$r = request($pdo, $shopConfig($createWithAttachmentHttp), 'POST', '/admin/support', 3, ['credential' => 'ext-exklusiv', 'subject' => 'Mit Anhang', 'message' => 'x']);
+$sentAttachment = json_decode($createWithAttachmentHttp->lastRequest['body'], true)['attachment'];
+check('support: opening a ticket with a real upload sends it base64-encoded, name and all', $r['status'] === 302 && $sentAttachment === ['name' => 'beweis.png', 'content' => base64_encode('ein paar testbytes')]);
+
+$replyWithAttachmentHttp = new FakeLicenseHttp(200, json_encode(['reference' => 'tkt_withatt', 'status' => 'open']));
+request($pdo, $shopConfig($replyWithAttachmentHttp), 'POST', '/admin/support/tkt_withatt/reply', 3, ['message' => 'Noch ein Anhang.']);
+check('support reply: an upload on the reply form travels the same way', json_decode($replyWithAttachmentHttp->lastRequest['body'], true)['attachment']['name'] === 'beweis.png');
+unset($_FILES['attachment']);
+
+$_FILES['attachment'] = ['name' => 'zu-gross.png', 'type' => 'image/png', 'tmp_name' => '', 'error' => UPLOAD_ERR_INI_SIZE, 'size' => 0];
+$shouldNotBeCalledHttp = new FakeLicenseHttp(200, json_encode(['reference' => 'tkt_never', 'status' => 'open']));
+$r = request($pdo, $shopConfig($shouldNotBeCalledHttp), 'POST', '/admin/support', 3, ['credential' => 'ext-exklusiv', 'subject' => 'x', 'message' => 'y']);
+check('support: a failed upload (over this host\'s own upload_max_filesize) is refused locally, no request sent at all', $r['status'] === 302 && $shouldNotBeCalledHttp->callCount === 0
+    && str_contains($_SESSION['_flash']['error'] ?? '', 'abgelehnt'));
+unset($_FILES['attachment']);
+
+$downloadProxyHttp = new FakeLicenseHttp(200, 'die originalen bytes');
+$r = request($pdo, $shopConfig($downloadProxyHttp), 'GET', '/admin/support/attachments/42?name=beweis.png', 3);
+check('support: the attachment proxy streams exactly what the license server answered', $r['status'] === 200 && $r['body'] === 'die originalen bytes'
+    && json_decode($downloadProxyHttp->lastRequest['body'], true) === ['license_key' => 'mlk_live_support_test', 'domain' => 'https://example.test', 'message_id' => 42]);
+
+$noAccessHttp = new FakeLicenseHttp(404, json_encode(['error' => 'not_found']));
+check('support: none of this installation\'s keys owning the message bounces back to the list, not an error page', request($pdo, $shopConfig($noAccessHttp), 'GET', '/admin/support/attachments/999999', 3)['status'] === 302);
 
 // --- Support: the admin bell ------------------------------------------------
 $pdo->exec("DELETE FROM setting WHERE name LIKE 'core.support.%'");
-$answeredHttp = new FakeLicenseHttp(200, json_encode(['tickets' => [['reference' => 'tkt_new1', 'subject' => 'Export schlägt fehl', 'status' => 'answered', 'updated_at' => '2026-02-01 00:00:00']]]));
+$answeredHttp = new FakeLicenseHttp(200, json_encode(['tickets' => [['reference' => 'tkt_new1', 'subject' => 'Export schlägt fehl', 'status' => 'answered', 'updated_at' => '2026-02-01 00:00:00', 'last_sender' => 'operator', 'last_message_at' => '2026-02-01 00:00:00']]]));
 $refreshConfig = $shopConfig($answeredHttp);
 Modulento\Core\Support\SupportNotices::refresh(new Modulento\Core\App($refreshConfig, $pdo));
 check('support bell: a ticket the operator has answered counts as unread', Modulento\Core\Support\SupportNotices::unreadCount(new Modulento\Core\App($refreshConfig, $pdo)) === 1);
@@ -5473,7 +5543,7 @@ check('support bell: actually opening the thread clears it right away, no need t
 Modulento\Core\Support\SupportNotices::refresh(new Modulento\Core\App($refreshConfig, $pdo));
 check('support bell: refreshing again does not resurrect a ticket already seen in its current state', Modulento\Core\Support\SupportNotices::unreadCount(new Modulento\Core\App($refreshConfig, $pdo)) === 0);
 
-$repliedAgainHttp = new FakeLicenseHttp(200, json_encode(['tickets' => [['reference' => 'tkt_new1', 'subject' => 'Export schlägt fehl', 'status' => 'answered', 'updated_at' => '2026-02-02 00:00:00']]]));
+$repliedAgainHttp = new FakeLicenseHttp(200, json_encode(['tickets' => [['reference' => 'tkt_new1', 'subject' => 'Export schlägt fehl', 'status' => 'answered', 'updated_at' => '2026-02-02 00:00:00', 'last_sender' => 'operator', 'last_message_at' => '2026-02-02 00:00:00']]]));
 Modulento\Core\Support\SupportNotices::refresh(new Modulento\Core\App($shopConfig($repliedAgainHttp), $pdo));
 check('support bell: a further reply after that becomes unread again', Modulento\Core\Support\SupportNotices::unreadCount(new Modulento\Core\App($refreshConfig, $pdo)) === 1);
 

@@ -14,14 +14,19 @@
     <section class="card-box">
         <p><strong>{{ message.sender == 'operator' ? trans('core.admin.support.sender.operator') : trans('core.admin.support.sender.customer') }}</strong> &middot; {{ message.created_at }}</p>
         <p class="message-body">{{ message.body }}</p>
+        {% if message.attachment %}
+            <p><a href="{{ url('/admin/support/attachments/' ~ message.id) }}?name={{ message.attachment|url_encode }}">📎 {{ message.attachment }}</a></p>
+        {% endif %}
     </section>
 {% endfor %}
 
 <section class="card-box">
-    <form method="post" action="{{ url('/admin/support/' ~ ticket.reference ~ '/reply') }}" class="stack-form">
+    <form method="post" action="{{ url('/admin/support/' ~ ticket.reference ~ '/reply') }}" class="stack-form" enctype="multipart/form-data">
         {{ csrf_field() }}
         <label for="message">{{ trans('core.admin.support.field.message') }}</label>
         <textarea id="message" name="message" rows="5" maxlength="5000" required></textarea>
+        <label for="attachment">{{ trans('core.admin.support.field.attachment') }}</label>
+        <input id="attachment" name="attachment" type="file" accept=".png,.jpg,.jpeg,.gif,.webp,.pdf,.txt,.log">
         <button type="submit">{{ trans('core.admin.support.reply') }}</button>
     </form>
 </section>
