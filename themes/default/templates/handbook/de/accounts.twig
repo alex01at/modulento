@@ -2,6 +2,9 @@
 <p>Unter <strong>Administration → Accounts</strong>: suchen, sperren und entsperren, als bestätigt markieren, ein Passwort zurücksetzen, Rollen ändern, löschen. Die Seite eines Kontos zeigt sein Protokoll.</p>
 <p><strong>Konto anlegen</strong> erstellt ein Konto für jemanden, mit oder ohne Passwort. Ohne eigenes Passwort bekommt die Person eine E-Mail mit einem Link, um selbst eines zu setzen.</p>
 
+<h2>Demo-Modus</h2>
+<p>Auf der Seite eines Kontos lässt sich der <strong>Demo-Modus</strong> einschalten - zum Beispiel für ein Konto, das auf einer öffentlichen Demo-Installation frei zugänglich ist. Das Konto kann sich weiterhin anmelden und alles ansehen, aber kein Formular mehr absenden: Profil, Angebote, Bestellungen, Nachrichten - nichts lässt sich mehr speichern, ändern oder löschen. Das wird an einer einzigen Stelle im Kern durchgesetzt, bevor eine Anfrage überhaupt bei einer Seite ankommt, und gilt deshalb genauso für jede installierte Erweiterung. Nur Abmelden bleibt möglich, damit niemand in der eigenen Sitzung gefangen ist. Weder das eigene Konto noch das letzte Konto mit vollen Rechten lässt sich in den Demo-Modus versetzen.</p>
+
 <h2>Als dieses Konto anmelden</h2>
 <p>Mit dem Recht <code>core.accounts.impersonate</code> lässt sich die Seite so anzeigen, wie dieses Konto sie sieht - um herauszufinden, was die Person tatsächlich sieht. Oben auf jeder Seite bleibt dabei ein Balken, bis auf <strong>Beenden und zurück zur Administration</strong> geklickt wird. Während man als jemand anderes angemeldet ist, können Passwort, E-Mail-Adresse und das Konto selbst nicht geändert oder gelöscht werden. Administratoren können nicht auf diese Weise betreten werden, das eigene Konto auch nicht, und ein gesperrtes ebenfalls nicht. Jede Erstellung und jede Anmeldung dieser Art steht im Protokoll des Kontos.</p>
 

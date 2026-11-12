@@ -103,6 +103,7 @@ final class Extension implements ExtensionContract
             </tbody>
         </table>
     </div>
+    <p><code>routes()</code>: a <code>POST</code> to a route of your own never runs for an account in demo mode - enforced in the core itself, before your own controller is called, exactly like the CSRF check. Nothing extra is needed for that.</p>
 
     <h3>Website &amp; account</h3>
     <div class="table-wrap">

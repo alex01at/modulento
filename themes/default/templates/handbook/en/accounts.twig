@@ -2,6 +2,9 @@
 <p>Under <strong>Administration → Accounts</strong>: search, block and unblock, mark as verified, send a password reset, change roles, delete. The page of an account shows its log.</p>
 <p><strong>Create account</strong> makes an account for someone, with or without a password. Without one, the person gets an e-mail with a link to set their own.</p>
 
+<h2>Demo mode</h2>
+<p>An account's own page offers a <strong>demo mode</strong> switch - for an account that is freely reachable on a public demo installation, say. The account can still sign in and look at everything, but can no longer submit any form: profile, offers, orders, messages - nothing can be saved, changed or deleted any more. This is enforced at a single place in the core, before a request ever reaches a page, so it applies the same way to every installed extension. Only signing out still works, so nobody is trapped in their own session. Neither your own account nor the only account that may do everything can be put into demo mode.</p>
+
 <h2>Signing in as this account</h2>
 <p>With the permission <code>core.accounts.impersonate</code>, the site can be shown the way this account sees it - to find out what the person actually sees. A bar stays at the top of every page until <strong>End and back to the administration</strong> is clicked. While signed in as someone else, the password, the e-mail address and the account itself cannot be changed or deleted. Administrators cannot be entered this way, nor one's own account, nor a blocked one. Every creation and every sign-in of this kind is kept in the account's log.</p>
 
