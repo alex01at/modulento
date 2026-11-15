@@ -49,6 +49,9 @@ final class Extension implements ExtensionContract
     /** Set by a test to see dashboardLink()'s own $visible in effect. */
     public static bool $hideDashboardLink = false;
 
+    /** Set by a test to simulate a purchased one-off posting credit. */
+    public static int $additionalOfferQuota = 0;
+
     public function register(Registrar $registrar): void
     {
         $registrar->permission('example.logins.view', 'example.permission.logins_view');
@@ -128,6 +131,8 @@ final class Extension implements ExtensionContract
             public function current(int $accountId): ?array { return null; }
             public function setQuantity(int $accountId, int $quantity): void { }
         });
+
+        $registrar->additionalOfferQuota(fn (int $accountId, string $offerType, App $app): int => self::$additionalOfferQuota);
 
         $registrar->listen(AccountLoggedIn::class, function (AccountLoggedIn $event, App $app): void {
             $stmt = $app->db->prepare('INSERT INTO x_example_login (account_id, logged_in_at) VALUES (:id, :now)');

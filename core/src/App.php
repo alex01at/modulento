@@ -170,6 +170,8 @@ final class App
     private array $adminGroupLabels = [];
     /** @var array<int, array{permission: string, provider: \Closure}> */
     private array $adminNotices = [];
+    /** @var list<\Closure> */
+    private array $additionalOfferQuotaProviders = [];
     /** @var array<int, array{label_key: string, path: string}> */
     private array $navigation = [];
     /** @var array<int, array{label_key: string, path: string}> */
@@ -402,6 +404,31 @@ final class App
     public function addAdminNotice(string $permission, \Closure $provider): void
     {
         $this->adminNotices[] = ['permission' => $permission, 'provider' => $provider];
+    }
+
+    /**
+     * One-off offers an account may post beyond what its subscription plan
+     * already allows for the type - e.g. a posting credit sold without any
+     * plan (Registrar::additionalOfferQuota()). Summed across every
+     * extension that registered one; OfferController adds this on top of
+     * the plan's own number, never in place of it.
+     *
+     * @param \Closure(int $accountId, string $offerType, App $app): int $provider
+     */
+    public function addAdditionalOfferQuota(\Closure $provider): void
+    {
+        $this->additionalOfferQuotaProviders[] = $provider;
+    }
+
+    /** The sum every registered provider above answers for this account and type; 0 with none registered. */
+    public function additionalOfferQuota(int $accountId, string $offerType): int
+    {
+        $total = 0;
+        foreach ($this->additionalOfferQuotaProviders as $provider) {
+            $total += $provider($accountId, $offerType, $this);
+        }
+
+        return $total;
     }
 
     /** @return array<int, array{count: int, label_key: string, link: string}> every notice the current admin may see and that has something to show right now */

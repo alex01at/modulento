@@ -490,6 +490,20 @@ final class Registrar
         $this->app->addAdminNotice($permission, $provider);
     }
 
+    /**
+     * One-off offers an account may post for this type beyond what its
+     * subscription plan already allows - e.g. a posting credit sold
+     * without any plan (modulento-ext-jobs' pay-per-post). Added on top
+     * of the plan's own number (OfferController::offerQuota()); has no
+     * effect once that number is already unlimited (null).
+     *
+     * @param Closure(int $accountId, string $offerType, App $app): int $provider
+     */
+    public function additionalOfferQuota(Closure $provider): void
+    {
+        $this->app->addAdditionalOfferQuota($provider);
+    }
+
     private function prefixed(string $name, string $kind): string
     {
         if (!str_starts_with($name, $this->manifest->id . '.')) {

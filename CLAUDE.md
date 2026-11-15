@@ -67,7 +67,7 @@ etablierte Muster mit einer lazy ausgewerteten Closure).
 `homeSection()`, `providerSection()`, `offerSection()`,
 `dashboardSection()`, `adminAccountSection()`, `adminProviderSection()`, `checkoutSection()`,
 `orderDiscount()`, `module()`, `moduleEnabled()`, `exportable()`,
-`offerType()`, `orderFlow()`, `paymentMethod()`, `demoOffers()`,
+`offerType()`, `orderFlow()`, `paymentMethod()`, `demoOffers()`, `additionalOfferQuota()`,
 `subscriptionFeature()`, `subscriptionProvider()`, `planTemplate()`,
 `stripeWebhook()`, `task()`, `listen()`, `pageBlockType()`,
 `registrationSection()`, `registrationGuard()`, `shortcode()`.

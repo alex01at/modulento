@@ -2213,6 +2213,18 @@ check('offer quota: a plan with freelancer.service = 1 lets the first draft thro
 $get('/account/offers/new?type=freelancer.service', $quotaId);
 $post('/account/offers/wizard', ['type' => 'freelancer.service', 'wizard_step' => 1, 'locales' => []], false);
 check('offer quota: the second one is refused once the plan\'s number is reached', $pdo->query("SELECT COUNT(*) FROM offer WHERE provider_id = (SELECT id FROM provider WHERE account_id = $quotaId)")->fetchColumn() == 1);
+
+// Registrar::additionalOfferQuota(): a one-off purchased credit adds on top of the plan's own number, never in place of it.
+Modulento\Example\Extension::$additionalOfferQuota = 1;
+$get('/account/offers/new?type=freelancer.service', $quotaId);
+$post('/account/offers/wizard', ['type' => 'freelancer.service', 'wizard_step' => 1, 'locales' => []], false);
+check('additionalOfferQuota: a purchased credit lets a second offer through although the plan itself only allows one', $pdo->query("SELECT COUNT(*) FROM offer WHERE provider_id = (SELECT id FROM provider WHERE account_id = $quotaId)")->fetchColumn() == 2);
+$get('/account/offers/new?type=freelancer.service', $quotaId);
+$post('/account/offers/wizard', ['type' => 'freelancer.service', 'wizard_step' => 1, 'locales' => []], false);
+check('additionalOfferQuota: a third is still refused once the plan\'s number plus the credit is both used up', $pdo->query("SELECT COUNT(*) FROM offer WHERE provider_id = (SELECT id FROM provider WHERE account_id = $quotaId)")->fetchColumn() == 2);
+Modulento\Example\Extension::$additionalOfferQuota = 0;
+// Back to exactly the one offer the tests further below (image quota) rely on.
+$pdo->exec("DELETE FROM offer WHERE provider_id = (SELECT id FROM provider WHERE account_id = $quotaId) AND id <> $quotaOfferId");
 $quotaImage = tempnam(sys_get_temp_dir(), 'img');
 imagepng(imagecreatetruecolor(50, 50), $quotaImage);
 $_FILES = ['image' => ['tmp_name' => $quotaImage, 'error' => UPLOAD_ERR_OK, 'size' => filesize($quotaImage), 'name' => 'x.png', 'type' => 'image/png']];

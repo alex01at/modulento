@@ -634,14 +634,22 @@ final class OfferController extends Controller
      * as it always has; with one, the active plan decides alone - including
      * when that plan simply never set a number for this type, which means
      * no limit (unlike having no plan at all, which means none allowed).
+     * Either way, Registrar::additionalOfferQuota() can add a one-off
+     * amount on top (a purchased posting credit, say) - never in place of
+     * the number above, and never once that number is already unlimited.
      */
     private function offerQuota(array $provider, string $typeId): ?int
     {
+        $accountId = (int) $provider['account_id'];
+        $extra = $this->app->additionalOfferQuota($accountId, $typeId);
+
         if (!$this->app->subscriptions->hasProvider()) {
-            return $provider['status'] === 'approved' ? self::MAX_OFFERS : self::MAX_OFFERS_UNAPPROVED;
+            return ($provider['status'] === 'approved' ? self::MAX_OFFERS : self::MAX_OFFERS_UNAPPROVED) + $extra;
         }
 
-        return $this->app->subscriptions->offerLimit($provider['account_id'], $typeId);
+        $base = $this->app->subscriptions->offerLimit($accountId, $typeId);
+
+        return $base === null ? null : $base + $extra;
     }
 
     /**

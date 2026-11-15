@@ -139,6 +139,7 @@ final class Extension implements ExtensionContract
                 <tr><th scope="row"><code>paymentMethod()</code></th><td>A payment method of its own.</td></tr>
                 <tr><th scope="row"><code>orderDiscount()</code></th><td>Adjusts an order's line items before they are totalled - e.g. a coupon code.</td></tr>
                 <tr><th scope="row"><code>demoOffers()</code></th><td>How this offer type creates a sample offer under Administration → Demo data.</td></tr>
+                <tr><th scope="row"><code>additionalOfferQuota()</code></th><td>Extra offers of a type an account may post beyond what its plan already allows - e.g. a posting credit bought on its own. Added to the plan's own number, never in place of it, and has no effect once that number is already unlimited.</td></tr>
             </tbody>
         </table>
     </div>
