@@ -1,0 +1,47 @@
+<p>Besides the website there is a standalone Android app. The same app serves two audiences without the code ever telling them apart: <strong>operators</strong> (full access to the administration, depending on their own permissions) and <strong>customers</strong> (their own account, or no account at all as a guest). What someone gets to see in the app is decided entirely by the server's answer when they log in - exactly as in the browser-based administration.</p>
+
+<h2>Where the app comes from</h2>
+<p>The app is not downloaded from an app store; instead, it is built once per installation, with its own server address and its own name/icon baked in. A separate form, apart from Modulento itself, does this (ask whoever runs the licence server / app build pipeline for its address). All it needs is:</p>
+<ul>
+    <li>the installation's own server address (<code>https://…</code>),</li>
+    <li>a name for the app, as it should appear on the device.</li>
+</ul>
+<p>After a few minutes a finished, already signed <code>.apk</code> file is ready to download. The form itself needs nothing more than a browser - no Android Studio, no developer account, no program to install on one's own computer.</p>
+
+<h2>What building the app technically requires (only for whoever runs this build service, not for the individual Modulento operator)</h2>
+<p>Running this build service (the infrastructure behind it, not a single app) requires:</p>
+<ul>
+    <li>a GitHub account holding the app's source repository with a signing key already set up (as GitHub Actions secrets - never visible in the code or in the build form),</li>
+    <li>the small form tool that starts a build, shows its progress, and offers the finished file for download (ordinary PHP web hosting, the same kind Modulento itself needs, is enough),</li>
+    <li>for developing/testing the app locally: a JDK (Java) and the Android SDK - not needed to simply run the form itself, GitHub Actions takes care of that for every build.</li>
+</ul>
+<p>The individual Modulento operator needs none of this - for them it is a form with two fields and a download link.</p>
+
+<h2>Installing the finished app</h2>
+<p>For now the app does not come from the Play Store, but as a file to sideload:</p>
+<ol>
+    <li>Get the <code>.apk</code> file onto the device (download it directly on the phone, or via cable/cloud folder/e-mail to oneself).</li>
+    <li>Opening it, Android asks for permission to "install unknown apps" for whichever app opened the file (file manager or browser) - allow it once, then install.</li>
+</ol>
+<p>An update currently means: have a new <code>.apk</code> built and distribute it again (e.g. the same link on one's own website that customers already know). There is no automatic update mechanism inside the app itself yet.</p>
+
+<h2>How an operator passes the app on to their customers</h2>
+<p>This is deliberately not a second, different app: the same <code>.apk</code> file the operator uses with full access is also what their customers get - they simply see in it only what their own account (or guest mode, without an account) is allowed to see. A download link on one's own website, by e-mail, or as a QR code is the usual way.</p>
+
+<h2>What the app shows</h2>
+<table>
+    <thead><tr><th scope="col">Area</th><th scope="col">Who sees it</th></tr></thead>
+    <tbody>
+        <tr><td>Without logging in</td><td>the website's public home page, a "Log in" button</td></tr>
+        <tr><td>Account</td><td>one's own account details, log out</td></tr>
+        <tr><td>Administration</td><td>only with at least one permission in the administration - shows exactly the menu entries that account would also see in the browser under <code>/admin</code>; an entry opens the respective administration page, logged in, in an embedded view</td></tr>
+        <tr><td>Discover</td><td>the ordinary website, also for anything that does not (yet) have its own app screen</td></tr>
+    </tbody>
+</table>
+<p>An account with no administration permission at all simply sees no "Administration" area - no error message, the entry is just missing, exactly as the corresponding menu entry would be missing in the browser too.</p>
+
+<h2>Managing app logins</h2>
+<p>Every login in the app creates its own, revocable access (comparable to "stay logged in" in the browser, but independent of it). Under <strong>My account → App logins</strong> an account can see every one of its active app logins (with the date it was last used) and revoke any of them - for example after losing a device. Logging out inside the app itself only ever revokes that one device's own login automatically.</p>
+
+<h2>For developers</h2>
+<p>The technical interface the app uses to talk to one's own installation is described under <strong>Administration → Documentation</strong> ("Mobile API v1") - meant for anyone building something of their own against that interface, not for day-to-day operation.</p>

@@ -1,0 +1,47 @@
+<p>Neben der Website gibt es eine eigenständige Android-App. Dieselbe App bedient zwei Zielgruppen, ohne dass im Code zwischen ihnen unterschieden wird: <strong>Betreiber</strong> (voller Zugriff auf die Administration, abhängig von den eigenen Rechten) und <strong>Kundinnen und Kunden</strong> (eigenes Konto oder ganz ohne Anmeldung als Gast). Was jemand in der App zu sehen bekommt, entscheidet allein die Antwort des Servers auf die Anmeldung - genau wie in der Administration im Browser.</p>
+
+<h2>Woher die App kommt</h2>
+<p>Die App wird nicht aus einem App Store geladen, sondern pro Installation einmal passend gebaut: mit der eigenen Server-Adresse und einem eigenen Namen/Symbol fest eingebaut. Dafür gibt es ein eigenes, von Modulento getrenntes Formular (die Adresse nennt der Betreiber des Lizenzservers bzw. der App-Build-Pipeline). Dort reicht:</p>
+<ul>
+    <li>die eigene Server-Adresse (<code>https://…</code>),</li>
+    <li>ein Name für die App, wie er auf dem Gerät erscheinen soll.</li>
+</ul>
+<p>Nach wenigen Minuten steht eine fertige, bereits signierte <code>.apk</code>-Datei zum Herunterladen bereit. Das Formular selbst braucht nichts weiter als einen Browser - kein Android Studio, kein Entwicklerkonto, keine Installation irgendeines Programms auf dem eigenen Rechner.</p>
+
+<h2>Was zum Bauen der App technisch nötig ist (nur für den Betreiber des Lizenz-/Build-Dienstes, nicht für den einzelnen Modulento-Betreiber)</h2>
+<p>Wer diesen Build-Dienst selbst betreibt (also die Infrastruktur dahinter, nicht die einzelne App), braucht:</p>
+<ul>
+    <li>ein GitHub-Konto mit dem App-Quellcode-Repository und einem eingerichteten Signierschlüssel (als GitHub-Actions-Secrets hinterlegt - nie im Code, nie im Build-Formular sichtbar),</li>
+    <li>das kleine Formular-Werkzeug, das einen Build anstößt, den Fortschritt anzeigt und die fertige Datei zum Download bereitstellt (ein gewöhnliches PHP-Webhosting wie für Modulento selbst reicht),</li>
+    <li>für die Entwicklung/lokales Testen der App: ein JDK (Java) und das Android SDK - für den laufenden Betrieb des Formulars selbst nicht nötig, das übernimmt GitHub Actions bei jedem Build automatisch.</li>
+</ul>
+<p>Der einzelne Modulento-Betreiber selbst braucht nichts davon - für ihn ist es ein Formular mit zwei Feldern und ein Download-Link.</p>
+
+<h2>Die fertige App installieren</h2>
+<p>Die App kommt (jedenfalls vorerst) nicht aus dem Play Store, sondern als Datei zum Sideload:</p>
+<ol>
+    <li>Die <code>.apk</code>-Datei aufs Gerät bringen (Download direkt auf dem Smartphone, oder per Kabel/Cloud-Ordner/Mail an sich selbst).</li>
+    <li>Beim Öffnen fragt Android nach der Erlaubnis „Unbekannte Apps installieren“ für die App, mit der die Datei geöffnet wurde (Dateimanager oder Browser) - einmal erlauben, dann installieren.</li>
+</ol>
+<p>Ein Update bedeutet aktuell: eine neue <code>.apk</code> bauen lassen und erneut verteilen (z. B. derselbe Link auf der eigenen Website, den die eigenen Kundinnen und Kunden schon kennen). Ein automatischer Update-Mechanismus in der App selbst gibt es noch nicht.</p>
+
+<h2>Wie der Betreiber die App an seine Kundschaft weitergibt</h2>
+<p>Das ist bewusst keine zweite, andere App: dieselbe <code>.apk</code>-Datei, die der Betreiber selbst mit vollem Zugriff nutzt, bekommen auch seine Kundinnen und Kunden - sie sehen in ihr nur das, wofür ihr eigenes Konto (oder der Gast-Modus ohne Konto) berechtigt ist. Üblich ist ein Download-Link auf der eigenen Website, per Mail oder als QR-Code.</p>
+
+<h2>Was die App zeigt</h2>
+<table>
+    <thead><tr><th scope="col">Bereich</th><th scope="col">Wer sieht ihn</th></tr></thead>
+    <tbody>
+        <tr><td>Ohne Anmeldung</td><td>die öffentliche Startseite der Website, ein Knopf „Anmelden“</td></tr>
+        <tr><td>Konto</td><td>die eigenen Kontodaten, abmelden</td></tr>
+        <tr><td>Verwaltung</td><td>nur mit mindestens einer Berechtigung in der Administration - zeigt genau die Menüpunkte, die das Konto auch im Browser unter <code>/admin</code> sehen würde; ein Eintrag öffnet die jeweilige Administrationsseite angemeldet in einer eingebetteten Ansicht</td></tr>
+        <tr><td>Entdecken</td><td>die normale Website, auch für Dinge, für die es (noch) keinen eigenen App-Bildschirm gibt</td></tr>
+    </tbody>
+</table>
+<p>Ein Konto ohne jede Administrationsberechtigung sieht also schlicht keinen „Verwaltung“-Bereich - keine Fehlermeldung, der Punkt fehlt einfach, genau wie ein entsprechender Menüpunkt im Browser auch fehlen würde.</p>
+
+<h2>App-Anmeldungen verwalten</h2>
+<p>Jede Anmeldung in der App legt einen eigenen, widerrufbaren Zugang an (vergleichbar mit „Angemeldet bleiben“ im Browser, aber unabhängig davon). Unter <strong>Mein Konto → App-Logins</strong> sieht ein Konto alle seine aktiven App-Anmeldungen (mit Datum der letzten Nutzung) und kann einzelne davon widerrufen - zum Beispiel nach dem Verlust eines Geräts. Das Abmelden in der App selbst widerruft automatisch nur die eigene Anmeldung dieses einen Geräts.</p>
+
+<h2>Für Entwicklerinnen und Entwickler</h2>
+<p>Die technische Schnittstelle, über die die App mit der eigenen Installation spricht, ist in <strong>Administration → Dokumentation</strong> („Mobile-API v1“) beschrieben - das richtet sich an alle, die selbst etwas gegen diese Schnittstelle bauen wollen, nicht an den täglichen Betrieb.</p>

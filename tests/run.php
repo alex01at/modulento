@@ -1000,9 +1000,9 @@ $pdo->exec("DELETE FROM account WHERE email = 'english@example.test'");
 
 // --- Handbook --------------------------------------------------------------
 $slugs = array_keys(Modulento\Core\Support\Handbook::CHAPTERS);
-check('handbook: thirteen chapters, in the order they are meant to be read', count($slugs) === 13 && $slugs[0] === 'intro' && end($slugs) === 'glossary');
+check('handbook: fourteen chapters, in the order they are meant to be read', count($slugs) === 14 && $slugs[0] === 'intro' && end($slugs) === 'glossary');
 $r = $get('/handbook', null);
-check('handbook: the overview lists every chapter, in German by default', $r['status'] === 200 && substr_count($r['body'], '<a href="/handbook/') === 13 && str_contains($r['body'], 'Zahlungsarten für Bestellungen'));
+check('handbook: the overview lists every chapter, in German by default', $r['status'] === 200 && substr_count($r['body'], '<a href="/handbook/') === 14 && str_contains($r['body'], 'Zahlungsarten für Bestellungen'));
 $r = $get('/en/handbook', null);
 check('handbook: the same overview in English', $r['status'] === 200 && str_contains($r['body'], '<h1>Handbook</h1>') && str_contains($r['body'], 'Payment methods for orders'));
 $r = $get('/handbook/intro', null);

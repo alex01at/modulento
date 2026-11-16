@@ -371,6 +371,7 @@ return [
     'core.handbook.chapter.themes' => 'Themes',
     'core.handbook.chapter.languages' => 'Mehrsprachigkeit',
     'core.handbook.chapter.operations' => 'Betrieb',
+    'core.handbook.chapter.mobile_app' => 'Die Mobile-App',
     'core.handbook.chapter.glossary' => 'Glossar',
     'core.module.remember_login.name' => 'Angemeldet bleiben',
     'core.module.remember_login.description' => 'Checkbox beim Anmelden und Liste der gemerkten Geräte.',

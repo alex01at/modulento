@@ -371,6 +371,7 @@ return [
     'core.handbook.chapter.themes' => 'Themes',
     'core.handbook.chapter.languages' => 'Multiple languages',
     'core.handbook.chapter.operations' => 'Operations',
+    'core.handbook.chapter.mobile_app' => 'The mobile app',
     'core.handbook.chapter.glossary' => 'Glossary',
     'core.module.remember_login.name' => 'Stay logged in',
     'core.module.remember_login.description' => 'The box at login and the list of remembered devices.',

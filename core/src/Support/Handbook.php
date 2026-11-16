@@ -28,6 +28,7 @@ final class Handbook
         'themes' => 'core.handbook.chapter.themes',
         'languages' => 'core.handbook.chapter.languages',
         'operations' => 'core.handbook.chapter.operations',
+        'mobile-app' => 'core.handbook.chapter.mobile_app',
         'glossary' => 'core.handbook.chapter.glossary',
     ];
 }
