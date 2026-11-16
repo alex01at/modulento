@@ -4,7 +4,12 @@ declare(strict_types=1);
 
 namespace Modulento\Core;
 
+use Modulento\Core\Account\ApiTokens;
+use Modulento\Core\Controller\AccountApiTokenController;
 use Modulento\Core\Controller\AccountController;
+use Modulento\Core\Controller\Api\AuthApiController;
+use Modulento\Core\Controller\Api\MetaController;
+use Modulento\Core\Controller\WebviewController;
 use Modulento\Core\Controller\AdminAccountController;
 use Modulento\Core\Controller\AdminCatalogueController;
 use Modulento\Core\Controller\AdminCustomFieldController;
@@ -159,6 +164,27 @@ final class Kernel
         $app->path = $route['path'];
         $app->translator->setLocale($route['locale']);
 
+        // The mobile API: an app sends its token instead of a session
+        // cookie. Only below /api/ (with or without a language prefix), so
+        // no page a browser asks for is ever touched by this.
+        if (str_starts_with($app->path, '/api/') && !$app->auth->check()) {
+            $token = ApiTokens::parseHeader($_SERVER['HTTP_AUTHORIZATION'] ?? null);
+            $accountId = $token !== null ? $app->apiTokens->resolve($token['selector'], $token['secret']) : null;
+            if ($accountId !== null) {
+                $app->auth->login($accountId);
+                // The login lasts for this request only: the session's
+                // cookie is not sent and the session ends with the answer.
+                // Otherwise a client that keeps cookies would stay logged
+                // in after its token was revoked.
+                header_remove('Set-Cookie');
+                register_shutdown_function(static function (): void {
+                    if (session_status() === PHP_SESSION_ACTIVE) {
+                        session_destroy();
+                    }
+                });
+            }
+        }
+
         return $route['redirect'] !== null ? $route['redirect'] . ($query ? '?' . $query : '') : null;
     }
 
@@ -206,6 +232,17 @@ final class Kernel
         $router->post('/account/provider', [ProviderController::class, 'save']);
         $router->post('/account/identity', [AccountController::class, 'submitIdentity']);
         $router->post('/account/billing', [AccountController::class, 'updateBilling']);
+
+        // The mobile API (v1): JSON, authenticated by a Bearer token (see
+        // prepareRequest()). No form of this site posts here, so there is
+        // no session-bound CSRF token an app could send.
+        $router->post('/api/v1/auth/login', [AuthApiController::class, 'login'], Router::PUBLIC, csrfExempt: true);
+        $router->post('/api/v1/auth/logout', [AuthApiController::class, 'logout'], Router::AUTH, csrfExempt: true);
+        $router->post('/api/v1/auth/webview-handoff', [AuthApiController::class, 'webviewHandoff'], Router::AUTH, csrfExempt: true);
+        $router->get('/api/v1/meta', [MetaController::class, 'index']);
+        $router->get('/webview/session', [WebviewController::class, 'session'], Router::PUBLIC);
+        $router->get('/account/api-tokens', [AccountApiTokenController::class, 'index']);
+        $router->post('/account/api-tokens/{id}/revoke', [AccountApiTokenController::class, 'revoke']);
 
         $router->get('/account/payments', [PaymentSettingsController::class, 'index']);
         $router->post('/account/payments/transfer', [PaymentSettingsController::class, 'saveTransfer']);
@@ -670,6 +707,7 @@ final class Kernel
         $app->scheduler->register('core.account-cleanup', 60, function (App $app): void {
             $app->tokens->purgeExpired();
             $app->loginTokens->purgeExpired();
+            $app->apiTokens->purgeExpired();
             $app->accounts->deleteUnverifiedOlderThan(7 * 86400);
             $app->notifications->purgeRead(90);
         });

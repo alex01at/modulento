@@ -22,6 +22,9 @@ final class Router
     /** The prefix of an access that names a feature of a subscription plan. */
     public const FEATURE = 'feature:';
 
+    /** What a refusal below /api/ is called when the place refusing names nothing more exact. */
+    private const API_ERROR_CODES = [403 => 'forbidden', 404 => 'not_found', 413 => 'too_large'];
+
     /** @var array<int, array{method: string, regex: string, handler: array|Closure, access: string, csrfExempt: bool}> */
     private array $routes = [];
 
@@ -133,7 +136,7 @@ final class Router
                 header('Location: ' . $this->app->url('/login'));
                 return false;
             }
-            $this->fail(403, 'core.error.forbidden');
+            $this->fail(403, 'core.error.forbidden', 'unauthenticated');
             return false;
         }
 
@@ -190,7 +193,7 @@ final class Router
      */
     private function demoBlocks(string $path): bool
     {
-        if (in_array($path, ['/logout', '/account/stop-impersonating'], true)) {
+        if (in_array($path, ['/logout', '/account/stop-impersonating', '/api/v1/auth/logout', '/api/v1/auth/webview-handoff'], true)) {
             return false;
         }
 
@@ -232,7 +235,8 @@ final class Router
      */
     private function isAjax(): bool
     {
-        return ($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'XMLHttpRequest'
+        return $this->isApi()
+            || ($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'XMLHttpRequest'
             || str_contains((string) ($_SERVER['HTTP_ACCEPT'] ?? ''), 'application/json');
     }
 
@@ -260,6 +264,10 @@ final class Router
         http_response_code(503);
         header('Retry-After: 3600');
 
+        if ($this->isApi()) {
+            $this->apiError('maintenance', 'core.maintenance.title');
+            return;
+        }
         if ($this->isAjax()) {
             echo '503 - ' . $this->app->translator->trans('core.maintenance.title');
             return;
@@ -270,15 +278,39 @@ final class Router
         ]);
     }
 
-    private function fail(int $status, string $messageKey): void
+    private function fail(int $status, string $messageKey, ?string $code = null): void
     {
         http_response_code($status);
 
+        if ($this->isApi()) {
+            $this->apiError($code ?? self::API_ERROR_CODES[$status] ?? 'error', $messageKey);
+            return;
+        }
         if ($this->isAjax()) {
             echo $status . ' - ' . $this->app->translator->trans($messageKey);
             return;
         }
 
         echo $this->app->view()->render('error.twig', ['status' => $status, 'message_key' => $messageKey]);
+    }
+
+    /**
+     * The mobile API: an app never gets a page or a redirect to the login
+     * form, whatever headers it sends - a refusal is JSON in the shape of
+     * every other answer below /api/.
+     */
+    private function isApi(): bool
+    {
+        return str_starts_with($this->app->path, '/api/');
+    }
+
+    private function apiError(string $code, string $messageKey): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        header('Cache-Control: no-store');
+        echo json_encode(
+            ['error' => ['code' => $code, 'message' => $this->app->translator->trans($messageKey)]],
+            JSON_UNESCAPED_UNICODE
+        );
     }
 }

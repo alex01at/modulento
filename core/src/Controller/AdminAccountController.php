@@ -152,6 +152,7 @@ final class AdminAccountController extends Controller
         // A blocked account is refused anyway; deleting keeps its devices
         // from logging in again by themselves once it is unblocked.
         $this->app->loginTokens->revokeAll((int) $account['id']);
+        $this->app->apiTokens->revokeAll((int) $account['id']);
         $this->app->mailer->send($account['email'], 'emails/account_blocked.txt.twig', ['note' => $note], $this->localeOf($account));
         $this->back($account, 'success', 'core.admin.accounts.blocked');
     }

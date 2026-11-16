@@ -190,6 +190,7 @@ final class AccountController extends Controller
         }
 
         $this->app->loginTokens->revokeAll($this->accountId());
+        $this->app->apiTokens->revokeAll($this->accountId());
         $this->app->loginTokens->forget();
         $this->back('success', 'core.account.devices.revoked');
     }
@@ -275,6 +276,8 @@ final class AccountController extends Controller
         $this->app->tokens->revoke($this->accountId(), Tokens::RESET_PASSWORD);
         $this->app->auth->refreshStamp();
         $this->app->loginTokens->renew($this->accountId());
+        // An app logs in again with the new password.
+        $this->app->apiTokens->revokeAll($this->accountId());
         // If it was not the owner, this mail is how they find out.
         $this->app->mailer->send($account['email'], 'emails/password_changed.txt.twig', [
             'reset_link' => $this->app->url('/forgot-password', absolute: true),

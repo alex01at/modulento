@@ -16,6 +16,7 @@ use Modulento\Core\Support\Backups;
 use Modulento\Core\Support\Design;
 use Modulento\Core\Support\Branding;
 use Modulento\Core\Support\MessageSeen;
+use Modulento\Core\Account\ApiTokens;
 use Modulento\Core\Account\LoginTokens;
 use Modulento\Core\Account\Preferences;
 use Modulento\Core\Account\Roles;
@@ -96,6 +97,7 @@ final class App
     public readonly Accounts $accounts;
     public readonly Tokens $tokens;
     public readonly LoginTokens $loginTokens;
+    public readonly ApiTokens $apiTokens;
     public readonly Mailer $mailer;
     public readonly Locales $locales;
     public readonly Pages $pages;
@@ -311,6 +313,7 @@ final class App
         $this->accountIdentities = new AccountIdentities($db);
         $this->socialLoginHttp = $config['social_login']['http'] ?? new CurlHttpClient();
         $this->loginTokens = new LoginTokens($db);
+        $this->apiTokens = new ApiTokens($db);
         $this->mailer = new Mailer($this);
         $this->router = new Router($this);
     }

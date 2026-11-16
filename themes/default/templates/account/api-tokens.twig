@@ -1,0 +1,40 @@
+{% extends 'layout/base.twig' %}
+
+{% block title %}{{ trans('core.api.tokens.title') }} – {{ site_name }}{% endblock %}
+
+{% block content %}
+{% include 'account/_nav.twig' %}
+<h1>{{ trans('core.api.tokens.title') }}</h1>
+<p>{{ trans('core.api.tokens.intro') }}</p>
+
+{% if tokens is empty %}
+    <p class="empty">{{ trans('core.api.tokens.none') }}</p>
+{% else %}
+    <table>
+        <thead>
+        <tr>
+            <th scope="col">{{ trans('core.api.tokens.name') }}</th>
+            <th scope="col">{{ trans('core.api.tokens.created') }}</th>
+            <th scope="col">{{ trans('core.api.tokens.last_used') }}</th>
+            <th scope="col"><span class="visually-hidden">{{ trans('core.api.tokens.revoke') }}</span></th>
+        </tr>
+        </thead>
+        <tbody>
+        {% for token in tokens %}
+            <tr>
+                <td>{{ token.name ?? trans('core.api.tokens.unnamed') }}</td>
+                <td>{{ token.created_at }} UTC</td>
+                <td>{{ token.last_used_at }} UTC</td>
+                <td>
+                    <form method="post" action="{{ url('/account/api-tokens/' ~ token.id ~ '/revoke') }}" class="inline-form">
+                        {{ csrf_field() }}
+                        <button type="submit">{{ trans('core.api.tokens.revoke') }}</button>
+                    </form>
+                </td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    <p><small>{{ trans('core.api.tokens.revoke_hint') }}</small></p>
+{% endif %}
+{% endblock %}

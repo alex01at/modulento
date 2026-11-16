@@ -257,6 +257,8 @@ $pdo->exec("CREATE TABLE account_token (id INTEGER PRIMARY KEY, account_id INTEG
     purpose TEXT, token_hash TEXT UNIQUE, payload TEXT, expires_at TEXT, created_at TEXT)");
 $pdo->exec("CREATE TABLE account_login_token (id INTEGER PRIMARY KEY, account_id INTEGER REFERENCES account (id) ON DELETE CASCADE,
     selector TEXT UNIQUE, token_hash TEXT, previous_hash TEXT, rotated_at TEXT, auth_stamp TEXT, user_agent TEXT, created_at TEXT, last_used_at TEXT, expires_at TEXT)");
+$pdo->exec("CREATE TABLE account_api_token (id INTEGER PRIMARY KEY, account_id INTEGER REFERENCES account (id) ON DELETE CASCADE,
+    selector TEXT UNIQUE, token_hash TEXT, name TEXT, auth_stamp TEXT, created_at TEXT, last_used_at TEXT, expires_at TEXT, revoked_at TEXT)");
 $pdo->exec("CREATE TABLE rate_limit_attempt (id INTEGER PRIMARY KEY, action TEXT, identifier TEXT, created_at TEXT)");
 $pdo->exec("CREATE TABLE task_run (name TEXT PRIMARY KEY, last_started_at TEXT, last_finished_at TEXT, last_status TEXT, last_error TEXT)");
 $pdo->exec("CREATE TABLE x_example_login (id INTEGER PRIMARY KEY, account_id INTEGER REFERENCES account (id) ON DELETE CASCADE, logged_in_at TEXT)");
@@ -451,6 +453,44 @@ function request(PDO $pdo, array $config, string $method, string $path, int|fals
     $body = (string) ob_get_clean();
 
     return ['called' => $called, 'status' => (int) http_response_code(), 'body' => $body, 'redirect' => $redirect];
+}
+
+/**
+ * A request of an app to the mobile API: no session from before, no CSRF
+ * token, and the token (if any) as a Bearer header.
+ *
+ * @return array{status: int, body: string, json: ?array, redirect: ?string}
+ */
+function apiRequest(PDO $pdo, array $config, string $method, string $path, ?string $bearerToken, array $post = []): array
+{
+    $_SESSION = [];
+    $_POST = $post;
+    parse_str((string) parse_url($path, PHP_URL_QUERY), $_GET);
+    $_SERVER['REQUEST_URI'] = $path;
+    unset($_SERVER['HTTP_X_REQUESTED_WITH'], $_SERVER['HTTP_REFERER'], $_SERVER['HTTP_AUTHORIZATION']);
+    if ($bearerToken !== null) {
+        $_SERVER['HTTP_AUTHORIZATION'] = 'Bearer ' . $bearerToken;
+    }
+    http_response_code(200);
+
+    $app = new Modulento\Core\App($config, $pdo);
+    $app->translator->load($config['app']['root'] . '/core/lang', 'core');
+
+    Modulento\Core\Kernel::registerCore($app);
+    $app->extensions->loadEnabled($app);
+    Modulento\Core\Kernel::registerLast($app);
+    Modulento\Core\Kernel::loadThemeTexts($app);
+    $redirect = Modulento\Core\Kernel::prepareRequest($app, $path, startSession: false);
+
+    ob_start();
+    if ($redirect === null) {
+        $app->router->dispatch($method, $app->path);
+    }
+    $body = (string) ob_get_clean();
+    unset($_SERVER['HTTP_AUTHORIZATION']);
+    $json = json_decode($body, true);
+
+    return ['status' => (int) http_response_code(), 'body' => $body, 'json' => is_array($json) ? $json : null, 'redirect' => $redirect];
 }
 
 $r = request($pdo, $config, 'GET', '/open', null);
@@ -6676,6 +6716,163 @@ check('demo data: a quantity above the maximum is clamped, not taken at face val
 $post('/admin/demo-data/clear', [], 3);
 
 $pdo->exec("UPDATE extension SET enabled = 0 WHERE id = 'freelancer'");
+
+// --- Mobile API v1: token login, meta, logout, handoff to a session ---
+$pdo->exec('DELETE FROM rate_limit_attempt');
+$apiConfig = $config;
+$apiConfig['app']['secret_key'] = sys_get_temp_dir() . '/modulento-test-api-key-' . bin2hex(random_bytes(4)) . '/secret.key';
+$apiApp = fn () => new Modulento\Core\App($apiConfig, $pdo);
+$api = fn (string $method, string $path, ?string $token, array $fields = []) => apiRequest($pdo, $apiConfig, $method, $path, $token, $fields);
+$apiPw = 'a long password for the app';
+$apiUserId = $apiApp()->accounts->create('app-user@example.test', $apiPw, 'de', true);
+$apiAdminId = $apiApp()->accounts->create('app-admin@example.test', $apiPw, 'de', true);
+$pdo->exec("INSERT INTO account_role VALUES ({$apiAdminId}, 2)");
+$apiTokenCount = fn () => (int) $pdo->query('SELECT COUNT(*) FROM account_api_token WHERE revoked_at IS NULL')->fetchColumn();
+
+$r = $api('POST', '/api/v1/auth/login', null, ['email' => 'app-user@example.test', 'password' => 'not the password']);
+check('api: a wrong password is refused with 401 and an error envelope', $r['status'] === 401 && ($r['json']['error']['code'] ?? null) === 'invalid_credentials'
+    && ($r['json']['error']['message'] ?? '') !== '' && !isset($r['json']['data']) && $apiTokenCount() === 0);
+$r = $api('POST', '/api/v1/auth/login', null, ['email' => 'nobody@example.test', 'password' => $apiPw]);
+check('api: an unknown address is refused the same way', $r['status'] === 401 && ($r['json']['error']['code'] ?? null) === 'invalid_credentials');
+
+$r = $api('POST', '/api/v1/auth/login', null, ['email' => 'App-User@example.test ', 'password' => $apiPw, 'device_name' => "Pixel 8\x07"]);
+$userToken = (string) ($r['json']['data']['token'] ?? '');
+check('api: login needs no CSRF token and answers with a token, the account and the version', $r['status'] === 200
+    && preg_match('/\A[a-f0-9]{24}\.[a-f0-9]{64}\z/', $userToken) === 1
+    && ($r['json']['data']['account'] ?? null) === ['id' => $apiUserId, 'email' => 'app-user@example.test', 'display_name' => null, 'locale' => 'de', 'created_at' => $r['json']['data']['account']['created_at'], 'demo_mode' => false]
+    && $r['json']['data']['api_version'] === Modulento\Core\App::API_VERSION);
+check('api: the answer never carries the password hash', !str_contains($r['body'], 'password'));
+$apiRow = $pdo->query('SELECT * FROM account_api_token WHERE account_id = ' . $apiUserId)->fetch();
+check('api: only the hash of the secret is stored, with the device name cleaned', $apiRow['token_hash'] === hash('sha256', explode('.', $userToken)[1])
+    && !str_contains(implode('|', array_map('strval', $apiRow)), explode('.', $userToken)[1]) && $apiRow['name'] === 'Pixel 8' && $apiRow['expires_at'] === null);
+check('api: a successful login leaves no counted attempt of its own behind', (int) $pdo->query("SELECT COUNT(*) FROM rate_limit_attempt WHERE action = 'login-pair'")->fetchColumn() === 1);
+
+$r = $api('GET', '/api/v1/meta', $userToken);
+$meta = $r['json']['data'] ?? [];
+check('api: meta with a token lists every part an app builds its screens from', $r['status'] === 200
+    && array_diff(['api_version', 'core_version', 'account', 'permissions', 'modules', 'extensions', 'admin_menu', 'notices', 'branding', 'languages'], array_keys($meta)) === []
+    && $meta['account']['id'] === $apiUserId && $meta['account']['email'] === 'app-user@example.test');
+check('api: an account without a role holds no permission and sees no admin menu', $meta['permissions'] === [] && $meta['admin_menu'] === [] && $meta['notices'] === []);
+check('api: meta names modules, design and languages', in_array('remember_login', array_column($meta['modules'], 'id'), true) && is_bool($meta['modules'][0]['enabled'])
+    && $meta['modules'][0]['label_key'] === 'core.module.' . $meta['modules'][0]['id'] . '.name' && array_filter(array_column($meta['modules'], 'label'), fn (string $label) => str_starts_with($label, 'core.')) === []
+    && array_diff(['site_name', 'accent', 'ground', 'text', 'font', 'radius'], array_keys($meta['branding'])) === []
+    && $meta['languages']['default'] === $apiApp()->locales->default() && $meta['languages']['enabled'] === $apiApp()->locales->enabled());
+
+$r = $api('POST', '/api/v1/auth/login', null, ['email' => 'app-admin@example.test', 'password' => $apiPw]);
+$adminToken = (string) ($r['json']['data']['token'] ?? '');
+$r = $api('GET', '/api/v1/meta', $adminToken);
+$meta = $r['json']['data'] ?? [];
+$apiFullApp = $apiApp();
+Modulento\Core\Kernel::registerCore($apiFullApp);
+$apiFullApp->extensions->loadEnabled($apiFullApp);
+$menuPaths = array_merge([], ...array_map(fn (array $group) => array_column($group['items'], 'path'), $meta['admin_menu'] ?? []));
+check('api: an administrator holds every permission', $r['status'] === 200 && $meta['permissions'] === array_keys($apiFullApp->permissions()) && in_array('core.admin.access', $meta['permissions'], true));
+check('api: and gets the admin menu in its sections, in their fixed order, with texts', in_array('/admin/pages', $menuPaths, true) && count($menuPaths) === count($apiFullApp->adminMenu())
+    && array_values(array_intersect(Modulento\Core\App::ADMIN_GROUPS, array_column($meta['admin_menu'], 'id'))) === array_column($meta['admin_menu'], 'id')
+    && $meta['admin_menu'][0]['label'] !== '' && !str_starts_with($meta['admin_menu'][0]['label'], 'core.') && $meta['admin_menu'][0]['items'][0]['label'] !== '');
+
+$r = $api('GET', '/api/v1/meta', null);
+check('api: meta without a token is refused as JSON, not sent to the login form', $r['status'] === 403 && ($r['json']['error']['code'] ?? null) === 'unauthenticated' && $r['redirect'] === null);
+$r = $api('GET', '/api/v1/meta', explode('.', $userToken)[0] . '.' . str_repeat('0', 64));
+check('api: a known selector with a wrong secret is refused', $r['status'] === 403 && ($r['json']['error']['code'] ?? null) === 'unauthenticated');
+check('api: a token that is no token is refused', $api('GET', '/api/v1/meta', 'something else')['status'] === 403);
+check('api: unknown addresses below /api/ answer 404 as JSON', ($api('GET', '/api/v1/nothing', $userToken)['json']['error']['code'] ?? null) === 'not_found');
+$_SERVER['HTTP_AUTHORIZATION'] = 'Bearer ' . $userToken;
+$r = request($pdo, $apiConfig, 'GET', '/members', null);
+unset($_SERVER['HTTP_AUTHORIZATION']);
+check('api: a token logs in below /api/ only, never on a page', !$r['called']);
+check('api: with a language prefix the answer is in that language', ($api('GET', '/en/api/v1/meta', null)['json']['error']['message'] ?? null) === 'Access denied'
+    && $api('GET', '/en/api/v1/meta', $userToken)['status'] === 200);
+
+// Two devices of one account: logging out one leaves the other.
+$r = $api('POST', '/api/v1/auth/login', null, ['email' => 'app-user@example.test', 'password' => $apiPw, 'device_name' => 'Tablet']);
+$secondToken = (string) $r['json']['data']['token'];
+$r = request($pdo, $apiConfig, 'GET', '/account/api-tokens', $apiUserId);
+check('api: the account page lists its app logins by name, without the secrets', $r['status'] === 200 && str_contains($r['body'], 'Pixel 8') && str_contains($r['body'], 'Tablet')
+    && !str_contains($r['body'], explode('.', $secondToken)[1]) && !str_contains($r['body'], explode('.', $secondToken)[0]));
+check('api: nobody sees the app logins of another account', !str_contains(request($pdo, $apiConfig, 'GET', '/account/api-tokens', $apiAdminId)['body'], 'Pixel 8'));
+
+$r = $api('POST', '/api/v1/auth/logout', $userToken);
+check('api: logout answers ok', $r['status'] === 200 && ($r['json']['data']['ok'] ?? null) === true);
+check('api: the token that logged out is not accepted any more', $api('GET', '/api/v1/meta', $userToken)['status'] === 403);
+check('api: the other device of the account stays logged in', $api('GET', '/api/v1/meta', $secondToken)['status'] === 200 && $api('GET', '/api/v1/meta', $adminToken)['status'] === 200);
+check('api: logout without a token is refused', $api('POST', '/api/v1/auth/logout', null)['status'] === 403);
+
+$secondId = (int) $pdo->query('SELECT id FROM account_api_token WHERE selector = ' . $pdo->quote(explode('.', $secondToken)[0]))->fetchColumn();
+request($pdo, $apiConfig, 'POST', "/account/api-tokens/{$secondId}/revoke", $apiAdminId);
+check('api: another account cannot revoke a login', $api('GET', '/api/v1/meta', $secondToken)['status'] === 200);
+request($pdo, $apiConfig, 'POST', "/account/api-tokens/{$secondId}/revoke", $apiUserId);
+check('api: the owner revokes a login on the account page', $api('GET', '/api/v1/meta', $secondToken)['status'] === 403
+    && !str_contains(request($pdo, $apiConfig, 'GET', '/account/api-tokens', $apiUserId)['body'], 'Tablet'));
+
+// What else ends a token: its end date, a blocked account, a new password.
+$r = $api('POST', '/api/v1/auth/login', null, ['email' => 'app-user@example.test', 'password' => $apiPw]);
+$thirdToken = (string) $r['json']['data']['token'];
+$pdo->exec("UPDATE account_api_token SET expires_at = '2020-01-01 00:00:00' WHERE revoked_at IS NULL AND account_id = {$apiUserId}");
+check('api: an expired token is refused', $api('GET', '/api/v1/meta', $thirdToken)['status'] === 403);
+$pdo->exec("UPDATE account_api_token SET expires_at = '2999-01-01 00:00:00' WHERE revoked_at IS NULL AND account_id = {$apiUserId}");
+check('api: a token with an end date in the future works', $api('GET', '/api/v1/meta', $thirdToken)['status'] === 200);
+$pdo->exec("UPDATE account SET status = 'blocked' WHERE id = {$apiUserId}");
+check('api: a blocked account is refused, token or not', $api('GET', '/api/v1/meta', $thirdToken)['status'] === 403);
+$pdo->exec("UPDATE account SET status = 'active' WHERE id = {$apiUserId}");
+$apiApp()->accounts->setPassword($apiUserId, 'another long password for it');
+check('api: a token from before a password change is worth nothing', $api('GET', '/api/v1/meta', $thirdToken)['status'] === 403);
+$apiApp()->accounts->setPassword($apiUserId, $apiPw);
+check('api: also not after the old password is back - the stamp is of the hash', $api('GET', '/api/v1/meta', $thirdToken)['status'] === 403);
+$apiApp()->apiTokens->revokeAll($apiAdminId);
+check('api: revoking all tokens of an account ends each of them', $api('GET', '/api/v1/meta', $adminToken)['status'] === 403);
+$pdo->exec("UPDATE account_api_token SET revoked_at = '2020-01-01 00:00:00' WHERE revoked_at IS NOT NULL");
+$apiApp()->apiTokens->purgeExpired();
+check('api: the cleanup removes what was revoked long ago and nothing else', (int) $pdo->query('SELECT COUNT(*) FROM account_api_token')->fetchColumn() === $apiTokenCount());
+
+// Handoff: the app's embedded browser gets an ordinary session.
+$r = $api('POST', '/api/v1/auth/login', null, ['email' => 'app-user@example.test', 'password' => $apiPw]);
+$userToken = (string) $r['json']['data']['token'];
+check('api: a handoff code needs a token', $api('POST', '/api/v1/auth/webview-handoff', null)['status'] === 403);
+$r = $api('POST', '/api/v1/auth/webview-handoff', $userToken, ['path' => '/account/settings']);
+$code = (string) ($r['json']['data']['code'] ?? '');
+check('api: a handoff code is made without a database row', $r['status'] === 200 && $code !== '' && str_ends_with((string) $r['json']['data']['url'], '/webview/session?code=' . $code)
+    && $r['json']['data']['expires_in'] === Modulento\Core\Support\WebviewHandoff::TTL_SECONDS);
+$handoff = new Modulento\Core\Support\WebviewHandoff($apiApp()->secrets);
+check('api: the code names the account and the page', $handoff->verify($code) === ['account_id' => $apiUserId, 'path' => '/account/settings']);
+check('api: the code is void after a minute', $handoff->verify($code, time() + 61) === null && $handoff->verify($handoff->issue($apiUserId, null, time() - 61)) === null);
+[$payload, $signature] = explode('.', $code);
+$forged = rtrim(strtr(base64_encode((string) json_encode(['a' => $apiAdminId, 'e' => time() + 60, 'p' => null])), '+/', '-_'), '=');
+check('api: a changed code is refused', $handoff->verify($forged . '.' . $signature) === null && $handoff->verify($payload . '.' . str_repeat('0', 64)) === null
+    && $handoff->verify($payload) === null && $handoff->verify(['x']) === null);
+check('api: another installation\'s key makes no valid code', (new Modulento\Core\Support\WebviewHandoff(new Modulento\Core\Support\Secrets(dirname($apiConfig['app']['secret_key']) . '/other.key')))->verify($code) === null);
+check('api: a page outside this site is never the target', $handoff->verify($handoff->issue($apiUserId, '//evil.example/x'))['path'] === null
+    && $handoff->verify($handoff->issue($apiUserId, 'https://evil.example/'))['path'] === null);
+
+$r = $api('GET', '/webview/session?code=' . $forged . '.' . $signature, null);
+check('webview: a forged code is refused and logs nobody in', $r['status'] === 403 && !isset($_SESSION['account_id']) && !request($pdo, $apiConfig, 'GET', '/members', false)['called']);
+$r = $api('GET', '/webview/session?code=' . $handoff->issue($apiUserId, null, time() - 61), null);
+check('webview: an expired code is refused', $r['status'] === 403 && !isset($_SESSION['account_id']));
+$r = $api('GET', '/webview/session?code=' . $code, null);
+check('webview: a valid code starts a session for the account', ($_SESSION['account_id'] ?? null) === $apiUserId && $r['body'] === '');
+$r = request($pdo, $apiConfig, 'GET', '/members', false);
+check('webview: the next request of that browser is logged in, without a token', $r['called']);
+$pdo->exec("UPDATE account SET status = 'blocked' WHERE id = {$apiUserId}");
+$r = $api('GET', '/webview/session?code=' . $handoff->issue($apiUserId), null);
+check('webview: a code of a blocked account is refused', $r['status'] === 403 && !isset($_SESSION['account_id']));
+$pdo->exec("UPDATE account SET status = 'active' WHERE id = {$apiUserId}");
+
+// The login form goes through the same check as the API.
+$pdo->exec('DELETE FROM rate_limit_attempt');
+for ($i = 0; $i < 5; $i++) {
+    $api('POST', '/api/v1/auth/login', null, ['email' => 'app-user@example.test', 'password' => 'guess ' . $i]);
+}
+$r = $api('POST', '/api/v1/auth/login', null, ['email' => 'app-user@example.test', 'password' => $apiPw]);
+check('api: after too many wrong passwords even the right one waits', $r['status'] === 429 && ($r['json']['error']['code'] ?? null) === 'too_many_attempts');
+$post('/login', ['email' => 'app-user@example.test', 'password' => $apiPw], null);
+check('api: and the login form counts against the same limit', !isset($_SESSION['account_id']));
+$pdo->exec('DELETE FROM rate_limit_attempt');
+$pdo->exec("UPDATE account SET email_verified_at = NULL WHERE id = {$apiUserId}");
+$r = $api('POST', '/api/v1/auth/login', null, ['email' => 'app-user@example.test', 'password' => $apiPw]);
+check('api: an unconfirmed address gets no token', $r['status'] === 403 && ($r['json']['error']['code'] ?? null) === 'email_unverified');
+$pdo->exec('DELETE FROM account WHERE id IN (' . $apiUserId . ', ' . $apiAdminId . ')');
+check('api: the tokens go with the account', (int) $pdo->query('SELECT COUNT(*) FROM account_api_token')->fetchColumn() === 0);
+$pdo->exec('DELETE FROM rate_limit_attempt');
 
 foreach ($GLOBALS['failed'] ?? [] as $label) {
     echo "FAIL  {$label}\n";

@@ -63,6 +63,19 @@ final class Secrets
         return $plain === false ? null : $plain;
     }
 
+    /**
+     * A signature only this installation can make or check, for short-lived
+     * values that are handed out and come back (no database row needed).
+     * Every purpose signs with a key of its own, derived from the key
+     * file, so a signature made for one purpose proves nothing for another.
+     *
+     * @throws RuntimeException if the key file cannot be created or read
+     */
+    public function mac(string $purpose, string $data): string
+    {
+        return hash_hmac('sha256', $data, hash_hmac('sha256', 'mac:' . $purpose, $this->key(create: true), true));
+    }
+
     private function key(bool $create): string
     {
         if ($this->key !== null) {

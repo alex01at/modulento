@@ -209,3 +209,78 @@ final class Extension implements ExtensionContract
     </ol>
     <p>An extension runs its own code on the server. Install only packages from sources you trust.</p>
 </section>
+
+<section class="card-box">
+    <h2>Mobile API v1</h2>
+    <p>A JSON interface for apps, below <code>/api/v1/</code>. It is an addition to the website and changes nothing about it: pages, forms and browser sessions work as before. An app logs in with e-mail address and password, receives a token and sends it with every request from then on.</p>
+
+    <h3>Answers</h3>
+    <p>Every answer is JSON in one of two shapes – including every refusal below <code>/api/</code> (not logged in, unknown address, maintenance mode):</p>
+<pre><code>{ "data": { … } }
+{ "error": { "code": "invalid_credentials", "message": "E-mail address or password is incorrect." } }</code></pre>
+    <p><code>code</code> stays the same and is meant for the app; <code>message</code> is a text in the language of the request, meant for people. As on the website, the prefix of the address selects the language (<code>/en/api/v1/meta</code>); without a prefix the default language applies.</p>
+    <div class="table-wrap">
+        <table>
+            <thead><tr><th scope="col">Code</th><th scope="col">Status</th><th scope="col">Meaning</th></tr></thead>
+            <tbody>
+                <tr><th scope="row"><code>invalid_credentials</code></th><td>401</td><td>E-mail address or password is incorrect.</td></tr>
+                <tr><th scope="row"><code>too_many_attempts</code></th><td>429</td><td>Too many login attempts; the same limits as for the website's login form.</td></tr>
+                <tr><th scope="row"><code>email_unverified</code></th><td>403</td><td>The password is right, but the e-mail address has not been confirmed yet.</td></tr>
+                <tr><th scope="row"><code>unauthenticated</code></th><td>403</td><td>No token, or one that is unknown, logged out or expired. The app shows its login again.</td></tr>
+                <tr><th scope="row"><code>forbidden</code></th><td>403</td><td>Logged in, but without the permission needed – or an account in demo mode tries to change something.</td></tr>
+                <tr><th scope="row"><code>invalid_token</code></th><td>400</td><td>Logging out without the token that is to be logged out.</td></tr>
+                <tr><th scope="row"><code>not_found</code></th><td>404</td><td>There is no such address.</td></tr>
+                <tr><th scope="row"><code>maintenance</code></th><td>503</td><td>Maintenance mode; only administrators get through.</td></tr>
+                <tr><th scope="row"><code>unavailable</code></th><td>503</td><td>The server cannot create or read the key file (only when handing off to the WebView).</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <h3>Logging in</h3>
+    <ol>
+        <li><code>POST /api/v1/auth/login</code> with <code>email</code>, <code>password</code> and optionally <code>device_name</code> (at most 100 characters, shown in the account under “My app logins”).</li>
+        <li>The answer contains the token – this one time only. The server stores nothing but a hash of it.</li>
+        <li>Every further request carries the header <code>Authorization: Bearer &lt;token&gt;</code>.</li>
+    </ol>
+    <p>Fields can be sent as form fields or as a JSON object (<code>Content-Type: application/json</code>). The API needs no CSRF token. A token is valid until it is logged out (in the app or at <code>/account/api-tokens</code>), the password is changed, “Log out everywhere” is chosen or the account is blocked. It only works below <code>/api/</code>, never on a page of the website, and the answer sets no session cookie. Some servers do not pass the <code>Authorization</code> header on to PHP by themselves; the <code>public/.htaccess</code> shipped takes care of that (<code>mod_rewrite</code>).</p>
+<pre><code>{ "data": {
+    "token": "4c1a61adc853c8d70a1c5a0b.3f6c…",
+    "account": { "id": 7, "email": "me@example.org", "display_name": null, "locale": "en", "created_at": "2026-01-01 00:00:00", "demo_mode": false },
+    "api_version": 1
+} }</code></pre>
+
+    <h3>Endpoints</h3>
+    <div class="table-wrap">
+        <table>
+            <thead><tr><th scope="col">Address</th><th scope="col">Access</th><th scope="col">What for</th></tr></thead>
+            <tbody>
+                <tr><th scope="row"><code>POST /api/v1/auth/login</code></th><td>anyone</td><td>E-mail address and password for a token. Answer: <code>token</code>, <code>account</code>, <code>api_version</code>.</td></tr>
+                <tr><th scope="row"><code>POST /api/v1/auth/logout</code></th><td>token</td><td>Logs out exactly the token sent along; other devices of the account stay logged in. Answer: <code>ok</code>.</td></tr>
+                <tr><th scope="row"><code>GET /api/v1/meta</code></th><td>token</td><td>Everything an app builds its screens from for this account, in one call (see below).</td></tr>
+                <tr><th scope="row"><code>POST /api/v1/auth/webview-handoff</code></th><td>token</td><td>A code that logs an embedded WebView in as the same account. Optional field <code>path</code>: the page to open afterwards. Answer: <code>code</code>, <code>url</code>, <code>expires_in</code>.</td></tr>
+                <tr><th scope="row"><code>GET /webview/session?code=…</code></th><td>anyone</td><td>Opened by the WebView, not by the app itself: checks the code, starts an ordinary session and redirects – to the page named in the code, else to <code>?redirect=/path</code>, else to <code>/account</code>. An invalid or expired code yields 403.</td></tr>
+            </tbody>
+        </table>
+    </div>
+    <p>The code for the WebView is valid for 60 seconds and needs no database row: it is signed with a key from this installation's key file. Only paths of this website can be the target, never another site's address.</p>
+
+    <h3><code>GET /api/v1/meta</code></h3>
+    <div class="table-wrap">
+        <table>
+            <thead><tr><th scope="col">Field</th><th scope="col">Content</th></tr></thead>
+            <tbody>
+                <tr><th scope="row"><code>api_version</code></th><td>Version of the interface for extensions (<code>App::API_VERSION</code>).</td></tr>
+                <tr><th scope="row"><code>core_version</code></th><td>Version of this installation; <code>0.0.0</code> outside a release package.</td></tr>
+                <tr><th scope="row"><code>account</code></th><td><code>id</code>, <code>email</code>, <code>display_name</code>, <code>locale</code>, <code>created_at</code>, <code>demo_mode</code>.</td></tr>
+                <tr><th scope="row"><code>permissions</code></th><td>List of the permissions the account holds, e.g. <code>core.orders.manage</code>. Empty for an account without a role.</td></tr>
+                <tr><th scope="row"><code>modules</code></th><td>Per module <code>id</code>, <code>label_key</code>, <code>label</code>, <code>enabled</code>.</td></tr>
+                <tr><th scope="row"><code>extensions</code></th><td>The active extensions: <code>id</code>, <code>name</code>, <code>version</code>, <code>type</code> (<code>app</code> or <code>addon</code>), <code>description</code>.</td></tr>
+                <tr><th scope="row"><code>admin_menu</code></th><td>The administration's menu as this account sees it: sections in their fixed order with <code>id</code>, <code>label_key</code>, <code>label</code> and <code>items</code> (each <code>label_key</code>, <code>label</code>, <code>path</code>, <code>permission</code>). Only entries the account holds the permission for; sections without an entry are left out. Entries from an extension's <code>adminMenu()</code> appear here too.</td></tr>
+                <tr><th scope="row"><code>notices</code></th><td>Pending notices of the administration (the bell): <code>count</code>, <code>label_key</code>, <code>label</code>, <code>link</code>. Including those from <code>adminNotice()</code>.</td></tr>
+                <tr><th scope="row"><code>branding</code></th><td><code>site_name</code> and the design values <code>accent</code>, <code>ground</code>, <code>text</code>, <code>font</code>, <code>radius</code>.</td></tr>
+                <tr><th scope="row"><code>languages</code></th><td><code>default</code> and <code>enabled</code> (a list, the default language first).</td></tr>
+            </tbody>
+        </table>
+    </div>
+    <p>An extension's own endpoints: register them in <code>routes()</code> below <code>/api/</code>, a <code>POST</code> with <code>csrfExempt: true</code>, and extend <code>Modulento\Core\Controller\Api\ApiController</code> – <code>$this-&gt;data([...])</code> and <code>$this-&gt;fail($code, $messageKey, $status)</code> produce the two shapes. Access and permissions are checked by the router as for any other route.</p>
+</section>

@@ -228,6 +228,7 @@ final class RegistrationController extends Controller
         // Remembered devices too. Their stamp no longer fits anyway, but
         // rows nobody can use have no reason to stay.
         $this->app->loginTokens->revokeAll($data['account_id']);
+        $this->app->apiTokens->revokeAll($data['account_id']);
         $this->app->accounts->markVerified($data['account_id']);
 
         // The owner is back in control: attempts by others no longer count.

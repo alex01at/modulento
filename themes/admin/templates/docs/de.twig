@@ -209,3 +209,78 @@ final class Extension implements ExtensionContract
     </ol>
     <p>Eine Erweiterung führt eigenen Code auf dem Server aus. Installiere nur Pakete aus Quellen, denen du vertraust.</p>
 </section>
+
+<section class="card-box">
+    <h2>Mobile-API v1</h2>
+    <p>Eine JSON-Schnittstelle für Apps, unter <code>/api/v1/</code>. Sie ergänzt die Website und ändert nichts an ihr: Seiten, Formulare und Sitzungen im Browser arbeiten wie bisher. Eine App meldet sich mit E-Mail-Adresse und Passwort an, erhält ein Token und schickt es danach mit jeder Anfrage mit.</p>
+
+    <h3>Antworten</h3>
+    <p>Jede Antwort ist JSON in einer von zwei Formen – auch jede Ablehnung unterhalb von <code>/api/</code> (nicht angemeldet, Adresse unbekannt, Wartungsmodus):</p>
+<pre><code>{ "data": { … } }
+{ "error": { "code": "invalid_credentials", "message": "E-Mail-Adresse oder Passwort stimmen nicht." } }</code></pre>
+    <p><code>code</code> bleibt gleich und ist für die App gedacht, <code>message</code> ist ein Text in der Sprache der Anfrage und für Menschen gedacht. Die Sprache bestimmt wie auf der Website das Präfix der Adresse (<code>/en/api/v1/meta</code>), ohne Präfix gilt die Standardsprache.</p>
+    <div class="table-wrap">
+        <table>
+            <thead><tr><th scope="col">Code</th><th scope="col">Status</th><th scope="col">Bedeutung</th></tr></thead>
+            <tbody>
+                <tr><th scope="row"><code>invalid_credentials</code></th><td>401</td><td>E-Mail-Adresse oder Passwort stimmen nicht.</td></tr>
+                <tr><th scope="row"><code>too_many_attempts</code></th><td>429</td><td>Zu viele Anmeldeversuche; dieselben Grenzen wie beim Anmeldeformular der Website.</td></tr>
+                <tr><th scope="row"><code>email_unverified</code></th><td>403</td><td>Das Passwort stimmt, die E-Mail-Adresse ist aber noch nicht bestätigt.</td></tr>
+                <tr><th scope="row"><code>unauthenticated</code></th><td>403</td><td>Kein, ein unbekanntes, ein abgemeldetes oder ein abgelaufenes Token. Die App zeigt ihre Anmeldung erneut.</td></tr>
+                <tr><th scope="row"><code>forbidden</code></th><td>403</td><td>Angemeldet, aber ohne das nötige Recht – oder ein Konto im Demo-Modus will etwas ändern.</td></tr>
+                <tr><th scope="row"><code>invalid_token</code></th><td>400</td><td>Abmelden ohne das Token, das abgemeldet werden soll.</td></tr>
+                <tr><th scope="row"><code>not_found</code></th><td>404</td><td>Diese Adresse gibt es nicht.</td></tr>
+                <tr><th scope="row"><code>maintenance</code></th><td>503</td><td>Wartungsmodus; nur Administrator:innen kommen durch.</td></tr>
+                <tr><th scope="row"><code>unavailable</code></th><td>503</td><td>Der Server kann die Schlüsseldatei nicht anlegen oder lesen (nur beim Wechsel in die WebView).</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <h3>Anmelden</h3>
+    <ol>
+        <li><code>POST /api/v1/auth/login</code> mit <code>email</code>, <code>password</code> und optional <code>device_name</code> (höchstens 100 Zeichen, erscheint beim Konto unter „Meine App-Logins“).</li>
+        <li>Die Antwort enthält das Token – nur dieses eine Mal. Der Server speichert davon nur einen Hash.</li>
+        <li>Jede weitere Anfrage trägt den Kopf <code>Authorization: Bearer &lt;token&gt;</code>.</li>
+    </ol>
+    <p>Felder können als Formularfelder oder als JSON-Objekt (<code>Content-Type: application/json</code>) gesendet werden. Ein CSRF-Token braucht die API nicht. Ein Token gilt, bis es abgemeldet wird (in der App oder unter <code>/account/api-tokens</code>), das Passwort geändert, „Überall abmelden“ gewählt oder das Konto gesperrt wird. Es wirkt nur unterhalb von <code>/api/</code>, nie auf einer Seite der Website, und die Antwort setzt kein Sitzungs-Cookie. Manche Server reichen den Kopf <code>Authorization</code> nicht von selbst an PHP weiter; die mitgelieferte <code>public/.htaccess</code> sorgt dafür (<code>mod_rewrite</code>).</p>
+<pre><code>{ "data": {
+    "token": "4c1a61adc853c8d70a1c5a0b.3f6c…",
+    "account": { "id": 7, "email": "ich@example.org", "display_name": null, "locale": "de", "created_at": "2026-01-01 00:00:00", "demo_mode": false },
+    "api_version": 1
+} }</code></pre>
+
+    <h3>Endpunkte</h3>
+    <div class="table-wrap">
+        <table>
+            <thead><tr><th scope="col">Adresse</th><th scope="col">Zugriff</th><th scope="col">Wofür</th></tr></thead>
+            <tbody>
+                <tr><th scope="row"><code>POST /api/v1/auth/login</code></th><td>jeder</td><td>E-Mail-Adresse und Passwort gegen ein Token. Antwort: <code>token</code>, <code>account</code>, <code>api_version</code>.</td></tr>
+                <tr><th scope="row"><code>POST /api/v1/auth/logout</code></th><td>Token</td><td>Meldet genau das mitgeschickte Token ab; andere Geräte des Kontos bleiben angemeldet. Antwort: <code>ok</code>.</td></tr>
+                <tr><th scope="row"><code>GET /api/v1/meta</code></th><td>Token</td><td>Alles, woraus eine App ihre Oberfläche für dieses Konto aufbaut, in einem Aufruf (siehe unten).</td></tr>
+                <tr><th scope="row"><code>POST /api/v1/auth/webview-handoff</code></th><td>Token</td><td>Ein Code, mit dem eine eingebettete WebView als dasselbe Konto angemeldet wird. Optionales Feld <code>path</code>: die Seite, die danach geöffnet wird. Antwort: <code>code</code>, <code>url</code>, <code>expires_in</code>.</td></tr>
+                <tr><th scope="row"><code>GET /webview/session?code=…</code></th><td>jeder</td><td>Wird von der WebView geöffnet, nicht von der App selbst: prüft den Code, startet eine gewöhnliche Sitzung und leitet weiter – zur Seite aus dem Code, sonst zu <code>?redirect=/pfad</code>, sonst zu <code>/account</code>. Ein ungültiger oder abgelaufener Code ergibt 403.</td></tr>
+            </tbody>
+        </table>
+    </div>
+    <p>Der Code für die WebView gilt 60 Sekunden und kommt ohne Datenbankeintrag aus: Er ist mit einem Schlüssel aus der Schlüsseldatei dieser Installation signiert. Als Ziel sind nur Pfade dieser Website möglich, nie eine fremde Adresse.</p>
+
+    <h3><code>GET /api/v1/meta</code></h3>
+    <div class="table-wrap">
+        <table>
+            <thead><tr><th scope="col">Feld</th><th scope="col">Inhalt</th></tr></thead>
+            <tbody>
+                <tr><th scope="row"><code>api_version</code></th><td>Version der Schnittstelle für Erweiterungen (<code>App::API_VERSION</code>).</td></tr>
+                <tr><th scope="row"><code>core_version</code></th><td>Version dieser Installation; <code>0.0.0</code> außerhalb eines Release-Pakets.</td></tr>
+                <tr><th scope="row"><code>account</code></th><td><code>id</code>, <code>email</code>, <code>display_name</code>, <code>locale</code>, <code>created_at</code>, <code>demo_mode</code>.</td></tr>
+                <tr><th scope="row"><code>permissions</code></th><td>Liste der Rechte, die das Konto hält, z. B. <code>core.orders.manage</code>. Leer für ein Konto ohne Rolle.</td></tr>
+                <tr><th scope="row"><code>modules</code></th><td>Je Modul <code>id</code>, <code>label_key</code>, <code>label</code>, <code>enabled</code>.</td></tr>
+                <tr><th scope="row"><code>extensions</code></th><td>Die aktiven Erweiterungen: <code>id</code>, <code>name</code>, <code>version</code>, <code>type</code> (<code>app</code> oder <code>addon</code>), <code>description</code>.</td></tr>
+                <tr><th scope="row"><code>admin_menu</code></th><td>Das Menü der Administration, wie dieses Konto es sieht: Gruppen in fester Reihenfolge mit <code>id</code>, <code>label_key</code>, <code>label</code> und <code>items</code> (je <code>label_key</code>, <code>label</code>, <code>path</code>, <code>permission</code>). Nur Einträge, für die das Konto das Recht hält; Gruppen ohne Eintrag fehlen. Auch Einträge aus <code>adminMenu()</code> einer Erweiterung erscheinen hier.</td></tr>
+                <tr><th scope="row"><code>notices</code></th><td>Offene Hinweise der Administration (die Glocke): <code>count</code>, <code>label_key</code>, <code>label</code>, <code>link</code>. Auch die aus <code>adminNotice()</code>.</td></tr>
+                <tr><th scope="row"><code>branding</code></th><td><code>site_name</code> und die Gestaltungswerte <code>accent</code>, <code>ground</code>, <code>text</code>, <code>font</code>, <code>radius</code>.</td></tr>
+                <tr><th scope="row"><code>languages</code></th><td><code>default</code> und <code>enabled</code> (Liste, Standardsprache zuerst).</td></tr>
+            </tbody>
+        </table>
+    </div>
+    <p>Eigene Endpunkte einer Erweiterung: in <code>routes()</code> unterhalb von <code>/api/</code> anmelden, ein <code>POST</code> mit <code>csrfExempt: true</code>, und vom Controller <code>Modulento\Core\Controller\Api\ApiController</code> erben – <code>$this-&gt;data([...])</code> und <code>$this-&gt;fail($code, $messageKey, $status)</code> liefern die beiden Formen. Zugriff und Rechte prüft der Router wie bei jeder anderen Route.</p>
+</section>
